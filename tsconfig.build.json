@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["api", "functions", "functions-example", "node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}
+
+
+
+
+
+
+
+
+
+
