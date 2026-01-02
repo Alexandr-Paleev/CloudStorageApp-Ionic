@@ -5,8 +5,8 @@ const googleDriveService = {
     /**
      * Check if connected
      */
-    isConnected(): boolean {
-        return googleDriveAuthService.isAuthorized();
+    async isConnected(): Promise<boolean> {
+        return await googleDriveAuthService.isAuthorized();
     },
 
     /**
@@ -17,7 +17,7 @@ const googleDriveService = {
         folderId?: string,
         onProgress?: (progress: UploadProgress) => void
     ): Promise<any> {
-        const token = googleDriveAuthService.getAccessToken();
+        const token = await googleDriveAuthService.getAccessToken();
         if (!token) throw new Error('Google Drive not connected');
 
         const metadata = {
@@ -69,7 +69,7 @@ const googleDriveService = {
      * Delete file from Google Drive
      */
     async deleteFile(fileId: string): Promise<void> {
-        const token = googleDriveAuthService.getAccessToken();
+        const token = await googleDriveAuthService.getAccessToken();
         if (!token) throw new Error('Google Drive not connected');
 
         const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {

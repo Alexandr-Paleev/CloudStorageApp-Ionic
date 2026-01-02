@@ -1,298 +1,254 @@
 # ☁️ Cloud Storage App
 
-Современное веб-приложение для хранения, просмотра и управления файлами с поддержкой PWA и мобильных устройств. Построено на Ionic + React + Cloudinary + Firebase.
+A modern web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Cloudinary + Supabase.
 
-## 📋 Описание проекта
+## 📋 Project Description
 
-Cloud Storage App — это полнофункциональное облачное хранилище файлов, которое позволяет пользователям:
+Cloud Storage App is a full-featured cloud file storage that allows users to:
 
-- Безопасно хранить файлы в облаке (PDF, изображения, документы)
-- Просматривать и управлять своими файлами через удобный интерфейс
-- Использовать приложение как на веб, так и на мобильных устройствах (iOS/Android)
-- Автоматически расширять хранилище через Google Drive при превышении лимита
+- Securely store files in the cloud (PDFs, images, documents)
+- View and manage files through a user-friendly interface
+- Use the app on both web and mobile devices (iOS/Android)
+- Automatically expand storage via Google Drive when the limit is exceeded
 
-## ✨ Основные возможности
+## ✨ Key Features
 
-### 🔐 Аутентификация
+### 🔐 Authentication
 
-- ✅ Регистрация и вход по Email/Password
-- ✅ Вход через Google аккаунт
-- ✅ Защищенные маршруты (только авторизованные пользователи)
+- ✅ Email/Password registration and login
+- ✅ Google Account sign-in
+- ✅ Protected routes (authorized users only)
 
-### 📁 Управление файлами
+### 📁 File Management
 
-- ✅ Загрузка файлов с индикатором прогресса
-- ✅ Просмотр списка всех файлов пользователя
-- ✅ Предпросмотр PDF и изображений
-- ✅ Удаление файлов (с полным удалением из Cloudinary)
-- ✅ Переименование файлов
-- ✅ Отображение метаданных (размер, дата загрузки, тип)
+- ✅ File upload with progress indicator
+- ✅ User file list view
+- ✅ PDF and image preview
+- ✅ File deletion (with full removal from Cloudinary)
+- ✅ File renaming
+- ✅ Metadata display (size, upload date, type)
 
-### 💾 Хранилище
+### 💾 Storage
 
-- ✅ **500 МБ** бесплатного хранилища на пользователя (Cloudinary)
-- ✅ Автоматическое подключение Google Drive при превышении лимита
-- ✅ Визуальный индикатор использования хранилища (прогресс-бар)
-- ✅ Отслеживание размера всех загруженных файлов
+- ✅ **500 MB** free storage per user (Cloudinary)
+- ✅ Automatic Google Drive connection when the limit is exceeded
+- ✅ Visual storage usage indicator (progress bar)
+- ✅ Tracking total size of all uploaded files
 
-### 📱 Платформы
+### 📱 Platforms
 
-- ✅ **Web** — работает в любом современном браузере
-- ✅ **PWA** — можно установить как приложение на телефон/компьютер
-- ✅ **iOS/Android** — поддержка нативных приложений через Capacitor
+- ✅ **Web** — works in any modern browser
+- ✅ **PWA** — can be installed as an app on phone/computer
+- ✅ **iOS/Android** — native app support via Capacitor
 
-### 🎨 Интерфейс
+### 🎨 Interface
 
-- ✅ Адаптивный дизайн (работает на всех размерах экранов)
-- ✅ Современный UI на базе Ionic компонентов
-- ✅ Темная/светлая тема (системные настройки)
-- ✅ Плавные анимации и переходы
+- ✅ Responsive design (works on all screen sizes)
+- ✅ Modern UI based on Ionic components
+- ✅ Dark/light theme support (system settings)
+- ✅ Smooth animations and transitions
 
-## 🚀 Быстрый старт
+## 🚀 Quick Start
 
-### 1. Установка зависимостей
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Настройка переменных окружения
+### 2. Configure Environment Variables
 
-Создайте файл `.env` в корне проекта:
+Create a `.env` file in the project root:
 
 ```env
-# Firebase Configuration
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Cloudinary Configuration
 VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
 VITE_CLOUDINARY_API_KEY=your_api_key
 VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset_name
 
-# Обязательно: API endpoint для удаления файлов
+# Required: API endpoint for file deletion
 VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete
 
-# Опционально: Google Drive (для дополнительного хранилища)
+# Optional: Google Drive (for extra storage)
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
-### 3. Настройка сервисов
+### 3. Service Setup
 
-#### Firebase
+#### Supabase
 
-1. Создайте проект на [Firebase Console](https://console.firebase.google.com/)
-2. Включите **Authentication** (Email/Password и Google)
-3. Создайте **Firestore Database** (режим test или production)
-4. Настройте правила безопасности Firestore:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /files/{fileId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-  }
-}
-```
+1. Create a project on [Supabase.com](https://supabase.com/)
+2. Run the schema from `SUPABASE_SCHEMA.sql` in the SQL Editor.
+3. Enable **Google Auth** in Authentication -> Providers if needed.
+4. Set up a private bucket named `files` in Storage.
 
 #### Cloudinary
 
-1. Зарегистрируйтесь на [Cloudinary](https://cloudinary.com/users/register/free)
-2. Создайте **Upload Preset**:
+1. Register on [Cloudinary](https://cloudinary.com/users/register/free)
+2. Create an **Upload Preset**:
    - Settings → Upload → Upload presets → Add upload preset
-   - Preset name: `cloud-storage-app` (или любое другое)
+   - Preset name: `cloud-storage-app` (or any other)
    - Signing mode: `Unsigned`
-   - Asset folder: оставьте пустым
-3. Включите доставку PDF: Settings → Security → Allow delivery of PDF and ZIP files
+   - Asset folder: leave empty
+3. Enable PDF delivery: Settings → Security → Allow delivery of PDF and ZIP files
 
-#### Vercel API (для удаления файлов)
+#### Vercel API (for file deletion)
 
-1. Зарегистрируйтесь на [Vercel](https://vercel.com/)
-2. Подключите Git репозиторий
-3. Добавьте переменные окружения в Vercel:
+1. Register on [Vercel](https://vercel.com/)
+2. Connect your Git repository
+3. Add environment variables in Vercel:
    - `CLOUDINARY_CLOUD_NAME`
    - `CLOUDINARY_API_KEY`
    - `CLOUDINARY_API_SECRET`
-4. После деплоя скопируйте URL API и добавьте в `.env`:
+4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 
-#### Google Drive (опционально)
+#### Google Drive (optional)
 
-1. Создайте проект в [Google Cloud Console](https://console.cloud.google.com/)
-2. Включите Google Drive API
-3. Создайте OAuth 2.0 Client ID
-4. Добавьте `VITE_GOOGLE_CLIENT_ID` в `.env`
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Google Drive API
+3. Create OAuth 2.0 Client ID
+4. Add `VITE_GOOGLE_CLIENT_ID` to `.env`
 
-### 4. Запуск приложения
+### 4. Run Application
 
 ```bash
-# Режим разработки
+# Development mode
 npm run dev
 
-# Сборка для продакшена
+# Production build
 npm run build
 
-# Просмотр собранного приложения
+# Preview build
 npm run preview
 ```
 
-Приложение будет доступно по адресу: `http://localhost:5173`
+The app will be available at: `http://localhost:5173`
 
-## 📦 Технологический стек
+## 📦 Tech Stack
 
 - **UI Framework**: Ionic React 8.0
 - **Frontend**: React 18 + TypeScript
-- **Хранилище файлов**: Cloudinary (25 GB бесплатно)
-- **База данных**: Firebase Firestore (метаданные)
-- **Аутентификация**: Firebase Auth
+- **File Storage**: Cloudinary (25 GB free) & Supabase Storage (PDFs)
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
 - **State Management**: TanStack Query + React Context API
-- **Роутинг**: React Router DOM
-- **Сборка**: Vite + Capacitor
+- **Routing**: React Router DOM
+- **Build**: Vite + Capacitor
 - **Backend API**: Vercel Functions
 
-## 🚀 Деплой
+## 🚀 Deployment
 
-### Firebase Hosting (рекомендуется)
+### Vercel (recommended)
 
-```bash
-# 1. Установка Firebase CLI
-npm install -g firebase-tools
+1. Install Vercel CLI: `npm install -g vercel`
+2. Deploy: `vercel --prod`
 
-# 2. Вход в Firebase
-firebase login
-
-# 3. Инициализация (если еще не сделано)
-firebase init hosting
-# Выберите: dist как папку, Yes для SPA
-
-# 4. Деплой
-npm run deploy
-```
-
-После деплоя приложение будет доступно по адресу:
-
-- `https://your-project-id.web.app`
-- `https://your-project-id.firebaseapp.com`
-
-### Vercel (альтернатива)
-
-```bash
-# Установка Vercel CLI
-npm install -g vercel
-
-# Деплой
-vercel --prod
-```
-
-## 📱 Публикация как мобильное приложение
+## 📱 Mobile App Publication
 
 ### Android
 
 ```bash
-# Сборка веб-приложения
+# Build web app
 npm run build
 
-# Добавление Android платформы
+# Add Android platform
 npx cap add android
 
-# Открытие в Android Studio
+# Open in Android Studio
 npx cap open android
 ```
 
-В Android Studio соберите APK или AAB для публикации в Google Play.
+In Android Studio, build APK or AAB for Google Play Store.
 
 ### iOS
 
 ```bash
-# Добавление iOS платформы
+# Add iOS platform
 npx cap add ios
 
-# Открытие в Xcode
+# Open in Xcode
 npx cap open ios
 ```
 
-**Требования**: Mac с установленным Xcode и Apple Developer аккаунтом ($99/год)
+**Requirements**: Mac with Xcode installed and an Apple Developer account ($99/year).
 
-## 📁 Структура проекта
+## 📁 Project Structure
 
 ```
 cloud-storage-app/
 ├── src/
 │   ├── pages/
-│   │   ├── Login.tsx              # Страница входа/регистрации
-│   │   ├── Dashboard.tsx          # Список файлов пользователя
-│   │   ├── Upload.tsx             # Загрузка файлов
-│   │   └── FileView.tsx           # Просмотр/управление файлом
+│   │   ├── Login.tsx              # Login/Register page
+│   │   ├── Dashboard.tsx          # User file list
+│   │   ├── Upload.tsx             # File upload page
+│   │   └── FileView.tsx           # File view/manage page
 │   ├── services/
-│   │   ├── auth.service.ts        # Сервис аутентификации
-│   │   ├── storage.service.ts     # Сервис работы с файлами
-│   │   ├── cloudinary.service.ts  # Сервис Cloudinary
-│   │   ├── googledrive-auth.service.ts  # OAuth для Google Drive
-│   │   └── googledrive.service.ts # Сервис Google Drive
+│   │   ├── auth.service.ts        # Authentication service
+│   │   ├── storage.service.ts     # Main file service
+│   │   ├── cloudinary.service.ts  # Cloudinary service
+│   │   ├── googledrive-auth.service.ts  # Google Drive OAuth
+│   │   └── googledrive.service.ts # Google Drive service
+│   ├── providers/
+│   │   ├── storage.provider.ts    # Storage Provider architecture
+│   │   └── impl/                  # Provider implementations
 │   ├── contexts/
-│   │   └── AuthContext.tsx        # Context для аутентификации
+│   │   └── AuthContext.tsx        # Authentication context
 │   ├── components/
-│   │   └── PrivateRoute.tsx      # Защищенный роут
-│   ├── firebase/
-│   │   └── firebase.config.ts     # Конфигурация Firebase
-│   ├── App.tsx                    # Главный компонент
-│   └── main.tsx                   # Точка входа
+│   │   └── PrivateRoute.tsx       # Protected route component
+│   ├── supabase/
+│   │   └── supabase.config.ts     # Supabase configuration
+│   ├── App.tsx                    # Main component
+│   └── main.tsx                   # Entry point
 ├── api/
 │   └── cloudinary/
-│       └── delete.ts              # Vercel Function для удаления файлов
-├── capacitor.config.ts            # Конфигурация Capacitor
-├── vite.config.ts                 # Конфигурация Vite
+│       └── delete.ts              # Vercel Function for deletion
+├── capacitor.config.ts            # Capacitor config
+├── vite.config.ts                 # Vite config
 └── package.json
 ```
 
-## 🔒 Лимиты и ограничения
+## 🔒 Limits and Restrictions
 
-### Приложение
+### Application
 
-- **Максимальный размер хранилища на пользователя**: 500 МБ в Cloudinary
-- **Дополнительное хранилище**: Google Drive (15 GB бесплатно) — автоматически подключается при превышении лимита
-- **Максимальный размер одного файла**: 50 МБ
+- **Max storage per user**: 500 MB in Cloudinary (default)
+- **Extra storage**: Google Drive (15 GB free) — auto-connects when limit is reached
+- **Max single file size**: 50 MB
 
-### Cloudinary (бесплатный план)
+### Cloudinary (Free Plan)
 
-- **Хранилище**: 25 GB
-- **Трафик**: 25 GB/месяц
-- **Трансформации**: 25,000/месяц
+- **Storage**: 25 GB
+- **Bandwidth**: 25 GB/month
+- **Transformations**: 25,000/month
 
-### Firebase (бесплатный план Spark)
+### Supabase (Free Tier)
 
-- **Firestore**: 50,000 документов
-- **Firebase Auth**: 10,000 пользователей
+- **Database**: 500MB
+- **Storage**: 1GB (5GB bandwidth)
 
-### Google Drive (опционально)
-
-- **Хранилище**: 15 GB бесплатно на пользователя
-- **Использование**: Автоматически подключается при превышении лимита 500 МБ
-
-## 🛠️ Разработка
+## 🛠️ Development
 
 ```bash
-# Линтинг
+# Linting
 npm run lint
 
-# Форматирование кода
+# Code formatting
 npm run format
 ```
 
-## 📝 Лицензия
+## 📝 License
 
 MIT
 
-## 🤝 Поддержка
+## 🤝 Support
 
-Если у вас возникли вопросы или проблемы, создайте issue в репозитории проекта.
+If you have any questions or issues, please create an issue in the project repository.
 
 ---
 
-**Создано с ❤️ используя Ionic + React + Firebase + Cloudinary**
+**Created with ❤️ using Ionic + React + Supabase + Cloudinary**

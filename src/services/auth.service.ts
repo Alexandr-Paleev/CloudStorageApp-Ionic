@@ -58,6 +58,24 @@ export const authService = {
       subscription.unsubscribe();
     };
   },
+
+  /**
+   * Sign in with Google OAuth
+   */
+  async signInWithGoogle(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+        scopes: 'openid email profile https://www.googleapis.com/auth/drive.file',
+        redirectTo: window.location.origin + '/dashboard',
+      },
+    });
+    if (error) throw error;
+  },
 };
 
 

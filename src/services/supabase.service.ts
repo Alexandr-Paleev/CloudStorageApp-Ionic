@@ -5,7 +5,12 @@ const supabaseService = {
     /**
      * Get all files for a user in a specific folder
      */
-    async getFiles(userId: string, folderId: string | null = null): Promise<FileMetadata[]> {
+    async getFiles(
+        userId: string,
+        folderId: string | null = null,
+        page?: number,
+        pageSize?: number
+    ): Promise<FileMetadata[]> {
         let query = supabase
             .from('files')
             .select('*')
@@ -15,6 +20,13 @@ const supabaseService = {
             query = query.eq('folder_id', folderId);
         } else {
             query = query.is('folder_id', null);
+        }
+
+        // Apply pagination if provided
+        if (page !== undefined && pageSize !== undefined) {
+            const from = page * pageSize;
+            const to = from + pageSize - 1;
+            query = query.range(from, to);
         }
 
         const { data, error } = await query.order('created_at', { ascending: false });

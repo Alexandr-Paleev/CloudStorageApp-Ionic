@@ -1,3 +1,5 @@
+import { supabase } from '../supabase/supabase.config';
+
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -58,17 +60,25 @@ const googleDriveAuthService = {
     },
 
     /**
-     * Get current access token
+     * Get current access token (from Supabase session or fallback)
      */
-    getAccessToken(): string | null {
+    async getAccessToken(): Promise<string | null> {
+        // 1. Try to get provider_token from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.provider_token) {
+            return session.provider_token;
+        }
+
+        // 2. Fallback to local storage or memory
         return accessToken || localStorage.getItem('gdrive_access_token');
     },
 
     /**
      * Check if authorized
      */
-    isAuthorized(): boolean {
-        return !!this.getAccessToken();
+    async isAuthorized(): Promise<boolean> {
+        const token = await this.getAccessToken();
+        return !!token;
     },
 
     /**

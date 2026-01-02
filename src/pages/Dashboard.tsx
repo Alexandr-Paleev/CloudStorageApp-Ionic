@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   IonContent,
@@ -20,12 +20,15 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonAlert,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
 } from '@ionic/react';
 import { add, logOut, document, image, folder as folderIcon, arrowBack, createOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
 import { useState } from 'react';
+import { getThumbnailUrl } from '../utils/thumbnail.utils';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -35,18 +38,33 @@ const Dashboard: React.FC = () => {
   const [showFolderAlert, setShowFolderAlert] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
+  const PAGE_SIZE = 15;
+
   const {
-    data: items,
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     isLoading,
     error,
-  } = useQuery({
+  } = useInfiniteQuery({
     queryKey: ['items', user?.id, folderId || 'root'],
-    queryFn: () => {
+    queryFn: ({ pageParam = 0 }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.getItems(user.id, folderId || null);
+      return storageService.getItems(user.id, folderId || null, pageParam as number, PAGE_SIZE);
     },
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.files.length < PAGE_SIZE) return undefined;
+      return allPages.length;
+    },
+    initialPageParam: 0,
     enabled: !!user?.id,
   });
+
+  const items = {
+    files: data?.pages.flatMap(page => page.files) || [],
+    folders: data?.pages[0]?.folders || []
+  };
 
   const { data: storageSize } = useQuery({
     queryKey: ['storageSize', user?.id],
@@ -74,7 +92,7 @@ const Dashboard: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       setShowFolderAlert(false);
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setErrorToast(err.message || 'Failed to create folder. Ensure Supabase is configured.');
     }
   });
@@ -95,8 +113,10 @@ const Dashboard: React.FC = () => {
   };
 
   const handleRefresh = async (event: CustomEvent) => {
-    await queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-    await queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['items', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] }),
+    ]);
     (event.target as HTMLIonRefresherElement).complete();
   };
 
@@ -113,13 +133,9 @@ const Dashboard: React.FC = () => {
     return document;
   };
 
-  const formatDate = (date: any) => {
+  const formatDate = (date: string | undefined) => {
     if (!date) return 'Unknown date';
     try {
-      if (typeof date === 'string') return new Date(date).toLocaleDateString();
-      if (date && typeof date === 'object' && date.toMillis && typeof date.toMillis === 'function') {
-        return new Date(date.toMillis()).toLocaleDateString();
-      }
       return new Date(date).toLocaleDateString();
     } catch (e) {
       console.error('Date formatting error:', e);
@@ -265,16 +281,26 @@ const Dashboard: React.FC = () => {
             >
               <IonCardContent>
                 <IonItem lines="none">
-                  <IonIcon
-                    icon={getFileIcon(file.type)}
-                    slot="start"
-                    style={{ fontSize: '32px' }}
-                  />
+                  {file.type?.startsWith('image/') ? (
+                    <div slot="start" style={{ width: '40px', height: '40px', marginRight: '16px', overflow: 'hidden', borderRadius: '4px' }}>
+                      <img
+                        src={getThumbnailUrl(file.download_url, file.storage_type, 80, 80)}
+                        alt={file.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <IonIcon
+                      icon={getFileIcon(file.type)}
+                      slot="start"
+                      style={{ fontSize: '32px' }}
+                    />
+                  )}
                   <IonLabel>
                     <h2>{file.name}</h2>
                     <p>
                       {formatFileSize(file.size)} •{' '}
-                      {formatDate(file.created_at || (file as any).uploadedAt)}
+                      {formatDate(file.created_at)}
                     </p>
                   </IonLabel>
                   <IonButton
@@ -292,6 +318,20 @@ const Dashboard: React.FC = () => {
               </IonCardContent>
             </IonCard>
           ))}
+          {items && items.files.length > 0 && (
+            <IonInfiniteScroll
+              onIonInfinite={async (ev) => {
+                await fetchNextPage();
+                (ev.target as HTMLIonInfiniteScrollElement).complete();
+              }}
+              disabled={!hasNextPage}
+            >
+              <IonInfiniteScrollContent
+                loadingText="Loading more files..."
+                loadingSpinner="bubbles"
+              />
+            </IonInfiniteScroll>
+          )}
         </div>
 
         <IonToast

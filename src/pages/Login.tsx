@@ -17,8 +17,11 @@ import {
   IonText,
   IonToast,
   IonSpinner,
+  IonIcon,
 } from '@ionic/react';
+import { logoGoogle } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/auth.service';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -109,6 +112,28 @@ const Login: React.FC = () => {
                   {loading ? <IonSpinner name="crescent" /> : isRegister ? 'Register' : 'Sign In'}
                 </IonButton>
               </form>
+
+              <div style={{ margin: '20px 0', textAlign: 'center', borderTop: '1px solid #ddd', paddingTop: '20px' }}>
+                <IonButton
+                  expand="block"
+                  fill="outline"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      await authService.signInWithGoogle();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Google login failed');
+                      setShowToast(true);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  <IonIcon slot="start" icon={logoGoogle} />
+                  Sign in with Google
+                </IonButton>
+              </div>
 
               <IonButton
                 expand="block"

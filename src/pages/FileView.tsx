@@ -24,6 +24,7 @@ import {
 import { download, create, trash, arrowBack } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
+import { FileMetadata } from '../schemas/file.schema';
 
 const FileView: React.FC = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -33,7 +34,7 @@ const FileView: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
 
-  const { data: file, isLoading } = useQuery({
+  const { data: file, isLoading, refetch } = useQuery<FileMetadata | null>({
     queryKey: ['file', fileId],
     queryFn: () => {
       if (!fileId) throw new Error('File ID is required');
@@ -89,8 +90,7 @@ const FileView: React.FC = () => {
 
   const getDownloadUrl = () => {
     if (!file) return undefined;
-    const url = (file as any).download_url || (file as any).downloadURL;
-    return typeof url === 'string' ? url : undefined;
+    return file.download_url;
   };
 
   const handleDownload = () => {
@@ -106,13 +106,9 @@ const FileView: React.FC = () => {
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
-  const formatDate = (date: any) => {
+  const formatDate = (date: string | undefined) => {
     if (!date) return 'Unknown date';
     try {
-      if (typeof date === 'string') return new Date(date).toLocaleString();
-      if (date && typeof date === 'object' && date.toMillis && typeof date.toMillis === 'function') {
-        return new Date(date.toMillis()).toLocaleString();
-      }
       return new Date(date).toLocaleString();
     } catch (e) {
       return 'Invalid date';
@@ -209,6 +205,10 @@ const FileView: React.FC = () => {
               src={downloadUrl}
               alt={file.name}
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              onError={() => {
+                console.log('Image failed to load, probably expired. Refreshing...');
+                refetch();
+              }}
             />
           )}
           {isPDF && downloadUrl && (
@@ -231,6 +231,10 @@ const FileView: React.FC = () => {
                   backgroundColor: '#fff',
                 }}
                 title={file.name}
+                onError={() => {
+                  console.log('PDF failed to load, probably expired. Refreshing...');
+                  refetch();
+                }}
               />
               <div
                 style={{
@@ -295,7 +299,7 @@ const FileView: React.FC = () => {
               <IonItem>
                 <IonLabel>
                   <h2>Uploaded</h2>
-                  <p>{formatDate(file.created_at || (file as any).uploadedAt)}</p>
+                  <p>{formatDate(file.created_at)}</p>
                 </IonLabel>
               </IonItem>
               <IonItem>
