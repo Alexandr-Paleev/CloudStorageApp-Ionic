@@ -5,7 +5,7 @@ export interface RetryOptions {
     maxRetries: number;
     initialDelay: number;
     maxDelay: number;
-    onRetry?: (error: any, attempt: number) => void;
+    onRetry?: (error: unknown, attempt: number) => void;
 }
 
 const DEFAULT_OPTIONS: RetryOptions = {
@@ -26,7 +26,7 @@ export const withRetry = async <T>(
         ...options,
     };
 
-    let lastError: any;
+    let lastError: unknown;
     let delay = initialDelay;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {

@@ -1,6 +1,12 @@
 import { UploadProgress } from './storage.service';
 import googleDriveAuthService from './googledrive-auth.service';
 
+interface GoogleDriveFile {
+    id: string;
+    name: string;
+    webViewLink: string;
+}
+
 const googleDriveService = {
     /**
      * Check if connected
@@ -16,7 +22,7 @@ const googleDriveService = {
         file: File,
         folderId?: string,
         onProgress?: (progress: UploadProgress) => void
-    ): Promise<any> {
+    ): Promise<GoogleDriveFile> {
         const token = await googleDriveAuthService.getAccessToken();
         if (!token) throw new Error('Google Drive not connected');
 

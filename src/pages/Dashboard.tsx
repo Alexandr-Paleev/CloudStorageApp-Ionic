@@ -44,7 +44,6 @@ const Dashboard: React.FC = () => {
     data,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
     isLoading,
     error,
   } = useInfiniteQuery({

@@ -3,7 +3,30 @@ import { supabase } from '../supabase/supabase.config';
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-let tokenClient: any = null;
+interface TokenResponse {
+    access_token: string;
+    error?: string;
+}
+
+interface TokenClient {
+    callback: (response: TokenResponse) => void;
+    requestAccessToken(options?: { prompt?: string }): void;
+}
+
+declare global {
+    interface Window {
+        google: {
+            accounts: {
+                oauth2: {
+                    initTokenClient(config: any): TokenClient;
+                    revoke(token: string, callback: () => void): void;
+                };
+            };
+        };
+    }
+}
+
+let tokenClient: TokenClient | null = null;
 let accessToken: string | null = null;
 
 const googleDriveAuthService = {
@@ -19,10 +42,10 @@ const googleDriveAuthService = {
             script.async = true;
             script.defer = true;
             script.onload = () => {
-                tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+                tokenClient = window.google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: SCOPES,
-                    callback: (response: any) => {
+                    callback: (response: TokenResponse) => {
                         if (response.error !== undefined) {
                             console.error('Google Auth Error:', response);
                         }
@@ -45,8 +68,12 @@ const googleDriveAuthService = {
             await this.initialize();
         }
 
+        if (!tokenClient) {
+            throw new Error('Google Drive client not initialized');
+        }
+
         return new Promise((resolve, reject) => {
-            tokenClient.callback = (response: any) => {
+            tokenClient!.callback = (response: TokenResponse) => {
                 if (response.error !== undefined) {
                     reject(response);
                     return;
@@ -55,7 +82,7 @@ const googleDriveAuthService = {
                 localStorage.setItem('gdrive_access_token', response.access_token);
                 resolve(response.access_token);
             };
-            tokenClient.requestAccessToken({ prompt: 'consent' });
+            tokenClient!.requestAccessToken({ prompt: 'consent' });
         });
     },
 
@@ -84,10 +111,10 @@ const googleDriveAuthService = {
     /**
      * Logout from Google
      */
-    logout(): void {
-        const token = this.getAccessToken();
+    async logout(): Promise<void> {
+        const token = await this.getAccessToken();
         if (token) {
-            (window as any).google.accounts.oauth2.revoke(token, () => {
+            window.google.accounts.oauth2.revoke(token, () => {
                 console.log('Token revoked');
             });
         }
