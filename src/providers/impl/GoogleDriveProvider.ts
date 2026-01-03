@@ -26,7 +26,7 @@ export class GoogleDriveProvider implements IStorageProvider {
         };
     }
 
-    async delete(path: string): Promise<void> {
+    async delete(path: string, _metadata?: { type?: string; name?: string }): Promise<void> {
         await googleDriveService.deleteFile(path);
     }
 }

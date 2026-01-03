@@ -22,7 +22,22 @@ export class CloudinaryProvider implements IStorageProvider {
         };
     }
 
-    async delete(path: string): Promise<void> {
-        await cloudinaryService.deleteFile(path);
+    async delete(path: string, metadata?: { type?: string; name?: string }): Promise<void> {
+        let resourceType: string | undefined;
+        let finalPath = path;
+
+        // Check if it's a PDF, which is stored as 'raw' in Cloudinary
+        if (metadata?.type === 'application/pdf' || metadata?.name?.toLowerCase().endsWith('.pdf')) {
+            resourceType = 'raw';
+        } else {
+            // For images, Cloudinary usually stores public_id WITHOUT extension.
+            // If our path has an extension (like .jpg, .png), we should strip it.
+            // But only if it looks like an extension (3-4 chars after dot).
+            if (finalPath.match(/\.[a-z0-9]{3,4}$/i)) {
+                 finalPath = finalPath.replace(/\.[^/.]+$/, "");
+            }
+        }
+        
+        await cloudinaryService.deleteFile(finalPath, resourceType);
     }
 }

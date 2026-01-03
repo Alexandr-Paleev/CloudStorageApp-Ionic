@@ -79,11 +79,13 @@ const cloudinaryService = {
     /**
      * Delete file via proxy (since public API requires signature)
      */
-    async deleteFile(publicId: string): Promise<void> {
+    async deleteFile(publicId: string, resourceType?: string): Promise<void> {
         if (!deleteApiUrl) {
             console.warn('Cloudinary delete API URL not configured.');
             return;
         }
+
+        console.log(`[CloudinaryService] Deleting file. PublicID: "${publicId}", Type: "${resourceType}"`);
 
         try {
             const response = await fetch(deleteApiUrl, {
@@ -91,7 +93,7 @@ const cloudinaryService = {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ publicId }),
+                body: JSON.stringify({ publicId, resourceType }),
             });
 
             if (!response.ok) {

@@ -110,7 +110,8 @@ const storageService = {
     let storageDeleteError: Error | null = null;
     try {
       const provider = providerManager.getProvider(file.storage_type);
-      await provider.delete(file.storage_path);
+      // Pass metadata so the provider knows if it's a PDF (raw) or Image
+      await provider.delete(file.storage_path, { type: file.type, name: file.name });
     } catch (error) {
       storageDeleteError =
         error instanceof Error ? error : new Error('Unknown storage deletion error');

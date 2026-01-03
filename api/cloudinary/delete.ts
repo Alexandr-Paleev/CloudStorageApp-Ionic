@@ -20,34 +20,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       api_secret: process.env.CLOUDINARY_API_SECRET || '',
     });
 
-    const { publicId } = req.body as { publicId?: string };
+    const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
 
     if (!publicId) {
       res.status(400).json({ error: 'publicId is required' });
       return;
     }
 
-    const result = await cloudinary.uploader.destroy(publicId);
+    console.log(`[Cloudinary] Deleting ${publicId}, type: ${resourceType || 'default(image)'}`);
 
-    if (result.result === 'ok') {
-      res.status(200).json({ success: true });
-      return;
-    } else if (result.result === 'not found') {
+    // Determine options based on passed resourceType or default fallback
+    // If resourceType is explicit (e.g. 'raw' for PDF), use it.
+    // Otherwise default to 'image'.
+    const options = resourceType ? { resource_type: resourceType } : { resource_type: 'image' };
+
+    let result = await cloudinary.uploader.destroy(publicId, options);
+
+    // Robust Fallback Logic:
+    // If we tried 'image' (default) and got 'not found', it might be a 'raw' file or 'video'
+    // that we didn't know about. Try finding it as 'raw' just in case.
+    if (!resourceType && result.result === 'not found') {
+       console.log(`[Cloudinary] Not found as image, trying as raw: ${publicId}`);
+       result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    }
+
+    if (result.result === 'ok' || result.result === 'not found') {
       res.status(200).json({
         success: true,
-        message: 'File not found (may already be deleted)',
+        message: result.result === 'not found' ? 'File not found (may already be deleted)' : 'Deleted successfully',
+        details: result
       });
       return;
     } else {
+      console.error(`[Cloudinary] Deletion failed:`, result);
       res.status(500).json({
-        error: `Failed to delete file: ${result.result}`,
+        error: `Failed to delete file from Cloudinary: ${result.result}`,
+        details: result
       });
       return;
     }
   } catch (error) {
     console.error('Error deleting file from Cloudinary:', error);
+    // Return the actual error message to help debugging
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to delete file',
+      error: error instanceof Error ? error.message : 'Unknown server error during deletion',
     });
     return;
   }
