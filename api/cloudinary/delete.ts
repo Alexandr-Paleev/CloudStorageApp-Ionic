@@ -32,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // Determine options based on passed resourceType or default fallback
     // If resourceType is explicit (e.g. 'raw' for PDF), use it.
     // Otherwise default to 'image'.
+    // Fix: Added explicit logging and fallback handling
     const options = resourceType ? { resource_type: resourceType } : { resource_type: 'image' };
 
     let result = await cloudinary.uploader.destroy(publicId, options);

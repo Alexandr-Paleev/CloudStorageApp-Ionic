@@ -27,6 +27,7 @@ export class CloudinaryProvider implements IStorageProvider {
         let finalPath = path;
 
         // Check if it's a PDF, which is stored as 'raw' in Cloudinary
+        // Logic updated to handle both raw files and images with extension stripping
         if (metadata?.type === 'application/pdf' || metadata?.name?.toLowerCase().endsWith('.pdf')) {
             resourceType = 'raw';
         } else {
