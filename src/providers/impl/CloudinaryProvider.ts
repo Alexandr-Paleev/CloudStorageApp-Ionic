@@ -22,11 +22,7 @@ export class CloudinaryProvider implements IStorageProvider {
         };
     }
 
-    async delete(path: string, metadata?: { type?: string; name?: string }): Promise<void> {
-        let resourceType: string | undefined;
-        if (metadata?.type === 'application/pdf' || metadata?.name?.toLowerCase().endsWith('.pdf')) {
-            resourceType = 'raw';
-        }
-        await cloudinaryService.deleteFile(path, resourceType);
+    async delete(path: string): Promise<void> {
+        await cloudinaryService.deleteFile(path);
     }
 }

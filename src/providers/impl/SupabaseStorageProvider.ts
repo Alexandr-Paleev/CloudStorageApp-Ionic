@@ -22,7 +22,7 @@ export class SupabaseStorageProvider implements IStorageProvider {
         };
     }
 
-    async delete(path: string, _metadata?: { type?: string; name?: string }): Promise<void> {
+    async delete(path: string): Promise<void> {
         await supabaseStorageService.deleteFile(path);
     }
 

@@ -110,8 +110,7 @@ const storageService = {
     let storageDeleteError: Error | null = null;
     try {
       const provider = providerManager.getProvider(file.storage_type);
-      // Pass file metadata to help the provider decide how to delete (e.g., Cloudinary resource_type)
-      await provider.delete(file.storage_path, { type: file.type, name: file.name });
+      await provider.delete(file.storage_path);
     } catch (error) {
       storageDeleteError =
         error instanceof Error ? error : new Error('Unknown storage deletion error');

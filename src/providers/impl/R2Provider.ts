@@ -24,7 +24,7 @@ export class R2Provider implements IStorageProvider {
         };
     }
 
-    async delete(path: string, _metadata?: { type?: string; name?: string }): Promise<void> {
+    async delete(path: string): Promise<void> {
         await r2Service.deleteFile(path);
     }
 
