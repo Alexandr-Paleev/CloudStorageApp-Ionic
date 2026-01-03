@@ -34,14 +34,8 @@ dist-ssr
 ios
 android
 
-
-
-
-
-
-
-
-
+# Firebase
+.firebase/
 
 
 
