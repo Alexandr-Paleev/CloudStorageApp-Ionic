@@ -15,9 +15,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const cloudinary = (await import('cloudinary')).v2;
 
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
-      api_key: process.env.CLOUDINARY_API_KEY || '',
-      api_secret: process.env.CLOUDINARY_API_SECRET || '',
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+      api_key: process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY || '',
+      api_secret: process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET || '',
     });
 
     const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
