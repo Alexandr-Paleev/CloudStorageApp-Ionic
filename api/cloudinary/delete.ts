@@ -1,23 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  // Обработка preflight запросов
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
-  // Только POST запросы
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
-    // Динамический импорт Cloudinary
     const cloudinary = (await import('cloudinary')).v2;
 
-    // Инициализация Cloudinary
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
       api_key: process.env.CLOUDINARY_API_KEY || '',
@@ -31,7 +27,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    // Удаление файла из Cloudinary
     const result = await cloudinary.uploader.destroy(publicId);
 
     if (result.result === 'ok') {

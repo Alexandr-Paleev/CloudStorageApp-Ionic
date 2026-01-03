@@ -4,9 +4,9 @@ import { v2 as cloudinary } from 'cloudinary';
 
 initializeApp();
 
-// Настройка Cloudinary из переменных окружения
-// Установите через Firebase Console > Functions > Configuration
-// или через команду: firebase functions:secrets:set CLOUDINARY_API_SECRET
+// Configure Cloudinary from environment variables
+// Set via Firebase Console > Functions > Configuration
+// or via command: firebase functions:secrets:set CLOUDINARY_API_SECRET
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
   api_key: process.env.CLOUDINARY_API_KEY || '',
@@ -14,10 +14,9 @@ cloudinary.config({
 });
 
 /**
- * Firebase Function для удаления файлов из Cloudinary
+ * Firebase Function for deleting files from Cloudinary
  */
 export const deleteCloudinaryFile = functions.https.onCall(async (data, context) => {
-  // Проверка аутентификации
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -29,13 +28,11 @@ export const deleteCloudinaryFile = functions.https.onCall(async (data, context)
   }
 
   try {
-    // Удаление файла из Cloudinary
     const result = await cloudinary.uploader.destroy(publicId);
 
     if (result.result === 'ok') {
       return { success: true, message: 'File deleted successfully' };
     } else if (result.result === 'not found') {
-      // Файл уже удален или не существует - это не ошибка
       return {
         success: true,
         message: 'File not found (may already be deleted)',
