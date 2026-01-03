@@ -40,27 +40,24 @@ const storageService = {
     folderId: string | null = null,
     useGoogleDrive?: boolean
   ): Promise<FileMetadata> {
-    // 1. Select the best provider
     const provider = await providerManager.selectProvider(file, userId, {
       canUploadToLocal: (size) => this.canUploadToLocal(userId, size),
       useGoogleDrive,
     });
 
-    // 2. Perform the upload with Retries
-    const result = await withRetry(
-      () => provider.upload(file, userId, onProgress),
-      {
-        maxRetries: 2,
-        onRetry: (error, attempt) => {
-          console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
-        }
-      }
-    );
+    const result = await withRetry(() => provider.upload(file, userId, onProgress), {
+      maxRetries: 2,
+      onRetry: (error, attempt) => {
+        console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
+      },
+    });
 
-    // 3. Save Metadata to Supabase with "Transactionality" (Cleanup on failure)
     try {
+      const { validateAndSanitizeName } = await import('../schemas/file.schema');
+      const sanitizedName = validateAndSanitizeName(file.name);
+
       return await supabaseService.saveFileMetadata({
-        name: file.name,
+        name: sanitizedName,
         size: file.size,
         type: file.type,
         download_url: result.url,
@@ -72,26 +69,25 @@ const storageService = {
     } catch (dbError) {
       console.error('Failed to save file metadata to Supabase. Rolling back storage...', dbError);
 
-      // Cleanup the uploaded file to avoid orphan "ghost" files
       try {
         await provider.delete(result.path);
       } catch (cleanupError) {
-        console.error('Critical: Failed to cleanup orphan file after database failure:', cleanupError);
+        console.error(
+          'Critical: Failed to cleanup orphan file after database failure:',
+          cleanupError
+        );
       }
 
-      throw new Error(`Failed to finalize upload: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`);
+      throw new Error(
+        `Failed to finalize upload: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`
+      );
     }
   },
 
   /**
    * Get files and folders
    */
-  async getItems(
-    userId: string,
-    folderId: string | null = null,
-    page?: number,
-    pageSize?: number
-  ) {
+  async getItems(userId: string, folderId: string | null = null, page?: number, pageSize?: number) {
     const [files, folders] = await Promise.all([
       supabaseService.getFiles(userId, folderId, page, pageSize),
       // Only fetch folders on the first page to avoid duplication in infinite scroll
@@ -103,71 +99,87 @@ const storageService = {
   },
 
   /**
-   * Delete file
+   * Delete file with user ownership verification
    */
-  async deleteFile(fileId: string): Promise<void> {
-    const file = await this.getFileMetadata(fileId);
-    if (!file) throw new Error('File not found');
+  async deleteFile(fileId: string, userId: string): Promise<void> {
+    const file = await this.getFileMetadata(fileId, userId);
+    if (!file) {
+      throw new Error('File not found or access denied');
+    }
 
-    // 1. Get the correct provider and delete
+    let storageDeleteError: Error | null = null;
     try {
       const provider = providerManager.getProvider(file.storage_type);
       await provider.delete(file.storage_path);
     } catch (error) {
-      console.error(`Failed to delete file from ${file.storage_type}:`, error);
+      storageDeleteError =
+        error instanceof Error ? error : new Error('Unknown storage deletion error');
+      console.error(`Failed to delete file from ${file.storage_type}:`, storageDeleteError);
+      throw new Error(`Failed to delete file from storage: ${storageDeleteError.message}`);
     }
 
-    // 2. Delete Metadata from Supabase
-    await supabaseService.deleteFileMetadata(fileId);
+    try {
+      await supabaseService.deleteFileMetadata(fileId, userId);
+    } catch (dbError) {
+      console.error('Critical: Storage file deleted but metadata deletion failed:', dbError);
+      throw new Error(
+        `Failed to delete file metadata: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`
+      );
+    }
   },
 
   /**
-   * Get single file metadata
+   * Get single file metadata with user ownership verification
    */
-  async getFileMetadata(fileId: string): Promise<FileMetadata | null> {
-    const { supabase } = await import('../supabase/supabase.config');
-    const { data } = await supabase
-      .from('files')
-      .select('*')
-      .eq('id', fileId)
-      .single();
-    const file = data as FileMetadata;
+  async getFileMetadata(fileId: string, userId: string): Promise<FileMetadata | null> {
+    const file = await supabaseService.getFileMetadata(fileId, userId);
 
-    // If the provider supports signed URLs, refresh it
-    if (file) {
-      try {
-        const provider = providerManager.getProvider(file.storage_type);
-        if (provider.getSignedUrl) {
-          file.download_url = await provider.getSignedUrl(file.storage_path);
-        }
-      } catch (error) {
-        console.error(`Failed to refresh URL for ${file.storage_type}:`, error);
+    if (!file) {
+      return null;
+    }
+
+    try {
+      const provider = providerManager.getProvider(file.storage_type);
+      if (provider.getSignedUrl) {
+        file.download_url = await provider.getSignedUrl(file.storage_path);
       }
+    } catch (error) {
+      console.error(`Failed to refresh URL for ${file.storage_type}:`, error);
     }
 
     return file;
   },
 
   /**
-   * Rename file
+   * Rename file with validation and user ownership verification
    */
-  async renameFile(fileId: string, name: string): Promise<void> {
-    await supabaseService.updateFileMetadata(fileId, { name });
+  async renameFile(fileId: string, userId: string, name: string): Promise<void> {
+    const { validateAndSanitizeName } = await import('../schemas/file.schema');
+    const sanitizedName = validateAndSanitizeName(name);
+
+    await supabaseService.updateFileMetadata(fileId, userId, { name: sanitizedName });
   },
 
   /**
    * Folders
    */
-  async createFolder(userId: string, name: string, parentId: string | null = null): Promise<Folder> {
+  async createFolder(
+    userId: string,
+    name: string,
+    parentId: string | null = null
+  ): Promise<Folder> {
+    const { validateAndSanitizeName } = await import('../schemas/file.schema');
+    const sanitizedName = validateAndSanitizeName(name);
+
     return await supabaseService.createFolder({
-      name,
+      name: sanitizedName,
       user_id: userId,
       parent_id: parentId,
     });
   },
 
-  async deleteFolder(folderId: string): Promise<void> {
-    await supabaseService.deleteFolder(folderId);
+  async deleteFolder(folderId: string, userId: string): Promise<void> {
+    await supabaseService.deleteFolder(folderId, userId);
   },
 };
 

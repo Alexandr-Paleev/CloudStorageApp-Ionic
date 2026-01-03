@@ -25,6 +25,7 @@ import { download, create, trash, arrowBack } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { FileMetadata } from '../schemas/file.schema';
+import { formatFileSize, formatDateTime } from '../utils/format.utils';
 
 const FileView: React.FC = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -34,19 +35,25 @@ const FileView: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
 
-  const { data: file, isLoading, refetch } = useQuery<FileMetadata | null>({
-    queryKey: ['file', fileId],
+  const {
+    data: file,
+    isLoading,
+    refetch,
+  } = useQuery<FileMetadata | null>({
+    queryKey: ['file', fileId, user?.id],
     queryFn: () => {
       if (!fileId) throw new Error('File ID is required');
-      return storageService.getFileMetadata(fileId);
+      if (!user?.id) throw new Error('User not authenticated');
+      return storageService.getFileMetadata(fileId, user.id);
     },
-    enabled: !!fileId,
+    enabled: !!fileId && !!user?.id,
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => {
       if (!fileId) throw new Error('File ID is required');
-      return storageService.deleteFile(fileId);
+      if (!user?.id) throw new Error('User not authenticated');
+      return storageService.deleteFile(fileId, user.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
@@ -58,12 +65,11 @@ const FileView: React.FC = () => {
   const renameMutation = useMutation({
     mutationFn: (name: string) => {
       if (!fileId) throw new Error('File ID is required');
-      // Note: storageService rename logic might need update if we want to change this
-      // For now, let's keep it simple or implement in storage.service
-      return storageService.renameFile(fileId, name);
+      if (!user?.id) throw new Error('User not authenticated');
+      return storageService.renameFile(fileId, user.id, name);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['file', fileId] });
+      queryClient.invalidateQueries({ queryKey: ['file', fileId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       setShowRenameModal(false);
     },
@@ -97,21 +103,6 @@ const FileView: React.FC = () => {
     const url = getDownloadUrl();
     if (url) {
       window.open(url, '_blank');
-    }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
-
-  const formatDate = (date: string | undefined) => {
-    if (!date) return 'Unknown date';
-    try {
-      return new Date(date).toLocaleString();
-    } catch (e) {
-      return 'Invalid date';
     }
   };
 
@@ -299,7 +290,7 @@ const FileView: React.FC = () => {
               <IonItem>
                 <IonLabel>
                   <h2>Uploaded</h2>
-                  <p>{formatDate(file.created_at)}</p>
+                  <p>{formatDateTime(file.created_at)}</p>
                 </IonLabel>
               </IonItem>
               <IonItem>

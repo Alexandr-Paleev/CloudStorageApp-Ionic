@@ -27,6 +27,7 @@ import storageService, {
   MAX_USER_STORAGE_LIMIT,
 } from '../services/storage.service';
 import googleDriveAuthService from '../services/googledrive-auth.service';
+import { formatFileSize } from '../utils/format.utils';
 
 const Upload: React.FC = () => {
   const { user } = useAuth();
@@ -130,11 +131,6 @@ const Upload: React.FC = () => {
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
 
   return (
     <IonPage>

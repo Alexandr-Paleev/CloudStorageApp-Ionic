@@ -27,4 +27,8 @@ export class R2Provider implements IStorageProvider {
     async delete(path: string): Promise<void> {
         await r2Service.deleteFile(path);
     }
+
+    async getSignedUrl(path: string): Promise<string> {
+        return await r2Service.getSignedDownloadUrl(path);
+    }
 }

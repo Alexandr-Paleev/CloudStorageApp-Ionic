@@ -29,6 +29,7 @@ import storageService from '../services/storage.service';
 import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
+import { formatFileSize, formatDate } from '../utils/format.utils';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -75,7 +76,10 @@ const Dashboard: React.FC = () => {
   });
 
   const deleteFileMutation = useMutation({
-    mutationFn: (fileId: string) => storageService.deleteFile(fileId),
+    mutationFn: (fileId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return storageService.deleteFile(fileId, user.id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
@@ -119,27 +123,11 @@ const Dashboard: React.FC = () => {
     (event.target as HTMLIonRefresherElement).complete();
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
-
   const getFileIcon = (type: string | undefined) => {
     if (!type) return document;
     if (type.startsWith('image/')) return image;
     if (type === 'application/pdf') return document;
     return document;
-  };
-
-  const formatDate = (date: string | undefined) => {
-    if (!date) return 'Unknown date';
-    try {
-      return new Date(date).toLocaleDateString();
-    } catch (e) {
-      console.error('Date formatting error:', e);
-      return 'Invalid date';
-    }
   };
 
   const storagePercentage = storageSize

@@ -105,28 +105,44 @@ const supabaseService = {
     },
 
     /**
-     * Delete folder and its contents (recursive)
-     * Note: This should idealy be a database function for performance
+     * Delete folder and its contents (recursive) with user ownership check
+     * Note: This should ideally be a database function for performance
      */
-    async deleteFolder(folderId: string): Promise<void> {
-        // 1. Get all subfolders
+    async deleteFolder(folderId: string, userId: string): Promise<void> {
+        const { data: folder, error: folderError } = await supabase
+            .from('folders')
+            .select('id, user_id')
+            .eq('id', folderId)
+            .eq('user_id', userId)
+            .single();
+
+        if (folderError || !folder) {
+            throw new Error('Folder not found or access denied');
+        }
+
         const { data: subfolders } = await supabase
             .from('folders')
             .select('id')
-            .eq('parent_id', folderId);
+            .eq('parent_id', folderId)
+            .eq('user_id', userId);
 
-        // 2. Recursively delete subfolders
         if (subfolders) {
             for (const sub of subfolders) {
-                await this.deleteFolder(sub.id);
+                await this.deleteFolder(sub.id, userId);
             }
         }
 
-        // 3. Delete files in this folder (metadata only here, actual storage deletion handled separately)
-        await supabase.from('files').delete().eq('folder_id', folderId);
+        await supabase
+            .from('files')
+            .delete()
+            .eq('folder_id', folderId)
+            .eq('user_id', userId);
 
-        // 4. Delete the folder itself
-        const { error } = await supabase.from('folders').delete().eq('id', folderId);
+        const { error } = await supabase
+            .from('folders')
+            .delete()
+            .eq('id', folderId)
+            .eq('user_id', userId);
 
         if (error) {
             console.error('Supabase deleteFolder error:', error);
@@ -135,29 +151,68 @@ const supabaseService = {
     },
 
     /**
-     * Delete file metadata
+     * Get single file metadata with user ownership check
      */
-    async deleteFileMetadata(fileId: string): Promise<void> {
-        const { error } = await supabase.from('files').delete().eq('id', fileId);
+    async getFileMetadata(fileId: string, userId: string): Promise<FileMetadata | null> {
+        const { data, error } = await supabase
+            .from('files')
+            .select('*')
+            .eq('id', fileId)
+            .eq('user_id', userId)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return null;
+            }
+            console.error('Supabase getFileMetadata error:', error);
+            throw error;
+        }
+
+        return data as FileMetadata | null;
+    },
+
+    /**
+     * Delete file metadata with user ownership check
+     */
+    async deleteFileMetadata(fileId: string, userId: string): Promise<void> {
+        const { data, error } = await supabase
+            .from('files')
+            .delete()
+            .eq('id', fileId)
+            .eq('user_id', userId)
+            .select()
+            .single();
 
         if (error) {
             console.error('Supabase deleteFileMetadata error:', error);
             throw error;
         }
+
+        if (!data) {
+            throw new Error('File not found or access denied');
+        }
     },
 
     /**
-     * Update file metadata (rename, move)
+     * Update file metadata (rename, move) with user ownership check
      */
-    async updateFileMetadata(fileId: string, updates: Partial<FileMetadata>): Promise<void> {
-        const { error } = await supabase
+    async updateFileMetadata(fileId: string, userId: string, updates: Partial<FileMetadata>): Promise<void> {
+        const { data, error } = await supabase
             .from('files')
             .update(updates)
-            .eq('id', fileId);
+            .eq('id', fileId)
+            .eq('user_id', userId)
+            .select()
+            .single();
 
         if (error) {
             console.error('Supabase updateFileMetadata error:', error);
             throw error;
+        }
+
+        if (!data) {
+            throw new Error('File not found or access denied');
         }
     },
 };
