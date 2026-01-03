@@ -34,7 +34,7 @@ export interface IStorageProvider {
     /**
      * Delete a file
      */
-    delete(path: string): Promise<void>;
+    delete(path: string, metadata?: { type?: string; name?: string }): Promise<void>;
 
     /**
      * Get a fresh signed URL (optional)
