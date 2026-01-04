@@ -85,8 +85,6 @@ const cloudinaryService = {
             return;
         }
 
-        console.log(`[CloudinaryService] Deleting file. PublicID: "${publicId}", Type: "${resourceType}"`);
-
         try {
             const response = await fetch(deleteApiUrl, {
                 method: 'POST',

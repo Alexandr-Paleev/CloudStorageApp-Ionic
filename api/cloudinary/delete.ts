@@ -27,12 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    console.log(`[Cloudinary] Deleting ${publicId}, type: ${resourceType || 'default(image)'}`);
-
     // Determine options based on passed resourceType or default fallback
     // If resourceType is explicit (e.g. 'raw' for PDF), use it.
     // Otherwise default to 'image'.
-    // Fix: Added explicit logging and fallback handling
     const options = resourceType ? { resource_type: resourceType } : { resource_type: 'image' };
 
     let result = await cloudinary.uploader.destroy(publicId, options);
@@ -41,7 +38,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // If we tried 'image' (default) and got 'not found', it might be a 'raw' file or 'video'
     // that we didn't know about. Try finding it as 'raw' just in case.
     if (!resourceType && result.result === 'not found') {
-       console.log(`[Cloudinary] Not found as image, trying as raw: ${publicId}`);
        result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
     }
 

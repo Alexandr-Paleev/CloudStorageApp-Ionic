@@ -37,6 +37,10 @@ const Dashboard: React.FC = () => {
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
   const [showFolderAlert, setShowFolderAlert] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState<{ isOpen: boolean; fileId: string | null }>({
+    isOpen: false,
+    fileId: null,
+  });
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const PAGE_SIZE = 15;
@@ -105,14 +109,8 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const handleDeleteFile = async (fileId: string) => {
-    if (window.confirm('Are you sure you want to delete this file?')) {
-      try {
-        await deleteFileMutation.mutateAsync(fileId);
-      } catch (err) {
-        console.error('Failed to delete file:', err);
-      }
-    }
+  const handleDeleteFile = (fileId: string) => {
+    setShowDeleteAlert({ isOpen: true, fileId });
   };
 
   const handleRefresh = async (event: CustomEvent) => {
@@ -328,6 +326,29 @@ const Dashboard: React.FC = () => {
           color="danger"
         />
 
+        <IonAlert
+          isOpen={showDeleteAlert.isOpen}
+          onDidDismiss={() => setShowDeleteAlert({ isOpen: false, fileId: null })}
+          header="Delete File"
+          message="Are you sure you want to delete this file? This action cannot be undone."
+          buttons={[
+            {
+              text: 'Cancel',
+              role: 'cancel',
+              handler: () => setShowDeleteAlert({ isOpen: false, fileId: null }),
+            },
+            {
+              text: 'Delete',
+              role: 'destructive',
+              handler: () => {
+                if (showDeleteAlert.fileId) {
+                  deleteFileMutation.mutate(showDeleteAlert.fileId);
+                }
+              },
+            },
+          ]}
+        />
+        
         <IonAlert
           isOpen={showFolderAlert}
           onDidDismiss={() => setShowFolderAlert(false)}
