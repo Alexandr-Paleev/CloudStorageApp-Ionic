@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
+import { env } from './env';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -17,7 +18,7 @@ import '@ionic/react/css/display.css';
 
 // Initialize Sentry
 Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN,
+  dsn: env.VITE_SENTRY_DSN,
   integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
   // Performance Monitoring
   tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!

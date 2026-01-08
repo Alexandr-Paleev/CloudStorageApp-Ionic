@@ -2,6 +2,7 @@ import supabaseService from './supabase.service';
 import { FileMetadata, Folder } from '../schemas/file.schema';
 import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
+import * as Sentry from '@sentry/react';
 
 export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB in bytes (Local limit before GDrive)
 
@@ -67,15 +68,19 @@ const storageService = {
         user_id: userId,
       });
     } catch (dbError) {
-      console.error('Failed to save file metadata to Supabase. Rolling back storage...', dbError);
+      Sentry.captureException(dbError, {
+        tags: { context: 'storage.uploadFile' },
+        extra: { fileName: file.name, userId },
+      });
 
       try {
         await provider.delete(result.path);
       } catch (cleanupError) {
-        console.error(
-          'Critical: Failed to cleanup orphan file after database failure:',
-          cleanupError
-        );
+        Sentry.captureException(cleanupError, {
+          level: 'fatal',
+          tags: { context: 'storage.uploadFile.cleanup' },
+          extra: { path: result.path, userId },
+        });
       }
 
       throw new Error(
@@ -115,14 +120,21 @@ const storageService = {
     } catch (error) {
       storageDeleteError =
         error instanceof Error ? error : new Error('Unknown storage deletion error');
-      console.error(`Failed to delete file from ${file.storage_type}:`, storageDeleteError);
+      Sentry.captureException(storageDeleteError, {
+        tags: { context: 'storage.deleteFile', storageType: file.storage_type },
+        extra: { fileId, userId },
+      });
       throw new Error(`Failed to delete file from storage: ${storageDeleteError.message}`);
     }
 
     try {
       await supabaseService.deleteFileMetadata(fileId, userId);
     } catch (dbError) {
-      console.error('Critical: Storage file deleted but metadata deletion failed:', dbError);
+      Sentry.captureException(dbError, {
+        level: 'fatal',
+        tags: { context: 'storage.deleteFile.metadata' },
+        extra: { fileId, userId },
+      });
       throw new Error(
         `Failed to delete file metadata: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`
       );
@@ -145,7 +157,10 @@ const storageService = {
         file.download_url = await provider.getSignedUrl(file.storage_path);
       }
     } catch (error) {
-      console.error(`Failed to refresh URL for ${file.storage_type}:`, error);
+      Sentry.captureException(error, {
+        tags: { context: 'storage.getFileMetadata.refreshUrl', storageType: file.storage_type },
+        extra: { fileId, userId },
+      });
     }
 
     return file;

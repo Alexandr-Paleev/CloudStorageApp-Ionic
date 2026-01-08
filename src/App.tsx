@@ -1,8 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import {
-  IonApp,
-  setupIonicReact,
-} from '@ionic/react';
+import { IonApp, setupIonicReact } from '@ionic/react';
 
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './pages/Login';
@@ -10,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import FileView from './pages/FileView';
 import PrivateRoute from './components/PrivateRoute';
+import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -63,8 +61,8 @@ const App: React.FC = () => (
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    <PWAUpdatePrompt />
   </IonApp>
 );
 
 export default App;
-
