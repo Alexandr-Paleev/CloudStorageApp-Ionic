@@ -1,8 +1,22 @@
 {
   "name": "cloud-storage-app",
-  "version": "0.0.1",
-  "author": "Ionic Framework",
-  "homepage": "https://ionicframework.com/",
+  "version": "1.0.0",
+  "author": "Aleksandr Paleev",
+  "homepage": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "cloud-storage",
+    "ionic",
+    "react",
+    "pwa",
+    "file-upload",
+    "supabase",
+    "cloudinary"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --project tsconfig.build.json --noEmit && vite build",

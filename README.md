@@ -1,6 +1,14 @@
-# ☁️ Cloud Storage App
+# ☁️ Cloud Storage App - Community Edition
 
-A modern web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Cloudinary + Supabase.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![Demo](https://img.shields.io/badge/Demo-Live-success)](https://cloud-storage-app-ionic-v0.vercel.app)
+
+A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Cloudinary + Supabase.
+
+🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Cloud Storage Pro](#-pro-version)** (coming soon)
+
+> 💎 **Looking for more features?** Check out [Cloud Storage Pro](#-pro-version) with Dropbox, OneDrive, AWS S3, team collaboration, and priority support.
 
 ## 📋 Project Description
 
@@ -38,8 +46,10 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 ### 📱 Platforms
 
 - ✅ **Web** — works in any modern browser
-- ✅ **PWA** — can be installed as an app on phone/computer
+- ✅ **PWA** — can be installed as an app on phone/computer (Service Worker + offline support)
 - ✅ **iOS/Android** — native app support via Capacitor
+
+> 📱 **PWA Ready!** Install the app on your device: [Testing Guide](PWA_TESTING.md)
 
 ### 🎨 Interface
 
@@ -241,14 +251,50 @@ npm run lint
 npm run format
 ```
 
+## 💎 Pro Version
+
+**Cloud Storage Pro** is a premium version with enterprise features:
+
+### Additional Features in Pro:
+
+- 🔗 **Dropbox Integration** - sync with Dropbox
+- 🔗 **OneDrive Integration** - Microsoft cloud storage
+- 🔗 **AWS S3 Support** - enterprise-grade storage
+- 👥 **Team Collaboration** - share files with team members
+- 📊 **Advanced Analytics** - detailed usage statistics
+- 🎨 **White-Label** - custom branding for your business
+- ⚡ **Priority Support** - dedicated technical assistance
+- 🚀 **Unlimited Storage** - no limits on file uploads
+
+**Coming Soon!** Stay tuned for the Pro version launch.
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+Please read our [Code Style Guide](https://github.com/aleksandrpaleev/CloudStorageApp-Ionic#code-style) before contributing.
+
 ## 📝 License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🤝 Support
 
-If you have any questions or issues, please create an issue in the project repository.
+- 💬 **Issues**: [GitHub Issues](https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/issues)
+- 📧 **Email**: support@cloudstorage.app (for Pro customers)
+
+## 🌟 Star History
+
+If you find this project useful, please give it a ⭐ on GitHub!
 
 ---
 
-**Created with ❤️ using Ionic + React + Supabase + Cloudinary**
+**Created with ❤️ by Aleksandr Paleev**
+
+**Stack**: Ionic + React + TypeScript + Supabase + Cloudinary + Vercel
