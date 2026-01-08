@@ -32,6 +32,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,scss}\"",
     "deploy": "npm run build && firebase deploy --only hosting",
+    "generate:icons": "node scripts/generate-icons.js",
     "prepare": "husky"
   },
   "dependencies": {
@@ -74,6 +75,7 @@
     "husky": "^9.0.11",
     "lint-staged": "^15.2.0",
     "prettier": "^3.3.3",
+    "sharp": "^0.34.5",
     "typescript": "5.5.4",
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^1.2.0",
