@@ -10,12 +10,20 @@
   "license": "MIT",
   "keywords": [
     "cloud-storage",
+    "file-upload",
+    "file-management",
     "ionic",
     "react",
     "pwa",
-    "file-upload",
+    "progressive-web-app",
+    "typescript",
     "supabase",
-    "cloudinary"
+    "cloudinary",
+    "capacitor",
+    "mobile-app",
+    "open-source",
+    "tanstack-query",
+    "vercel"
   ],
   "scripts": {
     "dev": "vite",
