@@ -1,0 +1,23 @@
+# Sponsorship options for Cloud Storage App
+# Uncomment and add your usernames/links when ready
+
+# GitHub Sponsors (free tier available)
+# github: [aleksandrpaleev]
+
+# Patreon (recurring donations)
+# patreon: your_patreon_username
+
+# Open Collective (transparent funding)
+# open_collective: your_collective_name
+
+# Ko-fi (one-time donations, no fees)
+# ko_fi: your_kofi_username
+
+# Buy Me a Coffee (one-time donations)
+# custom: ['https://www.buymeacoffee.com/your_username']
+
+# Interested in Cloud Storage Pro with enterprise features?
+# Contact us for early access, custom integrations, and premium support
+custom:
+  - 'https://cloud-storage-app-ionic-v0.vercel.app'
+  - 'mailto:paleev045@gmail.com?subject=Cloud%20Storage%20Pro%20Inquiry'
