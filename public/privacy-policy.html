@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Cloud Storage App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        h2 {
+            color: #1e40af;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        h3 {
+            color: #1e3a8a;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .updated {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+        }
+        .highlight {
+            background: #dbeafe;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            background: #1d4ed8;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to App</a>
+        
+        <h1>Privacy Policy for Cloud Storage App</h1>
+        <p class="updated"><strong>Last Updated:</strong> January 10, 2026</p>
+
+        <h2>Introduction</h2>
+        <p>Cloud Storage App ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our application.</p>
+
+        <h2>Information We Collect</h2>
+
+        <h3>1. Account Information</h3>
+        <ul>
+            <li><span class="highlight">Email address</span> (when you sign up)</li>
+            <li><span class="highlight">Google account information</span> (if you sign in with Google)</li>
+            <li><span class="highlight">Profile information</span> (name, profile picture if provided by Google)</li>
+        </ul>
+
+        <h3>2. Files and Content</h3>
+        <ul>
+            <li>Files you upload to our service</li>
+            <li>Folder names and file metadata (size, type, upload date)</li>
+            <li>File storage locations (determined by our routing logic)</li>
+        </ul>
+
+        <h3>3. Technical Information</h3>
+        <ul>
+            <li>Browser type and version</li>
+            <li>Device information (for PWA functionality)</li>
+            <li>IP address and location data (for security)</li>
+            <li>Usage statistics (via Sentry for error tracking)</li>
+        </ul>
+
+        <h2>How We Use Your Information</h2>
+        <p>We use your information to:</p>
+        <ul>
+            <li>Provide and maintain the Service</li>
+            <li>Authenticate your account</li>
+            <li>Store and manage your files</li>
+            <li>Send you service-related notifications</li>
+            <li>Improve our Service and user experience</li>
+            <li>Detect and prevent fraud and abuse</li>
+            <li>Comply with legal obligations</li>
+        </ul>
+
+        <h2>Data Storage</h2>
+        <p>Your data is stored securely using:</p>
+        <ul>
+            <li><strong>Supabase</strong> (authentication and metadata)</li>
+            <li><strong>Cloudinary</strong> (image storage)</li>
+            <li><strong>Google Drive</strong> (optional, with your explicit consent)</li>
+            <li><strong>Cloudflare R2</strong> (optional file storage)</li>
+        </ul>
+
+        <h2>Data Sharing</h2>
+        <p>We <strong>DO NOT</strong> sell your personal information. We may share data with:</p>
+        <ul>
+            <li><strong>Service providers</strong> (Supabase, Cloudinary, Sentry) - only as necessary to provide the Service</li>
+            <li><strong>Law enforcement</strong> - if required by law</li>
+            <li><strong>Business transfers</strong> - in case of merger or acquisition</li>
+        </ul>
+
+        <h2>Your Rights</h2>
+        <p>You have the right to:</p>
+        <ul>
+            <li>Access your personal data</li>
+            <li>Correct inaccurate data</li>
+            <li>Delete your account and data</li>
+            <li>Export your data</li>
+            <li>Opt-out of non-essential data collection</li>
+        </ul>
+
+        <h3>How to Exercise Your Rights</h3>
+        <p>Contact us at: <a href="mailto:aleksandr.paleev@example.com">aleksandr.paleev@example.com</a> (or via <a href="https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/issues" target="_blank">GitHub Issues</a>)</p>
+
+        <h2>Data Retention</h2>
+        <ul>
+            <li><strong>Account data:</strong> Retained while your account is active</li>
+            <li><strong>Files:</strong> Retained until you delete them or close your account</li>
+            <li><strong>Logs:</strong> Retained for 90 days for security purposes</li>
+        </ul>
+
+        <h2>Security</h2>
+        <p>We implement industry-standard security measures:</p>
+        <ul>
+            <li>Encrypted data transmission (HTTPS)</li>
+            <li>Secure authentication (Supabase Auth)</li>
+            <li>Row Level Security (RLS) policies</li>
+            <li>Regular security audits</li>
+        </ul>
+
+        <h2>Cookies and Tracking</h2>
+        <p>We use:</p>
+        <ul>
+            <li><strong>Essential cookies</strong> (for authentication)</li>
+            <li><strong>Analytics cookies</strong> (Sentry for error tracking)</li>
+            <li><strong>No third-party advertising cookies</strong></li>
+        </ul>
+
+        <h2>Children's Privacy</h2>
+        <p>Our Service is not intended for users under 13 years old. We do not knowingly collect data from children.</p>
+
+        <h2>Changes to This Policy</h2>
+        <p>We may update this Privacy Policy. We will notify you of significant changes via:</p>
+        <ul>
+            <li>Email notification</li>
+            <li>In-app notification</li>
+            <li>Update date at the top of this policy</li>
+        </ul>
+
+        <h2>Third-Party Services</h2>
+        <p>We use the following third-party services:</p>
+        <ul>
+            <li><strong>Supabase</strong> - <a href="https://supabase.com/privacy" target="_blank">Privacy Policy</a></li>
+            <li><strong>Cloudinary</strong> - <a href="https://cloudinary.com/privacy" target="_blank">Privacy Policy</a></li>
+            <li><strong>Google Drive</strong> - <a href="https://policies.google.com/privacy" target="_blank">Privacy Policy</a></li>
+            <li><strong>Sentry</strong> - <a href="https://sentry.io/privacy/" target="_blank">Privacy Policy</a></li>
+        </ul>
+
+        <h2>Contact Us</h2>
+        <p>If you have questions about this Privacy Policy:</p>
+        <ul>
+            <li><strong>Email:</strong> <a href="mailto:aleksandr.paleev@example.com">aleksandr.paleev@example.com</a></li>
+            <li><strong>GitHub:</strong> <a href="https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/issues" target="_blank">Open an Issue</a></li>
+        </ul>
+
+        <h2>Compliance</h2>
+        <p>This Privacy Policy complies with:</p>
+        <ul>
+            <li><strong>GDPR</strong> (General Data Protection Regulation)</li>
+            <li><strong>CCPA</strong> (California Consumer Privacy Act)</li>
+            <li><strong>Google OAuth 2.0 Policy</strong></li>
+        </ul>
+
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+
+        <p style="text-align: center; color: #666;">
+            <strong>Community Edition</strong> is open-source (MIT License).<br>
+            <strong>Pro Edition</strong> may have additional terms for enterprise customers.
+        </p>
+    </div>
+</body>
+</html>

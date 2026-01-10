@@ -289,6 +289,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 💬 **Issues**: [GitHub Issues](https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/issues)
 - 📧 **Email**: support@cloudstorage.app (for Pro customers)
 
+## 📄 Legal
+
+- **[Privacy Policy](PRIVACY_POLICY.md)** - How we handle your data
+- **[Terms of Service](TERMS_OF_SERVICE.md)** - Rules and guidelines
+
 ## 🌟 Star History
 
 If you find this project useful, please give it a ⭐ on GitHub!
