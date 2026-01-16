@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
+      includeAssets: ['icon-192x192-v2.png', 'icon-512x512-v2.png'],
       manifest: {
         name: 'Cloud Storage App',
         short_name: 'Cloud Storage',
@@ -22,13 +22,13 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/icon-192x192.png',
+            src: '/icon-192x192-v2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable',
           },
           {
-            src: '/icon-512x512.png',
+            src: '/icon-512x512-v2.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',
