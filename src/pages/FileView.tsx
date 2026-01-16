@@ -197,7 +197,6 @@ const FileView: React.FC = () => {
               alt={file.name}
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               onError={() => {
-                console.log('Image failed to load, probably expired. Refreshing...');
                 refetch();
               }}
             />
@@ -223,7 +222,6 @@ const FileView: React.FC = () => {
                 }}
                 title={file.name}
                 onError={() => {
-                  console.log('PDF failed to load, probably expired. Refreshing...');
                   refetch();
                 }}
               />

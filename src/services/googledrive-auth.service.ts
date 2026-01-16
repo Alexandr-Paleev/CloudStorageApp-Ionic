@@ -122,9 +122,7 @@ const googleDriveAuthService = {
   async logout(): Promise<void> {
     const token = await this.getAccessToken();
     if (token) {
-      window.google.accounts.oauth2.revoke(token, () => {
-        console.log('Token revoked');
-      });
+      window.google.accounts.oauth2.revoke(token, () => {});
     }
     accessToken = null;
     localStorage.removeItem('gdrive_access_token');
