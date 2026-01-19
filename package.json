@@ -1,6 +1,6 @@
 {
   "name": "cloud-storage-app",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Aleksandr Paleev",
   "homepage": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic",
   "repository": {
@@ -43,6 +43,7 @@
     "@capacitor/core": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
+    "@capacitor/share": "^6.0.4",
     "@capacitor/status-bar": "^6.0.0",
     "@ionic/react": "^8.0.0",
     "@sentry/react": "^10.32.1",

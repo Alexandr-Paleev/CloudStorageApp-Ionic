@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// import { Share } from '@capacitor/share';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
@@ -20,8 +21,20 @@ import {
   IonSpinner,
   IonIcon,
   IonModal,
+  IonActionSheet,
 } from '@ionic/react';
-import { download, create, trash, arrowBack, link } from 'ionicons/icons';
+import {
+  download,
+  create,
+  trash,
+  arrowBack,
+  link,
+  shareSocial,
+  logoWhatsapp,
+  logoFacebook,
+  logoTwitter,
+  paperPlane,
+} from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { FileMetadata } from '../schemas/file.schema';
@@ -34,6 +47,7 @@ const FileView: React.FC = () => {
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
   const [copyToast, setCopyToast] = useState<{
     show: boolean;
     message: string;
@@ -124,6 +138,33 @@ const FileView: React.FC = () => {
       setCopyToast({ show: true, message: 'Link copied to clipboard!', color: 'success' });
     } catch {
       setCopyToast({ show: true, message: 'Failed to copy link', color: 'danger' });
+    }
+  };
+
+  const handleSocialShare = async (platform: 'telegram' | 'whatsapp' | 'facebook' | 'x') => {
+    const url = getDownloadUrl();
+    if (!file || !url) return;
+
+    const text = `Check out ${file.name}`;
+    let shareUrl = '';
+
+    switch (platform) {
+      case 'telegram':
+        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+        break;
+      case 'whatsapp':
+        shareUrl = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+        break;
+      case 'facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+        break;
+      case 'x':
+        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+        break;
+    }
+
+    if (shareUrl) {
+      window.open(shareUrl, '_blank');
     }
   };
 
@@ -326,6 +367,52 @@ const FileView: React.FC = () => {
             <IonIcon icon={download} slot="start" />
             Download
           </IonButton>
+
+          <IonButton
+            expand="block"
+            fill="outline"
+            onClick={() => setShowShareSheet(true)}
+            style={{ marginTop: '10px' }}
+          >
+            <IonIcon icon={shareSocial} slot="start" />
+            Share
+          </IonButton>
+
+          <IonActionSheet
+            isOpen={showShareSheet}
+            onDidDismiss={() => setShowShareSheet(false)}
+            header="Share via"
+            buttons={[
+              {
+                text: 'Telegram',
+                icon: paperPlane,
+                handler: () => handleSocialShare('telegram'),
+              },
+              {
+                text: 'WhatsApp',
+                icon: logoWhatsapp,
+                handler: () => handleSocialShare('whatsapp'),
+              },
+              {
+                text: 'Facebook',
+                icon: logoFacebook,
+                handler: () => handleSocialShare('facebook'),
+              },
+              {
+                text: 'X (Twitter)',
+                icon: logoTwitter,
+                handler: () => handleSocialShare('x'),
+              },
+              {
+                text: 'Cancel',
+                role: 'cancel',
+                data: {
+                  action: 'cancel',
+                },
+              },
+            ]}
+          />
+
           <IonButton
             expand="block"
             fill="outline"
