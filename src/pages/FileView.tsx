@@ -21,7 +21,7 @@ import {
   IonIcon,
   IonModal,
 } from '@ionic/react';
-import { download, create, trash, arrowBack } from 'ionicons/icons';
+import { download, create, trash, arrowBack, link } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { FileMetadata } from '../schemas/file.schema';
@@ -34,6 +34,15 @@ const FileView: React.FC = () => {
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [copyToast, setCopyToast] = useState<{
+    show: boolean;
+    message: string;
+    color: 'success' | 'danger';
+  }>({
+    show: false,
+    message: '',
+    color: 'success',
+  });
 
   const {
     data: file,
@@ -103,6 +112,18 @@ const FileView: React.FC = () => {
     const url = getDownloadUrl();
     if (url) {
       window.open(url, '_blank');
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const url = getDownloadUrl();
+    if (!url) return;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyToast({ show: true, message: 'Link copied to clipboard!', color: 'success' });
+    } catch {
+      setCopyToast({ show: true, message: 'Failed to copy link', color: 'danger' });
     }
   };
 
@@ -308,6 +329,15 @@ const FileView: React.FC = () => {
           <IonButton
             expand="block"
             fill="outline"
+            onClick={handleCopyLink}
+            style={{ marginTop: '10px' }}
+          >
+            <IonIcon icon={link} slot="start" />
+            Copy Link
+          </IonButton>
+          <IonButton
+            expand="block"
+            fill="outline"
             onClick={handleRename}
             style={{ marginTop: '10px' }}
           >
@@ -362,6 +392,13 @@ const FileView: React.FC = () => {
           message={deleteMutation.isError ? 'Failed to delete file' : 'Failed to rename file'}
           duration={3000}
           color="danger"
+        />
+        <IonToast
+          isOpen={copyToast.show}
+          message={copyToast.message}
+          duration={2000}
+          color={copyToast.color}
+          onDidDismiss={() => setCopyToast({ ...copyToast, show: false })}
         />
       </IonContent>
     </IonPage>
