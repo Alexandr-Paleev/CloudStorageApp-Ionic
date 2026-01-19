@@ -103,6 +103,10 @@ const storageService = {
     return { files, folders };
   },
 
+  async getFolder(folderId: string, userId: string): Promise<Folder | null> {
+    return supabaseService.getFolder(folderId, userId);
+  },
+
   /**
    * Delete file with user ownership verification
    */

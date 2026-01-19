@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import { Share } from '@capacitor/share';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
@@ -9,12 +8,7 @@ import {
   IonTitle,
   IonToolbar,
   IonButton,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardTitle,
   IonItem,
-  IonLabel,
   IonInput,
   IonButtons,
   IonToast,
@@ -22,23 +16,29 @@ import {
   IonIcon,
   IonModal,
   IonActionSheet,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonText,
 } from '@ionic/react';
 import {
-  download,
-  create,
-  trash,
+  createOutline,
+  trashOutline,
   arrowBack,
-  link,
-  shareSocial,
+  linkOutline,
+  shareSocialOutline,
   logoWhatsapp,
   logoFacebook,
   logoTwitter,
-  paperPlane,
+  paperPlaneOutline,
+  documentTextOutline,
+  cloudDownloadOutline,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
+import './FileView.css';
 
 const FileView: React.FC = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -47,6 +47,7 @@ const FileView: React.FC = () => {
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [copyToast, setCopyToast] = useState<{
     show: boolean;
@@ -112,9 +113,7 @@ const FileView: React.FC = () => {
   };
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this file?')) {
-      deleteMutation.mutate();
-    }
+    setShowDeleteModal(true);
   };
 
   const getDownloadUrl = () => {
@@ -178,26 +177,18 @@ const FileView: React.FC = () => {
   if (isLoading) {
     return (
       <IonPage>
-        <IonHeader>
+        <IonHeader className="ion-no-border">
           <IonToolbar>
             <IonButtons slot="start">
-              <IonButton onClick={() => navigate(-1)}>
+              <IonButton onClick={() => navigate(-1)} color="dark">
                 <IonIcon icon={arrowBack} />
               </IonButton>
             </IonButtons>
-            <IonTitle>File</IonTitle>
           </IonToolbar>
         </IonHeader>
-        <IonContent>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100%',
-            }}
-          >
-            <IonSpinner />
+        <IonContent className="ion-padding">
+          <div className="file-view-loader">
+            <IonSpinner color="primary" />
           </div>
         </IonContent>
       </IonPage>
@@ -207,22 +198,20 @@ const FileView: React.FC = () => {
   if (!file) {
     return (
       <IonPage>
-        <IonHeader>
+        <IonHeader className="ion-no-border">
           <IonToolbar>
             <IonButtons slot="start">
-              <IonButton onClick={() => navigate(-1)}>
+              <IonButton onClick={() => navigate(-1)} color="dark">
                 <IonIcon icon={arrowBack} />
               </IonButton>
             </IonButtons>
             <IonTitle>File Not Found</IonTitle>
           </IonToolbar>
         </IonHeader>
-        <IonContent>
-          <IonCard>
-            <IonCardContent>
-              <IonLabel>File not found</IonLabel>
-            </IonCardContent>
-          </IonCard>
+        <IonContent className="ion-padding">
+          <div className="file-not-found">
+            <p>File not found or access denied.</p>
+          </div>
         </IonContent>
       </IonPage>
     );
@@ -230,253 +219,249 @@ const FileView: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
+      <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => navigate(-1)}>
+            <IonButton onClick={() => navigate(-1)} color="dark">
               <IonIcon icon={arrowBack} />
             </IonButton>
           </IonButtons>
           <IonTitle>{file.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
+
       <IonContent fullscreen>
-        {/* File Preview */}
-        <div
-          style={{
-            width: '100%',
-            height: '50vh',
-            backgroundColor: '#f5f5f5',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-          }}
-        >
-          {isImage && downloadUrl && (
-            <img
-              src={downloadUrl}
-              alt={file.name}
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              onError={() => {
-                refetch();
-              }}
-            />
-          )}
-          {isPDF && downloadUrl && (
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-              }}
-            >
-              <iframe
+        <div className="file-view-container">
+          <div className="bg-gradient-mesh preview-area">
+            {isImage && downloadUrl ? (
+              <img
                 src={downloadUrl}
-                style={{
-                  width: '100%',
-                  height: 'calc(100% - 60px)',
-                  border: 'none',
-                  flex: 1,
-                  backgroundColor: '#fff',
-                }}
-                title={file.name}
-                onError={() => {
-                  refetch();
-                }}
+                alt={file.name}
+                className="preview-image"
+                onError={() => refetch()}
               />
+            ) : isPDF && downloadUrl ? (
+              <div className="preview-pdf-container">
+                <iframe src={downloadUrl} className="preview-pdf-frame" title={file.name} />
+              </div>
+            ) : (
+              <div className="preview-placeholder">
+                <div className="preview-icon-box">
+                  <IonIcon icon={documentTextOutline} className="preview-icon" />
+                </div>
+                <IonText color="dark">
+                  <h2 className="preview-title">No preview</h2>
+                  <p className="preview-type">{file.type || 'Unknown Type'}</p>
+                </IonText>
+              </div>
+            )}
+          </div>
+
+          <div className="ion-padding-horizontal">
+            <div className="glass-card metadata-card">
+              <IonGrid className="metadata-grid">
+                <IonRow>
+                  <IonCol size="6">
+                    <IonText color="medium" className="metadata-label">
+                      Created
+                    </IonText>
+                    <div className="metadata-value">{formatDateTime(file.created_at)}</div>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonText color="medium" className="metadata-label">
+                      Size
+                    </IonText>
+                    <div className="metadata-value">{formatFileSize(file.size)}</div>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
+
+            <div className="actions-container">
+              <IonButton
+                expand="block"
+                className="premium-button download-button"
+                onClick={handleDownload}
+              >
+                <IonIcon icon={cloudDownloadOutline} slot="start" />
+                Download Original
+              </IonButton>
+
+              <IonGrid className="action-grid">
+                <IonRow>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      onClick={() => setShowShareSheet(true)}
+                      className="action-button"
+                    >
+                      <IonIcon icon={shareSocialOutline} />
+                      <span className="action-button-label">Share</span>
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      onClick={handleCopyLink}
+                      className="action-button"
+                    >
+                      <IonIcon icon={linkOutline} />
+                      <span className="action-button-label">Copy Link</span>
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      onClick={handleRename}
+                      className="action-button"
+                    >
+                      <IonIcon icon={createOutline} />
+                      <span className="action-button-label">Rename</span>
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      color="danger"
+                      onClick={handleDelete}
+                      disabled={deleteMutation.isPending}
+                      className="delete-button"
+                    >
+                      {!deleteMutation.isPending ? (
+                        <>
+                          <IonIcon icon={trashOutline} />
+                          <span className="action-button-label">Delete</span>
+                        </>
+                      ) : (
+                        <IonSpinner name="crescent" />
+                      )}
+                    </IonButton>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
+          </div>
+        </div>
+
+        <IonActionSheet
+          isOpen={showShareSheet}
+          onDidDismiss={() => setShowShareSheet(false)}
+          header="Share via"
+          buttons={[
+            {
+              text: 'Telegram',
+              icon: paperPlaneOutline,
+              handler: () => handleSocialShare('telegram'),
+            },
+            { text: 'WhatsApp', icon: logoWhatsapp, handler: () => handleSocialShare('whatsapp') },
+            { text: 'Facebook', icon: logoFacebook, handler: () => handleSocialShare('facebook') },
+            { text: 'X', icon: logoTwitter, handler: () => handleSocialShare('x') },
+            { text: 'Cancel', role: 'cancel' },
+          ]}
+        />
+
+        <IonModal
+          isOpen={showDeleteModal}
+          onDidDismiss={() => setShowDeleteModal(false)}
+          className="glass-modal"
+          breakpoints={[0, 0.4]}
+          initialBreakpoint={0.4}
+        >
+          <IonContent className="ion-padding">
+            <div style={{ textAlign: 'center', paddingTop: '20px', paddingBottom: '30px' }}>
               <div
                 style={{
-                  padding: '10px',
-                  textAlign: 'center',
-                  backgroundColor: '#fff',
-                  width: '100%',
-                  borderTop: '1px solid #e0e0e0',
+                  width: '60px',
+                  height: '60px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
                 }}
               >
-                <IonButton
-                  size="small"
-                  fill="outline"
-                  onClick={() => window.open(downloadUrl, '_blank')}
-                >
-                  <IonIcon icon={download} slot="start" />
-                  Open in New Tab
-                </IonButton>
+                <IonIcon icon={trashOutline} color="danger" style={{ fontSize: '32px' }} />
               </div>
-            </div>
-          )}
-          {!isImage && !isPDF && (
-            <div style={{ textAlign: 'center', padding: '20px' }}>
-              <IonLabel>
-                <h2>No preview available</h2>
-                <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-                  File type: {file.type || 'Unknown'}
+              <IonText color="dark">
+                <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>
+                  Delete File?
+                </h2>
+                <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+                  Are you sure you want to delete <b>{file?.name}</b>?<br />
+                  This action cannot be undone.
                 </p>
-                <p style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
-                  File name: {file.name}
-                </p>
-              </IonLabel>
+              </IonText>
+              <IonGrid>
+                <IonRow>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      fill="outline"
+                      color="medium"
+                      onClick={() => setShowDeleteModal(false)}
+                      style={{ height: '48px', '--border-radius': '12px' }}
+                    >
+                      Cancel
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonButton
+                      expand="block"
+                      color="danger"
+                      onClick={() => {
+                        setShowDeleteModal(false);
+                        deleteMutation.mutate();
+                      }}
+                      style={{ height: '48px', '--border-radius': '12px' }}
+                    >
+                      Delete
+                    </IonButton>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
             </div>
-          )}
-        </div>
+          </IonContent>
+        </IonModal>
 
-        {/* File Info */}
-        <div className="ion-padding">
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>File Information</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <IonItem>
-                <IonLabel>
-                  <h2>Name</h2>
-                  <p>{file.name}</p>
-                </IonLabel>
-              </IonItem>
-              <IonItem>
-                <IonLabel>
-                  <h2>Size</h2>
-                  <p>{formatFileSize(file.size)}</p>
-                </IonLabel>
-              </IonItem>
-              <IonItem>
-                <IonLabel>
-                  <h2>Type</h2>
-                  <p>{file.type}</p>
-                </IonLabel>
-              </IonItem>
-              <IonItem>
-                <IonLabel>
-                  <h2>Uploaded</h2>
-                  <p>{formatDateTime(file.created_at)}</p>
-                </IonLabel>
-              </IonItem>
-              <IonItem>
-                <IonLabel>
-                  <h2>Storage</h2>
-                  <p>{file.storage_type}</p>
-                </IonLabel>
-              </IonItem>
-            </IonCardContent>
-          </IonCard>
-
-          {/* Actions */}
-          <IonButton expand="block" onClick={handleDownload} style={{ marginTop: '20px' }}>
-            <IonIcon icon={download} slot="start" />
-            Download
-          </IonButton>
-
-          <IonButton
-            expand="block"
-            fill="outline"
-            onClick={() => setShowShareSheet(true)}
-            style={{ marginTop: '10px' }}
-          >
-            <IonIcon icon={shareSocial} slot="start" />
-            Share
-          </IonButton>
-
-          <IonActionSheet
-            isOpen={showShareSheet}
-            onDidDismiss={() => setShowShareSheet(false)}
-            header="Share via"
-            buttons={[
-              {
-                text: 'Telegram',
-                icon: paperPlane,
-                handler: () => handleSocialShare('telegram'),
-              },
-              {
-                text: 'WhatsApp',
-                icon: logoWhatsapp,
-                handler: () => handleSocialShare('whatsapp'),
-              },
-              {
-                text: 'Facebook',
-                icon: logoFacebook,
-                handler: () => handleSocialShare('facebook'),
-              },
-              {
-                text: 'X (Twitter)',
-                icon: logoTwitter,
-                handler: () => handleSocialShare('x'),
-              },
-              {
-                text: 'Cancel',
-                role: 'cancel',
-                data: {
-                  action: 'cancel',
-                },
-              },
-            ]}
-          />
-
-          <IonButton
-            expand="block"
-            fill="outline"
-            onClick={handleCopyLink}
-            style={{ marginTop: '10px' }}
-          >
-            <IonIcon icon={link} slot="start" />
-            Copy Link
-          </IonButton>
-          <IonButton
-            expand="block"
-            fill="outline"
-            onClick={handleRename}
-            style={{ marginTop: '10px' }}
-          >
-            <IonIcon icon={create} slot="start" />
-            Rename
-          </IonButton>
-          <IonButton
-            expand="block"
-            fill="outline"
-            color="danger"
-            onClick={handleDelete}
-            style={{ marginTop: '10px' }}
-            disabled={deleteMutation.isPending}
-          >
-            <IonIcon icon={trash} slot="start" />
-            {deleteMutation.isPending ? <IonSpinner name="crescent" /> : 'Delete'}
-          </IonButton>
-        </div>
-
-        {/* Rename Modal */}
-        <IonModal isOpen={showRenameModal} onDidDismiss={() => setShowRenameModal(false)}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>Rename File</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={() => setShowRenameModal(false)}>Cancel</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
+        <IonModal
+          isOpen={showRenameModal}
+          onDidDismiss={() => setShowRenameModal(false)}
+          className="glass-modal"
+          breakpoints={[0, 0.45]}
+          initialBreakpoint={0.45}
+        >
           <IonContent className="ion-padding">
-            <IonItem>
-              <IonLabel position="stacked">New Name</IonLabel>
-              <IonInput
-                value={newName}
-                onIonInput={(e) => setNewName(e.detail.value!)}
-                placeholder="Enter new file name"
-              />
-            </IonItem>
-            <IonButton
-              expand="block"
-              onClick={handleRenameSubmit}
-              disabled={!newName.trim() || renameMutation.isPending}
-              style={{ marginTop: '20px' }}
-            >
-              {renameMutation.isPending ? <IonSpinner name="crescent" /> : 'Save'}
-            </IonButton>
+            <h2 className="rename-title">Rename File</h2>
+            <div className="custom-input has-focus">
+              <IonItem lines="none">
+                <IonInput
+                  value={newName}
+                  onIonInput={(e) => setNewName(e.detail.value!)}
+                  placeholder="Enter new name"
+                />
+              </IonItem>
+            </div>
+            <div style={{ paddingBottom: '30px' }}>
+              <IonButton
+                className="premium-button save-button"
+                expand="block"
+                onClick={handleRenameSubmit}
+                disabled={!newName.trim() || renameMutation.isPending}
+              >
+                {renameMutation.isPending ? 'Renaming...' : 'Save Changes'}
+              </IonButton>
+            </div>
           </IonContent>
         </IonModal>
 
         <IonToast
           isOpen={deleteMutation.isError || renameMutation.isError}
-          message={deleteMutation.isError ? 'Failed to delete file' : 'Failed to rename file'}
+          message={deleteMutation.isError ? 'Failed to delete' : 'Failed to rename'}
           duration={3000}
           color="danger"
         />

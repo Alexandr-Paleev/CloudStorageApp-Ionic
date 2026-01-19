@@ -60,6 +60,26 @@ const supabaseService = {
   },
 
   /**
+   * Get single folder metadata
+   */
+  async getFolder(folderId: string, userId: string): Promise<Folder | null> {
+    const { data, error } = await supabase
+      .from('folders')
+      .select('*')
+      .eq('id', folderId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      Sentry.captureException(error, { tags: { context: 'supabase.getFolder' } });
+      throw error;
+    }
+
+    return data as Folder;
+  },
+
+  /**
    * Create a new folder
    */
   async createFolder(folder: Omit<Folder, 'id' | 'created_at'>): Promise<Folder> {

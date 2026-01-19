@@ -1,0 +1,109 @@
+/* Global Utilities & Shared Components */
+
+/* Glassmorphism Utilities */
+.glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05),
+        0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border-radius: 16px;
+}
+
+.glass-modal {
+    --background: rgba(255, 255, 255, 0.85);
+    --backdrop-filter: blur(20px);
+}
+
+body.dark .glass-card {
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+}
+
+/* Gradient Background Utility */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #4F46E5 0%, #0EA5E9 100%);
+}
+
+.bg-gradient-mesh {
+    background-color: #F8FAFC;
+    background-image:
+        radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.10) 0px, transparent 50%);
+}
+
+body.dark .bg-gradient-mesh {
+    background-color: #0f172a;
+    background-image:
+        radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.25) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.25) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.20) 0px, transparent 50%);
+}
+
+/* Custom Input Styling */
+.custom-input {
+    --background: rgba(255, 255, 255, 0.6);
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --padding-top: 12px;
+    --padding-bottom: 12px;
+    --border-radius: 12px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.custom-input.has-focus {
+    --background: #ffffff;
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+body.dark .custom-input {
+    --background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+body.dark .custom-input.has-focus {
+    --background: #1e293b;
+}
+
+/* Custom Modal */
+.glass-modal {
+    --background: rgba(255, 255, 255, 0.85);
+    --backdrop-opacity: 0.4;
+    --border-radius: 24px 24px 0 0;
+}
+
+.glass-modal .ion-page {
+    background: transparent;
+}
+
+.glass-modal .modal-wrapper {
+    background: white;
+    border-radius: 24px 24px 0 0;
+    /* Rounded top corners only */
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+body.dark .glass-modal {
+    --background: rgba(30, 41, 59, 0.9);
+}
+
+body.dark .glass-modal .modal-wrapper {
+    background: #1e293b;
+}
+
+/* Premium Button */
+ion-button.premium-button {
+    --border-radius: 12px;
+    --box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-size: 16px;
+    height: 48px;
+}

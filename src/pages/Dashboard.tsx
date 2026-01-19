@@ -7,10 +7,6 @@ import {
   IonTitle,
   IonToolbar,
   IonButton,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardTitle,
   IonItem,
   IonLabel,
   IonIcon,
@@ -22,14 +18,30 @@ import {
   IonAlert,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
+  IonList,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonText,
 } from '@ionic/react';
-import { add, logOut, document, image, folder as folderIcon, arrowBack, createOutline } from 'ionicons/icons';
+import {
+  add,
+  logOutOutline,
+  documentTextOutline,
+  imageOutline,
+  folderOpen,
+  arrowBack,
+  createOutline,
+  trashOutline,
+  cloud,
+} from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
-import { formatFileSize, formatDate } from '../utils/format.utils';
+import { formatFileSize, formatDateTime } from '../utils/format.utils';
+import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -37,7 +49,10 @@ const Dashboard: React.FC = () => {
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
   const [showFolderAlert, setShowFolderAlert] = useState(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState<{ isOpen: boolean; fileId: string | null }>({
+  const [showDeleteAlert, setShowDeleteAlert] = useState<{
+    isOpen: boolean;
+    fileId: string | null;
+  }>({
     isOpen: false,
     fileId: null,
   });
@@ -45,13 +60,7 @@ const Dashboard: React.FC = () => {
 
   const PAGE_SIZE = 15;
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isLoading,
-    error,
-  } = useInfiniteQuery({
+  const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
     queryKey: ['items', user?.id, folderId || 'root'],
     queryFn: ({ pageParam = 0 }) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -66,8 +75,8 @@ const Dashboard: React.FC = () => {
   });
 
   const items = {
-    files: data?.pages.flatMap(page => page.files) || [],
-    folders: data?.pages[0]?.folders || []
+    files: data?.pages.flatMap((page) => page.files) || [],
+    folders: data?.pages[0]?.folders || [],
   };
 
   const { data: storageSize } = useQuery({
@@ -77,6 +86,15 @@ const Dashboard: React.FC = () => {
       return storageService.getUserStorageSize(user.id);
     },
     enabled: !!user?.id,
+  });
+
+  const { data: currentFolder } = useQuery({
+    queryKey: ['folder', folderId],
+    queryFn: () => {
+      if (!user?.id || !folderId) return null;
+      return storageService.getFolder(folderId, user.id);
+    },
+    enabled: !!user?.id && !!folderId,
   });
 
   const deleteFileMutation = useMutation({
@@ -101,7 +119,7 @@ const Dashboard: React.FC = () => {
     },
     onError: (err: Error) => {
       setErrorToast(err.message || 'Failed to create folder. Ensure Supabase is configured.');
-    }
+    },
   });
 
   const handleLogout = async () => {
@@ -122,87 +140,80 @@ const Dashboard: React.FC = () => {
   };
 
   const getFileIcon = (type: string | undefined) => {
-    if (!type) return document;
-    if (type.startsWith('image/')) return image;
-    if (type === 'application/pdf') return document;
-    return document;
+    if (!type) return documentTextOutline;
+    if (type.startsWith('image/')) return imageOutline;
+    if (type === 'application/pdf') return documentTextOutline;
+    return documentTextOutline;
   };
 
-  const storagePercentage = storageSize
-    ? ((storageSize / MAX_USER_STORAGE_LIMIT) * 100).toFixed(1)
-    : '0';
+  // Safe calculation for storage
+  const usedBytes = storageSize || 0;
+  const storagePercentage = Math.min(usedBytes / MAX_USER_STORAGE_LIMIT, 1);
+  const percentageDisplay = (storagePercentage * 100).toFixed(1);
 
   return (
     <IonPage>
-      <IonHeader>
+      <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonButtons slot="start">
             {folderId && (
-              <IonButton onClick={() => navigate(-1)}>
+              <IonButton onClick={() => navigate('/dashboard')} color="dark">
                 <IonIcon icon={arrowBack} />
               </IonButton>
             )}
           </IonButtons>
-          <IonTitle>{folderId ? 'Folder Content' : 'My Files'}</IonTitle>
+          <IonTitle>{folderId && currentFolder ? currentFolder.name : 'Folder'}</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={handleLogout}>
-              <IonIcon icon={logOut} />
+            <IonButton onClick={handleLogout} color="dark">
+              <IonIcon icon={logOutOutline} />
             </IonButton>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen>
+
+      <IonContent fullscreen className="ion-padding-horizontal">
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent />
         </IonRefresher>
 
-        <div className="ion-padding">
-          {/* Storage Usage Card */}
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>Storage Usage</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <div
-                style={{
-                  width: '100%',
-                  height: '20px',
-                  backgroundColor: '#e0e0e0',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.min(Number(storagePercentage), 100)}%`,
-                    height: '100%',
-                    backgroundColor: Number(storagePercentage) > 80 ? '#eb445a' : '#2dd36f',
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-              <IonLabel
-                style={{ fontSize: '12px', color: '#666', marginTop: '8px', display: 'block' }}
-              >
-                {storagePercentage}% used
-              </IonLabel>
-            </IonCardContent>
-          </IonCard>
+        <div className="dashboard-header-spacer">
+          <div className="glass-card storage-card">
+            <div className="storage-header">
+              <IonText color="dark" className="storage-title">
+                Storage Used
+              </IonText>
+              <IonText color="medium" className="storage-percentage">
+                {percentageDisplay}%
+              </IonText>
+            </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <div className="storage-bar-container">
+              <div
+                className="storage-bar-fill"
+                style={{
+                  width: `${percentageDisplay}%`,
+                }}
+              />
+            </div>
+
+            <IonText color="medium" className="storage-stats">
+              {formatFileSize(usedBytes)} of {formatFileSize(MAX_USER_STORAGE_LIMIT)} used
+            </IonText>
+          </div>
+
+          <div className="dashboard-actions-grid">
             <IonButton
+              className="premium-button"
               expand="block"
-              style={{ flex: 1 }}
               onClick={() => navigate(folderId ? `/upload/${folderId}` : '/upload')}
             >
               <IonIcon icon={add} slot="start" />
               Upload
             </IonButton>
             <IonButton
+              color="light"
+              className="premium-button new-folder-button"
               expand="block"
-              fill="outline"
-              style={{ flex: 1 }}
               onClick={() => setShowFolderAlert(true)}
             >
               <IonIcon icon={createOutline} slot="start" />
@@ -210,100 +221,114 @@ const Dashboard: React.FC = () => {
             </IonButton>
           </div>
 
-          {/* Items List */}
-          {(isLoading) && (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <IonSpinner />
+          {items?.folders && items.folders.length > 0 && (
+            <div className="folders-section">
+              <IonText color="dark" className="section-title">
+                Folders
+              </IonText>
+              <IonGrid className="folders-grid">
+                <IonRow>
+                  {items.folders.map((f) => (
+                    <IonCol size="6" sizeSm="4" sizeMd="3" key={f.id}>
+                      <div
+                        onClick={() => navigate(`/dashboard/${f.id}`)}
+                        className="folder-card"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            navigate(`/dashboard/${f.id}`);
+                          }
+                        }}
+                      >
+                        <IonIcon icon={folderOpen} className="folder-icon" />
+                        <IonText color="dark" className="folder-name">
+                          {f.name}
+                        </IonText>
+                      </div>
+                    </IonCol>
+                  ))}
+                </IonRow>
+              </IonGrid>
             </div>
           )}
 
-          {error && (
-            <IonCard>
-              <IonCardContent>
-                <IonLabel color="danger">Error loading items. Please try again.</IonLabel>
-              </IonCardContent>
-            </IonCard>
-          )}
+          <div>
+            <IonText color="dark" className="section-title">
+              Files
+            </IonText>
 
-          {items && items.files.length === 0 && items.folders.length === 0 && (
-            <IonCard>
-              <IonCardContent>
-                <IonLabel>This folder is empty.</IonLabel>
-              </IonCardContent>
-            </IonCard>
-          )}
+            {isLoading && (
+              <div className="files-loading">
+                <IonSpinner color="primary" />
+              </div>
+            )}
 
-          {/* Folders List */}
-          {items?.folders.map((f) => (
-            <IonCard
-              key={f.id}
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/dashboard/${f.id}`)}
-              className="folder-card"
-            >
-              <IonCardContent>
-                <IonItem lines="none">
-                  <IonIcon
-                    icon={folderIcon}
-                    slot="start"
-                    style={{ fontSize: '32px', color: '#3171e0' }}
-                  />
-                  <IonLabel>
-                    <h2>{f.name}</h2>
-                    <p>{formatDate(f.created_at)}</p>
-                  </IonLabel>
-                </IonItem>
-              </IonCardContent>
-            </IonCard>
-          ))}
+            {error && <div className="files-error">Error loading items.</div>}
 
-          {/* Files List */}
-          {items?.files.map((file) => (
-            <IonCard
-              key={file.id}
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/file/${file.id}`)}
-            >
-              <IonCardContent>
-                <IonItem lines="none">
-                  {file.type?.startsWith('image/') ? (
-                    <div slot="start" style={{ width: '40px', height: '40px', marginRight: '16px', overflow: 'hidden', borderRadius: '4px' }}>
-                      <img
-                        src={getThumbnailUrl(file.download_url, file.storage_type, 80, 80)}
-                        alt={file.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+            {!isLoading &&
+              items?.files.length === 0 &&
+              (!items.folders || items.folders.length === 0) && (
+                <div className="files-empty">
+                  <IonIcon icon={cloud} className="files-empty-icon" />
+                  <p>No files yet. Upload something!</p>
+                </div>
+              )}
+
+            <IonList lines="none" className="files-list">
+              {items?.files.map((file) => (
+                <div
+                  key={file.id}
+                  className="glass-card file-list-item"
+                  onClick={() => navigate(`/file/${file.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      navigate(`/file/${file.id}`);
+                    }
+                  }}
+                >
+                  <IonItem detail={false} lines="none" className="file-item-inner">
+                    <div slot="start" className="file-thumbnail-container">
+                      {file.type?.startsWith('image/') ? (
+                        <div className="file-thumbnail-img-box">
+                          <img
+                            src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
+                            alt={file.name}
+                            className="file-thumbnail-img"
+                          />
+                        </div>
+                      ) : (
+                        <div className="file-icon-box">
+                          <IonIcon icon={getFileIcon(file.type)} className="file-icon" />
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <IonIcon
-                      icon={getFileIcon(file.type)}
-                      slot="start"
-                      style={{ fontSize: '32px' }}
-                    />
-                  )}
-                  <IonLabel>
-                    <h2>{file.name}</h2>
-                    <p>
-                      {formatFileSize(file.size)} •{' '}
-                      {formatDate(file.created_at)}
-                    </p>
-                  </IonLabel>
-                  <IonButton
-                    slot="end"
-                    fill="clear"
-                    color="danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteFile(file.id!);
-                    }}
-                  >
-                    Delete
-                  </IonButton>
-                </IonItem>
-              </IonCardContent>
-            </IonCard>
-          ))}
-          {items && items.files.length > 0 && (
+
+                    <IonLabel className="ion-text-wrap">
+                      <h2 className="file-meta-name">{file.name}</h2>
+                      <p className="file-meta-details">
+                        {formatFileSize(file.size)} • {formatDateTime(file.created_at)}
+                      </p>
+                    </IonLabel>
+
+                    <IonButton
+                      slot="end"
+                      fill="clear"
+                      color="medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteFile(file.id!);
+                      }}
+                    >
+                      <IonIcon icon={trashOutline} color="danger" className="file-delete-icon" />
+                    </IonButton>
+                  </IonItem>
+                </div>
+              ))}
+            </IonList>
+
             <IonInfiniteScroll
               onIonInfinite={async (ev) => {
                 await fetchNextPage();
@@ -311,12 +336,9 @@ const Dashboard: React.FC = () => {
               }}
               disabled={!hasNextPage}
             >
-              <IonInfiniteScrollContent
-                loadingText="Loading more files..."
-                loadingSpinner="bubbles"
-              />
+              <IonInfiniteScrollContent loadingText="" loadingSpinner="bubbles" />
             </IonInfiniteScroll>
-          )}
+          </div>
         </div>
 
         <IonToast
@@ -330,7 +352,7 @@ const Dashboard: React.FC = () => {
           isOpen={showDeleteAlert.isOpen}
           onDidDismiss={() => setShowDeleteAlert({ isOpen: false, fileId: null })}
           header="Delete File"
-          message="Are you sure you want to delete this file? This action cannot be undone."
+          message="Are you sure you want to delete this file? This action is permanent."
           buttons={[
             {
               text: 'Cancel',
@@ -348,7 +370,7 @@ const Dashboard: React.FC = () => {
             },
           ]}
         />
-        
+
         <IonAlert
           isOpen={showFolderAlert}
           onDidDismiss={() => setShowFolderAlert(false)}
@@ -357,14 +379,14 @@ const Dashboard: React.FC = () => {
             {
               name: 'folderName',
               type: 'text',
-              placeholder: 'Folder name'
-            }
+              placeholder: 'Folder name',
+            },
           ]}
           buttons={[
             {
               text: 'Cancel',
               role: 'cancel',
-              handler: () => setShowFolderAlert(false)
+              handler: () => setShowFolderAlert(false),
             },
             {
               text: 'Create',
@@ -372,8 +394,8 @@ const Dashboard: React.FC = () => {
                 if (data.folderName) {
                   createFolderMutation.mutate(data.folderName);
                 }
-              }
-            }
+              },
+            },
           ]}
         />
         <IonToast

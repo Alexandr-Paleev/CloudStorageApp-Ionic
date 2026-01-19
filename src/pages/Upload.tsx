@@ -131,7 +131,6 @@ const Upload: React.FC = () => {
     }
   };
 
-
   return (
     <IonPage>
       <IonHeader>
@@ -192,16 +191,6 @@ const Upload: React.FC = () => {
               <IonLabel color="danger" style={{ display: 'block', marginTop: '10px' }}>
                 {error}
               </IonLabel>
-            )}
-
-            {isGoogleDriveConnected && (
-              <IonItem style={{ marginTop: '10px' }}>
-                <IonLabel>
-                  <p style={{ fontSize: '12px', color: '#2dd36f' }}>
-                    ✓ Google Drive connected - files will be saved to Google Drive
-                  </p>
-                </IonLabel>
-              </IonItem>
             )}
 
             <IonButton

@@ -1,0 +1,226 @@
+/* Dashboard Page Styles */
+
+.dashboard-header-spacer {
+    padding-top: 10px;
+    padding-bottom: 40px;
+}
+
+/* Storage Overview Card */
+.storage-card {
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.storage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.storage-title {
+    font-weight: 600;
+}
+
+.storage-percentage {
+    font-size: 14px;
+}
+
+.storage-bar-container {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.storage-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--ion-color-secondary) 0%, var(--ion-color-primary) 100%);
+    border-radius: 10px;
+    transition: width 0.5s ease-out;
+}
+
+.storage-stats {
+    font-size: 12px;
+}
+
+/* Action Buttons */
+.dashboard-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.new-folder-button {
+    --background: #ffffff;
+    --color: var(--ion-color-primary);
+}
+
+/* Folders Grid */
+.folders-section {
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    padding-left: 4px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.folders-grid {
+    padding: 0;
+}
+
+.folder-card {
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: transform 0.1s;
+    border: 1px solid rgba(0, 0, 0, 0.02);
+}
+
+.folder-icon {
+    font-size: 32px;
+    color: var(--ion-color-secondary);
+    margin-bottom: 8px;
+}
+
+.folder-name {
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Files List */
+.files-loading {
+    text-align: center;
+    padding: 40px;
+}
+
+.files-error {
+    padding: 20px;
+    text-align: center;
+    color: var(--ion-color-danger);
+}
+
+.files-empty {
+    text-align: center;
+    padding: 60px 20px;
+    opacity: 0.6;
+}
+
+.files-empty-icon {
+    font-size: 48px;
+    color: #cbd5e1;
+    margin-bottom: 16px;
+}
+
+.files-list {
+    background: transparent;
+    padding: 0;
+}
+
+.file-list-item {
+    margin-bottom: 12px;
+    padding: 8px 4px;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.file-item-inner {
+    --background: transparent;
+    --padding-start: 8px;
+}
+
+.file-thumbnail-container {
+    margin-right: 16px;
+}
+
+.file-thumbnail-img-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #f1f5f9;
+}
+
+.file-thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.file-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-icon {
+    font-size: 24px;
+    color: #64748b;
+}
+
+.file-meta-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.file-meta-details {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.file-delete-icon {
+    opacity: 0.7;
+}
+
+/* Dark Mode Overrides for Dashboard */
+body.dark .new-folder-button {
+    --background: rgba(30, 30, 30, 0.5);
+    --color: #ffffff;
+}
+
+body.dark .folder-card {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+body.dark .folder-name {
+    color: #f8fafc;
+}
+
+body.dark .file-list-item {
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+body.dark .file-meta-name {
+    color: #f8fafc;
+}
+
+body.dark .section-title {
+    color: #f8fafc;
+}
