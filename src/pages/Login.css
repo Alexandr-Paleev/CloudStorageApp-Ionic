@@ -27,6 +27,11 @@
     backdrop-filter: blur(10px);
 }
 
+.login-logo-icon {
+    font-size: 56px;
+    color: #ffffff;
+}
+
 .brand-title {
     margin: 0;
     font-size: 28px;
