@@ -85,6 +85,11 @@ VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/de
 
 # Optional: Google Drive (for extra storage)
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
+
+# Optional: Analytics (production only)
+VITE_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
+VITE_HOTJAR_SITE_ID=1234567
+VITE_HOTJAR_VERSION=6
 ```
 
 ### 3. Service Setup
@@ -124,6 +129,22 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 3. Create OAuth 2.0 Client ID
 4. Add `VITE_GOOGLE_CLIENT_ID` to `.env`
 
+#### Analytics (optional)
+
+Analytics are automatically enabled in production when environment variables are set.
+
+**Google Analytics 4:**
+1. Create a property in [Google Analytics](https://analytics.google.com/)
+2. Get your Measurement ID (starts with `G-`)
+3. Add `VITE_GA4_MEASUREMENT_ID` to `.env`
+
+**Hotjar:**
+1. Create a site in [Hotjar](https://www.hotjar.com/)
+2. Get your Site ID from the tracking code
+3. Add `VITE_HOTJAR_SITE_ID` to `.env`
+
+> **Privacy First**: Hotjar only runs on web (not native mobile apps). File names and sensitive data are automatically masked using `data-hj-suppress` attributes.
+
 ### 4. Run Application
 
 ```bash
@@ -150,6 +171,8 @@ The app will be available at: `http://localhost:5173`
 - **Routing**: React Router DOM
 - **Build**: Vite + Capacitor
 - **Backend API**: Vercel Functions
+- **Analytics**: Google Analytics 4 (GA4) + Hotjar
+- **Error Tracking**: Sentry
 
 ## 🚀 Deployment
 
@@ -209,7 +232,12 @@ cloud-storage-app/
 │   ├── contexts/
 │   │   └── AuthContext.tsx        # Authentication context
 │   ├── components/
-│   │   └── PrivateRoute.tsx       # Protected route component
+│   │   ├── PrivateRoute.tsx       # Protected route component
+│   │   └── PageViewTracker.tsx    # Analytics page view tracker
+│   ├── hooks/
+│   │   └── useAnalytics.ts        # GA4 + Hotjar analytics hook
+│   ├── types/
+│   │   └── analytics.types.ts     # Analytics event types
 │   ├── supabase/
 │   │   └── supabase.config.ts     # Supabase configuration
 │   ├── App.tsx                    # Main component

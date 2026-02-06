@@ -14,6 +14,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    "types": ["node", "trusted-types"],
+    "typeRoots": ["node_modules/@types"],
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
@@ -30,6 +33,3 @@
   "exclude": ["api", "functions", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
-
-
-
