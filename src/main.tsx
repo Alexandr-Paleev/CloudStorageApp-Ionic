@@ -4,6 +4,7 @@ import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
 import { env } from './env';
+import { initializeGA4, initializeHotjar, trackApiErrorStandalone } from './hooks/useAnalytics';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -28,11 +29,31 @@ Sentry.init({
   environment: import.meta.env.MODE,
 });
 
+// Initialize Analytics (GA4 + Hotjar)
+initializeGA4();
+initializeHotjar();
+
+/**
+ * Handle query/mutation errors globally for analytics tracking
+ */
+function handleQueryError(error: unknown, queryKey?: unknown): void {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const queryKeyString = queryKey ? JSON.stringify(queryKey) : undefined;
+
+  trackApiErrorStandalone({
+    error_message: errorMessage,
+    query_key: queryKeyString,
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      onError: (error) => handleQueryError(error),
     },
   },
 });

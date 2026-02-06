@@ -23,6 +23,11 @@ const envSchema = z.object({
 
   // Sentry - Optional
   VITE_SENTRY_DSN: z.string().optional(),
+
+  // Analytics - Optional
+  VITE_GA4_MEASUREMENT_ID: z.string().optional(),
+  VITE_HOTJAR_SITE_ID: z.string().optional(),
+  VITE_HOTJAR_VERSION: z.coerce.number().optional().default(6),
 });
 
 export type Env = z.infer<typeof envSchema>;

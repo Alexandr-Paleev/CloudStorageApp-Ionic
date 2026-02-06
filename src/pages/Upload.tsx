@@ -25,15 +25,18 @@ import { useAuth } from '../contexts/AuthContext';
 import storageService, {
   UploadProgress,
   MAX_USER_STORAGE_LIMIT,
+  FileMetadata,
 } from '../services/storage.service';
 import googleDriveAuthService from '../services/googledrive-auth.service';
 import { formatFileSize } from '../utils/format.utils';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 const Upload: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
+  const { trackFileUpload } = useAnalytics();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState('');
@@ -70,7 +73,15 @@ const Upload: React.FC = () => {
         useGoogleDrive
       );
     },
-    onSuccess: () => {
+    onSuccess: (result: FileMetadata, file: File) => {
+      // Track file upload analytics
+      trackFileUpload({
+        file_type: file.type,
+        file_size: file.size,
+        storage_provider: result.storage_type,
+        folder_id: folderId || undefined,
+      });
+
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
       if (folderId) {
@@ -166,7 +177,8 @@ const Upload: React.FC = () => {
             {selectedFile && (
               <IonItem style={{ marginTop: '20px' }}>
                 <IonLabel>
-                  <h2>{selectedFile.name}</h2>
+                  {/* data-hj-suppress masks file names from Hotjar recordings for privacy */}
+                  <h2 data-hj-suppress>{selectedFile.name}</h2>
                   <p>
                     {formatFileSize(selectedFile.size)} • {selectedFile.type}
                   </p>

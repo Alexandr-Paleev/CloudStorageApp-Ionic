@@ -8,6 +8,7 @@ import Upload from './pages/Upload';
 import FileView from './pages/FileView';
 import PrivateRoute from './components/PrivateRoute';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
+import { PageViewTracker } from './components/PageViewTracker';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -33,6 +34,7 @@ const App: React.FC = () => (
   <IonApp>
     <AuthProvider>
       <BrowserRouter>
+        <PageViewTracker />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
