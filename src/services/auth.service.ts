@@ -42,7 +42,9 @@ export const authService = {
    * Get current user
    */
   async getCurrentUser(): Promise<User | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     return user;
   },
 
@@ -50,7 +52,9 @@ export const authService = {
    * Subscribe to auth state changes
    */
   onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       callback(session?.user ?? null);
     });
 
@@ -77,15 +81,3 @@ export const authService = {
     if (error) throw error;
   },
 };
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,151 +1,151 @@
 /* File View Page Styles */
 
 .file-view-loader {
-    display: flex;
-    justify-content: center;
-    padding-top: 40vh;
+  display: flex;
+  justify-content: center;
+  padding-top: 40vh;
 }
 
 .file-not-found {
-    text-align: center;
-    margin-top: 40px;
-    color: #666;
+  text-align: center;
+  margin-top: 40px;
+  color: #666;
 }
 
 .file-view-container {
-    padding-bottom: 40px;
+  padding-bottom: 40px;
 }
 
 /* File Preview Area */
 .preview-area {
-    width: 100%;
-    height: 45vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    border-radius: 0 0 32px 32px;
-    margin-bottom: 24px;
-    padding: 24px;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  height: 45vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 0 0 32px 32px;
+  margin-bottom: 24px;
+  padding: 24px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
 }
 
 .preview-image {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    border-radius: 16px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
 }
 
 .preview-pdf-container {
-    width: 100%;
-    height: 100%;
-    background: #fff;
-    border-radius: 16px;
-    overflow: hidden;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .preview-pdf-frame {
-    width: 100%;
-    height: 100%;
-    border: none;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 .preview-placeholder {
-    text-align: center;
-    opacity: 0.6;
+  text-align: center;
+  opacity: 0.6;
 }
 
 .preview-icon-box {
-    width: 96px;
-    height: 96px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 16px;
+  width: 96px;
+  height: 96px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
 }
 
 .preview-icon {
-    font-size: 48px;
-    color: var(--ion-color-primary);
+  font-size: 48px;
+  color: var(--ion-color-primary);
 }
 
 .preview-title {
-    font-size: 18px;
-    font-weight: 600;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .preview-type {
-    font-size: 14px;
+  font-size: 14px;
 }
 
 /* Metadata Card */
 .metadata-card {
-    padding: 20px;
-    margin-bottom: 24px;
+  padding: 20px;
+  margin-bottom: 24px;
 }
 
 .metadata-grid {
-    padding: 0;
+  padding: 0;
 }
 
 .metadata-label {
-    font-size: 12px;
+  font-size: 12px;
 }
 
 .metadata-value {
-    font-size: 14px;
-    font-weight: 500;
-    color: #1e293b;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
 }
 
 /* Actions */
 .actions-container {
-    margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 .download-button {
-    margin-bottom: 16px;
+  margin-bottom: 16px;
 }
 
 .action-grid {
-    padding: 0;
+  padding: 0;
 }
 
 .action-button {
-    height: 50px;
+  height: 50px;
 }
 
 .action-button-label {
-    margin-left: 8px;
+  margin-left: 8px;
 }
 
 .delete-button {
-    height: 50px;
-    --border-color: rgba(var(--ion-color-danger-rgb), 0.3);
-    --background-hover: rgba(var(--ion-color-danger-rgb), 0.05);
+  height: 50px;
+  --border-color: rgba(var(--ion-color-danger-rgb), 0.3);
+  --background-hover: rgba(var(--ion-color-danger-rgb), 0.05);
 }
 
 /* Rename Modal */
 .rename-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 24px;
-    text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 .save-button {
-    margin-top: 24px;
+  margin-top: 24px;
 }
 
 /* Dark Mode Overrides */
 body.dark .metadata-value {
-    color: #f8fafc;
+  color: #f8fafc;
 }
 
 body.dark .delete-button {
-    --color: #ffcccc;
+  --color: #ffcccc;
 }

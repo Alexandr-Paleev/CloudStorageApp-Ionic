@@ -5,7 +5,7 @@
 
 :root {
   /* Primary - Deep Indigo */
-  --ion-color-primary: #4F46E5;
+  --ion-color-primary: #4f46e5;
   --ion-color-primary-rgb: 79, 70, 229;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
@@ -13,7 +13,7 @@
   --ion-color-primary-tint: #6159e8;
 
   /* Secondary - Sky Blue */
-  --ion-color-secondary: #0EA5E9;
+  --ion-color-secondary: #0ea5e9;
   --ion-color-secondary-rgb: 14, 165, 233;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
@@ -21,7 +21,7 @@
   --ion-color-secondary-tint: #26aee3;
 
   /* Tertiary - Violet (Success/Premium accents) */
-  --ion-color-tertiary: #8B5CF6;
+  --ion-color-tertiary: #8b5cf6;
   --ion-color-tertiary-rgb: 139, 92, 246;
   --ion-color-tertiary-contrast: #ffffff;
   --ion-color-tertiary-contrast-rgb: 255, 255, 255;
@@ -29,7 +29,7 @@
   --ion-color-tertiary-tint: #976cf7;
 
   /* Backgrounds */
-  --ion-background-color: #F8FAFC;
+  --ion-background-color: #f8fafc;
   --ion-background-color-rgb: 248, 250, 252;
 
   --ion-item-background: transparent;
