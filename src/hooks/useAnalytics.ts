@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import ReactGA from 'react-ga4';
-import { Capacitor } from '@capacitor/core';
+
 import { env } from '../env';
 import type {
   UploadFileEvent,
@@ -14,9 +14,6 @@ import type {
 
 /** Track whether GA4 has been initialized */
 let ga4Initialized = false;
-
-/** Track whether Hotjar has been initialized */
-let hotjarInitialized = false;
 
 /**
  * Safely execute analytics calls - prevents crashes from ad-blockers
@@ -60,62 +57,6 @@ export function initializeGA4(): void {
       },
     });
     ga4Initialized = true;
-  });
-}
-
-/**
- * Initialize Hotjar tracking
- * Only runs on web platform (not native Capacitor apps)
- * Should be called once at app startup
- */
-export function initializeHotjar(): void {
-  if (hotjarInitialized) return;
-
-  // Only load Hotjar on web, not on native mobile apps
-  if (Capacitor.isNativePlatform()) {
-    if (import.meta.env.DEV) {
-      console.info('[Analytics] Hotjar skipped - running on native platform');
-    }
-    return;
-  }
-
-  // Only load in production
-  if (import.meta.env.DEV) {
-    console.info('[Analytics] Hotjar skipped - not in production mode');
-    return;
-  }
-
-  const siteId = env.VITE_HOTJAR_SITE_ID;
-  const version = env.VITE_HOTJAR_VERSION;
-
-  if (!siteId) {
-    return;
-  }
-
-  safeAnalyticsCall(() => {
-    // Hotjar tracking code - using type assertions for the Hotjar global
-    interface HotjarWindow extends Window {
-      hj?: ((...args: unknown[]) => void) & { q?: unknown[] };
-      _hjSettings?: { hjid: number; hjsv: number };
-    }
-
-    const hjWindow = window as HotjarWindow;
-    const hjId = parseInt(siteId, 10);
-
-    hjWindow.hj =
-      hjWindow.hj ||
-      function (...args: unknown[]) {
-        (hjWindow.hj!.q = hjWindow.hj!.q || []).push(args);
-      };
-    hjWindow._hjSettings = { hjid: hjId, hjsv: version };
-
-    const head = document.getElementsByTagName('head')[0];
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://static.hotjar.com/c/hotjar-${hjId}.js?sv=${version}`;
-    head.appendChild(script);
-
-    hotjarInitialized = true;
   });
 }
 

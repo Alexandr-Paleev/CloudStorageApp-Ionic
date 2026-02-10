@@ -4,7 +4,8 @@ import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react';
 import { env } from './env';
-import { initializeGA4, initializeHotjar, trackApiErrorStandalone } from './hooks/useAnalytics';
+import { initializeGA4, trackApiErrorStandalone } from './hooks/useAnalytics';
+import { initHotjar } from './analytics/hotjar';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -31,7 +32,7 @@ Sentry.init({
 
 // Initialize Analytics (GA4 + Hotjar)
 initializeGA4();
-initializeHotjar();
+initHotjar();
 
 /**
  * Handle query/mutation errors globally for analytics tracking

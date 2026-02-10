@@ -9,6 +9,7 @@ import FileView from './pages/FileView';
 import PrivateRoute from './components/PrivateRoute';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { PageViewTracker } from './components/PageViewTracker';
+import { useHotjarStateChange } from './analytics/hotjar';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -30,11 +31,18 @@ import './theme/global.css';
 
 setupIonicReact();
 
+// Component to handle Hotjar state changes
+const HotjarTracker: React.FC = () => {
+  useHotjarStateChange();
+  return null;
+};
+
 const App: React.FC = () => (
   <IonApp>
     <AuthProvider>
       <BrowserRouter>
         <PageViewTracker />
+        <HotjarTracker />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route

@@ -89,6 +89,7 @@ const Login: React.FC = () => {
                     required
                     disabled={loading}
                     className="login-input-field"
+                    data-hj-allow
                   />
                 </IonItem>
               </div>
@@ -110,6 +111,7 @@ const Login: React.FC = () => {
                     required
                     disabled={loading}
                     className="login-input-field"
+                    data-hj-suppress
                   />
                 </IonItem>
               </div>
