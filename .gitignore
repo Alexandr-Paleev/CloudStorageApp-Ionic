@@ -41,3 +41,7 @@ android
 
 
 dev-dist/
+
+# Claude Code
+.claude/
+CLAUDE.md
