@@ -28,6 +28,8 @@ import storageService, {
   FileMetadata,
 } from '../services/storage.service';
 import googleDriveAuthService from '../services/googledrive-auth.service';
+import { useProfile } from '../hooks/useProfile';
+import ProviderSelector from '../components/ProviderSelector';
 import { formatFileSize } from '../utils/format.utils';
 import { useAnalytics } from '../hooks/useAnalytics';
 
@@ -42,6 +44,8 @@ const Upload: React.FC = () => {
   const [error, setError] = useState('');
   const [showGoogleDriveAlert, setShowGoogleDriveAlert] = useState(false);
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
+  const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
+  const { profile } = useProfile();
 
   // Check storage size
   const { data: storageSize } = useQuery({
@@ -70,7 +74,12 @@ const Upload: React.FC = () => {
           setUploadProgress(progress);
         },
         folderId || null,
-        useGoogleDrive
+        useGoogleDrive,
+        {
+          preferredProvider,
+          allowedProviders: profile?.allowed_providers,
+          storageLimit: profile?.storage_limit,
+        }
       );
     },
     onSuccess: (result: FileMetadata, file: File) => {
@@ -112,8 +121,9 @@ const Upload: React.FC = () => {
     setUploadProgress({ bytesTransferred: 0, totalBytes: selectedFile.size, progress: 0 });
 
     // Check if storage limit would be exceeded
+    const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
     const wouldExceedLimit =
-      storageSize !== undefined && storageSize + selectedFile.size > MAX_USER_STORAGE_LIMIT;
+      storageSize !== undefined && storageSize + selectedFile.size > storageLimit;
 
     if (wouldExceedLimit && !isGoogleDriveConnected && !useGoogleDrive) {
       setShowGoogleDriveAlert(true);
@@ -132,6 +142,7 @@ const Upload: React.FC = () => {
       await googleDriveAuthService.authorize();
       queryClient.invalidateQueries({ queryKey: ['googleDriveConnected'] });
       setUseGoogleDrive(true);
+      setPreferredProvider(undefined);
       setShowGoogleDriveAlert(false);
       // Retry upload after connecting
       if (selectedFile) {
@@ -184,6 +195,14 @@ const Upload: React.FC = () => {
                   </p>
                 </IonLabel>
               </IonItem>
+            )}
+
+            {profile?.tier === 'pro' && (
+              <ProviderSelector
+                selectedProvider={preferredProvider}
+                allowedProviders={profile.allowed_providers}
+                onSelect={setPreferredProvider}
+              />
             )}
 
             {uploadProgress && (

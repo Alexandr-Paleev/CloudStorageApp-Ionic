@@ -75,7 +75,14 @@ export const FileMetadataSchema = z.object({
   type: z.string(),
   download_url: z.string(), // Removed .url() validation to prevent issues with complex signed URLs
   storage_path: z.string(),
-  storage_type: z.enum(['cloudinary', 'firebase', 'googledrive', 'r2', 'supabase_storage']),
+  storage_type: z.enum([
+    'cloudinary',
+    'firebase',
+    'googledrive',
+    'r2',
+    'supabase_storage',
+    'dropbox',
+  ]),
   folder_id: z.string().uuid().nullable().optional(),
   user_id: z.string().optional(),
   created_at: z.string().optional(),

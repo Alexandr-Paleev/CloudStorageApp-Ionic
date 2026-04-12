@@ -45,6 +45,22 @@
   font-size: 12px;
 }
 
+.tier-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.tier-badge--pro {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+}
+
 /* Action Buttons */
 .dashboard-actions-grid {
   display: grid;

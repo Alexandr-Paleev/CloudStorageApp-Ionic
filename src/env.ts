@@ -28,6 +28,13 @@ const envSchema = z.object({
   VITE_GA4_MEASUREMENT_ID: z.string().optional(),
   VITE_HOTJAR_SITE_ID: z.string().optional(),
   VITE_HOTJAR_VERSION: z.coerce.number().optional().default(6),
+
+  // Stripe - Optional (required for billing)
+  VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+
+  // Dropbox - Optional (Pro feature)
+  VITE_DROPBOX_APP_KEY: z.string().optional(),
+  VITE_DROPBOX_REDIRECT_URI: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

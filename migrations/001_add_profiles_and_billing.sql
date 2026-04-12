@@ -1,48 +1,7 @@
--- Create folders table
-CREATE TABLE IF NOT EXISTS public.folders (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    parent_id UUID REFERENCES public.folders(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- Migration: Add profiles table for billing and subscription management
+-- Run this in Supabase SQL Editor
 
--- Create files table
-CREATE TABLE IF NOT EXISTS public.files (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    size BIGINT NOT NULL,
-    type TEXT NOT NULL,
-    download_url TEXT NOT NULL,
-    storage_path TEXT NOT NULL,
-    storage_type TEXT NOT NULL,
-    folder_id UUID REFERENCES public.folders(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Enable RLS
-ALTER TABLE public.folders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.files ENABLE ROW LEVEL SECURITY;
-
--- Policies for folders
-CREATE POLICY "Users can manage their own folders" ON public.folders
-    FOR ALL USING (auth.uid() = user_id);
-
--- Policies for files
-CREATE POLICY "Users can manage their own files" ON public.files
-    FOR ALL USING (auth.uid() = user_id);
-
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_folders_user_id ON public.folders(user_id);
-CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON public.folders(parent_id);
-CREATE INDEX IF NOT EXISTS idx_files_user_id ON public.files(user_id);
-CREATE INDEX IF NOT EXISTS idx_files_folder_id ON public.files(folder_id);
-
--- =============================================
--- Profiles table (billing & subscription)
--- =============================================
-
+-- 1. Create profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT,
@@ -59,8 +18,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 2. Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- 3. RLS Policies
 CREATE POLICY "Users can view own profile" ON public.profiles
     FOR SELECT USING (auth.uid() = id);
 
@@ -70,10 +31,11 @@ CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id)
     WITH CHECK (auth.uid() = id);
 
+-- 4. Indexes
 CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer_id ON public.profiles(stripe_customer_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_stripe_subscription_id ON public.profiles(stripe_subscription_id);
 
--- Auto-create profile on user registration
+-- 5. Auto-create profile on user registration
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -91,7 +53,7 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Auto-update updated_at timestamp
+-- 6. Auto-update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -104,7 +66,7 @@ CREATE TRIGGER on_profile_updated
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Backfill: create profiles for all existing users
+-- 7. Backfill: create profiles for all existing users
 INSERT INTO public.profiles (id, email, tier, storage_limit)
 SELECT id, email, 'free', 524288000
 FROM auth.users

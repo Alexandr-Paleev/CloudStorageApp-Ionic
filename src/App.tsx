@@ -6,6 +6,9 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import FileView from './pages/FileView';
+import Pricing from './pages/Pricing';
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import DropboxCallback from './pages/DropboxCallback';
 import PrivateRoute from './components/PrivateRoute';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { PageViewTracker } from './components/PageViewTracker';
@@ -66,6 +69,30 @@ const App: React.FC = () => (
             element={
               <PrivateRoute>
                 <FileView />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <PrivateRoute>
+                <Pricing />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/subscription/success"
+            element={
+              <PrivateRoute>
+                <SubscriptionSuccess />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/auth/dropbox/callback"
+            element={
+              <PrivateRoute>
+                <DropboxCallback />
               </PrivateRoute>
             }
           />

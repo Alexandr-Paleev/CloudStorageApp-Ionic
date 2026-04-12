@@ -4,7 +4,8 @@ import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
 import * as Sentry from '@sentry/react';
 
-export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB in bytes (Local limit before GDrive)
+/** @deprecated Use dynamic limit from user profile via billingService.getStorageLimit() */
+export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB default fallback
 
 export type { FileMetadata, Folder };
 
@@ -26,9 +27,14 @@ const storageService = {
   /**
    * Check if user can upload file to local storage (Cloudinary/R2)
    */
-  async canUploadToLocal(userId: string, fileSize: number): Promise<boolean> {
+  async canUploadToLocal(
+    userId: string,
+    fileSize: number,
+    storageLimit?: number
+  ): Promise<boolean> {
     const currentSize = await this.getUserStorageSize(userId);
-    return currentSize + fileSize <= MAX_USER_STORAGE_LIMIT;
+    const limit = storageLimit ?? MAX_USER_STORAGE_LIMIT;
+    return currentSize + fileSize <= limit;
   },
 
   /**
@@ -39,11 +45,18 @@ const storageService = {
     file: File,
     onProgress?: (progress: UploadProgress) => void,
     folderId: string | null = null,
-    useGoogleDrive?: boolean
+    useGoogleDrive?: boolean,
+    options?: {
+      preferredProvider?: string;
+      allowedProviders?: string[];
+      storageLimit?: number;
+    }
   ): Promise<FileMetadata> {
     const provider = await providerManager.selectProvider(file, userId, {
-      canUploadToLocal: (size) => this.canUploadToLocal(userId, size),
+      canUploadToLocal: (size) => this.canUploadToLocal(userId, size, options?.storageLimit),
       useGoogleDrive,
+      preferredProvider: options?.preferredProvider,
+      allowedProviders: options?.allowedProviders,
     });
 
     const result = await withRetry(() => provider.upload(file, userId, onProgress), {

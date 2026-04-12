@@ -3,7 +3,7 @@ import { UploadProgress } from '../services/storage.service';
 export interface StorageUploadResult {
   url: string;
   path: string;
-  type: 'cloudinary' | 'googledrive' | 'r2' | 'supabase_storage';
+  type: 'cloudinary' | 'googledrive' | 'r2' | 'supabase_storage' | 'dropbox';
 }
 
 export interface IStorageProvider {
