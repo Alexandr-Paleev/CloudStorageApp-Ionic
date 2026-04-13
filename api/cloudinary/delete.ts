@@ -1,17 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { authenticateUser } from '../lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
+    await authenticateUser(req);
     const cloudinary = (await import('cloudinary')).v2;
 
     cloudinary.config({
@@ -38,21 +35,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // If we tried 'image' (default) and got 'not found', it might be a 'raw' file or 'video'
     // that we didn't know about. Try finding it as 'raw' just in case.
     if (!resourceType && result.result === 'not found') {
-       result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+      result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
     }
 
     if (result.result === 'ok' || result.result === 'not found') {
       res.status(200).json({
         success: true,
-        message: result.result === 'not found' ? 'File not found (may already be deleted)' : 'Deleted successfully',
-        details: result
+        message:
+          result.result === 'not found'
+            ? 'File not found (may already be deleted)'
+            : 'Deleted successfully',
+        details: result,
       });
       return;
     } else {
       console.error(`[Cloudinary] Deletion failed:`, result);
       res.status(500).json({
         error: `Failed to delete file from Cloudinary: ${result.result}`,
-        details: result
+        details: result,
       });
       return;
     }

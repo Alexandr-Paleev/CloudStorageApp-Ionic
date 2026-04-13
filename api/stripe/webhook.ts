@@ -27,7 +27,7 @@ async function buffer(readable: VercelRequest): Promise<Buffer> {
 }
 
 async function upgradeToPro(customerId: string, subscriptionId: string, periodEnd: Date) {
-  await supabase
+  const { error, count } = await supabase
     .from('profiles')
     .update({
       tier: 'pro',
@@ -37,11 +37,15 @@ async function upgradeToPro(customerId: string, subscriptionId: string, periodEn
       subscription_period_end: periodEnd.toISOString(),
       allowed_providers: TIER_LIMITS.pro.allowed_providers,
     })
-    .eq('stripe_customer_id', customerId);
+    .eq('stripe_customer_id', customerId)
+    .select('id', { count: 'exact', head: true });
+
+  if (error) throw new Error(`Failed to upgrade: ${error.message}`);
+  if (!count) throw new Error(`No profile found for customer ${customerId}`);
 }
 
 async function downgradeToFree(customerId: string) {
-  await supabase
+  const { error, count } = await supabase
     .from('profiles')
     .update({
       tier: 'free',
@@ -51,7 +55,11 @@ async function downgradeToFree(customerId: string) {
       subscription_period_end: null,
       allowed_providers: TIER_LIMITS.free.allowed_providers,
     })
-    .eq('stripe_customer_id', customerId);
+    .eq('stripe_customer_id', customerId)
+    .select('id', { count: 'exact', head: true });
+
+  if (error) throw new Error(`Failed to downgrade: ${error.message}`);
+  if (!count) throw new Error(`No profile found for customer ${customerId}`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -70,56 +78,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ message: 'Invalid signature' });
   }
 
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.subscription && session.customer) {
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-        await upgradeToPro(
-          session.customer as string,
-          subscription.id,
-          new Date(subscription.current_period_end * 1000)
-        );
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.subscription && session.customer) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+          await upgradeToPro(
+            session.customer as string,
+            subscription.id,
+            new Date(subscription.current_period_end * 1000)
+          );
+        }
+        break;
       }
-      break;
-    }
 
-    case 'customer.subscription.updated': {
-      const subscription = event.data.object as Stripe.Subscription;
-      const customerId = subscription.customer as string;
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
 
-      if (subscription.status === 'active') {
-        await upgradeToPro(
-          customerId,
-          subscription.id,
-          new Date(subscription.current_period_end * 1000)
-        );
-      } else if (subscription.status === 'past_due') {
-        await supabase
-          .from('profiles')
-          .update({ subscription_status: 'past_due' })
-          .eq('stripe_customer_id', customerId);
+        if (subscription.status === 'active') {
+          await upgradeToPro(
+            customerId,
+            subscription.id,
+            new Date(subscription.current_period_end * 1000)
+          );
+        } else if (subscription.status === 'past_due') {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ subscription_status: 'past_due' })
+            .eq('stripe_customer_id', customerId);
+          if (error) throw new Error(`Failed to update status: ${error.message}`);
+        }
+        break;
       }
-      break;
-    }
 
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object as Stripe.Subscription;
-      await downgradeToFree(subscription.customer as string);
-      break;
-    }
-
-    case 'invoice.payment_failed': {
-      const invoice = event.data.object as Stripe.Invoice;
-      if (invoice.customer) {
-        await supabase
-          .from('profiles')
-          .update({ subscription_status: 'past_due' })
-          .eq('stripe_customer_id', invoice.customer as string);
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await downgradeToFree(subscription.customer as string);
+        break;
       }
-      break;
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        if (invoice.customer) {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ subscription_status: 'past_due' })
+            .eq('stripe_customer_id', invoice.customer as string);
+          if (error) throw new Error(`Failed to update payment status: ${error.message}`);
+        }
+        break;
+      }
     }
+
+    return res.status(200).json({ received: true });
+  } catch (handlerError) {
+    console.error('Webhook handler error:', handlerError);
+    return res.status(500).json({ message: 'Webhook handler failed' });
   }
-
-  return res.status(200).json({ received: true });
 }

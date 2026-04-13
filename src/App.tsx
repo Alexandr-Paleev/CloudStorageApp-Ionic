@@ -1,15 +1,10 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { IonApp, setupIonicReact } from '@ionic/react';
+import { IonApp, IonSpinner, setupIonicReact } from '@ionic/react';
 
 import { AuthProvider } from './contexts/AuthContext';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Upload from './pages/Upload';
-import FileView from './pages/FileView';
-import Pricing from './pages/Pricing';
-import SubscriptionSuccess from './pages/SubscriptionSuccess';
-import DropboxCallback from './pages/DropboxCallback';
 import PrivateRoute from './components/PrivateRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
@@ -34,6 +29,22 @@ import './theme/global.css';
 
 setupIonicReact();
 
+// Lazy-loaded pages for code-splitting
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Upload = lazy(() => import('./pages/Upload'));
+const FileView = lazy(() => import('./pages/FileView'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
+const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+const PageLoader: React.FC = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <IonSpinner color="primary" />
+  </div>
+);
+
 // Component to handle Hotjar state changes
 const HotjarTracker: React.FC = () => {
   useHotjarStateChange();
@@ -42,64 +53,69 @@ const HotjarTracker: React.FC = () => {
 
 const App: React.FC = () => (
   <IonApp>
-    <AuthProvider>
-      <BrowserRouter>
-        <PageViewTracker />
-        <HotjarTracker />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/dashboard/:folderId?"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/upload/:folderId?"
-            element={
-              <PrivateRoute>
-                <Upload />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/file/:fileId"
-            element={
-              <PrivateRoute>
-                <FileView />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/pricing"
-            element={
-              <PrivateRoute>
-                <Pricing />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/subscription/success"
-            element={
-              <PrivateRoute>
-                <SubscriptionSuccess />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/auth/dropbox/callback"
-            element={
-              <PrivateRoute>
-                <DropboxCallback />
-              </PrivateRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <PageViewTracker />
+          <HotjarTracker />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/dashboard/:folderId?"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/upload/:folderId?"
+                element={
+                  <PrivateRoute>
+                    <Upload />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/file/:fileId"
+                element={
+                  <PrivateRoute>
+                    <FileView />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/pricing"
+                element={
+                  <PrivateRoute>
+                    <Pricing />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/subscription/success"
+                element={
+                  <PrivateRoute>
+                    <SubscriptionSuccess />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/auth/dropbox/callback"
+                element={
+                  <PrivateRoute>
+                    <DropboxCallback />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
     <PWAUpdatePrompt />
   </IonApp>
 );

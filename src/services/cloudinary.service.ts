@@ -1,4 +1,5 @@
 import { UploadProgress } from './storage.service';
+import { supabase } from '../supabase/supabase.config';
 
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -86,10 +87,14 @@ const cloudinaryService = {
     }
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const response = await fetch(deleteApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }),
         },
         body: JSON.stringify({ publicId, resourceType }),
       });
