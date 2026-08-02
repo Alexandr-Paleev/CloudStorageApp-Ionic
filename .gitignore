@@ -42,6 +42,12 @@ android
 
 dev-dist/
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Claude Code
 .claude/
 CLAUDE.md

@@ -1,6 +1,16 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["api", "functions", "functions-example", "node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": [
+    "api",
+    "functions",
+    "functions-example",
+    "node_modules",
+    "dist",
+    "e2e",
+    "playwright.config.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
 }
 
 
