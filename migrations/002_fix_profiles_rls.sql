@@ -10,10 +10,20 @@
 -- SUPABASE_SERVICE_ROLE_KEY, which bypasses RLS, so the client needs no write
 -- access at all. The SELECT policy stays — useProfile() reads the row.
 --
--- Safe to run before or after 001, and safe to run twice.
+-- Safe to run twice, and safe to run before 001: DROP POLICY IF EXISTS and
+-- REVOKE both fail outright when the table itself is missing (IF EXISTS covers
+-- the policy, not the relation), so the whole thing is guarded.
 
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DO $$
+BEGIN
+    IF to_regclass('public.profiles') IS NULL THEN
+        RAISE NOTICE 'public.profiles does not exist yet — run 001 first; nothing to do here.';
+        RETURN;
+    END IF;
 
--- Belt and braces: drop the table-level grant as well, so accidentally
--- re-adding a policy later is not enough to reopen the hole.
-REVOKE UPDATE ON public.profiles FROM authenticated, anon;
+    DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+
+    -- Belt and braces: drop the table-level grant as well, so accidentally
+    -- re-adding a policy later is not enough to reopen the hole.
+    REVOKE UPDATE ON public.profiles FROM authenticated, anon;
+END $$;
