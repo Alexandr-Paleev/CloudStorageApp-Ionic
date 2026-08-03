@@ -46,6 +46,7 @@ const Upload: React.FC = () => {
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
   const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
   const { profile } = useProfile();
+  const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
 
   // Check storage size
   const { data: storageSize } = useQuery({
@@ -121,7 +122,6 @@ const Upload: React.FC = () => {
     setUploadProgress({ bytesTransferred: 0, totalBytes: selectedFile.size, progress: 0 });
 
     // Check if storage limit would be exceeded
-    const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
     const wouldExceedLimit =
       storageSize !== undefined && storageSize + selectedFile.size > storageLimit;
 
@@ -247,7 +247,7 @@ const Upload: React.FC = () => {
           isOpen={showGoogleDriveAlert}
           onDidDismiss={() => setShowGoogleDriveAlert(false)}
           header="Storage Limit Exceeded"
-          message={`You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your 500 MB limit. Connect Google Drive to upload more files?`}
+          message={`You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your ${(storageLimit / 1024 / 1024).toFixed(0)} MB limit. Connect Google Drive to upload more files?`}
           buttons={[
             {
               text: 'Cancel',

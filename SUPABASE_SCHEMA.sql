@@ -64,11 +64,12 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own profile" ON public.profiles
     FOR SELECT USING (auth.uid() = id);
 
--- Note: billing fields (tier, storage_limit, stripe_*, etc.) are updated
--- server-side via SUPABASE_SERVICE_ROLE_KEY which bypasses RLS
-CREATE POLICY "Users can update own profile" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id);
+-- No UPDATE policy on purpose. Every column here is billing state (tier,
+-- storage_limit, allowed_providers, stripe_*) and is written server-side with
+-- SUPABASE_SERVICE_ROLE_KEY, which bypasses RLS. RLS has no column-level
+-- granularity, so letting the client update its own row would let any user set
+-- tier = 'pro' for free.
+REVOKE UPDATE ON public.profiles FROM authenticated, anon;
 
 CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer_id ON public.profiles(stripe_customer_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_stripe_subscription_id ON public.profiles(stripe_subscription_id);

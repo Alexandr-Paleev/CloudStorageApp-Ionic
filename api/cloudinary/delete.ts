@@ -1,5 +1,32 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser } from '../lib/auth';
+import { authenticateUser, AuthError, supabase } from '../lib/auth';
+
+function stripExtension(path: string): string {
+  return path.replace(/\.[^/.]+$/, '');
+}
+
+/**
+ * CloudinaryProvider strips the extension from image public_ids before calling
+ * this endpoint, so a stored path of users/<id>/photo.jpg arrives here as
+ * users/<id>/photo — both forms have to be accepted.
+ */
+async function ownsAsset(userId: string, publicId: string): Promise<boolean> {
+  // Fast path: uploads go into a per-user folder (see cloudinary.service.ts)
+  if (publicId.startsWith(`users/${userId}/`)) return true;
+
+  // Fallback for Cloudinary accounts using dynamic folders, where the folder is
+  // stored separately and is not part of the public_id.
+  const { data } = await supabase
+    .from('files')
+    .select('storage_path')
+    .eq('user_id', userId)
+    .eq('storage_type', 'cloudinary');
+
+  const rows = (data || []) as { storage_path: string }[];
+  return rows.some(
+    (row) => row.storage_path === publicId || stripExtension(row.storage_path) === publicId
+  );
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
@@ -8,19 +35,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    await authenticateUser(req);
+    const userId = await authenticateUser(req);
     const cloudinary = (await import('cloudinary')).v2;
 
+    // Server-side names only: a VITE_ prefixed fallback would be inlined into
+    // the public client bundle by Vite.
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || '',
-      api_key: process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY || '',
-      api_secret: process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET || '',
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
+      api_key: process.env.CLOUDINARY_API_KEY || '',
+      api_secret: process.env.CLOUDINARY_API_SECRET || '',
     });
 
     const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
 
     if (!publicId) {
       res.status(400).json({ error: 'publicId is required' });
+      return;
+    }
+
+    if (!(await ownsAsset(userId, publicId))) {
+      res.status(403).json({ error: 'Access denied' });
       return;
     }
 
@@ -59,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (error) {
     console.error('Error deleting file from Cloudinary:', error);
     // Return the actual error message to help debugging
-    res.status(500).json({
+    res.status(error instanceof AuthError ? 401 : 500).json({
       error: error instanceof Error ? error.message : 'Unknown server error during deletion',
     });
     return;

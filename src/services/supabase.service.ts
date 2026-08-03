@@ -38,6 +38,37 @@ const supabaseService = {
   },
 
   /**
+   * Total bytes a user stores, across every folder and every provider.
+   * getFiles() defaults to root-level files only, so it cannot be used here —
+   * anything inside a folder would silently escape the storage quota. Paged
+   * because PostgREST caps how many rows it returns per request.
+   */
+  async getTotalStorageUsed(userId: string): Promise<number> {
+    const pageSize = 1000;
+    let total = 0;
+    let page = 0;
+
+    for (;;) {
+      const { data, error } = await supabase
+        .from('files')
+        .select('size')
+        .eq('user_id', userId)
+        .range(page * pageSize, page * pageSize + pageSize - 1);
+
+      if (error) {
+        Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
+        throw error;
+      }
+
+      const rows = (data || []) as { size: number }[];
+      total += rows.reduce((sum, row) => sum + row.size, 0);
+
+      if (rows.length < pageSize) return total;
+      page += 1;
+    }
+  },
+
+  /**
    * Get all folders for a user in a specific folder
    */
   async getFolders(userId: string, parentId: string | null = null): Promise<Folder[]> {

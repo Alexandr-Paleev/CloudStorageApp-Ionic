@@ -7,6 +7,22 @@ interface DropboxUploadResult {
   path_display: string;
 }
 
+/**
+ * create_shared_link_with_settings returns a preview page (…?dl=0), not the
+ * file itself. raw=1 serves the content, which is what <img> previews and
+ * downloads need.
+ */
+function toDirectLink(sharedUrl: string): string {
+  try {
+    const url = new URL(sharedUrl);
+    url.searchParams.delete('dl');
+    url.searchParams.set('raw', '1');
+    return url.toString();
+  } catch {
+    return sharedUrl;
+  }
+}
+
 const dropboxService = {
   isConnected(): boolean {
     return dropboxAuthService.isAuthorized();
@@ -81,7 +97,7 @@ const dropboxService = {
     let sharedLink: string;
     if (linkResponse.ok) {
       const linkData = await linkResponse.json();
-      sharedLink = linkData.url;
+      sharedLink = toDirectLink(linkData.url);
     } else {
       // If shared link already exists, get it
       const existingResponse = await fetch(
@@ -96,7 +112,8 @@ const dropboxService = {
         }
       );
       const existingData = await existingResponse.json();
-      sharedLink = existingData.links?.[0]?.url ?? uploadResponse.path_display;
+      const existingUrl = existingData.links?.[0]?.url;
+      sharedLink = existingUrl ? toDirectLink(existingUrl) : uploadResponse.path_display;
     }
 
     return { id: uploadResponse.path_display, sharedLink };

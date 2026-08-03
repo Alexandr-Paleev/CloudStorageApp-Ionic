@@ -5,6 +5,12 @@ import { GoogleDriveProvider } from './impl/GoogleDriveProvider';
 import { R2Provider } from './impl/R2Provider';
 import { DropboxProvider } from './impl/DropboxProvider';
 
+/**
+ * Providers we host and pay for — uploads there count against the plan quota.
+ * Google Drive and Dropbox live in the user's own cloud account.
+ */
+const LOCAL_PROVIDERS = ['cloudinary', 'r2', 'supabase_storage'];
+
 class ProviderManager {
   private providers: Map<string, IStorageProvider> = new Map();
 
@@ -59,6 +65,15 @@ class ProviderManager {
             `Provider "${options.preferredProvider}" is not connected. Please authorize it first.`
           );
         }
+      }
+      // Picking a provider by hand must not skip the quota the auto path enforces
+      if (
+        LOCAL_PROVIDERS.includes(preferred.name) &&
+        !(await options.canUploadToLocal(file.size))
+      ) {
+        throw new Error(
+          'Storage limit exceeded. Upgrade to Pro, or upload to Google Drive / Dropbox instead.'
+        );
       }
       return preferred;
     }

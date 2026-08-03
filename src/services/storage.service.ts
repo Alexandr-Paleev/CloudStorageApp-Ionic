@@ -20,8 +20,7 @@ const storageService = {
    * Get total storage size used by user
    */
   async getUserStorageSize(userId: string): Promise<number> {
-    const files = await supabaseService.getFiles(userId);
-    return files.reduce((total: number, file: FileMetadata) => total + file.size, 0);
+    return supabaseService.getTotalStorageUsed(userId);
   },
 
   /**

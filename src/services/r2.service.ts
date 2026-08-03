@@ -37,7 +37,7 @@ const r2Service = {
     const presignRes = await fetch('/api/r2/presign-upload', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+      body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
     });
 
     if (!presignRes.ok) {

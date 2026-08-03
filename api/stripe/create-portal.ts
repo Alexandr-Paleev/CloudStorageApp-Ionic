@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { authenticateUser, supabase } from '../lib/auth';
+import { authenticateUser, AuthError, supabase } from '../lib/auth';
+import { getAppUrl } from '../lib/app-url';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -24,14 +25,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
-      return_url: `${req.headers.origin}/pricing`,
+      return_url: `${getAppUrl(req)}/pricing`,
     });
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('token') ? 401 : 500;
     console.error('Portal error:', error);
-    return res.status(status).json({ message });
+    return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

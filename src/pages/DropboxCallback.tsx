@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IonContent, IonPage, IonSpinner, IonText } from '@ionic/react';
 import dropboxAuthService from '../services/dropbox-auth.service';
@@ -7,16 +7,21 @@ const DropboxCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
+  const exchangeStarted = useRef(false);
 
   useEffect(() => {
+    // StrictMode runs effects twice in dev — the code may only be exchanged once
+    if (exchangeStarted.current) return;
+
     const code = searchParams.get('code');
     if (!code) {
       setError('No authorization code received');
       return;
     }
+    exchangeStarted.current = true;
 
     dropboxAuthService
-      .handleCallback(code)
+      .handleCallback(code, searchParams.get('state'))
       .then(() => {
         navigate('/upload', { replace: true });
       })

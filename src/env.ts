@@ -5,9 +5,8 @@ const envSchema = z.object({
   VITE_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   VITE_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
 
-  // Cloudinary - Optional
+  // Cloudinary - Optional (API key/secret are server-side only, never VITE_)
   VITE_CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  VITE_CLOUDINARY_API_KEY: z.string().optional(),
   VITE_CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
   VITE_CLOUDINARY_DELETE_API_URL: z.string().url().optional(),
 
@@ -24,9 +23,6 @@ const envSchema = z.object({
   VITE_GA4_MEASUREMENT_ID: z.string().optional(),
   VITE_HOTJAR_SITE_ID: z.string().optional(),
   VITE_HOTJAR_VERSION: z.coerce.number().optional().default(6),
-
-  // Stripe - Optional (required for billing)
-  VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
 
   // Dropbox - Optional (Pro feature)
   VITE_DROPBOX_APP_KEY: z.string().optional(),

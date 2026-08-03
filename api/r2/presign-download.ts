@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { authenticateUser } from '../lib/auth';
+import { authenticateUser, AuthError } from '../lib/auth';
 import { getS3Client, getR2BucketName } from '../lib/r2';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -32,8 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('token') ? 401 : 500;
     console.error('R2 presign-download error:', error);
-    return res.status(status).json({ message });
+    return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

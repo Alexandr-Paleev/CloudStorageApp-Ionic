@@ -3,11 +3,17 @@ import { env } from '../env';
 const ACCESS_TOKEN_KEY = 'dropbox_access_token';
 const REFRESH_TOKEN_KEY = 'dropbox_refresh_token';
 const EXPIRY_KEY = 'dropbox_token_expiry';
+const VERIFIER_KEY = 'dropbox_code_verifier';
+const STATE_KEY = 'dropbox_oauth_state';
 
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
+function randomHex(byteLength: number): string {
+  const array = new Uint8Array(byteLength);
   crypto.getRandomValues(array);
   return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateCodeVerifier(): string {
+  return randomHex(32);
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
@@ -41,7 +47,10 @@ const dropboxAuthService = {
 
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
-    sessionStorage.setItem('dropbox_code_verifier', codeVerifier);
+    // CSRF guard: Dropbox returns state to the redirect URI unchanged
+    const state = randomHex(16);
+    sessionStorage.setItem(VERIFIER_KEY, codeVerifier);
+    sessionStorage.setItem(STATE_KEY, state);
 
     const params = new URLSearchParams({
       client_id: appKey,
@@ -50,17 +59,22 @@ const dropboxAuthService = {
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       token_access_type: 'offline',
+      state,
     });
 
     window.location.href = `https://www.dropbox.com/oauth2/authorize?${params}`;
   },
 
-  async handleCallback(code: string): Promise<string> {
+  async handleCallback(code: string, state: string | null): Promise<string> {
     const appKey = env.VITE_DROPBOX_APP_KEY;
     const redirectUri = env.VITE_DROPBOX_REDIRECT_URI;
-    const codeVerifier = sessionStorage.getItem('dropbox_code_verifier');
+    const codeVerifier = sessionStorage.getItem(VERIFIER_KEY);
+    const expectedState = sessionStorage.getItem(STATE_KEY);
     if (!appKey || !redirectUri || !codeVerifier) {
       throw new Error('Dropbox auth state missing');
+    }
+    if (!state || !expectedState || state !== expectedState) {
+      throw new Error('Dropbox authorization state mismatch. Please reconnect.');
     }
 
     const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
@@ -81,7 +95,8 @@ const dropboxAuthService = {
 
     const data = await response.json();
     saveTokens(data);
-    sessionStorage.removeItem('dropbox_code_verifier');
+    sessionStorage.removeItem(VERIFIER_KEY);
+    sessionStorage.removeItem(STATE_KEY);
     return data.access_token;
   },
 

@@ -26,6 +26,19 @@ async function buffer(readable: VercelRequest): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+/**
+ * Stripe moved current_period_end off the subscription and onto its items in
+ * API version 2025-03-31.basil. Reading the old field yields undefined, which
+ * turns into an Invalid Date and throws inside toISOString().
+ */
+function getPeriodEnd(subscription: Stripe.Subscription): Date {
+  const periodEnd = subscription.items.data[0]?.current_period_end;
+  if (!periodEnd) {
+    throw new Error(`Subscription ${subscription.id} has no current_period_end on its items`);
+  }
+  return new Date(periodEnd * 1000);
+}
+
 async function upgradeToPro(customerId: string, subscriptionId: string, periodEnd: Date) {
   const { error, count } = await supabase
     .from('profiles')
@@ -87,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await upgradeToPro(
             session.customer as string,
             subscription.id,
-            new Date(subscription.current_period_end * 1000)
+            getPeriodEnd(subscription)
           );
         }
         break;
@@ -98,11 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const customerId = subscription.customer as string;
 
         if (subscription.status === 'active') {
-          await upgradeToPro(
-            customerId,
-            subscription.id,
-            new Date(subscription.current_period_end * 1000)
-          );
+          await upgradeToPro(customerId, subscription.id, getPeriodEnd(subscription));
         } else if (subscription.status === 'past_due') {
           const { error } = await supabase
             .from('profiles')
