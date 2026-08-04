@@ -16,5 +16,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["api"]
+  "include": ["api"],
+  /* Specs are checked by vitest, and this config also runs during the
+     production build, where dev-only imports must not be required */
+  "exclude": ["api/**/*.test.ts"]
 }
