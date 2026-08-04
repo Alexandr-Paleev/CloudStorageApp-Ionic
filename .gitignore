@@ -48,6 +48,9 @@ dev-dist/
 /blob-report/
 /playwright/.cache/
 
+# Vitest
+/coverage/
+
 # Claude Code
 .claude/
 CLAUDE.md

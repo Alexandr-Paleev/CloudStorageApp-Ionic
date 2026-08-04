@@ -3,24 +3,21 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { authenticateUser, AuthError, supabase } from '../lib/auth';
 import { getS3Client, getR2BucketName } from '../lib/r2';
-import path from 'path';
+import { sanitizeFileName } from '../lib/filename';
 
 /** Same default the client falls back to when there is no profile row */
 const DEFAULT_STORAGE_LIMIT = 500 * 1024 * 1024;
 
-function sanitizeFileName(name: string): string {
-  // Extract basename to prevent path traversal (../../ etc)
-  const base = path.basename(name);
-  // Keep letters and digits from any alphabet — \w turns "Отчёт.pdf" into "______.pdf"
-  return base.replace(/[^\p{L}\p{N}._\-() ]/gu, '_') || 'unnamed';
-}
-
 async function getStorageLimit(userId: string): Promise<number> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('storage_limit')
     .eq('id', userId)
     .limit(1);
+
+  // Never fall through to the default on a failed read: that would silently cap
+  // a Pro user at the free tier and reject a legitimate upload with 413.
+  if (error) throw new Error(`Failed to read storage limit: ${error.message}`);
 
   const rows = (data || []) as { storage_limit: number }[];
   return rows[0]?.storage_limit ?? DEFAULT_STORAGE_LIMIT;

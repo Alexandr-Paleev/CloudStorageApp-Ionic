@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/supabase.config';
+import { HttpError, httpErrorFrom } from '../utils/http.utils';
 
 const r2BucketName = import.meta.env.VITE_R2_BUCKET_NAME;
 
@@ -41,8 +42,8 @@ const r2Service = {
     });
 
     if (!presignRes.ok) {
-      const err = await presignRes.json();
-      throw new Error(err.message || 'Failed to get upload URL');
+      // 413 here means the storage quota is full — retrying cannot change that
+      throw await httpErrorFrom(presignRes, 'Failed to get upload URL');
     }
 
     const { uploadUrl, key } = await presignRes.json();
@@ -65,7 +66,7 @@ const r2Service = {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve();
         } else {
-          reject(new Error(`R2 upload failed with status ${xhr.status}`));
+          reject(new HttpError(`R2 upload failed with status ${xhr.status}`, xhr.status));
         }
       };
 
@@ -90,8 +91,7 @@ const r2Service = {
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Failed to delete from R2');
+      throw await httpErrorFrom(res, 'Failed to delete from R2');
     }
   },
 
@@ -108,8 +108,7 @@ const r2Service = {
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Failed to get download URL');
+      throw await httpErrorFrom(res, 'Failed to get download URL');
     }
 
     const { url } = await res.json();

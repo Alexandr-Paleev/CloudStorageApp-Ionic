@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { getPeriodEnd } from '../lib/stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -26,21 +27,8 @@ async function buffer(readable: VercelRequest): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-/**
- * Stripe moved current_period_end off the subscription and onto its items in
- * API version 2025-03-31.basil. Reading the old field yields undefined, which
- * turns into an Invalid Date and throws inside toISOString().
- */
-function getPeriodEnd(subscription: Stripe.Subscription): Date {
-  const periodEnd = subscription.items.data[0]?.current_period_end;
-  if (!periodEnd) {
-    throw new Error(`Subscription ${subscription.id} has no current_period_end on its items`);
-  }
-  return new Date(periodEnd * 1000);
-}
-
 async function upgradeToPro(customerId: string, subscriptionId: string, periodEnd: Date) {
-  const { error, count } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .update({
       tier: 'pro',
@@ -51,14 +39,14 @@ async function upgradeToPro(customerId: string, subscriptionId: string, periodEn
       allowed_providers: TIER_LIMITS.pro.allowed_providers,
     })
     .eq('stripe_customer_id', customerId)
-    .select('id', { count: 'exact', head: true });
+    .select('id');
 
   if (error) throw new Error(`Failed to upgrade: ${error.message}`);
-  if (!count) throw new Error(`No profile found for customer ${customerId}`);
+  if (!data?.length) throw new Error(`No profile found for customer ${customerId}`);
 }
 
 async function downgradeToFree(customerId: string) {
-  const { error, count } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .update({
       tier: 'free',
@@ -69,10 +57,10 @@ async function downgradeToFree(customerId: string) {
       allowed_providers: TIER_LIMITS.free.allowed_providers,
     })
     .eq('stripe_customer_id', customerId)
-    .select('id', { count: 'exact', head: true });
+    .select('id');
 
   if (error) throw new Error(`Failed to downgrade: ${error.message}`);
-  if (!count) throw new Error(`No profile found for customer ${customerId}`);
+  if (!data?.length) throw new Error(`No profile found for customer ${customerId}`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

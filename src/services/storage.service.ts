@@ -2,6 +2,7 @@ import supabaseService from './supabase.service';
 import { FileMetadata, Folder } from '../schemas/file.schema';
 import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
+import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '@sentry/react';
 
 /** @deprecated Use dynamic limit from user profile via billingService.getStorageLimit() */
@@ -60,6 +61,9 @@ const storageService = {
 
     const result = await withRetry(() => provider.upload(file, userId, onProgress), {
       maxRetries: 2,
+      // A rejected upload (quota, auth) fails the same way every time — surface
+      // it immediately instead of making the user wait through the backoff
+      shouldRetry: isRetriableError,
       onRetry: (error, attempt) => {
         console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
       },
