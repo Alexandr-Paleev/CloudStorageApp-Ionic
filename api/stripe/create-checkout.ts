@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { authenticateUser, AuthError, supabase } from '../lib/auth';
-import { getAppUrl } from '../lib/app-url';
+import { authenticateUser, AuthError, supabase } from '../../lib/auth';
+import { getAppUrl } from '../../lib/app-url';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 

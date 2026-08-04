@@ -16,8 +16,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["api"],
+  /* lib/ holds the server-side helpers. They live outside api/ because Vercel
+     turns every file under api/ into its own Serverless Function, and the
+     Hobby plan allows at most 12 per deployment. */
+  "include": ["api", "lib"],
   /* Specs are checked by vitest, and this config also runs during the
      production build, where dev-only imports must not be required */
-  "exclude": ["api/**/*.test.ts"]
+  "exclude": ["**/*.test.ts"]
 }

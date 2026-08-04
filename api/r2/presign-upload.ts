@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { authenticateUser, AuthError, supabase } from '../lib/auth';
-import { getS3Client, getR2BucketName } from '../lib/r2';
-import { sanitizeFileName } from '../lib/filename';
+import { authenticateUser, AuthError, supabase } from '../../lib/auth';
+import { getS3Client, getR2BucketName } from '../../lib/r2';
+import { sanitizeFileName } from '../../lib/filename';
 
 /** Same default the client falls back to when there is no profile row */
 const DEFAULT_STORAGE_LIMIT = 500 * 1024 * 1024;

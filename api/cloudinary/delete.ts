@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../lib/auth';
+import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 
 function stripExtension(path: string): string {
   return path.replace(/\.[^/.]+$/, '');

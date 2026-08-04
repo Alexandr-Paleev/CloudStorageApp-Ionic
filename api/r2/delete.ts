@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { authenticateUser, AuthError } from '../lib/auth';
-import { getS3Client, getR2BucketName } from '../lib/r2';
+import { authenticateUser, AuthError } from '../../lib/auth';
+import { getS3Client, getR2BucketName } from '../../lib/r2';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
