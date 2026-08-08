@@ -54,3 +54,6 @@ dev-dist/
 # Claude Code
 .claude/
 CLAUDE.md
+
+# TypeScript incremental build info
+*.tsbuildinfo
