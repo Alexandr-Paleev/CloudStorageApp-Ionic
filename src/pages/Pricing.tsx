@@ -13,6 +13,8 @@ import {
 } from '@ionic/react';
 import { checkmarkCircle, lockClosed } from 'ionicons/icons';
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { env } from '../env';
 import { useProfile } from '../hooks/useProfile';
 import billingService from '../services/billing.service';
 import { TIER_CONFIG } from '../types/billing.types';
@@ -49,6 +51,12 @@ const Pricing: React.FC = () => {
       setPortalLoading(false);
     }
   };
+
+  // Reachable by URL even with the header link hidden, and every button here
+  // would hit a /api/stripe route that has no keys in this environment.
+  if (!env.VITE_BILLING_ENABLED) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (isLoading) {
     return (

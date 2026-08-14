@@ -33,7 +33,9 @@ const env = readEnv();
 const SUPABASE_URL = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
 const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
-const ready = Boolean(SUPABASE_URL && SERVICE_KEY && ANON_KEY);
+/* Billing is behind a flag, so the UI under test only exists where it is on */
+const billingEnabled = env.VITE_BILLING_ENABLED === 'true';
+const ready = Boolean(SUPABASE_URL && SERVICE_KEY && ANON_KEY && billingEnabled);
 
 /** supabase-js keeps the session under sb-<project-ref>-auth-token */
 const storageKey = ready
@@ -41,7 +43,7 @@ const storageKey = ready
   : 'unused';
 
 test.describe('Billing entry point', () => {
-  test.skip(!ready, 'needs Supabase credentials in .env');
+  test.skip(!ready, 'needs Supabase credentials and VITE_BILLING_ENABLED=true in .env');
 
   let userId = '';
   let session: unknown = null;

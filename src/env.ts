@@ -24,6 +24,17 @@ const envSchema = z.object({
   VITE_HOTJAR_SITE_ID: z.string().optional(),
   VITE_HOTJAR_VERSION: z.coerce.number().optional().default(6),
 
+  /**
+   * Billing is hidden unless the environment actually has Stripe configured.
+   * Defaults to off so a deployment without STRIPE_* keys never shows a buy
+   * button that would answer with a 500.
+   */
+  VITE_BILLING_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
+
   // Dropbox - Optional (Pro feature)
   VITE_DROPBOX_APP_KEY: z.string().optional(),
   VITE_DROPBOX_REDIRECT_URI: z.string().url().optional(),

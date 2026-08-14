@@ -42,6 +42,7 @@ import storageService from '../services/storage.service';
 import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
+import { env } from '../env';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -172,15 +173,18 @@ const Dashboard: React.FC = () => {
           <IonButtons slot="end">
             {/* The only permanent way into billing: UpgradeBanner appears at
                 80% usage, so without this a user could not reach the plans at
-                all, and a Pro user had no route to the customer portal. */}
-            <IonButton
-              onClick={() => navigate('/pricing')}
-              color="dark"
-              data-testid="pricing-link"
-              title={profile?.tier === 'pro' ? 'Manage subscription' : 'Plans'}
-            >
-              <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} />
-            </IonButton>
+                all, and a Pro user had no route to the customer portal.
+                Hidden where Stripe is not configured — see VITE_BILLING_ENABLED. */}
+            {env.VITE_BILLING_ENABLED && (
+              <IonButton
+                onClick={() => navigate('/pricing')}
+                color="dark"
+                data-testid="pricing-link"
+                title={profile?.tier === 'pro' ? 'Manage subscription' : 'Plans'}
+              >
+                <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} />
+              </IonButton>
+            )}
             <IonButton onClick={handleLogout} color="dark">
               <IonIcon icon={logOutOutline} />
             </IonButton>

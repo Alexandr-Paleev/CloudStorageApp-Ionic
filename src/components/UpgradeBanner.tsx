@@ -1,6 +1,7 @@
 import { IonButton, IonIcon, IonText } from '@ionic/react';
 import { rocketOutline } from 'ionicons/icons';
 import { useNavigate } from 'react-router-dom';
+import { env } from '../env';
 
 interface UpgradeBannerProps {
   usedBytes: number;
@@ -12,7 +13,7 @@ const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, 
   const navigate = useNavigate();
   const usagePercent = storageLimit > 0 ? usedBytes / storageLimit : 0;
 
-  if (tier === 'pro' || usagePercent < 0.8) return null;
+  if (!env.VITE_BILLING_ENABLED || tier === 'pro' || usagePercent < 0.8) return null;
 
   return (
     <div
