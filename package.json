@@ -2,10 +2,10 @@
   "name": "cloud-storage-app",
   "version": "3.0.0",
   "author": "Aleksandr Paleev",
-  "homepage": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic",
+  "homepage": "https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic.git"
+    "url": "https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic.git"
   },
   "license": "MIT",
   "keywords": [

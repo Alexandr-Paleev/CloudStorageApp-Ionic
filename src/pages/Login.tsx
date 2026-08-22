@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   IonContent,
   IonPage,
@@ -14,6 +14,7 @@ import { logoGoogle, personOutline, lockClosedOutline, cloudUploadOutline } from
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/auth.service';
 import './Login.css';
+import './Legal.css';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -169,6 +170,13 @@ const Login: React.FC = () => {
                 {isRegister ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
               </IonButton>
             </div>
+
+            {/* Shown at the point of account creation, and reachable without
+                an account — Stripe checks for these before going live. */}
+            <p className="legal-links">
+              By continuing you agree to our <Link to="/terms">Terms of Service</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>.
+            </p>
 
             {error && (
               <div

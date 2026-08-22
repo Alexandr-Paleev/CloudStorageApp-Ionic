@@ -38,6 +38,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
 const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const Legal = lazy(() => import('./pages/Legal'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -61,6 +62,11 @@ const App: React.FC = () => (
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/login" element={<Login />} />
+              {/* Public on purpose: Stripe reviews these before enabling live
+                  payments, and app stores need a reachable privacy policy —
+                  neither has an account to sign in with. */}
+              <Route path="/terms" element={<Legal document="terms" />} />
+              <Route path="/privacy" element={<Legal document="privacy" />} />
               <Route
                 path="/dashboard/:folderId?"
                 element={

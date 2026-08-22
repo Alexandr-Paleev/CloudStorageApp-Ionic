@@ -13,12 +13,13 @@ import {
 } from '@ionic/react';
 import { checkmarkCircle, lockClosed } from 'ionicons/icons';
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { env } from '../env';
 import { useProfile } from '../hooks/useProfile';
 import billingService from '../services/billing.service';
 import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
+import './Legal.css';
 
 const Pricing: React.FC = () => {
   const { profile, isLoading } = useProfile();
@@ -162,6 +163,12 @@ const Pricing: React.FC = () => {
               <p>{error}</p>
             </IonText>
           )}
+
+          {/* Consumer rules expect the terms to be readable before paying */}
+          <p className="legal-links">
+            Subscriptions renew monthly until cancelled. See our{' '}
+            <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
+          </p>
         </div>
       </IonContent>
     </IonPage>
