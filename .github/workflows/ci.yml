@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes the run still going for the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  check:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      # src/env.ts validates import.meta.env with Zod on startup, so the build
+      # needs the two required variables present. Real values come from repo
+      # secrets when they are set; the placeholders only have to satisfy Zod.
+      - name: Write .env
+        run: |
+          cat > .env <<'EOF'
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+          EOF
+
+      # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
+      - run: npm run build
+
+      - run: npm test
+
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # auth, routing and legal specs are pure UI and pass on placeholders.
+      # billing-entry.spec.ts provisions a throwaway user through the Supabase
+      # admin API and skips itself unless all four values below are real, so
+      # without the optional secrets it reports as skipped rather than failing.
+      - name: Write .env
+        run: |
+          cat > .env <<'EOF'
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL || '' }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
+          VITE_BILLING_ENABLED=true
+          EOF
+
+      - run: npm run test:e2e
+
+      - name: Upload report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
