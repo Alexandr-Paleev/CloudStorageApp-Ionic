@@ -2,9 +2,11 @@ import supabaseService from './supabase.service';
 import { FileMetadata, Folder } from '../schemas/file.schema';
 import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
+import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '@sentry/react';
 
-export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB in bytes (Local limit before GDrive)
+/** @deprecated Use dynamic limit from user profile via billingService.getStorageLimit() */
+export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB default fallback
 
 export type { FileMetadata, Folder };
 
@@ -19,16 +21,20 @@ const storageService = {
    * Get total storage size used by user
    */
   async getUserStorageSize(userId: string): Promise<number> {
-    const files = await supabaseService.getFiles(userId);
-    return files.reduce((total: number, file: FileMetadata) => total + file.size, 0);
+    return supabaseService.getTotalStorageUsed(userId);
   },
 
   /**
    * Check if user can upload file to local storage (Cloudinary/R2)
    */
-  async canUploadToLocal(userId: string, fileSize: number): Promise<boolean> {
+  async canUploadToLocal(
+    userId: string,
+    fileSize: number,
+    storageLimit?: number
+  ): Promise<boolean> {
     const currentSize = await this.getUserStorageSize(userId);
-    return currentSize + fileSize <= MAX_USER_STORAGE_LIMIT;
+    const limit = storageLimit ?? MAX_USER_STORAGE_LIMIT;
+    return currentSize + fileSize <= limit;
   },
 
   /**
@@ -39,15 +45,25 @@ const storageService = {
     file: File,
     onProgress?: (progress: UploadProgress) => void,
     folderId: string | null = null,
-    useGoogleDrive?: boolean
+    useGoogleDrive?: boolean,
+    options?: {
+      preferredProvider?: string;
+      allowedProviders?: string[];
+      storageLimit?: number;
+    }
   ): Promise<FileMetadata> {
     const provider = await providerManager.selectProvider(file, userId, {
-      canUploadToLocal: (size) => this.canUploadToLocal(userId, size),
+      canUploadToLocal: (size) => this.canUploadToLocal(userId, size, options?.storageLimit),
       useGoogleDrive,
+      preferredProvider: options?.preferredProvider,
+      allowedProviders: options?.allowedProviders,
     });
 
     const result = await withRetry(() => provider.upload(file, userId, onProgress), {
       maxRetries: 2,
+      // A rejected upload (quota, auth) fails the same way every time — surface
+      // it immediately instead of making the user wait through the backoff
+      shouldRetry: isRetriableError,
       onRetry: (error, attempt) => {
         console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
       },

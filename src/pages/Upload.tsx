@@ -28,6 +28,8 @@ import storageService, {
   FileMetadata,
 } from '../services/storage.service';
 import googleDriveAuthService from '../services/googledrive-auth.service';
+import { useProfile } from '../hooks/useProfile';
+import ProviderSelector from '../components/ProviderSelector';
 import { formatFileSize } from '../utils/format.utils';
 import { useAnalytics } from '../hooks/useAnalytics';
 
@@ -42,6 +44,9 @@ const Upload: React.FC = () => {
   const [error, setError] = useState('');
   const [showGoogleDriveAlert, setShowGoogleDriveAlert] = useState(false);
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
+  const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
+  const { profile } = useProfile();
+  const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
 
   // Check storage size
   const { data: storageSize } = useQuery({
@@ -70,7 +75,12 @@ const Upload: React.FC = () => {
           setUploadProgress(progress);
         },
         folderId || null,
-        useGoogleDrive
+        useGoogleDrive,
+        {
+          preferredProvider,
+          allowedProviders: profile?.allowed_providers,
+          storageLimit: profile?.storage_limit,
+        }
       );
     },
     onSuccess: (result: FileMetadata, file: File) => {
@@ -113,7 +123,7 @@ const Upload: React.FC = () => {
 
     // Check if storage limit would be exceeded
     const wouldExceedLimit =
-      storageSize !== undefined && storageSize + selectedFile.size > MAX_USER_STORAGE_LIMIT;
+      storageSize !== undefined && storageSize + selectedFile.size > storageLimit;
 
     if (wouldExceedLimit && !isGoogleDriveConnected && !useGoogleDrive) {
       setShowGoogleDriveAlert(true);
@@ -132,6 +142,7 @@ const Upload: React.FC = () => {
       await googleDriveAuthService.authorize();
       queryClient.invalidateQueries({ queryKey: ['googleDriveConnected'] });
       setUseGoogleDrive(true);
+      setPreferredProvider(undefined);
       setShowGoogleDriveAlert(false);
       // Retry upload after connecting
       if (selectedFile) {
@@ -186,6 +197,14 @@ const Upload: React.FC = () => {
               </IonItem>
             )}
 
+            {profile?.tier === 'pro' && (
+              <ProviderSelector
+                selectedProvider={preferredProvider}
+                allowedProviders={profile.allowed_providers}
+                onSelect={setPreferredProvider}
+              />
+            )}
+
             {uploadProgress && (
               <div style={{ marginTop: '20px' }}>
                 <IonLabel>Uploading... {uploadProgress.progress.toFixed(1)}%</IonLabel>
@@ -228,7 +247,7 @@ const Upload: React.FC = () => {
           isOpen={showGoogleDriveAlert}
           onDidDismiss={() => setShowGoogleDriveAlert(false)}
           header="Storage Limit Exceeded"
-          message={`You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your 500 MB limit. Connect Google Drive to upload more files?`}
+          message={`You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your ${(storageLimit / 1024 / 1024).toFixed(0)} MB limit. Connect Google Drive to upload more files?`}
           buttons={[
             {
               text: 'Cancel',

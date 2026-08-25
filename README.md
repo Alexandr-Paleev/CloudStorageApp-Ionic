@@ -306,7 +306,7 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-Please read our [Code Style Guide](https://github.com/aleksandrpaleev/CloudStorageApp-Ionic#code-style) before contributing.
+Code style is enforced automatically — ESLint and Prettier run on staged files through a pre-commit hook, so there is nothing to configure by hand. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`).
 
 ## 📝 License
 
@@ -314,7 +314,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🤝 Support
 
-- 💬 **Issues**: [GitHub Issues](https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/issues)
+- 💬 **Issues**: [GitHub Issues](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
 - 📧 **Email**: support@cloudstorage.app (for Pro customers)
 
 ## 📄 Legal

@@ -1,10 +1,10 @@
 blank_issues_enabled: true
 contact_links:
   - name: 💬 GitHub Discussions
-    url: https://github.com/aleksandrpaleev/CloudStorageApp-Ionic/discussions
+    url: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/discussions
     about: Ask questions and discuss ideas with the community
   - name: 📖 Documentation
-    url: https://github.com/aleksandrpaleev/CloudStorageApp-Ionic#readme
+    url: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic#readme
     about: Read the documentation and guides
   - name: 🌐 Live Demo
     url: https://cloud-storage-app-ionic-v0.vercel.app

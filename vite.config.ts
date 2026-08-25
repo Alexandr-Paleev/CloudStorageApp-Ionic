@@ -2,11 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import { devApi } from './vite-plugin-dev-api';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    /* Serves api/ from the dev server; no-op during build */
+    devApi(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192x192-v2.png', 'icon-512x512-v2.png'],

@@ -6,6 +6,11 @@ export interface RetryOptions {
   initialDelay: number;
   maxDelay: number;
   onRetry?: (error: unknown, attempt: number) => void;
+  /**
+   * Return false to give up immediately instead of retrying — e.g. a quota
+   * rejection, which would fail identically on every attempt.
+   */
+  shouldRetry?: (error: unknown) => boolean;
 }
 
 const DEFAULT_OPTIONS: RetryOptions = {
@@ -21,7 +26,7 @@ export const withRetry = async <T>(
   fn: () => Promise<T>,
   options: Partial<RetryOptions> = {}
 ): Promise<T> => {
-  const { maxRetries, initialDelay, maxDelay, onRetry } = {
+  const { maxRetries, initialDelay, maxDelay, onRetry, shouldRetry } = {
     ...DEFAULT_OPTIONS,
     ...options,
   };
@@ -35,7 +40,7 @@ export const withRetry = async <T>(
     } catch (error) {
       lastError = error;
 
-      if (attempt === maxRetries) {
+      if (attempt === maxRetries || (shouldRetry && !shouldRetry(error))) {
         break;
       }
 

@@ -34,10 +34,15 @@ import {
   createOutline,
   trashOutline,
   cloud,
+  rocketOutline,
+  star,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
+import { useProfile } from '../hooks/useProfile';
+import UpgradeBanner from '../components/UpgradeBanner';
+import { env } from '../env';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -45,6 +50,7 @@ import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const navigate = useNavigate();
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
@@ -146,9 +152,10 @@ const Dashboard: React.FC = () => {
     return documentTextOutline;
   };
 
-  // Safe calculation for storage
+  // Safe calculation for storage — use dynamic limit from profile
   const usedBytes = storageSize || 0;
-  const storagePercentage = Math.min(usedBytes / MAX_USER_STORAGE_LIMIT, 1);
+  const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
+  const storagePercentage = Math.min(usedBytes / storageLimit, 1);
   const percentageDisplay = (storagePercentage * 100).toFixed(1);
 
   return (
@@ -164,6 +171,20 @@ const Dashboard: React.FC = () => {
           </IonButtons>
           <IonTitle>{folderId && currentFolder ? currentFolder.name : 'Folder'}</IonTitle>
           <IonButtons slot="end">
+            {/* The only permanent way into billing: UpgradeBanner appears at
+                80% usage, so without this a user could not reach the plans at
+                all, and a Pro user had no route to the customer portal.
+                Hidden where Stripe is not configured — see VITE_BILLING_ENABLED. */}
+            {env.VITE_BILLING_ENABLED && (
+              <IonButton
+                onClick={() => navigate('/pricing')}
+                color="dark"
+                data-testid="pricing-link"
+                title={profile?.tier === 'pro' ? 'Manage subscription' : 'Plans'}
+              >
+                <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} />
+              </IonButton>
+            )}
             <IonButton onClick={handleLogout} color="dark">
               <IonIcon icon={logOutOutline} />
             </IonButton>
@@ -197,9 +218,12 @@ const Dashboard: React.FC = () => {
             </div>
 
             <IonText color="medium" className="storage-stats">
-              {formatFileSize(usedBytes)} of {formatFileSize(MAX_USER_STORAGE_LIMIT)} used
+              {formatFileSize(usedBytes)} of {formatFileSize(storageLimit)} used
+              {profile?.tier === 'pro' && <span className="tier-badge tier-badge--pro">Pro</span>}
             </IonText>
           </div>
+
+          <UpgradeBanner usedBytes={usedBytes} storageLimit={storageLimit} tier={profile?.tier} />
 
           <div className="dashboard-actions-grid">
             <IonButton

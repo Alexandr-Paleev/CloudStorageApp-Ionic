@@ -1,0 +1,111 @@
+.pricing-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 16px 0;
+}
+
+.pricing-heading {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pricing-heading h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pricing-heading p {
+  color: var(--ion-color-medium);
+  font-size: 16px;
+}
+
+.pricing-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pricing-card {
+  position: relative;
+  background: var(--ion-card-background, #fff);
+  border-radius: 16px;
+  padding: 24px;
+  flex: 1;
+  min-width: 280px;
+  max-width: 360px;
+  border: 2px solid var(--ion-color-light-shade);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pricing-card--active {
+  border-color: var(--ion-color-primary);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
+}
+
+.pricing-card--pro {
+  border-color: var(--ion-color-primary);
+}
+
+.pricing-card__badge {
+  position: absolute;
+  top: -12px;
+  right: 16px;
+  background: var(--ion-color-primary);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pricing-card__header {
+  margin-bottom: 20px;
+}
+
+.pricing-card__header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.pricing-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pricing-card__amount {
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.pricing-card__period {
+  color: var(--ion-color-medium);
+  font-size: 16px;
+}
+
+.pricing-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+}
+
+.pricing-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 15px;
+}
+
+.pricing-card__features ion-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.pricing-error {
+  text-align: center;
+  margin-top: 16px;
+}

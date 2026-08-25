@@ -1,11 +1,11 @@
 {
   "name": "cloud-storage-app",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "author": "Aleksandr Paleev",
-  "homepage": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic",
+  "homepage": "https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aleksandrpaleev/CloudStorageApp-Ionic.git"
+    "url": "https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic.git"
   },
   "license": "MIT",
   "keywords": [
@@ -27,10 +27,16 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --project tsconfig.build.json --noEmit && vite build",
+    "build": "tsc --project tsconfig.build.json --noEmit && tsc --project tsconfig.api.json && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,scss}\"",
+    "typecheck:api": "tsc --project tsconfig.api.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "deploy": "npm run build && firebase deploy --only hosting",
     "generate:icons": "node scripts/generate-icons.js",
     "prepare": "husky"
@@ -51,7 +57,6 @@
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.56.0",
     "@vercel/node": "^5.5.16",
-    "@vitest/ui": "^3.2.4",
     "ajv": "^8.17.1",
     "cloudinary": "^1.41.3",
     "esbuild": "0.27.3",
@@ -59,13 +64,14 @@
     "react-dom": "^18.3.1",
     "react-ga4": "^2.1.0",
     "react-router-dom": "^6.26.0",
-    "vitest": "^3.2.4",
+    "stripe": "^22.0.1",
     "zod": "^4.3.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0",
     "@eslint/js": "^9.39.2",
     "@ionic/prettier-config": "^4.0.0",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^20.19.32",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
@@ -73,6 +79,7 @@
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "@vitest/ui": "^3.2.4",
     "eslint": "^8.57.0",
     "eslint-plugin-jsx-a11y": "^6.9.0",
     "eslint-plugin-react": "^7.35.0",
@@ -85,6 +92,7 @@
     "typescript": "5.5.4",
     "vite": "^5.4.0",
     "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^3.2.4",
     "workbox-window": "^7.4.0"
   },
   "lint-staged": {
