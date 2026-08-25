@@ -36,7 +36,9 @@
   min-width: 280px;
   max-width: 360px;
   border: 2px solid var(--ion-color-light-shade);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .pricing-card--active {
@@ -108,4 +110,34 @@
 .pricing-error {
   text-align: center;
   margin-top: 16px;
+}
+
+.pricing-demo-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 12px 14px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--ion-color-dark);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.pricing-demo-notice ion-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 18px;
+  color: #f59e0b;
+}
+
+.pricing-demo-notice code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  white-space: nowrap;
 }

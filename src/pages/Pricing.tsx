@@ -11,7 +11,7 @@ import {
   IonText,
   IonIcon,
 } from '@ionic/react';
-import { checkmarkCircle, lockClosed } from 'ionicons/icons';
+import { checkmarkCircle, lockClosed, informationCircle } from 'ionicons/icons';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { env } from '../env';
@@ -95,6 +95,17 @@ const Pricing: React.FC = () => {
             <h1>Choose your plan</h1>
             <p>Unlock more storage and premium providers</p>
           </IonText>
+
+          {env.VITE_BILLING_DEMO_MODE && (
+            <div className="pricing-demo-notice" role="note">
+              <IonIcon icon={informationCircle} aria-hidden="true" />
+              <span>
+                <strong>Demo mode.</strong> Stripe runs on test keys here — real cards are declined.
+                Use <code>4242 4242 4242 4242</code> with any future expiry and any CVC. No money
+                changes hands.
+              </span>
+            </div>
+          )}
 
           <div className="pricing-cards">
             {/* Free Plan */}

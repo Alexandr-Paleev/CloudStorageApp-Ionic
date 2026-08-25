@@ -35,6 +35,17 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
 
+  /**
+   * Set where Stripe runs on test keys. Real cards are declined there, so the
+   * plans page has to say so — otherwise the page reads as a live storefront
+   * taking money it will never charge.
+   */
+  VITE_BILLING_DEMO_MODE: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
+
   // Dropbox - Optional (Pro feature)
   VITE_DROPBOX_APP_KEY: z.string().optional(),
   VITE_DROPBOX_REDIRECT_URI: z.string().url().optional(),
