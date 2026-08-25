@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { getS3Client, getR2BucketName } from '../../lib/r2';
 import { sanitizeFileName } from '../../lib/filename';
+import { formatBytes } from '../../lib/format';
 
 /** Same default the client falls back to when there is no profile row */
 const DEFAULT_STORAGE_LIMIT = 500 * 1024 * 1024;
@@ -76,8 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const [limit, used] = await Promise.all([getStorageLimit(userId), getStorageUsed(userId)]);
 
     if (used + size > limit) {
+      // A downgrade can leave an account above its new limit, so this is not
+      // only the "almost full" case — say plainly where the user stands.
+      const overBy = used > limit ? ` You are ${formatBytes(used - limit)} over the limit.` : '';
       return res.status(413).json({
-        message: `Storage limit exceeded. Using ${used} of ${limit} bytes, this file needs ${size} more.`,
+        message:
+          `Storage limit exceeded. Using ${formatBytes(used)} of ${formatBytes(limit)}, ` +
+          `and this file needs ${formatBytes(size)} more.${overBy}`,
       });
     }
 

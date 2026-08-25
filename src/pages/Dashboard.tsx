@@ -155,8 +155,13 @@ const Dashboard: React.FC = () => {
   // Safe calculation for storage — use dynamic limit from profile
   const usedBytes = storageSize || 0;
   const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
-  const storagePercentage = Math.min(usedBytes / storageLimit, 1);
-  const percentageDisplay = (storagePercentage * 100).toFixed(1);
+  // The bar stops at full, the number does not: cancelling Pro drops the limit
+  // back to 500 MB, and rounding that down to "100.0%" hides how far over the
+  // account actually is — which is also why uploads start failing.
+  const storageRatio = storageLimit > 0 ? usedBytes / storageLimit : 0;
+  const barWidth = (Math.min(storageRatio, 1) * 100).toFixed(1);
+  const percentageDisplay = (storageRatio * 100).toFixed(1);
+  const isOverLimit = usedBytes > storageLimit;
 
   return (
     <IonPage>
@@ -203,7 +208,7 @@ const Dashboard: React.FC = () => {
               <IonText color="dark" className="storage-title">
                 Storage Used
               </IonText>
-              <IonText color="medium" className="storage-percentage">
+              <IonText color={isOverLimit ? 'danger' : 'medium'} className="storage-percentage">
                 {percentageDisplay}%
               </IonText>
             </div>
@@ -212,13 +217,15 @@ const Dashboard: React.FC = () => {
               <div
                 className="storage-bar-fill"
                 style={{
-                  width: `${percentageDisplay}%`,
+                  width: `${barWidth}%`,
                 }}
               />
             </div>
 
-            <IonText color="medium" className="storage-stats">
+            <IonText color={isOverLimit ? 'danger' : 'medium'} className="storage-stats">
               {formatFileSize(usedBytes)} of {formatFileSize(storageLimit)} used
+              {isOverLimit &&
+                ` — ${formatFileSize(usedBytes - storageLimit)} over the limit, uploads are blocked until you free up space`}
               {profile?.tier === 'pro' && <span className="tier-badge tier-badge--pro">Pro</span>}
             </IonText>
           </div>
