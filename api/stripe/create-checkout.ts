@@ -48,6 +48,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // The client hides the upgrade button for Pro users, but this route is
+    // reachable directly — without this check a second checkout creates a
+    // second subscription and Stripe bills for both.
+    const activeSubscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      limit: 1,
+    });
+
+    if (activeSubscriptions.data.length > 0) {
+      return res.status(409).json({ message: 'Subscription already active' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',

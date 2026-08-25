@@ -11,6 +11,14 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 }
 
+/** Thrown when checkout is refused because the user is already subscribed. */
+export class SubscriptionExistsError extends Error {
+  constructor(message = 'Subscription already active') {
+    super(message);
+    this.name = 'SubscriptionExistsError';
+  }
+}
+
 const billingService = {
   async getProfile(userId: string): Promise<UserProfile | null> {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -42,6 +50,9 @@ const billingService = {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 409) {
+        throw new SubscriptionExistsError(error.message);
+      }
       throw new Error(error.message || 'Failed to create checkout session');
     }
 

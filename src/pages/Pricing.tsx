@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { env } from '../env';
 import { useProfile } from '../hooks/useProfile';
-import billingService from '../services/billing.service';
+import billingService, { SubscriptionExistsError } from '../services/billing.service';
 import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
 import './Legal.css';
@@ -29,18 +29,6 @@ const Pricing: React.FC = () => {
 
   const isPro = profile?.tier === 'pro';
 
-  const handleUpgrade = async () => {
-    setCheckoutLoading(true);
-    setError('');
-    try {
-      const url = await billingService.createCheckoutSession();
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start checkout');
-      setCheckoutLoading(false);
-    }
-  };
-
   const handleManageSubscription = async () => {
     setPortalLoading(true);
     setError('');
@@ -50,6 +38,24 @@ const Pricing: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to open portal');
       setPortalLoading(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    setCheckoutLoading(true);
+    setError('');
+    try {
+      const url = await billingService.createCheckoutSession();
+      window.location.href = url;
+    } catch (err) {
+      setCheckoutLoading(false);
+      // The subscription exists, but this profile has not caught up with it —
+      // the portal is where the user can actually act on it.
+      if (err instanceof SubscriptionExistsError) {
+        await handleManageSubscription();
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed to start checkout');
     }
   };
 
