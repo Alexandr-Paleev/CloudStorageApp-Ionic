@@ -19,14 +19,14 @@ import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
 // Initialize Sentry
+// Session Replay is deliberately not enabled: it was the single largest piece
+// of the initial download, and crash reports plus tracing cover what this app
+// actually needs. Add replayIntegration() back if session playback is wanted.
 Sentry.init({
   dsn: env.VITE_SENTRY_DSN,
-  integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+  integrations: [Sentry.browserTracingIntegration()],
   // Performance Monitoring
   tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,
-  // Session Replay
-  replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
-  replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
   environment: import.meta.env.MODE,
 });
 

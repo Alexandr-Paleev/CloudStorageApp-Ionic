@@ -97,4 +97,31 @@ export default defineConfig({
     port: 8100,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        /**
+         * Routes are already lazy (App.tsx), but every dependency still landed
+         * in one 1.7 MB chunk, so editing a single line of our own code made
+         * returning visitors re-download Ionic, Supabase and Sentry as well.
+         * Splitting by library keeps the parts that rarely change cached, and
+         * lets the browser fetch them in parallel.
+         */
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('@sentry')) return 'sentry';
+          if (id.includes('@ionic') || id.includes('ionicons')) return 'ionic';
+          if (id.includes('@supabase')) return 'supabase';
+          if (
+            id.includes('react-dom') ||
+            id.includes('react-router') ||
+            id.includes('@remix-run')
+          ) {
+            return 'react';
+          }
+          return 'vendor';
+        },
+      },
+    },
+  },
 });
