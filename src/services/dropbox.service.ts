@@ -9,7 +9,7 @@ interface DropboxUploadResult {
 }
 
 const dropboxService = {
-  isConnected(): boolean {
+  async isConnected(): Promise<boolean> {
     return dropboxAuthService.isAuthorized();
   },
 

@@ -9,7 +9,7 @@ export class DropboxProvider implements IStorageProvider {
     return !!import.meta.env.VITE_DROPBOX_APP_KEY;
   }
 
-  isConnected(): boolean {
+  async isConnected(): Promise<boolean> {
     return dropboxService.isConnected();
   }
 

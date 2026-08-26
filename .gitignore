@@ -60,3 +60,6 @@ CLAUDE.md
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# macOS/iCloud duplicates — "file 2.ext"
+* 2.*
