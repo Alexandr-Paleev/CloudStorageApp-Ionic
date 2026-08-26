@@ -1,10 +1,41 @@
 import { env } from '../env';
+import { supabase } from '../supabase/supabase.config';
 
-const ACCESS_TOKEN_KEY = 'dropbox_access_token';
-const REFRESH_TOKEN_KEY = 'dropbox_refresh_token';
-const EXPIRY_KEY = 'dropbox_token_expiry';
 const VERIFIER_KEY = 'dropbox_code_verifier';
 const STATE_KEY = 'dropbox_oauth_state';
+
+/** Keys this service used to write. Cleared once, so tokens issued before the
+ *  server-side flow do not keep sitting in localStorage on returning devices. */
+const LEGACY_TOKEN_KEYS = ['dropbox_access_token', 'dropbox_refresh_token', 'dropbox_token_expiry'];
+
+function purgeLegacyTokens(): void {
+  for (const key of LEGACY_TOKEN_KEYS) localStorage.removeItem(key);
+}
+purgeLegacyTokens();
+
+/**
+ * The access token lives here and nowhere else — not in localStorage, not in
+ * sessionStorage. It dies with the tab, and /api/dropbox/token mints a new one
+ * from the refresh token, which never leaves the server.
+ */
+let accessToken: string | null = null;
+let expiresAt = 0;
+
+function cacheToken(token: string, expiresIn: number | null): void {
+  accessToken = token;
+  // Refresh a little early rather than let an upload fail mid-flight.
+  expiresAt = expiresIn ? Date.now() + expiresIn * 1000 - 5 * 60 * 1000 : 0;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return {
+    'Content-Type': 'application/json',
+    ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }),
+  };
+}
 
 function randomHex(byteLength: number): string {
   const array = new Uint8Array(byteLength);
@@ -26,17 +57,6 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
     .replace(/=+$/, '');
 }
 
-function saveTokens(data: { access_token: string; refresh_token?: string; expires_in?: number }) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
-  if (data.refresh_token) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
-  }
-  if (data.expires_in) {
-    const expiry = Date.now() + data.expires_in * 1000;
-    localStorage.setItem(EXPIRY_KEY, expiry.toString());
-  }
-}
-
 const dropboxAuthService = {
   async authorize(): Promise<void> {
     const appKey = env.VITE_DROPBOX_APP_KEY;
@@ -49,6 +69,8 @@ const dropboxAuthService = {
     const codeChallenge = await generateCodeChallenge(codeVerifier);
     // CSRF guard: Dropbox returns state to the redirect URI unchanged
     const state = randomHex(16);
+    // Both are single-use and worthless without the code that arrives on the
+    // redirect, so sessionStorage is fine — unlike a refresh token.
     sessionStorage.setItem(VERIFIER_KEY, codeVerifier);
     sessionStorage.setItem(STATE_KEY, state);
 
@@ -66,92 +88,73 @@ const dropboxAuthService = {
   },
 
   async handleCallback(code: string, state: string | null): Promise<string> {
-    const appKey = env.VITE_DROPBOX_APP_KEY;
     const redirectUri = env.VITE_DROPBOX_REDIRECT_URI;
     const codeVerifier = sessionStorage.getItem(VERIFIER_KEY);
     const expectedState = sessionStorage.getItem(STATE_KEY);
-    if (!appKey || !redirectUri || !codeVerifier) {
+    if (!redirectUri || !codeVerifier) {
       throw new Error('Dropbox auth state missing');
     }
     if (!state || !expectedState || state !== expectedState) {
       throw new Error('Dropbox authorization state mismatch. Please reconnect.');
     }
 
-    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+    const response = await fetch('/api/dropbox/callback', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        grant_type: 'authorization_code',
-        client_id: appKey,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      }),
+      headers: await authHeaders(),
+      body: JSON.stringify({ code, codeVerifier, redirectUri }),
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to exchange Dropbox auth code');
-    }
-
-    const data = await response.json();
-    saveTokens(data);
     sessionStorage.removeItem(VERIFIER_KEY);
     sessionStorage.removeItem(STATE_KEY);
-    return data.access_token;
-  },
-
-  async refreshAccessToken(): Promise<string> {
-    const appKey = env.VITE_DROPBOX_APP_KEY;
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!appKey || !refreshToken) {
-      throw new Error('Cannot refresh — no refresh token. Please reconnect Dropbox.');
-    }
-
-    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: appKey,
-      }),
-    });
 
     if (!response.ok) {
-      this.logout();
-      throw new Error('Dropbox session expired. Please reconnect.');
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || 'Failed to connect Dropbox');
     }
 
-    const data = await response.json();
-    saveTokens(data);
-    return data.access_token;
-  },
-
-  async getAccessToken(): Promise<string | null> {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!token) return null;
-
-    // Check if token is expired (with 5 min buffer)
-    const expiry = localStorage.getItem(EXPIRY_KEY);
-    if (expiry && Date.now() > parseInt(expiry) - 5 * 60 * 1000) {
-      try {
-        return await this.refreshAccessToken();
-      } catch {
-        return null;
-      }
-    }
-
+    const { accessToken: token, expiresIn } = await response.json();
+    cacheToken(token, expiresIn);
     return token;
   },
 
-  isAuthorized(): boolean {
-    return !!localStorage.getItem(ACCESS_TOKEN_KEY);
+  async getAccessToken(): Promise<string | null> {
+    if (accessToken && (expiresAt === 0 || Date.now() < expiresAt)) {
+      return accessToken;
+    }
+
+    const response = await fetch('/api/dropbox/token', {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+
+    if (!response.ok) {
+      // 404 is the normal "not connected" answer, not an error worth throwing.
+      accessToken = null;
+      expiresAt = 0;
+      return null;
+    }
+
+    const { accessToken: token, expiresIn } = await response.json();
+    cacheToken(token, expiresIn);
+    return token;
   },
 
-  logout(): void {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(EXPIRY_KEY);
+  /** Asks the server, since the browser no longer holds any Dropbox state. */
+  async isAuthorized(): Promise<boolean> {
+    return (await this.getAccessToken()) !== null;
+  },
+
+  async logout(): Promise<void> {
+    accessToken = null;
+    expiresAt = 0;
+    purgeLegacyTokens();
+
+    await fetch('/api/dropbox/disconnect', {
+      method: 'POST',
+      headers: await authHeaders(),
+    }).catch(() => {
+      // Local state is already gone; a failed call only leaves a stale row.
+    });
   },
 };
 

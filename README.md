@@ -90,7 +90,19 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 VITE_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
 VITE_HOTJAR_SITE_ID=1234567
 VITE_HOTJAR_VERSION=6
+
+# Optional: Dropbox (Pro tier provider)
+VITE_DROPBOX_APP_KEY=your_dropbox_app_key
+VITE_DROPBOX_REDIRECT_URI=https://your-project.vercel.app/dropbox/callback
+# Server-side copy — the OAuth code is exchanged in /api/dropbox/*, never in
+# the browser, so the key must also exist without the VITE_ prefix.
+DROPBOX_APP_KEY=your_dropbox_app_key
 ```
+
+> **Dropbox tokens are handled server-side.** The refresh token is stored in the
+> `dropbox_connections` table (see `migrations/003_add_dropbox_connections.sql`)
+> and never reaches the browser; the app holds only a short-lived access token,
+> in memory. Run migration 003 before enabling Dropbox.
 
 ### 3. Service Setup
 
