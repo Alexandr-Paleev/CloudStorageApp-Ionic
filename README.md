@@ -125,10 +125,14 @@ DROPBOX_APP_KEY=your_dropbox_app_key
 #### Supabase
 
 1. Create a project on [Supabase.com](https://supabase.com/)
-2. Run the schema from `SUPABASE_SCHEMA.sql` in the SQL Editor, then every file
-   in `migrations/` in numerical order — `001` creates the `profiles` table
-   billing depends on, `002` closes a privilege-escalation hole in its RLS, and
-   `003` adds the table that keeps Dropbox refresh tokens off the client.
+2. Run every file in `migrations/` in the SQL Editor, in numerical order:
+   - `000` — `files` and `folders`, with their RLS policies
+   - `001` — the `profiles` table billing depends on
+   - `002` — closes a privilege-escalation hole in the profiles RLS
+   - `003` — the table that keeps Dropbox refresh tokens off the client
+
+   All four are safe to re-run, so there is no need to track which ones have
+   already been applied.
 3. Enable **Google Auth** in Authentication -> Providers if needed.
 4. Set up a private bucket named `files` in Storage.
 
@@ -304,7 +308,7 @@ cloud-storage-app/
 │   ├── r2/                        # Presigned URLs, quota enforced here
 │   └── stripe/                    # Checkout, Customer Portal, webhook
 ├── lib/                           # Shared by api/ and tests (auth, stripe, format)
-├── migrations/                    # SQL applied in the Supabase editor, in order
+├── migrations/                    # The whole schema, in order, each re-runnable
 ├── e2e/                           # Playwright specs
 ├── capacitor.config.ts            # Capacitor config
 ├── vite.config.ts                 # Vite config (incl. vendor chunk splitting)
