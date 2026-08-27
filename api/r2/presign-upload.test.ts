@@ -1,0 +1,193 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
+import { TIER_LIMITS } from '../../lib/tiers';
+
+const MB = 1024 * 1024;
+const GB = 1024 * MB;
+
+// vi.mock factories are hoisted above every declaration in this file, so
+// anything they close over has to be hoisted with them.
+const { FakeAuthError, authenticateUser, db, signedCommands } = vi.hoisted(() => ({
+  FakeAuthError: class FakeAuthError extends Error {},
+  authenticateUser: vi.fn(),
+  /** Reassigned per test; the mock reads through it at call time. */
+  db: { client: null as { from: (table: string) => unknown } | null },
+  /** The command the handler signs — asserting on it beats parsing a URL. */
+  signedCommands: [] as { input: Record<string, unknown> }[],
+}));
+
+vi.mock('../../lib/auth', () => ({
+  AuthError: FakeAuthError,
+  authenticateUser: (...args: unknown[]) => authenticateUser(...args),
+  supabase: { from: (table: string) => db.client!.from(table) },
+}));
+
+vi.mock('../../lib/r2', () => ({
+  getS3Client: () => ({}),
+  getR2BucketName: () => 'test-bucket',
+}));
+
+vi.mock('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: (_client: unknown, command: { input: Record<string, unknown> }) => {
+    signedCommands.push(command);
+    return Promise.resolve('https://r2.example/signed-url');
+  },
+}));
+
+import handler from './presign-upload';
+
+function setupTables(profile: TableAnswer, files: TableAnswer) {
+  db.client = mockSupabase({ profiles: profile, files }).client;
+}
+
+/** A profile on the given tier, with the given bytes already stored. */
+function account(limit: number, used: number) {
+  setupTables({ data: [{ storage_limit: limit }] }, { data: [{ size: used }] });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  signedCommands.length = 0;
+  authenticateUser.mockResolvedValue('user-1');
+  account(TIER_LIMITS.free.storage_limit, 0);
+});
+
+describe('presign-upload: request validation', () => {
+  it('refuses anything but POST', async () => {
+    const res = mockResponse();
+    await handler(mockRequest({ method: 'GET' }), res);
+    expect(res.statusCode).toBe(405);
+  });
+
+  it('answers 401 when the caller is not authenticated', async () => {
+    authenticateUser.mockRejectedValue(new FakeAuthError('Missing authorization token'));
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('requires a file name', async () => {
+    const res = mockResponse();
+    await handler(mockRequest({ body: { size: 1 } }), res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['a string', '100'],
+    ['negative', -1],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+  ])('rejects a size that is %s', async (_label, size) => {
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size } }), res);
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('presign-upload: quota enforcement', () => {
+  it('signs an upload that fits', async () => {
+    account(TIER_LIMITS.free.storage_limit, 100 * MB);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ uploadUrl: 'https://r2.example/signed-url' });
+  });
+
+  it('refuses an upload that would cross the limit', async () => {
+    account(TIER_LIMITS.free.storage_limit, 495 * MB);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+
+    expect(res.statusCode).toBe(413);
+    expect(signedCommands).toHaveLength(0);
+  });
+
+  it('counts the incoming file, not just what is already stored', async () => {
+    // Exactly at the limit: nothing stored is over quota, but the file is.
+    account(100, 100);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    expect(res.statusCode).toBe(413);
+  });
+
+  it('states the numbers in units a person can read', async () => {
+    account(TIER_LIMITS.free.storage_limit, 495 * MB);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+
+    const { message } = res.body as { message: string };
+    expect(message).toContain('500.0 MB');
+    expect(message).not.toMatch(/\d{7,}/); // no raw byte counts
+  });
+
+  it('says how far over the limit a downgraded account is', async () => {
+    // Cancelling Pro drops the limit to 500 MB with 3 GB already stored.
+    account(TIER_LIMITS.free.storage_limit, 3 * GB);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+
+    expect(res.statusCode).toBe(413);
+    expect((res.body as { message: string }).message).toMatch(/over the limit/);
+  });
+
+  it('honours the tier stored on the profile, not a hardcoded free limit', async () => {
+    account(TIER_LIMITS.pro.storage_limit, 2 * GB);
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'big.zip', size: 1 * GB } }), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('fails loudly when the profile cannot be read', async () => {
+    // Falling back to the default here would quietly cap a Pro user at 500 MB
+    // and reject a legitimate upload with 413.
+    setupTables({ error: { message: 'connection reset' } }, { data: [] });
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).not.toBe(413);
+  });
+
+  it('fails loudly when usage cannot be read', async () => {
+    // An undercount here would hand out URLs beyond the quota.
+    setupTables(
+      { data: [{ storage_limit: TIER_LIMITS.free.storage_limit }] },
+      { error: { message: 'timeout' } }
+    );
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+
+    expect(res.statusCode).toBe(500);
+  });
+});
+
+describe('presign-upload: the signed URL', () => {
+  it('binds the approved size into the signature', async () => {
+    // Without ContentLength in the signature the client could upload something
+    // far larger than the quota check approved.
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 42 } }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(signedCommands[0].input).toMatchObject({ ContentLength: 42 });
+  });
+
+  it('scopes the key to the caller, whatever name they send', async () => {
+    authenticateUser.mockResolvedValue('user-abc');
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: '../../escape.pdf', size: 1 } }), res);
+
+    const { key } = res.body as { key: string };
+    expect(key.startsWith('users/user-abc/')).toBe(true);
+    expect(key).not.toContain('..');
+  });
+
+  it('defaults the content type rather than signing an empty one', async () => {
+    const res = mockResponse();
+    await handler(mockRequest({ body: { fileName: 'a.bin', size: 1 } }), res);
+    expect(signedCommands[0].input).toMatchObject({ ContentType: 'application/octet-stream' });
+  });
+});
