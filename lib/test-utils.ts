@@ -18,6 +18,26 @@ export function mockRequest(overrides: Partial<VercelRequest> = {}): VercelReque
   } as VercelRequest;
 }
 
+/**
+ * A request whose body can only be read as a stream.
+ *
+ * The Stripe webhook verifies its signature against the raw bytes, so it
+ * consumes `req` with `for await` rather than touching `req.body`.
+ */
+export function mockRawRequest(
+  raw: string | Buffer,
+  overrides: Partial<VercelRequest> = {}
+): VercelRequest {
+  const buf = typeof raw === 'string' ? Buffer.from(raw) : raw;
+  const req = mockRequest(overrides) as VercelRequest & {
+    [Symbol.asyncIterator]: () => AsyncGenerator<Buffer>;
+  };
+  req[Symbol.asyncIterator] = async function* () {
+    yield buf;
+  };
+  return req;
+}
+
 export interface MockResponse extends VercelResponse {
   /** Status passed to res.status(); 0 means the handler never answered */
   statusCode: number;
@@ -52,8 +72,12 @@ export function mockResponse(): MockResponse {
  */
 export type TableAnswer = { data?: unknown[] | null; error?: { message: string } | null };
 
+/** `args` is present only when the call carried any — so a bare `.delete()`
+ *  still matches `{ table, op }` exactly. */
+export type RecordedCall = { table: string; op: string; args?: unknown[] };
+
 export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>) {
-  const calls: { table: string; op: string }[] = [];
+  const calls: RecordedCall[] = [];
   const pending: Record<string, TableAnswer[]> = {};
 
   for (const [table, answer] of Object.entries(tables)) {
@@ -105,8 +129,8 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
       from: (table: string) => {
         const api: Record<string, unknown> = {};
         for (const op of ['select', 'insert', 'update', 'upsert', 'delete']) {
-          api[op] = () => {
-            calls.push({ table, op });
+          api[op] = (...args: unknown[]) => {
+            calls.push(args.length > 0 ? { table, op, args } : { table, op });
             return builder(table);
           };
         }
