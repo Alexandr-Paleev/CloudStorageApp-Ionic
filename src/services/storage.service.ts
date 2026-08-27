@@ -4,9 +4,10 @@ import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
 import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '@sentry/react';
+import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 
 /** @deprecated Use dynamic limit from user profile via billingService.getStorageLimit() */
-export const MAX_USER_STORAGE_LIMIT = 500 * 1024 * 1024; // 500 MB default fallback
+export const MAX_USER_STORAGE_LIMIT = DEFAULT_STORAGE_LIMIT;
 
 export type { FileMetadata, Folder };
 

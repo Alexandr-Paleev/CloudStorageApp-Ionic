@@ -1,3 +1,5 @@
+import { TIER_LIMITS } from '../../lib/tiers';
+
 export type SubscriptionTier = 'free' | 'pro';
 
 export type SubscriptionStatus = 'inactive' | 'active' | 'past_due' | 'canceled' | 'trialing';
@@ -17,11 +19,12 @@ export interface UserProfile {
   updated_at: string;
 }
 
+/** Presentation on top of the shared limits — names, prices and copy are the
+ *  client's business; the numbers are not. */
 export const TIER_CONFIG = {
   free: {
     name: 'Free',
-    storage_limit: 500 * 1024 * 1024, // 500 MB
-    allowed_providers: ['cloudinary', 'r2', 'supabase_storage', 'googledrive'],
+    ...TIER_LIMITS.free,
     price: 0,
     features: [
       '500 MB storage',
@@ -32,8 +35,7 @@ export const TIER_CONFIG = {
   },
   pro: {
     name: 'Pro',
-    storage_limit: 5 * 1024 * 1024 * 1024, // 5 GB
-    allowed_providers: ['cloudinary', 'r2', 'supabase_storage', 'googledrive', 'dropbox'],
+    ...TIER_LIMITS.pro,
     price: 900, // $9.00 in cents
     features: [
       '5 GB storage',
