@@ -1,9 +1,13 @@
 name: CI
 
+# Every push is checked, not only pushes to main: a branch waiting for its
+# pull request to be opened was previously not verified at all.
 on:
   push:
-    branches: [main]
+  # Opening the PR would otherwise re-run what the push already covered. Forks
+  # still need this trigger — their pushes cannot run against this repository.
   pull_request:
+    types: [opened, reopened]
 
 # A new push supersedes the run still going for the same branch.
 concurrency:
