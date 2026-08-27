@@ -1,5 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { UserProfile } from '../types/billing.types';
+import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../lib/tiers';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const {
@@ -33,11 +34,13 @@ const billingService = {
 
   async getStorageLimit(userId: string): Promise<number> {
     const profile = await this.getProfile(userId);
-    return profile?.storage_limit ?? 500 * 1024 * 1024;
+    return profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
   },
 
   isProviderAllowed(profile: UserProfile | null, provider: string): boolean {
-    if (!profile) return ['cloudinary', 'r2', 'supabase_storage', 'googledrive'].includes(provider);
+    // No profile means no proof of a paid tier — fall back to free, not to more.
+    if (!profile)
+      return (TIER_LIMITS.free.allowed_providers as readonly string[]).includes(provider);
     return profile.allowed_providers.includes(provider);
   },
 

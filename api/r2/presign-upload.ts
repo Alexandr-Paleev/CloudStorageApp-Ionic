@@ -5,9 +5,7 @@ import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { getS3Client, getR2BucketName } from '../../lib/r2';
 import { sanitizeFileName } from '../../lib/filename';
 import { formatBytes } from '../../lib/format';
-
-/** Same default the client falls back to when there is no profile row */
-const DEFAULT_STORAGE_LIMIT = 500 * 1024 * 1024;
+import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 
 async function getStorageLimit(userId: string): Promise<number> {
   const { data, error } = await supabase

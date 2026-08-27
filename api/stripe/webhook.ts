@@ -2,22 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { getPeriodEnd } from '../../lib/stripe';
+import { TIER_LIMITS } from '../../lib/tiers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-
-// Tier configuration — duplicated from src/types/billing.types.ts
-// to avoid importing client-side code into serverless functions
-const TIER_LIMITS = {
-  free: {
-    storage_limit: 500 * 1024 * 1024, // 500 MB
-    allowed_providers: ['cloudinary', 'r2', 'supabase_storage', 'googledrive'],
-  },
-  pro: {
-    storage_limit: 5 * 1024 * 1024 * 1024, // 5 GB
-    allowed_providers: ['cloudinary', 'r2', 'supabase_storage', 'googledrive', 'dropbox'],
-  },
-} as const;
 
 async function buffer(readable: VercelRequest): Promise<Buffer> {
   const chunks: Buffer[] = [];
