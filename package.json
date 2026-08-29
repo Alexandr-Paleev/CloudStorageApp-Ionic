@@ -51,7 +51,7 @@
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
     "@capacitor/share": "^6.0.4",
-    "@capacitor/status-bar": "^6.0.0",
+    "@capacitor/status-bar": "^8.0.3",
     "@ionic/react": "^8.0.0",
     "@sentry/react": "^10.32.1",
     "@sentry/tracing": "^7.120.4",
