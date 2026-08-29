@@ -149,3 +149,9 @@ body.dark .metadata-value {
 body.dark .delete-button {
   --color: #ffcccc;
 }
+
+.share-note {
+  margin: 14px 2px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}

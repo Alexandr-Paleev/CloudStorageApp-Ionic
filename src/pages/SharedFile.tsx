@@ -109,8 +109,8 @@ const SharedFilePage: React.FC = () => {
               </IonButton>
 
               <p className="shared-file__note">
-                Shared with you through <Link to="/login">Cloud Storage</Link>. The link expires and
-                can be revoked by its owner.
+                Shared with you through <Link to="/login">Cloud Storage</Link>. This link expires,
+                and its owner can stop it from opening at any time.
               </p>
             </div>
           )}

@@ -50,7 +50,7 @@ const FileView: React.FC = () => {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
-  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<{ url: string; expiresAt: string } | null>(null);
   const [sharePending, setSharePending] = useState(false);
   const [copyToast, setCopyToast] = useState<{
     show: boolean;
@@ -140,14 +140,14 @@ const FileView: React.FC = () => {
    * known schedule and its owner can revoke it.
    */
   const ensureShareLink = async (): Promise<string | null> => {
-    if (shareLink) return shareLink;
+    if (shareLink) return shareLink.url;
     if (!fileId) return null;
 
     setSharePending(true);
     try {
-      const { url } = await shareService.createLink(fileId);
-      setShareLink(url);
-      return url;
+      const link = await shareService.createLink(fileId);
+      setShareLink(link);
+      return link.url;
     } catch (err) {
       setCopyToast({
         show: true,
@@ -380,6 +380,21 @@ const FileView: React.FC = () => {
                   </IonCol>
                 </IonRow>
               </IonGrid>
+
+              {shareLink && (
+                <IonText color="medium">
+                  {/* Says what revoking actually does. For files on providers
+                      that serve permanent public URLs (Cloudinary, Dropbox,
+                      Google Drive) the direct file address keeps working once
+                      someone has opened it — promising a clean revoke here
+                      would be a lie. */}
+                  <p className="share-note">
+                    Anyone with this link can download the file until{' '}
+                    {formatDateTime(shareLink.expiresAt)}. Revoking stops the link from opening — it
+                    cannot take back a file someone has already downloaded.
+                  </p>
+                </IonText>
+              )}
             </div>
           </div>
         </div>
