@@ -19,5 +19,5 @@
   /* lib/ holds the server-side helpers. They live outside api/ because Vercel
      turns every file under api/ into its own Serverless Function, and the
      Hobby plan allows at most 12 per deployment. */
-  "include": ["api", "lib", "vitest.config.ts"]
+  "include": ["api", "lib", "vitest.config.mts"]
 }
