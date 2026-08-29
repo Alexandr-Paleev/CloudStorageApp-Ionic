@@ -23,15 +23,13 @@ updates:
       types:
         patterns: ['@types/*']
     ignore:
-      # Major bumps here are platform migrations, not dependency updates:
-      # Capacitor 6 -> 8 moves the native toolchain, Ionic 8 -> 9 is a UI
-      # framework rewrite that e2e smoke tests would not catch, and @types/node
-      # must track the Node version CI actually runs (22).
-      - dependency-name: '@capacitor/*'
-        update-types: ['version-update:semver-major']
-      - dependency-name: '@ionic/*'
-        update-types: ['version-update:semver-major']
-      - dependency-name: '@types/node'
+      # Majors are migrations, not updates: they need a changelog read and a
+      # decision, which is exactly what an automated PR cannot supply. The
+      # first Dependabot run proposed seven of them at once — Capacitor 6 to 8,
+      # Ionic 8 to 9, TypeScript 5 to 7, react-router 6 to 7, ESLint 8 to 10 —
+      # two failing CI outright. Minor and patch still arrive weekly, which is
+      # where security fixes land.
+      - dependency-name: '*'
         update-types: ['version-update:semver-major']
     commit-message:
       prefix: chore
