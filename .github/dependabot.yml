@@ -22,6 +22,17 @@ updates:
         patterns: ['vitest', '@vitest/*', '@playwright/*', 'playwright']
       types:
         patterns: ['@types/*']
+    ignore:
+      # Major bumps here are platform migrations, not dependency updates:
+      # Capacitor 6 -> 8 moves the native toolchain, Ionic 8 -> 9 is a UI
+      # framework rewrite that e2e smoke tests would not catch, and @types/node
+      # must track the Node version CI actually runs (22).
+      - dependency-name: '@capacitor/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@ionic/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: chore
       include: scope
