@@ -37,6 +37,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
 import shareService from '../services/share.service';
+import ShareLinks from '../components/ShareLinks';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import './FileView.css';
@@ -147,6 +148,7 @@ const FileView: React.FC = () => {
     try {
       const link = await shareService.createLink(fileId);
       setShareLink(link);
+      queryClient.invalidateQueries({ queryKey: ['shareLinks', fileId] });
       return link.url;
     } catch (err) {
       setCopyToast({
@@ -395,6 +397,8 @@ const FileView: React.FC = () => {
                   </p>
                 </IonText>
               )}
+
+              {fileId && <ShareLinks fileId={fileId} />}
             </div>
           </div>
         </div>
