@@ -36,6 +36,7 @@ import {
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
+import shareService from '../services/share.service';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import './FileView.css';
@@ -49,6 +50,8 @@ const FileView: React.FC = () => {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [shareLink, setShareLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [sharePending, setSharePending] = useState(false);
   const [copyToast, setCopyToast] = useState<{
     show: boolean;
     message: string;
@@ -128,20 +131,53 @@ const FileView: React.FC = () => {
     }
   };
 
+  /**
+   * A share link, created on demand and reused for the rest of the visit.
+   *
+   * Sharing download_url directly, as this page used to, meant handing out
+   * either a permanent unrevocable URL (Cloudinary, Dropbox) or a signed one
+   * that dies in an hour (R2, Supabase Storage). A share link expires on a
+   * known schedule and its owner can revoke it.
+   */
+  const ensureShareLink = async (): Promise<string | null> => {
+    if (shareLink) return shareLink.url;
+    if (!fileId) return null;
+
+    setSharePending(true);
+    try {
+      const link = await shareService.createLink(fileId);
+      setShareLink(link);
+      return link.url;
+    } catch (err) {
+      setCopyToast({
+        show: true,
+        message: err instanceof Error ? err.message : 'Failed to create share link',
+        color: 'danger',
+      });
+      return null;
+    } finally {
+      setSharePending(false);
+    }
+  };
+
   const handleCopyLink = async () => {
-    const url = getDownloadUrl();
+    const url = await ensureShareLink();
     if (!url) return;
 
     try {
       await navigator.clipboard.writeText(url);
-      setCopyToast({ show: true, message: 'Link copied to clipboard!', color: 'success' });
+      setCopyToast({
+        show: true,
+        message: 'Share link copied — expires in 7 days',
+        color: 'success',
+      });
     } catch {
       setCopyToast({ show: true, message: 'Failed to copy link', color: 'danger' });
     }
   };
 
   const handleSocialShare = async (platform: 'telegram' | 'whatsapp' | 'facebook' | 'x') => {
-    const url = getDownloadUrl();
+    const url = await ensureShareLink();
     if (!file || !url) return;
 
     const text = `Check out ${file.name}`;
@@ -305,6 +341,7 @@ const FileView: React.FC = () => {
                       expand="block"
                       fill="outline"
                       onClick={handleCopyLink}
+                      disabled={sharePending}
                       className="action-button"
                     >
                       <IonIcon icon={linkOutline} />
@@ -343,6 +380,21 @@ const FileView: React.FC = () => {
                   </IonCol>
                 </IonRow>
               </IonGrid>
+
+              {shareLink && (
+                <IonText color="medium">
+                  {/* Says what revoking actually does. For files on providers
+                      that serve permanent public URLs (Cloudinary, Dropbox,
+                      Google Drive) the direct file address keeps working once
+                      someone has opened it — promising a clean revoke here
+                      would be a lie. */}
+                  <p className="share-note">
+                    Anyone with this link can download the file until{' '}
+                    {formatDateTime(shareLink.expiresAt)}. Revoking stops the link from opening — it
+                    cannot take back a file someone has already downloaded.
+                  </p>
+                </IonText>
+              )}
             </div>
           </div>
         </div>
