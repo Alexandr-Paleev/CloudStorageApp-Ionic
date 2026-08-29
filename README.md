@@ -53,6 +53,20 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 - ✅ Webhook keeps the tier in sync both ways — upgrade and cancellation
 - ✅ Storage limits and allowed providers driven by the tier, not hardcoded
 
+### 🔗 Sharing
+
+- ✅ Public share links — send a file to someone without an account
+- ✅ Links expire (7 days by default) and can be revoked from the file page
+- ✅ Each file lists its links with their state: active, expired or revoked
+- ✅ The recipient sees the file and nothing about its owner
+
+> **What revoking does, precisely.** It stops `/s/:token` from opening. It cannot
+> withdraw a file someone already downloaded, and on providers that serve
+> permanent public URLs (Cloudinary, Dropbox, Google Drive) the direct file
+> address keeps working for anyone who opened it. R2 and Supabase Storage are
+> signed per request and do expire. The UI says this rather than promising a
+> clean revoke.
+
 ### 📱 Platforms
 
 - ✅ **Web** — works in any modern browser
@@ -233,6 +247,77 @@ The app will be available at: `http://localhost:5173`
 - **Testing**: Vitest (unit) + Playwright (e2e), run in GitHub Actions
 - **Analytics**: Google Analytics 4 (GA4) + Hotjar
 - **Error Tracking**: Sentry
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph browser["Browser · Ionic React PWA"]
+        ui["Pages and services"]
+        anon["supabase-js<br/>anon key, subject to RLS"]
+    end
+
+    subgraph vercel["Vercel"]
+        static["Static bundle"]
+        api["Serverless functions · /api<br/>service-role key, bypasses RLS"]
+    end
+
+    subgraph data["Supabase"]
+        db[("Postgres<br/>RLS on every table")]
+        auth["Auth · JWT"]
+        sb_store["Storage · private bucket"]
+    end
+
+    subgraph external["Providers and services"]
+        r2["Cloudflare R2"]
+        cloudinary["Cloudinary"]
+        drive["Google Drive"]
+        dropbox["Dropbox"]
+        stripe["Stripe"]
+    end
+
+    ui --> anon
+    anon -->|"read own rows"| db
+    ui -->|"authenticated calls"| api
+    ui -->|"direct upload with a presigned URL"| r2
+    ui -->|"unsigned preset"| cloudinary
+
+    api --> db
+    api --> sb_store
+    api -->|"presign, delete"| r2
+    api -->|"delete, ownership checked"| cloudinary
+    api -->|"checkout, portal"| stripe
+    api -->|"OAuth exchange, token refresh"| dropbox
+    ui --> drive
+
+    stripe -->|"webhook · signature verified"| api
+    auth --- anon
+    auth --- api
+
+    guest["Recipient of a share link<br/>no account"] -->|"GET /api/share?token"| api
+```
+
+**The rule the layout follows:** anything holding a secret runs in `/api`. The
+browser bundle is public — Vite inlines every `VITE_`-prefixed value into it —
+so provider credentials, the Stripe secret key, the Supabase service-role key
+and Dropbox refresh tokens are only ever read server-side. The client talks to
+Postgres directly, but always through the anon key with RLS applied, and only
+for rows it owns.
+
+Uploads are the deliberate exception: files go from the browser straight to R2
+using a presigned URL, because proxying them through a serverless function would
+cap uploads at Vercel's 4.5 MB request body limit. The quota is therefore
+enforced when the URL is signed, and the approved size is signed into it.
+
+### Security decisions worth knowing
+
+| Decision | Reason |
+|---|---|
+| Billing columns are server-write only | RLS has no column-level granularity, so a self-update policy would let anyone set `tier = 'pro'` |
+| Dropbox refresh tokens live in `dropbox_connections`, never in the browser | an XSS could otherwise reach the user's Dropbox indefinitely |
+| Share tokens are stored as SHA-256 hashes | a leak of `shared_links` then reveals nothing usable |
+| `assertServiceRoleKey` refuses to start on an anon key | swapping the two keys fails silently: queries return nothing instead of erroring |
+| Quota and ownership are checked in `/api`, never trusted from the client | the client check is advisory; the presigned URL writes straight to the bucket |
 
 ## 🚀 Deployment
 
