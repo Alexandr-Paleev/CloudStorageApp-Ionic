@@ -5,6 +5,14 @@ export interface ShareLink {
   expiresAt: string;
 }
 
+/** A link as the owner sees it: no token — the server stores only its hash. */
+export interface ShareLinkRecord {
+  id: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const {
     data: { session },
@@ -33,6 +41,24 @@ const shareService = {
     }
 
     return (await response.json()) as ShareLink;
+  },
+
+  /**
+   * Links the caller created for one file.
+   *
+   * Read straight from the table: the "Users can view their own shared links"
+   * policy scopes it to created_by = auth.uid(), and the row carries no token —
+   * only its hash, which is not selected here.
+   */
+  async listLinks(fileId: string): Promise<ShareLinkRecord[]> {
+    const { data, error } = await supabase
+      .from('shared_links')
+      .select('id, created_at, expires_at, revoked_at')
+      .eq('file_id', fileId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []) as ShareLinkRecord[];
   },
 
   async revokeLink(id: string): Promise<void> {
