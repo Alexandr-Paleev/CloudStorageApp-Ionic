@@ -20,6 +20,31 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 - Automatically expand storage via Google Drive when the limit is exceeded
 - Upgrade to a paid tier for more space and additional providers
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard with the storage meter, the Pro badge and a list of files" width="820">
+</p>
+
+| Upload — Pro users pick the backend | Plans — Stripe in test mode |
+|---|---|
+| <img src="docs/screenshots/upload.png" alt="Upload screen with a provider picker: Auto, Cloudinary, Cloudflare R2, Supabase, Google Drive, Dropbox" width="420"> | <img src="docs/screenshots/pricing.png" alt="Free and Pro plans with a demo mode notice" width="420"> |
+
+| File view | What a share link opens |
+|---|---|
+| <img src="docs/screenshots/file-view.png" alt="File view with preview, metadata and actions" width="420"> | <img src="docs/screenshots/shared-file.png" alt="Public share page showing the file name, size and a download button" width="420"> |
+
+Share links are listed on the file they belong to, with their state and a way to revoke them:
+
+<p align="center">
+  <img src="docs/screenshots/share-links.png" alt="Share links panel showing an active link with its creation and expiry dates and a revoke button" width="820">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/dashboard-mobile.png" alt="The dashboard on a phone-sized viewport" width="300"><br>
+  <sub>The same dashboard as an installed PWA</sub>
+</p>
+
 ## ✨ Key Features
 
 ### 🔐 Authentication
