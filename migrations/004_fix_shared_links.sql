@@ -1,0 +1,69 @@
+-- Migration: close public read access to shared_links, and store token hashes
+-- Run this in Supabase SQL Editor.
+--
+-- The table shipped with a policy named "Anyone can read shared links by token"
+-- defined as USING (true) for role public. That is not "read by token" — it is
+-- read everything. The anon key is published in the client bundle, so anyone
+-- could do
+--
+--   GET /rest/v1/shared_links?select=token,file_id
+--
+-- and collect every share token in one request, then open every shared file.
+-- Verified against the live database before writing this.
+--
+-- Two changes:
+--
+-- 1. No client-side access at all. Lookup by token happens in /api/share, which
+--    uses SUPABASE_SERVICE_ROLE_KEY and bypasses RLS — the same shape as
+--    dropbox_connections. Owners still list their own links, without the secret.
+--
+-- 2. The token is stored as a SHA-256 hash. A leak of this table then reveals
+--    nothing usable, and the plaintext exists only in the URL the owner copies.
+--
+-- The single pre-existing row is dropped: its token was readable by the whole
+-- internet, and no code ever served it.
+--
+-- Safe to run twice.
+
+DO $$
+BEGIN
+    IF to_regclass('public.shared_links') IS NULL THEN
+        RAISE NOTICE 'public.shared_links does not exist — nothing to fix.';
+        RETURN;
+    END IF;
+
+    -- The hole itself.
+    DROP POLICY IF EXISTS "Anyone can read shared links by token" ON public.shared_links;
+
+    -- Writes go through /api/share, which verifies ownership of the file before
+    -- issuing a link, so the client needs no INSERT or DELETE of its own.
+    DROP POLICY IF EXISTS "Users can create shared links for their files" ON public.shared_links;
+    DROP POLICY IF EXISTS "Users can delete their own shared links" ON public.shared_links;
+    REVOKE INSERT, UPDATE, DELETE ON public.shared_links FROM authenticated, anon;
+
+    -- Compromised by the policy above, and unreachable anyway.
+    DELETE FROM public.shared_links;
+END $$;
+
+ALTER TABLE public.shared_links
+    ADD COLUMN IF NOT EXISTS token_hash TEXT,
+    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITH TIME ZONE;
+
+-- The plaintext column has no reason to exist: what is stored is the hash.
+ALTER TABLE public.shared_links DROP COLUMN IF EXISTS token;
+
+ALTER TABLE public.shared_links ALTER COLUMN token_hash SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_links_token_hash
+    ON public.shared_links(token_hash);
+CREATE INDEX IF NOT EXISTS idx_shared_links_created_by
+    ON public.shared_links(created_by);
+
+ALTER TABLE public.shared_links ENABLE ROW LEVEL SECURITY;
+
+-- Owners may list what they have shared and revoke it from the UI. token_hash
+-- is useless to them, and the plaintext token is shown once, at creation.
+DROP POLICY IF EXISTS "Users can view their own shared links" ON public.shared_links;
+CREATE POLICY "Users can view their own shared links" ON public.shared_links
+    FOR SELECT USING (created_by = auth.uid());

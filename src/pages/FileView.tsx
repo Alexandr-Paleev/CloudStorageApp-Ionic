@@ -36,6 +36,7 @@ import {
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
+import shareService from '../services/share.service';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import './FileView.css';
@@ -49,6 +50,8 @@ const FileView: React.FC = () => {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sharePending, setSharePending] = useState(false);
   const [copyToast, setCopyToast] = useState<{
     show: boolean;
     message: string;
@@ -128,20 +131,53 @@ const FileView: React.FC = () => {
     }
   };
 
+  /**
+   * A share link, created on demand and reused for the rest of the visit.
+   *
+   * Sharing download_url directly, as this page used to, meant handing out
+   * either a permanent unrevocable URL (Cloudinary, Dropbox) or a signed one
+   * that dies in an hour (R2, Supabase Storage). A share link expires on a
+   * known schedule and its owner can revoke it.
+   */
+  const ensureShareLink = async (): Promise<string | null> => {
+    if (shareLink) return shareLink;
+    if (!fileId) return null;
+
+    setSharePending(true);
+    try {
+      const { url } = await shareService.createLink(fileId);
+      setShareLink(url);
+      return url;
+    } catch (err) {
+      setCopyToast({
+        show: true,
+        message: err instanceof Error ? err.message : 'Failed to create share link',
+        color: 'danger',
+      });
+      return null;
+    } finally {
+      setSharePending(false);
+    }
+  };
+
   const handleCopyLink = async () => {
-    const url = getDownloadUrl();
+    const url = await ensureShareLink();
     if (!url) return;
 
     try {
       await navigator.clipboard.writeText(url);
-      setCopyToast({ show: true, message: 'Link copied to clipboard!', color: 'success' });
+      setCopyToast({
+        show: true,
+        message: 'Share link copied — expires in 7 days',
+        color: 'success',
+      });
     } catch {
       setCopyToast({ show: true, message: 'Failed to copy link', color: 'danger' });
     }
   };
 
   const handleSocialShare = async (platform: 'telegram' | 'whatsapp' | 'facebook' | 'x') => {
-    const url = getDownloadUrl();
+    const url = await ensureShareLink();
     if (!file || !url) return;
 
     const text = `Check out ${file.name}`;
@@ -305,6 +341,7 @@ const FileView: React.FC = () => {
                       expand="block"
                       fill="outline"
                       onClick={handleCopyLink}
+                      disabled={sharePending}
                       className="action-button"
                     >
                       <IonIcon icon={linkOutline} />

@@ -39,6 +39,7 @@ const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
 const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Legal = lazy(() => import('./pages/Legal'));
+const SharedFile = lazy(() => import('./pages/SharedFile'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -67,6 +68,9 @@ const App: React.FC = () => (
                   neither has an account to sign in with. */}
               <Route path="/terms" element={<Legal document="terms" />} />
               <Route path="/privacy" element={<Legal document="privacy" />} />
+              {/* Also public, and necessarily so: the token in the URL is the
+                  only credential a share link carries. */}
+              <Route path="/s/:token" element={<SharedFile />} />
               <Route
                 path="/dashboard/:folderId?"
                 element={

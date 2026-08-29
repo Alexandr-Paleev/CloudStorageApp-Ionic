@@ -1,0 +1,51 @@
+.shared-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+}
+
+.shared-file__card,
+.shared-file__state {
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 24px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.shared-file__card {
+  border: 1px solid var(--ion-color-light-shade);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.shared-file__icon {
+  font-size: 56px;
+  color: #4f46e5;
+  margin-bottom: 8px;
+}
+
+.shared-file__name {
+  margin: 8px 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.shared-file__meta {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+
+.shared-file__message {
+  margin: 0 0 20px;
+  color: var(--ion-color-medium);
+}
+
+.shared-file__note {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ion-color-medium);
+}
