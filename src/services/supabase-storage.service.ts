@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { supabase } from '../supabase/supabase.config';
 import { UploadProgress } from './storage.service';
 
@@ -27,7 +28,7 @@ const supabaseStorageService = {
     });
 
     if (error) {
-      console.error('Supabase Storage upload error:', error);
+      Sentry.captureException(error, { tags: { context: 'supabaseStorage.uploadFile' } });
       throw error;
     }
 
@@ -42,7 +43,9 @@ const supabaseStorageService = {
       .createSignedUrl(data.path, 3600); // 1 hour
 
     if (urlError) {
-      console.error('Supabase Storage signed URL error:', urlError);
+      Sentry.captureException(urlError, {
+        tags: { context: 'supabaseStorage.uploadFile.signUrl' },
+      });
       throw urlError;
     }
 
@@ -59,7 +62,7 @@ const supabaseStorageService = {
     const { error } = await supabase.storage.from(BUCKET_NAME).remove([path]);
 
     if (error) {
-      console.error('Supabase Storage delete error:', error);
+      Sentry.captureException(error, { tags: { context: 'supabaseStorage.deleteFile' } });
       throw error;
     }
   },
@@ -71,7 +74,7 @@ const supabaseStorageService = {
     const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUrl(path, 3600);
 
     if (error) {
-      console.error('Supabase Storage sign error:', error);
+      Sentry.captureException(error, { tags: { context: 'supabaseStorage.getSignedUrl' } });
       throw error;
     }
 

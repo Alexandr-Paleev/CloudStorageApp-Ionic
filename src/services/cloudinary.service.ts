@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { UploadProgress } from './storage.service';
 import { supabase } from '../supabase/supabase.config';
 
@@ -103,7 +104,7 @@ const cloudinaryService = {
         throw new Error('Failed to delete file from Cloudinary');
       }
     } catch (error) {
-      console.error('Cloudinary delete error:', error);
+      Sentry.captureException(error, { tags: { context: 'cloudinary.deleteFile' } });
       throw error;
     }
   },

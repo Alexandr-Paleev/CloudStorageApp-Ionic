@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { supabase } from '../supabase/supabase.config';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -53,7 +54,11 @@ const googleDriveAuthService = {
           scope: SCOPES,
           callback: (response: TokenResponse) => {
             if (response.error !== undefined) {
-              console.error('Google Auth Error:', response);
+              Sentry.captureMessage('Google Drive authorization failed', {
+                level: 'error',
+                tags: { context: 'googledrive.authorize' },
+                extra: { error: response.error },
+              });
             }
             accessToken = response.access_token;
             localStorage.setItem('gdrive_access_token', response.access_token);
