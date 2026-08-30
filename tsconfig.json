@@ -30,6 +30,6 @@
     }
   },
   "include": ["src", "lib", "e2e", "playwright.config.ts"],
-  "exclude": ["api", "functions", "node_modules", "dist"],
+  "exclude": ["api", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
