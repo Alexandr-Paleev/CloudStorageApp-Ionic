@@ -6,7 +6,7 @@
 
 A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Supabase, with Stripe billing and five storage backends.
 
-🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[v3.0.0 release](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.0.0)**
+🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[v3.1.0 release](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.1.0)**
 
 > 💳 **The demo runs Stripe in test mode.** Real cards are declined — upgrade with `4242 4242 4242 4242`, any future expiry, any CVC. No money changes hands.
 
@@ -69,7 +69,10 @@ Share links are listed on the file they belong to, with their state and a way to
 - ✅ Images routed to Cloudinary, other files to R2/Supabase — Pro users can pick a provider by hand
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
-- ✅ Quota enforced server-side, not just in the UI
+- ⚠️ Quota is enforced server-side **on the R2 path only** — `/api/r2/presign-upload`
+  refuses to sign a URL past the limit. Cloudinary (unsigned preset) and Supabase
+  Storage upload straight from the browser, so on those two paths the check is still
+  client-side and advisory. Images route to Cloudinary, so this is the common case.
 
 ### 💳 Billing
 
@@ -125,8 +128,11 @@ VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Cloudinary Configuration
+# The API key is deliberately absent: it belongs to the server-side block below,
+# without the VITE_ prefix. src/env.ts parses the whole of import.meta.env, so
+# Vite inlines every VITE_ variable into the public bundle — even ones no code
+# reads. Anything prefixed here is published.
 VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
-VITE_CLOUDINARY_API_KEY=your_api_key
 VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset_name
 
 # Required: API endpoint for file deletion
@@ -169,11 +175,18 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `001` — the `profiles` table billing depends on
    - `002` — closes a privilege-escalation hole in the profiles RLS
    - `003` — the table that keeps Dropbox refresh tokens off the client
+   - `004` — closes public read access to `shared_links` and switches it to
+     token hashes; on a new project it finds nothing to fix and does nothing
+   - `005` — creates `shared_links`, the table public share links live in
+   - `006` — drops a dead policy on `files` and writes the Storage bucket and
+     its policies down, so they stop living only in the dashboard
 
-   All four are safe to re-run, so there is no need to track which ones have
+   All seven are safe to re-run, so there is no need to track which ones have
    already been applied.
 3. Enable **Google Auth** in Authentication -> Providers if needed.
-4. Set up a private bucket named `files` in Storage.
+4. The `files` bucket and its policies come from migration `006` — nothing to click.
+   Creating the bucket by hand in the dashboard is what left a fresh project with
+   RLS on `storage.objects` and no policies, so every Supabase Storage upload failed.
 
 #### Cloudinary
 
@@ -255,7 +268,7 @@ npm run build
 npm run preview
 ```
 
-The app will be available at: `http://localhost:5173`
+The app will be available at: `http://localhost:8100`
 
 ## 📦 Tech Stack
 
@@ -342,7 +355,8 @@ enforced when the URL is signed, and the approved size is signed into it.
 | Dropbox refresh tokens live in `dropbox_connections`, never in the browser | an XSS could otherwise reach the user's Dropbox indefinitely |
 | Share tokens are stored as SHA-256 hashes | a leak of `shared_links` then reveals nothing usable |
 | `assertServiceRoleKey` refuses to start on an anon key | swapping the two keys fails silently: queries return nothing instead of erroring |
-| Quota and ownership are checked in `/api`, never trusted from the client | the client check is advisory; the presigned URL writes straight to the bucket |
+| Ownership is checked in `/api`, never trusted from the client | the presigned URL writes straight to the bucket, so the client check is advisory |
+| Quota is checked in `/api` **for R2 only** — a known gap, not a claim | Cloudinary and Supabase Storage receive the upload directly from the browser; nothing server-side sees it |
 
 ## 🚀 Deployment
 
@@ -441,7 +455,10 @@ only ever read server-side.
 | Provider selection | automatic | manual, per upload |
 
 - **Extra storage**: Google Drive (15 GB free) — auto-connects when limit is reached
-- **Max single file size**: 50 MB
+- **Max single file size**: not enforced. The figure of 50 MB appeared here before
+  anything implemented it; no check exists in the client, in `/api`, or on the
+  bucket (`file_size_limit` is null). Providers impose their own ceilings — Vercel
+  caps a function request body at 4.5 MB, which is why R2 uploads are presigned.
 - Cancelling Pro drops the limit back to 500 MB. Files already stored stay
   readable; only new uploads are refused until the account is back under quota.
 
