@@ -51,9 +51,13 @@ DROP POLICY IF EXISTS "Anyone can view shared files" ON public.files;
 
 -- Private on purpose: objects are served through short-lived signed URLs,
 -- created in supabase-storage.service.ts and in /api/share.
+-- DO UPDATE rather than DO NOTHING: privacy of the bucket is the invariant this
+-- migration exists to state. A bucket left public by an earlier hand-setup would
+-- otherwise survive the migration untouched, and every object in it stays
+-- readable without a signature.
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('files', 'files', false)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET public = false;
 
 -- Paths are "{userId}/{timestamp}_{fileName}", so the first path segment is the
 -- owner and is what every policy below checks against auth.uid().

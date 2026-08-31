@@ -50,8 +50,20 @@ BEGIN
     DROP POLICY IF EXISTS "Users can delete their own shared links" ON public.shared_links;
     REVOKE INSERT, UPDATE, DELETE ON public.shared_links FROM authenticated, anon;
 
-    -- Compromised by the policy above, and unreachable anyway.
-    DELETE FROM public.shared_links;
+    -- Compromised by the policy above, and unreachable anyway. Guarded by the
+    -- presence of the plaintext column, so this only ever fires on a table that
+    -- has not been through this migration yet. It used to run unconditionally,
+    -- which made every later re-run delete the live share links — the opposite
+    -- of the "safe to run twice" promised above, and of what the README tells
+    -- the reader to do with the migrations directory.
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'shared_links'
+          AND column_name = 'token'
+    ) THEN
+        DELETE FROM public.shared_links;
+    END IF;
 
     ALTER TABLE public.shared_links
         ADD COLUMN IF NOT EXISTS token_hash TEXT,
@@ -60,6 +72,12 @@ BEGIN
 
     -- The plaintext column has no reason to exist: what is stored is the hash.
     ALTER TABLE public.shared_links DROP COLUMN IF EXISTS token;
+
+    -- A row without a hash cannot be looked up by any token and is therefore
+    -- unreachable by construction — /api/share finds a link by hashing what the
+    -- visitor presents. Removing them is what makes the NOT NULL below safe on a
+    -- table someone half-migrated by hand; on a healthy one it matches nothing.
+    DELETE FROM public.shared_links WHERE token_hash IS NULL;
 
     ALTER TABLE public.shared_links ALTER COLUMN token_hash SET NOT NULL;
 
