@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   IonContent,
   IonPage,
@@ -28,10 +28,13 @@ const Login: React.FC = () => {
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Redirect if already logged in. Declared rather than called: navigate() here
+  // is a side effect during render, which React makes no promise about — under
+  // StrictMode the render runs twice, and a concurrent render that is thrown
+  // away would still have pushed onto the history stack. Pricing.tsx does the
+  // same thing this way. `replace` keeps /login out of the back history.
   if (user) {
-    navigate('/dashboard');
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

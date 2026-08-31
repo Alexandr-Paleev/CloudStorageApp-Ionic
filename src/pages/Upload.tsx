@@ -22,11 +22,8 @@ import {
   IonAlert,
 } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
-import storageService, {
-  UploadProgress,
-  MAX_USER_STORAGE_LIMIT,
-  FileMetadata,
-} from '../services/storage.service';
+import storageService, { UploadProgress, FileMetadata } from '../services/storage.service';
+import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import googleDriveAuthService from '../services/googledrive-auth.service';
 import { useProfile } from '../hooks/useProfile';
 import ProviderSelector from '../components/ProviderSelector';
@@ -46,7 +43,7 @@ const Upload: React.FC = () => {
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
   const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
   const { profile } = useProfile();
-  const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
+  const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
 
   // Check storage size
   const { data: storageSize } = useQuery({

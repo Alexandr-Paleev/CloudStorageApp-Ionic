@@ -6,9 +6,6 @@ import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '@sentry/react';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 
-/** @deprecated Use dynamic limit from user profile via billingService.getStorageLimit() */
-export const MAX_USER_STORAGE_LIMIT = DEFAULT_STORAGE_LIMIT;
-
 export type { FileMetadata, Folder };
 
 export type UploadProgress = {
@@ -34,7 +31,7 @@ const storageService = {
     storageLimit?: number
   ): Promise<boolean> {
     const currentSize = await this.getUserStorageSize(userId);
-    const limit = storageLimit ?? MAX_USER_STORAGE_LIMIT;
+    const limit = storageLimit ?? DEFAULT_STORAGE_LIMIT;
     return currentSize + fileSize <= limit;
   },
 

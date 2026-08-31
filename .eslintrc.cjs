@@ -9,7 +9,7 @@ module.exports = {
     'plugin:react/jsx-runtime',
     'plugin:jsx-a11y/recommended'
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'functions'],
+  ignorePatterns: ['dist', '.eslintrc.cjs'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh', 'jsx-a11y'],
   rules: {

@@ -39,7 +39,7 @@ import {
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import storageService from '../services/storage.service';
-import { MAX_USER_STORAGE_LIMIT } from '../services/storage.service';
+import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
 import { env } from '../env';
@@ -154,7 +154,7 @@ const Dashboard: React.FC = () => {
 
   // Safe calculation for storage — use dynamic limit from profile
   const usedBytes = storageSize || 0;
-  const storageLimit = profile?.storage_limit ?? MAX_USER_STORAGE_LIMIT;
+  const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
   // The bar stops at full, the number does not: cancelling Pro drops the limit
   // back to 500 MB, and rounding that down to "100.0%" hides how far over the
   // account actually is — which is also why uploads start failing.
