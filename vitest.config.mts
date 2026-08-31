@@ -32,10 +32,16 @@ export default defineConfig({
           setupFiles: ['./src/test/setup.ts'],
           /* src/env.ts validates import.meta.env with Zod at import time and
              the Supabase client is built from the result, so every module that
-             transitively imports either one needs these two present. */
+             transitively imports either one needs these two present.
+
+             The Cloudinary cloud name is here for a different reason: the
+             service reads it at module load to answer isConfigured(). Left to
+             the developer's own .env, the suite passes on a machine that has
+             one and fails in CI, which is exactly what happened. */
           env: {
             VITE_SUPABASE_URL: 'https://project.supabase.co',
             VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+            VITE_CLOUDINARY_CLOUD_NAME: 'test-cloud',
           },
         },
       },

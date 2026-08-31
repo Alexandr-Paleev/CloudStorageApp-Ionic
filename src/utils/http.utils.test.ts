@@ -14,6 +14,13 @@ describe('isRetriableError', () => {
     expect(isRetriableError(new HttpError('Too many requests', 429))).toBe(true);
   });
 
+  it('gives up on a 501 — the deployment is missing credentials, not busy', () => {
+    // /api/cloudinary/sign answers 501 when the server has no Cloudinary
+    // secret. Retrying only makes the user wait through the backoff twice for
+    // the same answer.
+    expect(isRetriableError(new HttpError('Cloudinary is not configured', 501))).toBe(false);
+  });
+
   it('retries errors with no status, such as a dropped connection', () => {
     expect(isRetriableError(new Error('network error'))).toBe(true);
   });

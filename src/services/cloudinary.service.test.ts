@@ -15,7 +15,7 @@ const AUTHORIZATION = {
   signature: 'the-signature',
   folder: 'users/user-1',
   tags: 'user_user-1',
-  resourceType: 'auto' as const,
+  resourceType: 'image' as const,
 };
 
 /** The one XHR the upload opens, captured so the test can answer it. */
@@ -112,7 +112,7 @@ describe('uploadFile', () => {
   it('uploads where the server told it to, not where the client guessed', async () => {
     await cloudinaryService.uploadFile(file(), 'user-1');
 
-    expect(sent!.url).toBe('https://api.cloudinary.com/v1_1/test-cloud/auto/upload');
+    expect(sent!.url).toBe('https://api.cloudinary.com/v1_1/test-cloud/image/upload');
   });
 
   it('follows the server into the raw endpoint for a PDF', async () => {

@@ -13,10 +13,19 @@ import { readQuota, quotaRejection } from '../../lib/quota';
  * server's side of the same routing.
  */
 
-/** Cloudinary stores PDFs as `raw`; everything else can be detected. */
-function resourceTypeFor(fileName: string, contentType?: string): 'raw' | 'auto' {
-  const isPdf = contentType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
-  return isPdf ? 'raw' : 'auto';
+/**
+ * Images go to Cloudinary's image endpoint; everything else is `raw`.
+ *
+ * Not `auto`. Auto decides for itself, and the decision has to be one that
+ * CloudinaryProvider.delete can reproduce months later from the stored row —
+ * it is the difference between deleting the asset and leaving it in the
+ * account forever, uncounted. Images keep no extension in their public_id,
+ * raw assets do, and both sides now split on the same question.
+ */
+function resourceTypeFor(fileName: string, contentType?: string): 'raw' | 'image' {
+  const isImage =
+    contentType?.startsWith('image/') ?? /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(fileName);
+  return isImage ? 'image' : 'raw';
 }
 
 function configureCloudinary(cloudinary: { config: (options: Record<string, string>) => void }) {
@@ -64,7 +73,10 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   if (!secret || !apiKey || !cloudName) {
-    res.status(500).json({ message: 'Cloudinary is not configured on the server' });
+    // 501, not 500: the client cannot see the server's variables, so
+    // isConfigured() still routes images here on a half-configured
+    // deployment. A 500 would be retried twice on the way to the same answer.
+    res.status(501).json({ message: 'Cloudinary is not configured on the server' });
     return;
   }
 
@@ -122,7 +134,7 @@ async function ownsAsset(userId: string, publicId: string): Promise<boolean> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({ message: 'Method not allowed' });
     return;
   }
 
@@ -135,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
     if (action !== 'delete') {
-      res.status(404).json({ error: `Unknown action "${action ?? ''}"` });
+      res.status(404).json({ message: `Unknown action "${action ?? ''}"` });
       return;
     }
 
@@ -145,12 +157,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
 
     if (!publicId) {
-      res.status(400).json({ error: 'publicId is required' });
+      res.status(400).json({ message: 'publicId is required' });
       return;
     }
 
     if (!(await ownsAsset(userId, publicId))) {
-      res.status(403).json({ error: 'Access denied' });
+      res.status(403).json({ message: 'Access denied' });
       return;
     }
 
@@ -161,11 +173,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     let result = await cloudinary.uploader.destroy(publicId, options);
 
-    // Robust Fallback Logic:
-    // If we tried 'image' (default) and got 'not found', it might be a 'raw' file or 'video'
-    // that we didn't know about. Try finding it as 'raw' just in case.
-    if (!resourceType && result.result === 'not found') {
-      result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    // The stored row is the only record of which endpoint an asset went to,
+    // and rows written before signing existed went through `auto`, which chose
+    // for itself. So a miss is retried against the other endpoint — in both
+    // directions, since the caller now names 'raw' explicitly.
+    if (result.result === 'not found') {
+      const fallback = options.resource_type === 'raw' ? 'image' : 'raw';
+      result = await cloudinary.uploader.destroy(publicId, { resource_type: fallback });
     }
 
     if (result.result === 'ok' || result.result === 'not found') {
@@ -181,16 +195,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     } else {
       console.error(`[Cloudinary] Deletion failed:`, result);
       res.status(500).json({
-        error: `Failed to delete file from Cloudinary: ${result.result}`,
+        message: `Failed to delete file from Cloudinary: ${result.result}`,
         details: result,
       });
       return;
     }
   } catch (error) {
-    console.error('Error deleting file from Cloudinary:', error);
-    // Return the actual error message to help debugging
+    // Shared by both actions, so it says neither "upload" nor "delete". The
+    // key is `message` throughout: httpErrorFrom() on the client reads that
+    // one, and a mismatch turned every failure here — an expired session, a
+    // missing migration — into a bare "Failed to authorize the upload".
+    console.error('[cloudinary]', error);
     res.status(error instanceof AuthError ? 401 : 500).json({
-      error: error instanceof Error ? error.message : 'Unknown server error during deletion',
+      message: error instanceof Error ? error.message : 'Unknown server error',
     });
     return;
   }

@@ -173,12 +173,17 @@ describe('cloudinary delete: result handling', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('does not second-guess an explicit resourceType', async () => {
+  it('tries the other endpoint when the named one has nothing', async () => {
+    // Rows written before uploads were signed went through Cloudinary's
+    // `auto`, which chose the endpoint for itself — so the type recorded on
+    // the row is a good guess, not a guarantee, in both directions.
     destroy.mockResolvedValue({ result: 'not found' });
     const res = mockResponse();
     await handler(del('users/user-1/doc', 'raw'), res);
 
-    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(destroy).toHaveBeenCalledTimes(2);
+    expect(destroy.mock.calls[0][1]).toMatchObject({ resource_type: 'raw' });
+    expect(destroy.mock.calls[1][1]).toMatchObject({ resource_type: 'image' });
     expect(res.statusCode).toBe(200);
   });
 
@@ -205,7 +210,7 @@ describe('cloudinary sign: authorizing an upload', () => {
       cloudName: 'test-cloud',
       apiKey: 'test-key',
       signature: 'the-signature',
-      resourceType: 'auto',
+      resourceType: 'image',
     });
   });
 
@@ -232,11 +237,19 @@ describe('cloudinary sign: authorizing an upload', () => {
     expect(res.body).toMatchObject({ folder: 'users/user-1', tags: 'user_user-1' });
   });
 
-  it('marks a PDF as raw, the way the delete path expects to find it', async () => {
+  it.each([
+    ['report.pdf', 'application/pdf'],
+    ['notes.txt', 'text/plain'],
+    ['archive.zip', 'application/zip'],
+  ])('sends %s to the raw endpoint, where the delete path looks for it', async (name, type) => {
+    // Anything that is not an image is raw. `auto` would decide for itself,
+    // and CloudinaryProvider.delete has to reproduce that decision from the
+    // stored row months later — a .txt guessed wrong is an asset that stays
+    // in the account after its row is gone.
     account(TIER_LIMITS.free.storage_limit, 0);
     const res = mockResponse();
 
-    await handler(sign({ fileName: 'report.pdf', contentType: 'application/pdf' }), res);
+    await handler(sign({ fileName: name, contentType: type }), res);
 
     expect(res.body).toMatchObject({ resourceType: 'raw' });
   });
@@ -285,16 +298,17 @@ describe('cloudinary sign: authorizing an upload', () => {
     expect(noSize.statusCode).toBe(400);
   });
 
-  it('fails loudly when the server has no Cloudinary secret', async () => {
-    // Silence here would mean falling back to an unsigned upload, which is the
-    // hole this endpoint exists to close.
+  it('answers 501 when the server has no Cloudinary secret', async () => {
+    // Not 500: the client cannot see the server's variables, so isConfigured()
+    // keeps routing images here on a half-configured deployment. 501 tells the
+    // retry helper this will never come good — see isRetriableError.
     account(TIER_LIMITS.free.storage_limit, 0);
     delete process.env.CLOUDINARY_API_SECRET;
     const res = mockResponse();
 
     await handler(sign(), res);
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(501);
     expect(apiSignRequest).not.toHaveBeenCalled();
   });
 });

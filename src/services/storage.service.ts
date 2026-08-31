@@ -5,20 +5,9 @@ import { withRetry } from '../utils/retry.utils';
 import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '../observability/sentry';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
+import { isQuotaRejection } from '../utils/quota.utils';
 
 export type { FileMetadata, Folder };
-
-/**
- * The database refuses an over-quota insert with PT413 — the trigger in
- * migrations/007, and PostgREST turns that SQLSTATE into HTTP 413. It is an
- * expected answer, not a fault: it needs a sentence the user can act on, and
- * it does not belong in Sentry.
- */
-function isQuotaRejection(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'PT413'
-  );
-}
 
 export type UploadProgress = {
   bytesTransferred: number;
@@ -114,6 +103,9 @@ const storageService = {
       }
 
       if (overQuota) {
+        // Drive and Dropbox really are a way out of this: the trigger does not
+        // count what lives in the user's own cloud (see migrations/007), so an
+        // upload routed there succeeds while the plan is full.
         throw new Error(
           'Storage limit exceeded. The file was not kept — free up space, ' +
             'upgrade to Pro, or upload to Google Drive / Dropbox instead.'

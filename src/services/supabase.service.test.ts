@@ -6,6 +6,7 @@ vi.mock('../supabase/supabase.config', () => ({ supabase: { from } }));
 vi.mock('../observability/sentry', () => ({ captureException: vi.fn() }));
 
 import supabaseService from './supabase.service';
+import * as Sentry from '../observability/sentry';
 
 /** Mimics the one chain this function uses: select → eq → maybeSingle. */
 function answers(result: { data?: unknown; error?: unknown }) {
@@ -46,5 +47,43 @@ describe('getTotalStorageUsed', () => {
     await expect(supabaseService.getTotalStorageUsed('user-1')).rejects.toMatchObject({
       message: 'connection reset',
     });
+  });
+});
+
+describe('saveFileMetadata', () => {
+  function insertFails(error: unknown) {
+    const chain = {
+      insert: vi.fn(() => chain),
+      select: vi.fn(() => chain),
+      single: vi.fn(async () => ({ data: null, error })),
+    };
+    from.mockReturnValue(chain);
+  }
+
+  const row = {
+    name: 'report.pdf',
+    size: 1024,
+    type: 'application/pdf',
+    download_url: 'https://example.invalid/x',
+    storage_path: 'user-1/report.pdf',
+    storage_type: 'r2' as const,
+    user_id: 'user-1',
+  };
+
+  it('does not report a full account to Sentry', async () => {
+    // The caller turns PT413 into a sentence the user can act on. Reporting it
+    // here as well is what made that skip ineffective: every user running out
+    // of space showed up as an exception.
+    insertFails(Object.assign(new Error('Storage limit exceeded'), { code: 'PT413' }));
+
+    await expect(supabaseService.saveFileMetadata(row)).rejects.toThrow(/Storage limit exceeded/);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('still reports a failure nobody expected', async () => {
+    insertFails(Object.assign(new Error('connection reset'), { code: '08006' }));
+
+    await expect(supabaseService.saveFileMetadata(row)).rejects.toThrow(/connection reset/);
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });

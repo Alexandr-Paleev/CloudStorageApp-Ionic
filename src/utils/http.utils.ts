@@ -15,9 +15,14 @@ export class HttpError extends Error {
 /**
  * A 4xx is the request's own fault — repeating it produces the same answer.
  * The exception is 429, where the server is explicitly asking us to come back.
+ *
+ * 501 is the other way round: a 5xx that will never come good. Our own routes
+ * use it for "this deployment has no credentials for that provider", and
+ * retrying that only makes the user wait through the backoff twice.
  */
 export function isRetriableError(error: unknown): boolean {
   if (error instanceof HttpError) {
+    if (error.status === 501) return false;
     return error.status >= 500 || error.status === 429;
   }
   // Network failures and unknown errors are worth another attempt

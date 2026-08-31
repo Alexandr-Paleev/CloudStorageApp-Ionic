@@ -126,7 +126,8 @@ async function asVercelRequest(
 
   return Object.assign(req, {
     body,
-    // Path params first, so ?action=… cannot shadow the routed segment.
+    // Path params are spread last, so a query string cannot shadow the
+    // segment the route was matched on.
     query: { ...Object.fromEntries(new URLSearchParams(search)), ...params },
     cookies: parseCookies(req.headers.cookie),
     [Symbol.asyncIterator]: async function* () {

@@ -39,3 +39,18 @@ export function storageMeter(usedBytes: number, storageLimit: number): StorageMe
     isOverLimit: used > storageLimit,
   };
 }
+
+/**
+ * The database refuses an over-quota insert with PT413 — the trigger in
+ * migrations/007 — and PostgREST turns that SQLSTATE into HTTP 413.
+ *
+ * It is an expected answer, not a fault. Both layers that touch the failed
+ * insert have to agree on that: the service that reports it and the one that
+ * wraps it. Reporting it from either would fill Sentry with users running out
+ * of space.
+ */
+export function isQuotaRejection(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'PT413'
+  );
+}

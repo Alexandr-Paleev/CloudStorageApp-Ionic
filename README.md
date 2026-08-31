@@ -86,6 +86,8 @@ Share links are listed on the file they belong to, with their state and a way to
   trigger there is what actually holds the line — including for uploads that go
   from the browser straight to a provider. `/api` refuses over-quota uploads
   before the bytes travel; the trigger is what makes that refusal binding.
+  Google Drive and Dropbox are not counted: those files live in the user's own
+  cloud, which is what makes overflowing into a connected Drive work at all.
 
 ### 💳 Billing
 

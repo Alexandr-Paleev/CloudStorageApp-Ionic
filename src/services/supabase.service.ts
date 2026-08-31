@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
+import { isQuotaRejection } from '../utils/quota.utils';
 
 const supabaseService = {
   /**
@@ -38,10 +39,11 @@ const supabaseService = {
   },
 
   /**
-   * Total bytes a user stores, across every folder and every provider.
-   * getFiles() defaults to root-level files only, so it cannot be used here —
-   * anything inside a folder would silently escape the storage quota. Paged
-   * because PostgREST caps how many rows it returns per request.
+   * Bytes the account has stored with the backends this app pays for.
+   *
+   * Google Drive and Dropbox are not counted: those files live in the user's
+   * own cloud. The figure comes from profiles.bytes_used, a counter kept by
+   * the trigger in migrations/007 — the same one that enforces the limit.
    */
   async getTotalStorageUsed(userId: string): Promise<number> {
     // One row, not every row. This used to page through the whole files table
@@ -139,7 +141,12 @@ const supabaseService = {
       .single();
 
     if (error) {
-      Sentry.captureException(error, { tags: { context: 'supabase.saveFileMetadata' } });
+      // An account that ran out of space is not a fault to report — the caller
+      // turns this into a sentence the user can act on. Reporting it here as
+      // well is what made the skip in storage.service.uploadFile ineffective.
+      if (!isQuotaRejection(error)) {
+        Sentry.captureException(error, { tags: { context: 'supabase.saveFileMetadata' } });
+      }
       throw error;
     }
 
