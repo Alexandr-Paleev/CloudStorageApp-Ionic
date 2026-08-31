@@ -39,11 +39,11 @@ describe('UpgradeBanner', () => {
     expect(screen.queryByText('Storage full!')).not.toBeInTheDocument();
   });
 
-  it('survives a limit of zero without dividing by it', () => {
-    // A profile row that never got a limit would otherwise put NaN through the
-    // comparison and hide the banner by accident rather than by decision.
+  it('treats a limit of zero as full rather than dividing by it', () => {
+    // A profile row with no room in it used to put 0 through the ratio and
+    // hide the banner by accident, on the one account that most needs it.
     show({ usedBytes: 10, storageLimit: 0 });
-    expect(screen.queryByText(/storage/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Storage full!')).toBeInTheDocument();
   });
 
   it('leads to the plans page', () => {

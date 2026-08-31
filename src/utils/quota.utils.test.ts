@@ -36,12 +36,29 @@ describe('storageMeter', () => {
     expect(meter.isOverLimit).toBe(true);
   });
 
-  it('does not divide by a limit of zero', () => {
-    const meter = storageMeter(1_000, 0);
+  it('reads a limit of zero as full, not as empty', () => {
+    // Both halves of the meter have to agree. Reporting 0.0% here while also
+    // reporting "over the limit" is what the earlier guard did, and the
+    // upgrade banner — reading the same ratio — then stayed hidden on an
+    // account that could not store a byte.
+    expect(storageMeter(1_000, 0)).toMatchObject({
+      ratio: 1,
+      barWidth: '100.0',
+      percentage: '100.0',
+      isOverLimit: true,
+    });
+  });
 
-    expect(meter.percentage).toBe('0.0');
-    expect(meter.barWidth).toBe('0.0');
-    expect(meter.isOverLimit).toBe(true);
+  it('does not call an empty account over its limit, even at zero', () => {
+    expect(storageMeter(0, 0).isOverLimit).toBe(false);
+  });
+
+  it('treats an unreadable limit the same way, rather than as NaN', () => {
+    // `profile?.storage_limit ?? DEFAULT` does not catch 0, and catches
+    // neither NaN nor a missing column that arrived as undefined.
+    for (const limit of [NaN, -1, undefined as unknown as number]) {
+      expect(storageMeter(1_000, limit).percentage).toBe('100.0');
+    }
   });
 
   it('ignores a usage figure that never arrived', () => {

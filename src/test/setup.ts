@@ -34,7 +34,12 @@ if (!window.matchMedia) {
    file. Nothing here is testing Ionic's own rendering: what these tests assert
    is which elements this app produces, with which attributes and handlers, and
    React sets both on the host element whether or not it ever upgrades. So the
-   definitions are dropped on the floor and the markup stays as authored. */
+   definitions are dropped on the floor and the markup stays as authored.
+
+   The cost: an Ionic control never enforces its own `disabled` here, so a test
+   asserting that a disabled control ignores a click would pass without proving
+   anything. Assert on the handler's own guard instead — as
+   ProviderSelector.test.tsx does. */
 customElements.define = () => {};
 
 class ObserverStub {

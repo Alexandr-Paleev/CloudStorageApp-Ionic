@@ -19,7 +19,18 @@ export type StorageMeter = {
  */
 export function storageMeter(usedBytes: number, storageLimit: number): StorageMeter {
   const used = Number.isFinite(usedBytes) && usedBytes > 0 ? usedBytes : 0;
-  const ratio = storageLimit > 0 ? used / storageLimit : 0;
+
+  // A limit that is zero, negative or unreadable is not a plan with room in
+  // it: nothing fits, so the meter reads full rather than empty. Guarding only
+  // the division — as this did at first — left the two halves disagreeing: the
+  // dashboard printed a red "0.0%" beside "500 MB over the limit" while the
+  // upgrade banner, reading the same ratio, stayed hidden below its threshold.
+  // `!(limit > 0)` rather than `limit <= 0` so NaN lands here too.
+  if (!(storageLimit > 0)) {
+    return { ratio: 1, barWidth: '100.0', percentage: '100.0', isOverLimit: used > 0 };
+  }
+
+  const ratio = used / storageLimit;
 
   return {
     ratio,
