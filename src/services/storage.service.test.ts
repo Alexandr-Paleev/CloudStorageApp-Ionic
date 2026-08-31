@@ -140,6 +140,28 @@ describe('uploadFile', () => {
     );
   });
 
+  it('reports a quota rejection from the database as a quota problem', async () => {
+    // The trigger from migrations/007 refuses the insert with PT413 — which
+    // PostgREST answers as HTTP 413 — and that is an expected answer rather
+    // than a fault: the user needs a sentence they can act on, and Sentry does
+    // not need the noise.
+    const r2 = provider();
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+    vi.mocked(supabaseService.saveFileMetadata).mockRejectedValue(
+      Object.assign(new Error('Storage limit exceeded: 524288000 of 524288000 bytes used'), {
+        code: 'PT413',
+      })
+    );
+
+    await expect(storageService.uploadFile('user-1', file())).rejects.toThrow(
+      /Storage limit exceeded\. The file was not kept/
+    );
+
+    // Still rolled back: the bytes reached the bucket before the row was tried.
+    expect(r2.delete).toHaveBeenCalledWith(uploaded.path);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
   it('retries an upload the server may yet accept', async () => {
     vi.useFakeTimers();
     const r2 = provider({

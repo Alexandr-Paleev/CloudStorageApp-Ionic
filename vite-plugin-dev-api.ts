@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
@@ -33,18 +33,18 @@ export function devApi(): Plugin {
         if (!url.startsWith('/api/')) return next();
 
         const [pathname, search = ''] = url.split('?');
-        const file = resolve(process.cwd(), `${pathname.slice(1)}.ts`);
-        if (!existsSync(file)) {
+        const route = resolveHandler(pathname);
+        if (!route) {
           return sendJson(res, 404, { message: `No handler at ${pathname}` });
         }
 
         try {
-          const mod = await server.ssrLoadModule(file);
+          const mod = await server.ssrLoadModule(route.file);
           const handler = mod.default;
           if (typeof handler !== 'function') {
             return sendJson(res, 500, { message: `${pathname} has no default export` });
           }
-          await handler(await asVercelRequest(req, search), asVercelResponse(res));
+          await handler(await asVercelRequest(req, search, route.params), asVercelResponse(res));
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Handler failed';
           server.config.logger.error(`[dev-api] ${pathname}: ${message}`);
@@ -52,6 +52,33 @@ export function devApi(): Plugin {
         }
       });
     },
+  };
+}
+
+/**
+ * Finds the file Vercel would route this path to.
+ *
+ * Exact match first, then a dynamic segment: api/x/[action].ts answers every
+ * /api/x/<anything> and receives the segment as req.query.action. This repo
+ * needs it because the Hobby plan caps a deployment at twelve serverless
+ * functions and api/ already has twelve — serving two actions from one file
+ * is how a thirteenth is avoided.
+ */
+function resolveHandler(pathname: string): { file: string; params: Record<string, string> } | null {
+  const exact = resolve(process.cwd(), `${pathname.slice(1)}.ts`);
+  if (existsSync(exact)) return { file: exact, params: {} };
+
+  const segments = pathname.slice(1).split('/');
+  const segment = segments.pop();
+  const dir = resolve(process.cwd(), segments.join('/'));
+  if (!segment || !existsSync(dir)) return null;
+
+  const dynamic = readdirSync(dir).find((name) => /^\[[^\]]+]\.ts$/.test(name));
+  if (!dynamic) return null;
+
+  return {
+    file: resolve(dir, dynamic),
+    params: { [dynamic.slice(1, dynamic.indexOf(']'))]: segment },
   };
 }
 
@@ -75,7 +102,11 @@ async function readBody(req: IncomingMessage): Promise<Buffer> {
  * reads the stream itself — the webhook, verifying its signature — still works
  * even though req.body has already been parsed.
  */
-async function asVercelRequest(req: IncomingMessage, search: string) {
+async function asVercelRequest(
+  req: IncomingMessage,
+  search: string,
+  params: Record<string, string> = {}
+) {
   const raw = await readBody(req);
   const contentType = req.headers['content-type'] || '';
 
@@ -95,7 +126,8 @@ async function asVercelRequest(req: IncomingMessage, search: string) {
 
   return Object.assign(req, {
     body,
-    query: Object.fromEntries(new URLSearchParams(search)),
+    // Path params first, so ?action=… cannot shadow the routed segment.
+    query: { ...Object.fromEntries(new URLSearchParams(search)), ...params },
     cookies: parseCookies(req.headers.cookie),
     [Symbol.asyncIterator]: async function* () {
       yield raw;

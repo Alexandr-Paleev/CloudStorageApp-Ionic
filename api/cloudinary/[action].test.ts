@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
+import { TIER_LIMITS } from '../../lib/tiers';
 
-const { FakeAuthError, authenticateUser, db, destroy, config } = vi.hoisted(() => ({
+const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticateUser: vi.fn(),
   db: { client: null as { from: (table: string) => unknown } | null },
   destroy: vi.fn(),
   config: vi.fn(),
+  apiSignRequest: vi.fn((_params: Record<string, unknown>, _secret: string) => 'the-signature'),
 }));
 
 vi.mock('../../lib/auth', () => ({
@@ -16,17 +18,39 @@ vi.mock('../../lib/auth', () => ({
 }));
 
 vi.mock('cloudinary', () => ({
-  v2: { config, uploader: { destroy } },
+  v2: {
+    config,
+    uploader: { destroy },
+    utils: {
+      api_sign_request: (params: Record<string, unknown>, secret: string) =>
+        apiSignRequest(params, secret),
+    },
+  },
 }));
 
-import handler from './delete';
+import handler from './[action]';
 
 function withFiles(rows: { storage_path: string }[]) {
   db.client = mockSupabase({ files: { data: rows } as TableAnswer }).client;
 }
 
+/** Both actions live in one function; the segment is what picks between them. */
 function del(publicId?: string, resourceType?: string) {
-  return mockRequest({ body: { publicId, resourceType } });
+  return mockRequest({ query: { action: 'delete' }, body: { publicId, resourceType } });
+}
+
+function sign(body: Record<string, unknown> = {}) {
+  return mockRequest({
+    query: { action: 'sign' },
+    body: { fileName: 'photo.png', size: 1024, contentType: 'image/png', ...body },
+  });
+}
+
+function account(limit: number, used: number) {
+  db.client = mockSupabase({
+    profiles: { data: [{ storage_limit: limit, bytes_used: used }] } as TableAnswer,
+    files: { data: [] } as TableAnswer,
+  }).client;
 }
 
 beforeEach(() => {
@@ -34,6 +58,9 @@ beforeEach(() => {
   authenticateUser.mockResolvedValue('user-1');
   withFiles([]);
   destroy.mockResolvedValue({ result: 'ok' });
+  process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+  process.env.CLOUDINARY_API_KEY = 'test-key';
+  process.env.CLOUDINARY_API_SECRET = 'test-secret';
 });
 
 describe('cloudinary delete: access', () => {
@@ -161,5 +188,121 @@ describe('cloudinary delete: result handling', () => {
     await handler(del('users/user-1/photo', 'image'), res);
 
     expect(res.statusCode).toBe(500);
+  });
+});
+
+describe('cloudinary sign: authorizing an upload', () => {
+  it("signs an upload that fits, into the caller's own folder", async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      folder: 'users/user-1',
+      tags: 'user_user-1',
+      cloudName: 'test-cloud',
+      apiKey: 'test-key',
+      signature: 'the-signature',
+      resourceType: 'auto',
+    });
+  });
+
+  it('signs exactly the parameters it hands back, and nothing else', async () => {
+    // Cloudinary rejects the upload if the signed set and the sent set differ,
+    // and an over-broad signature would let the client change what it sends.
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign(), res);
+
+    const [params, secret] = apiSignRequest.mock.calls[0];
+    expect(Object.keys(params).sort()).toEqual(['folder', 'tags', 'timestamp']);
+    expect(secret).toBe('test-secret');
+    expect(res.body).toMatchObject({ timestamp: params.timestamp });
+  });
+
+  it('never lets the caller name the folder it uploads into', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign({ folder: 'users/someone-else', tags: 'user_someone-else' }), res);
+
+    expect(res.body).toMatchObject({ folder: 'users/user-1', tags: 'user_user-1' });
+  });
+
+  it('marks a PDF as raw, the way the delete path expects to find it', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign({ fileName: 'report.pdf', contentType: 'application/pdf' }), res);
+
+    expect(res.body).toMatchObject({ resourceType: 'raw' });
+  });
+
+  it('refuses to sign an upload that would not fit', async () => {
+    account(TIER_LIMITS.free.storage_limit, TIER_LIMITS.free.storage_limit - 100);
+    const res = mockResponse();
+
+    await handler(sign({ size: 101 }), res);
+
+    expect(res.statusCode).toBe(413);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('Storage limit exceeded') });
+    expect(apiSignRequest).not.toHaveBeenCalled();
+  });
+
+  it('says how far over an account already is', async () => {
+    // A cancelled Pro subscription leaves the account above the free limit.
+    account(TIER_LIMITS.free.storage_limit, 3 * 1024 * 1024 * 1024);
+    const res = mockResponse();
+
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(413);
+    expect((res.body as { message: string }).message).toContain('over the limit');
+  });
+
+  it('refuses an unauthenticated caller before reading anything', async () => {
+    authenticateUser.mockRejectedValue(new FakeAuthError('Missing authorization token'));
+    const res = mockResponse();
+
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(401);
+    expect(apiSignRequest).not.toHaveBeenCalled();
+  });
+
+  it('requires a file name and a size', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+
+    const noName = mockResponse();
+    await handler(sign({ fileName: undefined }), noName);
+    expect(noName.statusCode).toBe(400);
+
+    const noSize = mockResponse();
+    await handler(sign({ size: undefined }), noSize);
+    expect(noSize.statusCode).toBe(400);
+  });
+
+  it('fails loudly when the server has no Cloudinary secret', async () => {
+    // Silence here would mean falling back to an unsigned upload, which is the
+    // hole this endpoint exists to close.
+    account(TIER_LIMITS.free.storage_limit, 0);
+    delete process.env.CLOUDINARY_API_SECRET;
+    const res = mockResponse();
+
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(apiSignRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudinary: routing between the two actions', () => {
+  it('answers 404 for a segment that is neither', async () => {
+    const res = mockResponse();
+    await handler(mockRequest({ query: { action: 'upload' }, body: {} }), res);
+    expect(res.statusCode).toBe(404);
   });
 });

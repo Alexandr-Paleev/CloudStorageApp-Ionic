@@ -84,10 +84,12 @@ BEGIN
     END IF;
 
     IF v_delta > 0 AND v_used + v_delta > v_limit THEN
-        -- 53100 is disk_full: the client can recognise it without matching on
-        -- the message text. supabase-js surfaces it as error.code.
+        -- PostgREST turns a SQLSTATE of the form PTnnn into HTTP nnn, so a
+        -- browser writing this row directly is refused with the same 413 that
+        -- /api answers with — and supabase-js surfaces the code, so the client
+        -- recognises the refusal without matching on message text.
         RAISE EXCEPTION USING
-            ERRCODE = '53100',
+            ERRCODE = 'PT413',
             MESSAGE = format(
                 'Storage limit exceeded: %s of %s bytes used, this file needs %s more',
                 v_used, v_limit, v_delta

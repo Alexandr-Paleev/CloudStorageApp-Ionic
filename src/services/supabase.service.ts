@@ -44,28 +44,22 @@ const supabaseService = {
    * because PostgREST caps how many rows it returns per request.
    */
   async getTotalStorageUsed(userId: string): Promise<number> {
-    const pageSize = 1000;
-    let total = 0;
-    let page = 0;
+    // One row, not every row. This used to page through the whole files table
+    // on each call — and it is called before every upload, alongside the same
+    // walk happening again inside the API. profiles.bytes_used is kept by the
+    // trigger from migrations/007, which is also what enforces the limit.
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('bytes_used')
+      .eq('id', userId)
+      .maybeSingle();
 
-    for (;;) {
-      const { data, error } = await supabase
-        .from('files')
-        .select('size')
-        .eq('user_id', userId)
-        .range(page * pageSize, page * pageSize + pageSize - 1);
-
-      if (error) {
-        Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
-        throw error;
-      }
-
-      const rows = (data || []) as { size: number }[];
-      total += rows.reduce((sum, row) => sum + row.size, 0);
-
-      if (rows.length < pageSize) return total;
-      page += 1;
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
+      throw error;
     }
+
+    return (data as { bytes_used: number } | null)?.bytes_used ?? 0;
   },
 
   /**

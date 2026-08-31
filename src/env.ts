@@ -7,7 +7,6 @@ const envSchema = z.object({
 
   // Cloudinary - Optional (API key/secret are server-side only, never VITE_)
   VITE_CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  VITE_CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
   VITE_CLOUDINARY_DELETE_API_URL: z.string().url().optional(),
 
   // Cloudflare R2 - Optional (credentials are server-side only)
