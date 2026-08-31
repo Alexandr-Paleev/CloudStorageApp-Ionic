@@ -180,22 +180,38 @@ export const test = base.extend<Fixtures>({
 });
 
 /**
- * Puts a small text file in the signed-in account and returns the id the app
- * gave it. Uploading through the real form rather than the API on purpose: it
- * is the path a user takes, and it is what routes the file through
- * ProviderManager to a backend.
+ * Fills the picker on the upload page and submits, without waiting for the
+ * outcome — a rejected upload stays on the page, and that is a case worth
+ * testing too.
  *
- * A .txt is not an image and R2 is unconfigured here, so it lands in Supabase
- * Storage — the one backend whose bucket policies this suite can observe.
+ * Through the real form rather than the API on purpose: it is the path a user
+ * takes, and the one that routes the file through ProviderManager. A .txt is
+ * not an image and R2 is unconfigured here, so it lands in Supabase Storage,
+ * the one backend whose bucket policies this suite can observe.
  */
-export async function uploadFile(page: Page, name: string): Promise<string> {
-  await page.goto('/upload');
+export async function submitUpload(page: Page, name: string, folderId?: string): Promise<void> {
+  // handleUpload compares the account's usage against its limit before it does
+  // anything, and treats either one being absent as "no reason to stop". Both
+  // arrive over the network, so pressing the button first would upload files
+  // that the quota should have refused — the waiters are registered before the
+  // navigation because the responses can otherwise land first.
+  const profileLoaded = page.waitForResponse((r) => r.url().includes('/rest/v1/profiles'));
+  const usageLoaded = page.waitForResponse((r) => r.url().includes('/rest/v1/files'));
+
+  await page.goto(folderId ? `/upload/${folderId}` : '/upload');
+  await Promise.all([profileLoaded, usageLoaded]);
+
   await page.setInputFiles('#file-input', {
     name,
     mimeType: 'text/plain',
     buffer: Buffer.from('uploaded by the end-to-end suite'),
   });
   await page.locator('ion-button', { hasText: 'Upload' }).click();
+}
+
+/** Submits and waits for the file to land, returning the id the app gave it. */
+export async function uploadFile(page: Page, name: string): Promise<string> {
+  await submitUpload(page, name);
   await page.waitForURL(/\/dashboard$/);
 
   await page.locator('.file-list-item', { hasText: name }).click();
@@ -204,6 +220,23 @@ export async function uploadFile(page: Page, name: string): Promise<string> {
   const id = new URL(page.url()).pathname.split('/').pop();
   if (!id) throw new Error(`could not read the file id from ${page.url()}`);
   return id;
+}
+
+/**
+ * Moves the account's quota. Lives here because it needs the service-role key:
+ * profiles has no UPDATE policy at all, deliberately — every column on it is
+ * billing state, and RLS cannot grant write access to some columns and not
+ * others (see migrations/002).
+ */
+export async function setStorageLimit(userId: string, bytes: number): Promise<void> {
+  const response = await admin(`/rest/v1/profiles?id=eq.${userId}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ storage_limit: bytes }),
+  });
+  if (!response.ok) {
+    throw new Error(`could not set the storage limit: ${await response.text()}`);
+  }
 }
 
 /**
