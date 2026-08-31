@@ -1,7 +1,8 @@
 /* Cloud Storage Premium Theme */
 /* https://ionicframework.com/docs/theming/css-variables */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Inter is loaded from index.html, with a preconnect. An @import here made the
+   browser parse this file before it could even discover the font request. */
 
 :root {
   /* Primary - Deep Indigo */
@@ -42,25 +43,57 @@
   --ion-border-radius: 12px;
 }
 
-/* Dark Mode - System Preference & Manual Override */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ion-background-color: #0f172a;
-    --ion-background-color-rgb: 15, 23, 42;
-
-    --ion-card-background: #1e293b;
-    --ion-text-color: #f8fafc;
-    --ion-text-color-rgb: 248, 250, 252;
-  }
-}
-
-/* Manual Dark Mode Class */
+/**
+ * Dark mode.
+ *
+ * There used to be a `prefers-color-scheme` block here as well, setting
+ * --ion-text-color to near-white on :root. It has been removed rather than kept
+ * as a no-JS fallback, because it was the bug: the surfaces that were meant to
+ * darken alongside it all live under `body.dark`, and nothing ever added that
+ * class (see theme/dark-mode.ts). An operating system set to dark therefore got
+ * near-white text on cards that stayed white — 1.05:1 in the login form, which
+ * is to say invisible. This is a React SPA; without JavaScript there is no app
+ * to theme, so a CSS-only path that JavaScript would always override bought
+ * nothing and cost that.
+ */
 body.dark {
   --ion-background-color: #0f172a;
   --ion-background-color-rgb: 15, 23, 42;
   --ion-card-background: #1e293b;
   --ion-text-color: #f8fafc;
   --ion-text-color-rgb: 248, 250, 252;
+
+  /**
+   * The dark and light palette entries swap, as they do in Ionic's own dark
+   * theme. `color="dark"` means "the palette's dark colour", not "the text
+   * colour" — so every <IonText color="dark"> on the dashboard rendered
+   * near-black on a near-black card once the surfaces darkened. Swapping the
+   * pair fixes all of them at the definition rather than at each call site.
+   */
+  --ion-color-dark: #f8fafc;
+  --ion-color-dark-rgb: 248, 250, 252;
+  --ion-color-dark-contrast: #0f172a;
+  --ion-color-dark-contrast-rgb: 15, 23, 42;
+  --ion-color-dark-shade: #dadbdd;
+  --ion-color-dark-tint: #f9fbfc;
+
+  --ion-color-light: #1e293b;
+  --ion-color-light-rgb: 30, 41, 59;
+  --ion-color-light-contrast: #f8fafc;
+  --ion-color-light-contrast-rgb: 248, 250, 252;
+  --ion-color-light-shade: #1a2434;
+  --ion-color-light-tint: #353f4f;
+
+  /* Lifted off Ionic's default grey, which sat too close to the dark card.
+     The whole entry, not just the base: Ionic derives hover and active states
+     from -shade and -tint, and half an override leaves those on light-theme
+     values. */
+  --ion-color-medium: #94a3b8;
+  --ion-color-medium-rgb: 148, 163, 184;
+  --ion-color-medium-contrast: #0f172a;
+  --ion-color-medium-contrast-rgb: 15, 23, 42;
+  --ion-color-medium-shade: #828fa2;
+  --ion-color-medium-tint: #9fabbf;
 
   /* Variables for glassmorphism override */
   --glass-bg: rgba(30, 41, 59, 0.7);

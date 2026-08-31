@@ -2,10 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as Sentry from '@sentry/react';
-import { env } from './env';
+import { initSentry } from './observability/sentry';
 import { initializeGA4, trackApiErrorStandalone } from './hooks/useAnalytics';
 import { initHotjar } from './analytics/hotjar';
+import { initDarkMode } from './theme/dark-mode';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -18,17 +18,17 @@ import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
-// Initialize Sentry
-// Session Replay is deliberately not enabled: it was the single largest piece
-// of the initial download, and crash reports plus tracing cover what this app
-// actually needs. Add replayIntegration() back if session playback is wanted.
-Sentry.init({
-  dsn: env.VITE_SENTRY_DSN,
-  integrations: [Sentry.browserTracingIntegration()],
-  // Performance Monitoring
-  tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,
-  environment: import.meta.env.MODE,
-});
+// Sentry, once the browser is idle — see observability/sentry.ts for why it is
+// no longer imported here directly, and what that costs.
+//
+// Session Replay is deliberately not enabled either: it was the single largest
+// piece of the initial download, and crash reports plus tracing cover what this
+// app actually needs. Add replayIntegration() back if session playback is wanted.
+initSentry();
+
+// Syncs body.dark with the OS. Before render, so the first paint is already in
+// the right theme rather than flashing the light one.
+initDarkMode();
 
 // Initialize Analytics (GA4 + Hotjar)
 initializeGA4();

@@ -3,7 +3,7 @@ import { FileMetadata, Folder } from '../schemas/file.schema';
 import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
 import { isRetriableError } from '../utils/http.utils';
-import * as Sentry from '@sentry/react';
+import * as Sentry from '../observability/sentry';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 
 export type { FileMetadata, Folder };

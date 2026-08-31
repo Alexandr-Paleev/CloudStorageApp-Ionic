@@ -46,6 +46,18 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
 
+  /**
+   * Shows "Try the demo" on the login page. Off by default, and paired with a
+   * server-side DEMO_ENABLED that /api/demo/session checks for itself — a
+   * client flag alone would only hide the button, not close the route, and a
+   * route that creates accounts is not something to leave open by accident.
+   */
+  VITE_DEMO_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
+
   // Dropbox - Optional (Pro feature)
   VITE_DROPBOX_APP_KEY: z.string().optional(),
   VITE_DROPBOX_REDIRECT_URI: z.string().url().optional(),

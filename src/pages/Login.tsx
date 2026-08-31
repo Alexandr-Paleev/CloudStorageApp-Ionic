@@ -10,9 +10,17 @@ import {
   IonSpinner,
   IonIcon,
 } from '@ionic/react';
-import { logoGoogle, personOutline, lockClosedOutline, cloudUploadOutline } from 'ionicons/icons';
+import {
+  logoGoogle,
+  personOutline,
+  lockClosedOutline,
+  cloudUploadOutline,
+  flashOutline,
+} from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/auth.service';
+import demoService from '../services/demo.service';
+import { env } from '../env';
 import './Login.css';
 import './Legal.css';
 
@@ -21,6 +29,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
@@ -36,6 +45,24 @@ const Login: React.FC = () => {
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  /* Either request in flight locks the whole card: two sessions being opened
+     at once would race to write the same auth store. */
+  const busy = loading || demoLoading;
+
+  const handleDemo = async () => {
+    setError('');
+    setDemoLoading(true);
+    try {
+      await demoService.start();
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start a demo session');
+      setShowToast(true);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +118,7 @@ const Login: React.FC = () => {
                     onIonFocus={() => setFocusedInput('email')}
                     onIonBlur={() => setFocusedInput(null)}
                     required
-                    disabled={loading}
+                    disabled={busy}
                     className="login-input-field"
                     data-hj-allow
                   />
@@ -113,7 +140,7 @@ const Login: React.FC = () => {
                     onIonFocus={() => setFocusedInput('password')}
                     onIonBlur={() => setFocusedInput(null)}
                     required
-                    disabled={loading}
+                    disabled={busy}
                     className="login-input-field"
                     data-hj-suppress
                   />
@@ -124,7 +151,7 @@ const Login: React.FC = () => {
                 className="premium-button submit-button"
                 expand="block"
                 type="submit"
-                disabled={loading}
+                disabled={busy}
               >
                 {loading ? (
                   <IonSpinner name="crescent" />
@@ -157,7 +184,7 @@ const Login: React.FC = () => {
                   setLoading(false);
                 }
               }}
-              disabled={loading}
+              disabled={busy}
             >
               <IonIcon slot="start" icon={logoGoogle} className="google-icon" />
               Sign in with Google
@@ -167,12 +194,41 @@ const Login: React.FC = () => {
               <IonButton
                 fill="clear"
                 onClick={() => setIsRegister(!isRegister)}
-                disabled={loading}
+                disabled={busy}
                 className="switch-auth-button"
               >
                 {isRegister ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
               </IonButton>
             </div>
+
+            {/* Last, and quiet on purpose.
+                This was the first element on the card and styled like the
+                submit button, which made the page read as a showcase rather
+                than as a product — two identical primary buttons, and the real
+                one below the fold. A visitor who wants in without signing up
+                still finds it in one glance; a visitor who came to log in is no
+                longer asked to step around it. */}
+            {env.VITE_DEMO_ENABLED && (
+              <div className="demo-entry">
+                <IonButton
+                  fill="clear"
+                  className="demo-button"
+                  onClick={handleDemo}
+                  disabled={busy}
+                  data-testid="demo-login"
+                >
+                  {demoLoading ? (
+                    <IonSpinner name="crescent" />
+                  ) : (
+                    <>
+                      <IonIcon slot="start" icon={flashOutline} />
+                      Just looking? Open a demo account
+                    </>
+                  )}
+                </IonButton>
+                <p className="demo-caption">No sign-up. Deleted after 24 hours.</p>
+              </div>
+            )}
 
             {/* Shown at the point of account creation, and reachable without
                 an account — Stripe checks for these before going live. */}
