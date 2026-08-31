@@ -89,3 +89,15 @@
   font-size: 14px;
   text-transform: none;
 }
+
+/* Dark-mode contrast on this card.
+   These colours were picked against a white card and never checked against the
+   dark one, because body.dark was never applied — see theme/dark-mode.ts. The
+   divider and the sign-up link both measured 3.07:1 there, below AA. */
+body.dark .divider-container {
+  color: #94a3b8;
+}
+
+body.dark .switch-auth-button {
+  --color: #94a3b8;
+}

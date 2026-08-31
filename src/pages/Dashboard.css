@@ -210,7 +210,11 @@
 }
 
 .file-delete-icon {
-  opacity: 0.7;
+  /* 0.7 muted the icon below the 3:1 WCAG asks of a non-text control, in both
+     themes: #eb445a at that opacity measures 2.62:1 on the white card and
+     2.47:1 on the dark one. 0.9 keeps it visibly secondary to the file name
+     and clears the threshold on both (3.41:1 and 3.33:1). */
+  opacity: 0.9;
 }
 
 /* Dark Mode Overrides for Dashboard */

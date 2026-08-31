@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react';
 import { env } from './env';
 import { initializeGA4, trackApiErrorStandalone } from './hooks/useAnalytics';
 import { initHotjar } from './analytics/hotjar';
+import { initDarkMode } from './theme/dark-mode';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -29,6 +30,10 @@ Sentry.init({
   tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,
   environment: import.meta.env.MODE,
 });
+
+// Syncs body.dark with the OS. Before render, so the first paint is already in
+// the right theme rather than flashing the light one.
+initDarkMode();
 
 // Initialize Analytics (GA4 + Hotjar)
 initializeGA4();

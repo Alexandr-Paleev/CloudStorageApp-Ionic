@@ -107,8 +107,22 @@ Share links are listed on the file they belong to, with their state and a way to
 
 - ✅ Responsive design (works on all screen sizes)
 - ✅ Modern UI based on Ionic components
-- ✅ Dark/light theme support (system settings)
+- ✅ Dark/light theme, following the system setting
 - ✅ Smooth animations and transitions
+
+> **The dark theme was only half wired**, and it is worth writing down because
+> nothing failed loudly. Nineteen rules across four stylesheets were written
+> under `body.dark`, and no code ever added that class — so every one of them
+> was dead. Meanwhile a `prefers-color-scheme` block set `--ion-text-color` to
+> near-white on `:root`, which *did* apply. An operating system set to dark
+> therefore got near-white text on cards that stayed white: measured at
+> **1.05:1** in the login form, meaning what you typed was invisible unless you
+> selected it. `theme/dark-mode.ts` now syncs the class, which makes the
+> existing CSS do what it always said it did, and the palette swaps `dark` and
+> `light` the way Ionic's own dark theme does — `color="dark"` names a palette
+> entry, not the text colour, so every `<IonText color="dark">` had gone
+> near-black on a near-black card. Three more contrast failures found by
+> measuring rather than looking are fixed alongside it.
 
 ## 🚀 Quick Start
 
