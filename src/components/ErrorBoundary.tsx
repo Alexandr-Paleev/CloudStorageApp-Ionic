@@ -1,6 +1,6 @@
 import { Component, ReactNode } from 'react';
 import { IonPage, IonContent, IonButton, IonText } from '@ionic/react';
-import * as Sentry from '@sentry/react';
+import * as Sentry from '../observability/sentry';
 
 interface Props {
   children: ReactNode;

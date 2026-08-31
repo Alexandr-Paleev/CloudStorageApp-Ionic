@@ -1,7 +1,8 @@
 /* Cloud Storage Premium Theme */
 /* https://ionicframework.com/docs/theming/css-variables */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Inter is loaded from index.html, with a preconnect. An @import here made the
+   browser parse this file before it could even discover the font request. */
 
 :root {
   /* Primary - Deep Indigo */

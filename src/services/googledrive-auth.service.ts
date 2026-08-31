@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/react';
+import * as Sentry from '../observability/sentry';
 import { supabase } from '../supabase/supabase.config';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;

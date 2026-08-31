@@ -1,0 +1,92 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1001 >>
+stream
+BT
+/F1 22 Tf
+60 760 Td
+20 TL
+/F1 26 Tf
+40 TL
+(Cloud Storage App) Tj
+T*
+/F1 13 Tf
+30 TL
+(This file lives in the demo account you just opened.) Tj
+T*
+/F1 13 Tf
+14 TL
+() Tj
+T*
+/F1 15 Tf
+26 TL
+(What you can try here:) Tj
+T*
+/F1 12 Tf
+18 TL
+(  - Upload a file. Images are routed to Cloudinary,) Tj
+T*
+/F1 12 Tf
+22 TL
+(    everything else to Cloudflare R2 or Supabase Storage.) Tj
+T*
+/F1 12 Tf
+18 TL
+(  - Open a file and create a share link. It expires in) Tj
+T*
+/F1 12 Tf
+22 TL
+(    7 days and can be revoked from the same screen.) Tj
+T*
+/F1 12 Tf
+18 TL
+(  - Watch the storage meter. The quota is enforced) Tj
+T*
+/F1 12 Tf
+22 TL
+(    server-side when an R2 upload URL is signed.) Tj
+T*
+/F1 12 Tf
+18 TL
+(  - Visit Plans. Stripe runs in test mode, so card) Tj
+T*
+/F1 12 Tf
+30 TL
+(    4242 4242 4242 4242 upgrades without charging you.) Tj
+T*
+/F1 12 Tf
+26 TL
+(This account is yours alone and is deleted after 24 hours.) Tj
+T*
+/F1 12 Tf
+18 TL
+(Source: github.com/Alexandr-Paleev/CloudStorageApp-Ionic) Tj
+T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001294 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1391
+%%EOF

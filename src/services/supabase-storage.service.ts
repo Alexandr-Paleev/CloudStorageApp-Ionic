@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/react';
+import * as Sentry from '../observability/sentry';
 import { supabase } from '../supabase/supabase.config';
 import { UploadProgress } from './storage.service';
 

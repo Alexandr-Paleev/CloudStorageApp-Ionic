@@ -31,6 +31,18 @@ jobs:
 
       - run: npm ci
 
+      # The dependency policy ignores majors — see .github/dependabot.yml, where
+      # the reasoning still holds. What it did not account for is that a security
+      # fix can land behind a major, and then nothing opens a pull request at
+      # all: four high-severity undici advisories sat in this repository for
+      # months, reachable only through @vercel/node, with every check green.
+      #
+      # --omit=dev on purpose. A vulnerability in a build tool is not a
+      # vulnerability in what the browser downloads or what the functions run,
+      # and failing the build over one trains people to ignore the step.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - run: npm run lint
 
       # src/env.ts validates import.meta.env with Zod on startup, so the build
@@ -86,6 +98,10 @@ jobs:
       # billing-entry.spec.ts provisions a throwaway user through the Supabase
       # admin API and skips itself unless all four values below are real, so
       # without the optional secrets it reports as skipped rather than failing.
+      #
+      # demo.spec.ts additionally needs DEMO_ENABLED, and deletes the account it
+      # opens rather than leaving it for the endpoint's 24-hour sweep — this
+      # runs on every push, against a real project.
       - name: Write .env
         run: |
           cat > .env <<'EOF'
@@ -94,6 +110,8 @@ jobs:
           SUPABASE_URL=${{ secrets.SUPABASE_URL || '' }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY || '' }}
           VITE_BILLING_ENABLED=true
+          VITE_DEMO_ENABLED=true
+          DEMO_ENABLED=true
           EOF
 
       - run: npm run test:e2e

@@ -324,10 +324,20 @@ const Dashboard: React.FC = () => {
                     <div slot="start" className="file-thumbnail-container">
                       {file.type?.startsWith('image/') ? (
                         <div className="file-thumbnail-img-box">
+                          {/* getThumbnailUrl only resizes on Cloudinary — the
+                              other backends hand back the original, so a long
+                              list would otherwise fetch every full-size image
+                              at once. lazy + async decoding keeps the ones
+                              below the fold out of the way; the dimensions
+                              reserve the box so the list does not jump. */}
                           <img
                             src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
                             alt={file.name}
                             className="file-thumbnail-img"
+                            loading="lazy"
+                            decoding="async"
+                            width={100}
+                            height={100}
                           />
                         </div>
                       ) : (

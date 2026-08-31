@@ -117,7 +117,7 @@ async function createUser(): Promise<{ user: TestUser; session: unknown }> {
  * cascades to shared_links through file_id), then folders. Deleting the user
  * last takes profiles and dropbox_connections with it.
  */
-async function deleteUser(userId: string): Promise<void> {
+export async function deleteUser(userId: string): Promise<void> {
   const listed = await admin('/storage/v1/object/list/files', {
     method: 'POST',
     body: JSON.stringify({ prefix: `${userId}/`, limit: 200 }),
@@ -142,15 +142,53 @@ async function deleteUser(userId: string): Promise<void> {
     headers: { Prefer: 'return=minimal' },
   });
 
-  await admin(`/auth/v1/admin/users/${userId}`, { method: 'DELETE' });
+  // Checked, and retried once after a pause. This call used to be made and
+  // forgotten, which is how accounts accumulated in a real project while every
+  // run reported success — a cleanup that fails silently is worse than no
+  // cleanup, because nothing ever tells you it is not happening.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const deleted = await admin(`/auth/v1/admin/users/${userId}`, { method: 'DELETE' });
+    if (deleted.ok) return;
+
+    if (attempt === 2) {
+      throw new Error(
+        `could not delete ${userId}: ${deleted.status} ${await deleted.text().catch(() => '')}`
+      );
+    }
+    // An immediate retry would only ask the same overloaded thing again.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 }
 
 interface Fixtures {
   /** The throwaway account this test owns. Created before, removed after. */
   user: TestUser;
+  /**
+   * Hands back an account the test caused to be created somewhere else — the
+   * demo endpoint mints its own, so no fixture can create it up front.
+   *
+   * Registering it here rather than deleting it in the test's own `finally` is
+   * the whole point. When a test exceeds its timeout Playwright abandons the
+   * body where it stands, so a `finally` never runs and the account survives;
+   * fixture teardown is given its own budget and runs anyway. That is exactly
+   * how this suite leaked accounts into a real project roughly one run in
+   * three, and the symptom was never a failing cleanup — it was a timeout that
+   * looked like an unrelated flake.
+   */
+  disposeAccount: (userId: string) => void;
 }
 
 export const test = base.extend<Fixtures>({
+  // The empty pattern is required, not sloppy: Playwright parses this argument
+  // to work out which fixtures this one depends on, and rejects any parameter
+  // that is not a destructuring pattern. This fixture depends on none.
+  // eslint-disable-next-line no-empty-pattern
+  disposeAccount: async ({}, use) => {
+    const ids: string[] = [];
+    await use((id) => ids.push(id));
+    for (const id of ids) await deleteUser(id);
+  },
+
   // auto, so a test written as ({ page }) is signed in too. Without it the
   // session would depend on whether the test happens to destructure `user`,
   // and a spec that forgot to would quietly run as an anonymous visitor and
@@ -167,13 +205,37 @@ export const test = base.extend<Fixtures>({
         JSON.stringify(session),
       ] as const);
 
+      // Both errors are captured rather than thrown where they happen, and the
+      // decision about which one to report is made afterwards.
+      //
+      // A failing test must not leave an account and its files behind, so the
+      // deletion has to run either way. But deleteUser now throws rather than
+      // failing quietly, and a throw that escapes a finally block replaces
+      // whatever the test was actually failing on — the real assertion error
+      // would be swapped for "could not delete <uuid>", making every cleanup
+      // hiccup look like the bug. ESLint's no-unsafe-finally is about exactly
+      // this, so the shape avoids finally altogether.
+      let testError: unknown = null;
       try {
         await use(user);
-      } finally {
-        // finally, not after use(): a failing test must not leave an account and
-        // its files in the project.
-        await deleteUser(user.id);
+      } catch (error) {
+        testError = error;
       }
+
+      let cleanupError: unknown = null;
+      try {
+        await deleteUser(user.id);
+      } catch (error) {
+        cleanupError = error;
+      }
+
+      if (testError) {
+        if (cleanupError) {
+          console.error('[fixtures] cleanup after a failing test also failed:', cleanupError);
+        }
+        throw testError;
+      }
+      if (cleanupError) throw cleanupError;
     },
     { auto: true },
   ],
@@ -244,10 +306,25 @@ export async function setStorageLimit(userId: string, bytes: number): Promise<vo
  * recipient sees. Cookies and localStorage are separate from `page`.
  */
 export async function anonymousPage(
-  browser: Browser
+  browser: Browser,
+  options: Parameters<Browser['newContext']>[0] = {}
 ): Promise<{ page: Page; close: () => Promise<void> }> {
-  const context = await browser.newContext();
+  const context = await browser.newContext(options);
   return { page: await context.newPage(), close: () => context.close() };
+}
+
+/**
+ * A distinct client address for a test that touches a rate-limited route.
+ *
+ * Without one, every run of the suite and every request made by hand while
+ * developing lands in the same bucket — the dev server holds the counter in
+ * module scope and outlives them all. This suite locked itself out of
+ * /api/demo/session that way, and the symptom was a 30-second timeout on a
+ * login page, not a message about a limit.
+ */
+export function uniqueForwardedFor(): Record<string, string> {
+  const octet = () => Math.floor(Math.random() * 254) + 1;
+  return { 'x-forwarded-for': `198.51.100.${octet()}` };
 }
 
 export { expect };

@@ -90,11 +90,55 @@
   text-transform: none;
 }
 
+/* The demo entry, below the fold of the decision rather than in front of it.
+   Ruled off so it reads as a separate offer, not a third way to sign in. */
+.demo-entry {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  text-align: center;
+}
+
+.demo-button {
+  --color: var(--ion-color-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  height: 34px;
+}
+
+.demo-button ion-icon {
+  font-size: 16px;
+  margin-right: 6px;
+}
+
+.demo-caption {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  /* #94a3b8 measured 2.56:1 against this card — below AA for text this size.
+     #64748b is what the divider and the sign-up link already use. */
+  color: #64748b;
+}
+
+body.dark .demo-entry {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Dark-mode contrast on this card.
-   These colours were picked against a white card and never checked against the
-   dark one, because body.dark was never applied — see theme/dark-mode.ts. The
-   divider and the sign-up link both measured 3.07:1 there, below AA. */
-body.dark .divider-container {
+   These colours were chosen against a white card and never checked against the
+   dark one, because body.dark was never applied — see theme/dark-mode.ts.
+   Measured on the dark card before: the demo link 2.33:1, the divider and the
+   sign-up link 3.07:1. All three now clear 4.5:1. */
+body.dark .demo-button {
+  --color: #a5b4fc;
+}
+
+body.dark .divider-container,
+body.dark .demo-caption {
   color: #94a3b8;
 }
 

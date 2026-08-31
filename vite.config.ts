@@ -108,6 +108,21 @@ export default defineConfig({
          * lets the browser fetch them in parallel.
          */
         manualChunks(id: string) {
+          const path = id.replace(/\\/g, '/');
+
+          /**
+           * The Sentry facade must not share a chunk with Sentry itself.
+           *
+           * observability/sentry.ts is imported statically by main.tsx and by
+           * every service that reports an error, while the reporter it loads
+           * arrives through a dynamic import. Left alone, Rollup merges the two
+           * — the facade is the only module that reaches @sentry — and the
+           * 151 KB reporter is back on the critical path, which is exactly what
+           * the dynamic import exists to prevent. Verified by grepping the
+           * built chunks: the facade's source was inside sentry-*.js.
+           */
+          if (path.endsWith('src/observability/sentry.ts')) return 'observability';
+
           if (!id.includes('node_modules')) return;
           if (id.includes('@sentry')) return 'sentry';
           if (id.includes('@ionic') || id.includes('ionicons')) return 'ionic';

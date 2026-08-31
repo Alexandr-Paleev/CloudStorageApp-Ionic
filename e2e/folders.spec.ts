@@ -21,12 +21,20 @@ test.describe('Folders', () => {
 
     // Typed, not filled. fill() sets the DOM value — toHaveValue below passes
     // either way — but the value never reaches the alert's own state, so the
-    // Create handler reads an empty name and quietly creates nothing. With
-    // fill() this test failed about half the time; typed, it has not failed.
+    // Create handler reads an empty name and quietly creates nothing.
+    //
+    // Retried, because typing alone was not enough either: the alert animates
+    // in, and keystrokes sent before it settles are dropped on the floor. That
+    // showed up only under parallel load, as an empty input after a full round
+    // of pressSequentially — so the retry re-types rather than waiting longer
+    // on a value that is never going to arrive.
     const name = page.locator('ion-alert input');
-    await name.click();
-    await name.pressSequentially(folder);
-    await expect(name).toHaveValue(folder);
+    await expect(async () => {
+      await name.click();
+      await name.press('ControlOrMeta+a');
+      await name.pressSequentially(folder);
+      await expect(name).toHaveValue(folder, { timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
 
     // Two claims, asserted separately: that the folder was created, and that
     // the list then shows it. Waiting only for the card reports both failures

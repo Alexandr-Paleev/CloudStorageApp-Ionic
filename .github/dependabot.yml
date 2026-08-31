@@ -27,8 +27,16 @@ updates:
       # decision, which is exactly what an automated PR cannot supply. The
       # first Dependabot run proposed seven of them at once — Capacitor 6 to 8,
       # Ionic 8 to 9, TypeScript 5 to 7, react-router 6 to 7, ESLint 8 to 10 —
-      # two failing CI outright. Minor and patch still arrive weekly, which is
-      # where security fixes land.
+      # two failing CI outright. Minor and patch still arrive weekly.
+      #
+      # The sentence that used to end this comment — "which is where security
+      # fixes land" — was wrong, and worth leaving a marker where it stood.
+      # Sometimes the fix is only in the next major, and then this rule means
+      # nobody is told at all: four high-severity undici advisories reached
+      # production dependencies through @vercel/node and sat there with every
+      # check green. The backstop is now `npm audit --omit=dev
+      # --audit-level=high` in CI, which fails the build rather than waiting
+      # for a pull request that this rule will never allow.
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
     commit-message:

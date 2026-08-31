@@ -1,6 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
-import * as Sentry from '@sentry/react';
+import * as Sentry from '../observability/sentry';
 
 const supabaseService = {
   /**

@@ -8,6 +8,17 @@ A modern, **open-source** web application for storing, viewing, and managing fil
 
 🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[v3.1.0 release](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.1.0)**
 
+> ⚡ **No sign-up needed.** "Just looking? Open a demo account", at the foot of
+> the login page, opens a private account seeded with a few files and deletes it
+> after 24 hours. It is a real account — same row-level security, same quota,
+> same Stripe test-mode checkout — because a demo running down a different code
+> path stops proving anything.
+>
+> It sits at the foot of that page rather than the top on purpose. As the first
+> element, styled like the submit button, it left two identical primary buttons
+> on the card and pushed the real one below the fold — and the page read as a
+> showcase rather than as a product.
+
 > 💳 **The demo runs Stripe in test mode.** Real cards are declined — upgrade with `4242 4242 4242 4242`, any future expiry, any CVC. No money changes hands.
 
 ## 📋 Project Description
@@ -26,12 +37,12 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
   <img src="docs/screenshots/dashboard.png" alt="Dashboard with the storage meter, the Pro badge and a list of files" width="820">
 </p>
 
-| Upload — Pro users pick the backend | Plans — Stripe in test mode |
-|---|---|
+| Upload — Pro users pick the backend                                                                                                                              | Plans — Stripe in test mode                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | <img src="docs/screenshots/upload.png" alt="Upload screen with a provider picker: Auto, Cloudinary, Cloudflare R2, Supabase, Google Drive, Dropbox" width="420"> | <img src="docs/screenshots/pricing.png" alt="Free and Pro plans with a demo mode notice" width="420"> |
 
-| File view | What a share link opens |
-|---|---|
+| File view                                                                                                 | What a share link opens                                                                                                            |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | <img src="docs/screenshots/file-view.png" alt="File view with preview, metadata and actions" width="420"> | <img src="docs/screenshots/shared-file.png" alt="Public share page showing the file name, size and a download button" width="420"> |
 
 Share links are listed on the file they belong to, with their state and a way to revoke them:
@@ -51,6 +62,7 @@ Share links are listed on the file they belong to, with their state and a way to
 
 - ✅ Email/Password registration and login
 - ✅ Google Account sign-in
+- ✅ **One-click demo** — a throwaway account, seeded and signed in, no sign-up
 - ✅ Protected routes (authorized users only)
 
 ### 📁 File Management
@@ -114,7 +126,7 @@ Share links are listed on the file they belong to, with their state and a way to
 > nothing failed loudly. Nineteen rules across four stylesheets were written
 > under `body.dark`, and no code ever added that class — so every one of them
 > was dead. Meanwhile a `prefers-color-scheme` block set `--ion-text-color` to
-> near-white on `:root`, which *did* apply. An operating system set to dark
+> near-white on `:root`, which _did_ apply. An operating system set to dark
 > therefore got near-white text on cards that stayed white: measured at
 > **1.05:1** in the login form, meaning what you typed was invisible unless you
 > selected it. `theme/dark-mode.ts` now syncs the class, which makes the
@@ -166,6 +178,12 @@ VITE_BILLING_ENABLED=true
 # Shows the "test card" notice on the plans page; set while on Stripe test keys
 VITE_BILLING_DEMO_MODE=true
 
+# One-click demo. Two variables on purpose: the VITE_ one only shows the button,
+# and a route that creates accounts must not be reachable because a client flag
+# was left on. /api/demo/session answers 404 unless DEMO_ENABLED is set too.
+VITE_DEMO_ENABLED=true
+DEMO_ENABLED=true
+
 # Optional: Dropbox (Pro tier provider)
 VITE_DROPBOX_APP_KEY=your_dropbox_app_key
 VITE_DROPBOX_REDIRECT_URI=https://your-project.vercel.app/dropbox/callback
@@ -197,6 +215,7 @@ DROPBOX_APP_KEY=your_dropbox_app_key
 
    All seven are safe to re-run, so there is no need to track which ones have
    already been applied.
+
 3. Enable **Google Auth** in Authentication -> Providers if needed.
 4. The `files` bucket and its policies come from migration `006` — nothing to click.
    Creating the bucket by hand in the dashboard is what left a fresh project with
@@ -258,11 +277,13 @@ DROPBOX_APP_KEY=your_dropbox_app_key
 Analytics are automatically enabled in production when environment variables are set.
 
 **Google Analytics 4:**
+
 1. Create a property in [Google Analytics](https://analytics.google.com/)
 2. Get your Measurement ID (starts with `G-`)
 3. Add `VITE_GA4_MEASUREMENT_ID` to `.env`
 
 **Hotjar:**
+
 1. Create a site in [Hotjar](https://www.hotjar.com/)
 2. Get your Site ID from the tracking code
 3. Add `VITE_HOTJAR_SITE_ID` to `.env`
@@ -363,14 +384,80 @@ enforced when the URL is signed, and the approved size is signed into it.
 
 ### Security decisions worth knowing
 
-| Decision | Reason |
-|---|---|
-| Billing columns are server-write only | RLS has no column-level granularity, so a self-update policy would let anyone set `tier = 'pro'` |
-| Dropbox refresh tokens live in `dropbox_connections`, never in the browser | an XSS could otherwise reach the user's Dropbox indefinitely |
-| Share tokens are stored as SHA-256 hashes | a leak of `shared_links` then reveals nothing usable |
-| `assertServiceRoleKey` refuses to start on an anon key | swapping the two keys fails silently: queries return nothing instead of erroring |
-| Ownership is checked in `/api`, never trusted from the client | the presigned URL writes straight to the bucket, so the client check is advisory |
-| Quota is checked in `/api` **for R2 only** — a known gap, not a claim | Cloudinary and Supabase Storage receive the upload directly from the browser; nothing server-side sees it |
+| Decision                                                                       | Reason                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Billing columns are server-write only                                          | RLS has no column-level granularity, so a self-update policy would let anyone set `tier = 'pro'`                                                                                                                                                                                                      |
+| Dropbox refresh tokens live in `dropbox_connections`, never in the browser     | an XSS could otherwise reach the user's Dropbox indefinitely                                                                                                                                                                                                                                          |
+| Share tokens are stored as SHA-256 hashes                                      | a leak of `shared_links` then reveals nothing usable                                                                                                                                                                                                                                                  |
+| `assertServiceRoleKey` refuses to start on an anon key                         | swapping the two keys fails silently: queries return nothing instead of erroring                                                                                                                                                                                                                      |
+| Ownership is checked in `/api`, never trusted from the client                  | the presigned URL writes straight to the bucket, so the client check is advisory                                                                                                                                                                                                                      |
+| Quota is checked in `/api` **for R2 only** — a known gap, not a claim          | Cloudinary and Supabase Storage receive the upload directly from the browser; nothing server-side sees it                                                                                                                                                                                             |
+| The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
+| Demo accounts are swept by email prefix, never by age alone                    | the sweep runs with the service-role key; a filter on age alone would eventually reach a real account                                                                                                                                                                                                 |
+| The demo rate limit is 20/hour per address, and per instance                   | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what every `/api` route here still wants |
+
+### Security headers
+
+`vercel.json` sends a Content-Security-Policy, HSTS, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy` and `X-Frame-Options` on every response.
+The interesting parts:
+
+- **`frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+  `form-action 'self'`** — the four that cost nothing and buy the most:
+  clickjacking, plugin content, a rewritten `<base>`, and a form posting
+  credentials to somebody else's host.
+- **`script-src` still carries `'unsafe-inline'`**, and that is a real weakness
+  rather than an oversight. The build emits no inline `<script>` at all — gtag.js
+  and Hotjar are what need it. Removing it means per-request nonces, which need
+  a server rendering the HTML rather than a static bundle.
+- **`connect-src https:` is deliberately wide.** The Supabase project ref, the R2
+  account and the Sentry ingest host all differ per deployment, and `vercel.json`
+  is checked in, so a hardcoded list would break every fork.
+
+`lib/csp.test.ts` parses the header out of `vercel.json` and asserts that every
+origin the app injects a script from is allowed. The policy is a string inside a
+JSON file — nothing else in the toolchain can see it, and a mistake there shows
+up only in production, in whichever browser the visitor happened to bring.
+
+### What the browser downloads first
+
+Measured from `npm run build`, gzipped, before anything is rendered:
+
+|                             | Before                     | After                      |
+| --------------------------- | -------------------------- | -------------------------- |
+| Initial JS + CSS            | 1 863 KB / **451 KB gzip** | 1 714 KB / **401 KB gzip** |
+| Chunks on the critical path | 6                          | 6 (Sentry out, facade in)  |
+
+Two changes, both cheap:
+
+- **Sentry is no longer imported at startup.** It sat at the top of `main.tsx`
+  _and_ of `ErrorBoundary.tsx`, so 151 KB of crash reporter (51 KB gzipped, an
+  ninth of the shell) was fetched before the first paint — by a library that has
+  nothing to report until the app is running. `src/observability/sentry.ts` is
+  now a facade every module imports instead; the real package arrives on
+  `requestIdleCallback`, and events raised in the meantime are queued rather
+  than dropped. The cost, stated plainly: `browserTracingIntegration` no longer
+  sees the initial pageload transaction.
+
+  Two traps on the way, both only visible in the build output:
+
+  1. `import('@sentry/react')` resolves to the whole module namespace, which
+     Rollup must keep intact — every integration the package ships became
+     reachable and the chunk grew from 151 KB to **494 KB**. Importing
+     `observability/sentry-client.ts`, which re-exports exactly four symbols,
+     gives Rollup a namespace small enough to shake against.
+  2. Rollup then merged the facade _into_ the Sentry chunk, so the static import
+     pulled the reporter back onto the critical path — the lazy import bought
+     nothing, and `dist/index.html` still listed `sentry-*.js` under
+     `modulepreload`. `manualChunks` now assigns the facade its own chunk.
+
+- **Inter is linked from `index.html` with a preconnect.** It was an `@import` at
+  the top of `theme/variables.css`, which is the slowest way to load a font: the
+  browser has to download and parse that stylesheet before it discovers a font
+  is needed at all.
+
+The remaining 239 KB gzipped is Ionic, and it is structural rather than
+something to tune — the framework registers its components eagerly.
 
 ## 🚀 Deployment
 
@@ -432,6 +519,9 @@ cloud-storage-app/
 │   ├── components/
 │   │   ├── PrivateRoute.tsx       # Protected route component
 │   │   └── PageViewTracker.tsx    # Analytics page view tracker
+│   ├── observability/
+│   │   ├── sentry.ts              # Facade — keeps Sentry off the critical path
+│   │   └── sentry-client.ts       # Four re-exports, so the chunk stays shakeable
 │   ├── hooks/
 │   │   └── useAnalytics.ts        # GA4 + Hotjar analytics hook
 │   ├── types/
@@ -442,6 +532,7 @@ cloud-storage-app/
 │   └── main.tsx                   # Entry point
 ├── api/                           # Vercel Functions — anything holding a secret
 │   ├── cloudinary/delete.ts       # Ownership-checked asset deletion
+│   ├── demo/session.ts            # Throwaway account for "Try the demo"
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here
 │   └── stripe/                    # Checkout, Customer Portal, webhook
@@ -458,15 +549,23 @@ inlines every `VITE_`-prefixed value into it — so provider credentials, the
 Stripe secret key, the Supabase service-role key and Dropbox refresh tokens are
 only ever read server-side.
 
+> **`api/` is full.** Vercel turns every `.ts` file there into its own Serverless
+> Function and the Hobby plan allows twelve; `api/demo/session.ts` was the
+> twelfth. This is why `api/share.ts` routes three verbs through one file, and
+> why the next server-side route has to either share an existing file or wait
+> for a plan that allows more. It already cost one thing worth naming: a
+> collector for CSP violation reports, which would have let the policy run in
+> report-only mode first.
+
 ## 🔒 Limits and Restrictions
 
 ### Application
 
-| | Free | Pro ($9/mo) |
-|---|---|---|
-| Storage | 500 MB | 5 GB |
-| Providers | Cloudinary, Supabase Storage, R2, Google Drive | + Dropbox |
-| Provider selection | automatic | manual, per upload |
+|                    | Free                                           | Pro ($9/mo)        |
+| ------------------ | ---------------------------------------------- | ------------------ |
+| Storage            | 500 MB                                         | 5 GB               |
+| Providers          | Cloudinary, Supabase Storage, R2, Google Drive | + Dropbox          |
+| Provider selection | automatic                                      | manual, per upload |
 
 - **Extra storage**: Google Drive (15 GB free) — auto-connects when limit is reached
 - **Max single file size**: not enforced. The figure of 50 MB appeared here before
@@ -504,11 +603,14 @@ npm run test:e2e
 
 # Type-check src and api, then build
 npm run build
+
+# Regenerate the demo seed files and the link-preview image
+npm run generate:demo-assets
 ```
 
-GitHub Actions runs lint, both type-check passes, unit and e2e tests on every
-pull request. `main` is protected: those checks are required, and changes land
-through pull requests only.
+GitHub Actions runs lint, both type-check passes, an audit of production
+dependencies, unit and e2e tests on every pull request. `main` is protected:
+those checks are required, and changes land through pull requests only.
 
 ## 🔍 Postmortem: the `anon` key that was named `SUPABASE_SERVICE_ROLE_KEY`
 
@@ -564,16 +666,74 @@ while the Stripe account had no registered webhook endpoint at all. Both were
 configuration, both were invisible to CI, and both only surfaced when a real
 request finally travelled the whole path.
 
+## 🔍 Postmortem: the dependency policy that hid the vulnerabilities it was meant to avoid
+
+`.github/dependabot.yml` ignores major version bumps, and the reasoning was
+sound enough to be worth quoting: majors are migrations, not updates, and the
+first Dependabot run proposed seven at once — Capacitor 6 to 8, Ionic 8 to 9,
+TypeScript 5 to 7, react-router 6 to 7, ESLint 8 to 10 — two of which failed CI
+outright. The comment ended with a sentence that turned out to be false:
+
+> Minor and patch still arrive weekly, **which is where security fixes land.**
+
+**The symptom.** `npm audit --omit=dev` reported nine vulnerabilities, four of
+them high, against a repository whose checks had been green for months. Twelve
+separate `undici` advisories — request smuggling, CRLF injection, response
+queue poisoning — reachable through `@vercel/node`, which was pinned at 5.x
+while 10.x was current.
+
+**The cause.** The fix was only available in a major, so the ignore rule
+suppressed it, and Dependabot opened nothing. Nothing else was watching: CI ran
+lint, two type-check passes, unit tests and Playwright, and not one of them has
+an opinion about a published advisory. The policy did not fail — it worked
+exactly as written, and what it was written to do turned out to include this.
+
+**What it took to clear.** Less than the alert count suggested, because the
+count was measuring the wrong thing:
+
+- `@vercel/node` is imported for `VercelRequest` and `VercelResponse` and
+  nothing else — Vercel supplies the runtime itself. It belonged in
+  `devDependencies` all along, where its transitive tree never reaches
+  production.
+- `ajv` was a direct dependency that no file in this repository imports. It came
+  in transitively through `vite-plugin-pwa` and `eslint` regardless.
+- `cloudinary` was the one genuine production high, and the only real migration:
+  v1 to v2. The app uses `v2.config()` and `v2.uploader.destroy()`, neither of
+  which changed.
+
+Production dependencies went from nine vulnerabilities (four high) to three
+(one low, two moderate, none high). The two that remain are `react-router`,
+which needs the v7 migration, and a pinned `esbuild` — both known, neither
+hidden.
+
+**What changed.** One CI step, which is the part that matters more than the
+upgrades:
+
+```yaml
+- name: Audit production dependencies
+  run: npm audit --omit=dev --audit-level=high
+```
+
+`--omit=dev` is load-bearing. A vulnerability in a build tool is not a
+vulnerability in what the browser downloads, and a step that fails over one
+trains people to skip reading it. The ignore rule stays — it was right about
+churn — but it is no longer the only thing standing between an advisory and this
+repository.
+
+The habit this adds to the [first postmortem](#-postmortem-the-anon-key-that-was-named-supabase_service_role_key)'s
+two: a policy that suppresses noise needs something else watching for what it
+suppresses, or the silence it produces is indistinguishable from safety.
+
 ## 💎 Pro Tier
 
 Shipped in [v3.0.0](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.0.0). Upgrading happens in the app, through Stripe Checkout.
 
-| | Free | Pro — $9/month |
-|---|---|---|
-| Storage | 500 MB | **5 GB** |
-| Providers | Cloudinary, Supabase Storage, R2, Google Drive | **+ Dropbox** |
-| Choose upload provider | — | ✅ |
-| Google Drive overflow | ✅ | ✅ |
+|                        | Free                                           | Pro — $9/month |
+| ---------------------- | ---------------------------------------------- | -------------- |
+| Storage                | 500 MB                                         | **5 GB**       |
+| Providers              | Cloudinary, Supabase Storage, R2, Google Drive | **+ Dropbox**  |
+| Choose upload provider | —                                              | ✅             |
+| Google Drive overflow  | ✅                                             | ✅             |
 
 Manage or cancel a subscription from the Stripe Customer Portal, reachable from
 the plans page. Cancelling takes effect immediately and the tier drops back to
