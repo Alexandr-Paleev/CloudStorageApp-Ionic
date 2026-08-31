@@ -46,6 +46,7 @@ import { env } from '../env';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
+import { storageMeter } from '../utils/quota.utils';
 import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
@@ -155,13 +156,11 @@ const Dashboard: React.FC = () => {
   // Safe calculation for storage — use dynamic limit from profile
   const usedBytes = storageSize || 0;
   const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
-  // The bar stops at full, the number does not: cancelling Pro drops the limit
-  // back to 500 MB, and rounding that down to "100.0%" hides how far over the
-  // account actually is — which is also why uploads start failing.
-  const storageRatio = storageLimit > 0 ? usedBytes / storageLimit : 0;
-  const barWidth = (Math.min(storageRatio, 1) * 100).toFixed(1);
-  const percentageDisplay = (storageRatio * 100).toFixed(1);
-  const isOverLimit = usedBytes > storageLimit;
+  const {
+    barWidth,
+    percentage: percentageDisplay,
+    isOverLimit,
+  } = storageMeter(usedBytes, storageLimit);
 
   return (
     <IonPage>

@@ -317,7 +317,7 @@ The app will be available at: `http://localhost:8100`
 - **Routing**: React Router DOM
 - **Build**: Vite + Capacitor
 - **Backend API**: Vercel Functions
-- **Testing**: Vitest (unit) + Playwright (e2e), run in GitHub Actions
+- **Testing**: Vitest (node and jsdom projects) + Playwright (e2e), run in GitHub Actions
 - **Analytics**: Google Analytics 4 (GA4) + Hotjar
 - **Error Tracking**: Sentry
 
@@ -595,8 +595,11 @@ npm run lint
 # Code formatting
 npm run format
 
-# Unit tests (Vitest)
+# Unit tests (Vitest) — both projects, server and client
 npm test
+
+# ...with the coverage report CI prints as two tables
+npm run test:coverage
 
 # End-to-end tests (Playwright)
 npm run test:e2e
@@ -611,6 +614,35 @@ npm run generate:demo-assets
 GitHub Actions runs lint, both type-check passes, an audit of production
 dependencies, unit and e2e tests on every pull request. `main` is protected:
 those checks are required, and changes land through pull requests only.
+
+### What the tests cover, and what they deliberately do not
+
+Two Vitest projects, because the two halves of this app run in different
+places: `server` executes the Vercel handlers and the `lib/` helpers under
+node, `client` renders the React layer under jsdom. CI prints their coverage
+as two tables — a single blended percentage would hide which half a pull
+request moved.
+
+The target is not a percentage. It is that everything deciding **access,
+money and quota** has a test:
+
+- `authenticateUser` — the gate every handler goes through, and the one thing
+  every handler test mocks, so it needs a test of its own.
+- `ProviderManager.selectProvider` — which backend a file lands on, and that
+  choosing one by hand still cannot walk past the quota.
+- The rollback in `storage.service.uploadFile` — the bytes reach the bucket
+  before the row exists, so a failed insert has to delete them again. The
+  compensating half of a transaction Postgres cannot give us.
+- The storage meter — cancelling Pro drops the limit back to 500 MB without
+  deleting anything, so the bar stops at full while the number keeps counting.
+- Share-link state — `stateOf()` in the browser deliberately re-implements
+  `shareUnusableReason()` from `lib/share.ts` rather than pull `node:crypto`
+  into the bundle. Two implementations can drift; each side is tested.
+
+Pages are left to Playwright rather than jsdom: `e2e/` opens a throwaway
+account per test and drives the real file lifecycle, share links, quota and
+folder scoping against a live Supabase project. Rendering a page in jsdom
+proves the markup exists; it does not prove an upload works.
 
 ## 🔍 Postmortem: the `anon` key that was named `SUPABASE_SERVICE_ROLE_KEY`
 
