@@ -8,7 +8,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  /* One worker in CI used to be necessary: every signed-in spec shared a single
+     throwaway account, so parallel tests would have seen each other's files.
+     The fixture in e2e/fixtures.ts gives each test its own account, which makes
+     the data disjoint by construction — four is the runner's core count on the
+     hosted image. */
+  workers: process.env.CI ? 4 : undefined,
   reporter: [['list'], ['html', { open: 'never' }]],
 
   use: {
