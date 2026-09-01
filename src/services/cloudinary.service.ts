@@ -4,7 +4,14 @@ import { supabase } from '../supabase/supabase.config';
 import { httpErrorFrom } from '../utils/http.utils';
 
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const deleteApiUrl = import.meta.env.VITE_CLOUDINARY_DELETE_API_URL;
+/**
+ * Same origin by default. The variable is kept because deployments set it, but
+ * an absolute URL is the wrong default twice over: a preview build then
+ * deletes assets against production, and an unset variable used to make
+ * deletion a silent no-op — which stopped being cosmetic once the quota
+ * rollback started relying on it to remove an asset whose row was refused.
+ */
+const deleteApiUrl = import.meta.env.VITE_CLOUDINARY_DELETE_API_URL || '/api/cloudinary/delete';
 
 /** What /api/cloudinary/sign hands back for exactly one upload. */
 type UploadAuthorization = {
@@ -14,8 +21,16 @@ type UploadAuthorization = {
   signature: string;
   folder: string;
   tags: string;
-  resourceType: 'raw' | 'auto';
+  resourceType: 'raw' | 'image';
 };
+
+/**
+ * Set once /api/cloudinary/sign has answered 501. Uploads used to fall through
+ * to R2 or Supabase Storage when Cloudinary was unconfigured, because the
+ * client could tell from VITE_CLOUDINARY_UPLOAD_PRESET; with signing, only the
+ * server knows, and it can only say so by being asked.
+ */
+let serverCannotSign = false;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const {
@@ -44,6 +59,12 @@ async function authorizeUpload(file: File): Promise<UploadAuthorization> {
   });
 
   if (!response.ok) {
+    // 501 means this deployment has no Cloudinary credentials server-side.
+    // The client cannot see that on its own — isConfigured() only knows the
+    // cloud name — so remember it, and let the next upload be routed to a
+    // backend that does work instead of failing the same way again.
+    if (response.status === 501) serverCannotSign = true;
+
     // Carries the status, so a 413 is not retried the way a 502 is.
     throw await httpErrorFrom(response, 'Failed to authorize the upload');
   }
@@ -63,7 +84,7 @@ const cloudinaryService = {
    * Check if Cloudinary is configured
    */
   isConfigured(): boolean {
-    return !!cloudName;
+    return !!cloudName && !serverCannotSign;
   },
 
   /**
@@ -133,11 +154,6 @@ const cloudinaryService = {
    * Delete file via proxy (since public API requires signature)
    */
   async deleteFile(publicId: string, resourceType?: string): Promise<void> {
-    if (!deleteApiUrl) {
-      console.warn('Cloudinary delete API URL not configured.');
-      return;
-    }
-
     try {
       const {
         data: { session },

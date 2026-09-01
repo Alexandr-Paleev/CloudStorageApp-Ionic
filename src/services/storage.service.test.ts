@@ -77,6 +77,28 @@ describe('uploadFile', () => {
     });
   });
 
+  it('records the size the provider says it stored, not the one that was picked', async () => {
+    // Cloudinary can hand back a different number than what was sent, and the
+    // row should describe the asset that exists.
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(
+      provider({ upload: vi.fn(async () => ({ ...uploaded, bytes: 512 })) })
+    );
+
+    await storageService.uploadFile('user-1', file('photo.png', 'image/png', 4096));
+
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    expect(metadata.size).toBe(512);
+  });
+
+  it('falls back to the file size for a provider that reports nothing', async () => {
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(provider());
+
+    await storageService.uploadFile('user-1', file('report.pdf', 'application/pdf', 2048));
+
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    expect(metadata.size).toBe(2048);
+  });
+
   it('strips path separators out of the name before storing it', async () => {
     // The stored name is a label, not a path — the provider decides where the
     // bytes go — but a name carrying separators still has no business in a row

@@ -19,6 +19,9 @@ export class CloudinaryProvider implements IStorageProvider {
       url: result.url,
       path: result.publicId,
       type: 'cloudinary',
+      // Cloudinary stores what it stores; the file that left the browser is
+      // not always the same size as the asset that arrives.
+      bytes: result.bytes,
     };
   }
 

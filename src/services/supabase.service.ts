@@ -58,6 +58,16 @@ const supabaseService = {
 
     if (error) {
       Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
+
+      // Deploy order: this column arrives with migrations/007. lib/quota.ts
+      // says the same thing on the server side; without it the symptom is a
+      // meter stuck at 0 B and every upload failing, which points nowhere.
+      if (/bytes_used/.test(error.message ?? '')) {
+        throw new Error(
+          'profiles.bytes_used is missing — apply migrations/007_enforce_storage_quota.sql'
+        );
+      }
+
       throw error;
     }
 

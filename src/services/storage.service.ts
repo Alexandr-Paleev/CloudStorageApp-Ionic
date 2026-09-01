@@ -74,7 +74,9 @@ const storageService = {
 
       return await supabaseService.saveFileMetadata({
         name: sanitizedName,
-        size: file.size,
+        // What the provider says it stored, when it says: the row should
+        // describe the asset that exists, not the one that was picked.
+        size: result.bytes ?? file.size,
         type: file.type,
         download_url: result.url,
         storage_path: result.path,

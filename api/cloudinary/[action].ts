@@ -23,8 +23,14 @@ import { readQuota, quotaRejection } from '../../lib/quota';
  * raw assets do, and both sides now split on the same question.
  */
 function resourceTypeFor(fileName: string, contentType?: string): 'raw' | 'image' {
-  const isImage =
-    contentType?.startsWith('image/') ?? /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(fileName);
+  // A ternary, not `??`: the browser sends '' — not undefined — when it cannot
+  // work out a type, and '' is a string, so `??` never reached the filename.
+  // A holiday.jpg picked up from a drive that reports no MIME type was being
+  // signed for the raw endpoint.
+  const isImage = contentType
+    ? contentType.startsWith('image/')
+    : /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(fileName);
+
   return isImage ? 'image' : 'raw';
 }
 
@@ -166,10 +172,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    // Determine options based on passed resourceType or default fallback
-    // If resourceType is explicit (e.g. 'raw' for PDF), use it.
-    // Otherwise default to 'image'.
-    const options = resourceType ? { resource_type: resourceType } : { resource_type: 'image' };
+    // Whitelisted, not taken as given: this value is interpolated into the
+    // path Cloudinary is called on, and an unrecognised one would also skew
+    // the not-found fallback below.
+    const RESOURCE_TYPES = ['image', 'raw', 'video'];
+    if (resourceType && !RESOURCE_TYPES.includes(resourceType)) {
+      res.status(400).json({ message: `Unsupported resourceType "${resourceType}"` });
+      return;
+    }
+
+    const options = { resource_type: resourceType || 'image' };
 
     let result = await cloudinary.uploader.destroy(publicId, options);
 

@@ -254,6 +254,18 @@ describe('cloudinary sign: authorizing an upload', () => {
     expect(res.body).toMatchObject({ resourceType: 'raw' });
   });
 
+  it('falls back to the file name when the browser reports no type at all', async () => {
+    // The browser sends '' — not undefined — for a type it cannot work out,
+    // and '' is a string, so the previous `??` never reached this branch: a
+    // .jpg was being signed for the raw endpoint and could not be deleted.
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign({ fileName: 'holiday.jpg', contentType: '' }), res);
+
+    expect(res.body).toMatchObject({ resourceType: 'image' });
+  });
+
   it('refuses to sign an upload that would not fit', async () => {
     account(TIER_LIMITS.free.storage_limit, TIER_LIMITS.free.storage_limit - 100);
     const res = mockResponse();
@@ -310,6 +322,24 @@ describe('cloudinary sign: authorizing an upload', () => {
 
     expect(res.statusCode).toBe(501);
     expect(apiSignRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudinary delete: the resource type is not taken as given', () => {
+  it('refuses one Cloudinary has no endpoint for', async () => {
+    // It is interpolated into the path the API is called on.
+    const res = mockResponse();
+    await handler(del('users/user-1/photo', '../../admin'), res);
+
+    expect(res.statusCode).toBe(400);
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it.each(['image', 'raw', 'video'])('accepts %s', async (type) => {
+    const res = mockResponse();
+    await handler(del('users/user-1/photo', type), res);
+
+    expect(res.statusCode).toBe(200);
   });
 });
 

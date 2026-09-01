@@ -180,6 +180,25 @@ describe('selectProvider — the automatic path', () => {
     expect(provider.name).toBe('cloudinary');
   });
 
+  it("does not read the quota to answer a request for the user's own Drive", async () => {
+    // The quota read can fail — a profiles blip, or migrations/007 not applied
+    // yet — and Drive costs the plan nothing. Failing this path because the
+    // *local* quota was unreadable breaks the one route that exists for when
+    // local storage cannot be used.
+    install({ googledrive: { connected: true } });
+    const canUploadToLocal = vi.fn(async () => {
+      throw new Error('profiles.bytes_used is missing');
+    });
+
+    const provider = await providerManager.selectProvider(image, 'user-1', {
+      canUploadToLocal,
+      useGoogleDrive: true,
+    });
+
+    expect(provider.name).toBe('googledrive');
+    expect(canUploadToLocal).not.toHaveBeenCalled();
+  });
+
   it('overflows a full account into a connected Drive', async () => {
     install({ googledrive: { connected: true } });
 

@@ -70,6 +70,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('isConfigured', () => {
@@ -163,5 +164,58 @@ describe('uploadFile', () => {
       format: 'png',
       bytes: 1024,
     });
+  });
+});
+
+describe('when the deployment cannot sign', () => {
+  it('stops offering itself after the server answers 501', async () => {
+    // Only the server knows whether CLOUDINARY_API_SECRET is set. Before
+    // signing, the client could tell from the upload preset and images fell
+    // through to R2 or Supabase Storage; now it can only find out by asking.
+    authorizeWith({
+      ok: false,
+      status: 501,
+      json: async () => ({ message: 'Cloudinary is not configured on the server' }),
+    } as unknown as Response);
+
+    expect(cloudinaryService.isConfigured()).toBe(true);
+    await expect(cloudinaryService.uploadFile(file(), 'user-1')).rejects.toThrow();
+
+    // ProviderManager asks this before every upload, so the next file is
+    // routed somewhere that works.
+    expect(cloudinaryService.isConfigured()).toBe(false);
+  });
+});
+
+describe('deleteFile', () => {
+  it('falls back to this deployment when no delete URL is configured', async () => {
+    // The rollback after a refused quota insert depends on this actually
+    // deleting something. It used to warn and return when the variable was
+    // unset, which left the asset in the account with no row pointing at it —
+    // and an absolute URL is the wrong default the other way round, since a
+    // preview build then deletes against production.
+    vi.stubEnv('VITE_CLOUDINARY_DELETE_API_URL', '');
+    vi.resetModules();
+    const fresh = (await import('./cloudinary.service')).default;
+
+    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fresh.deleteFile('users/user-1/photo');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/cloudinary/delete');
+  });
+
+  it('uses the configured URL when a deployment sets one', async () => {
+    vi.stubEnv('VITE_CLOUDINARY_DELETE_API_URL', 'https://example.invalid/api/cloudinary/delete');
+    vi.resetModules();
+    const fresh = (await import('./cloudinary.service')).default;
+
+    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fresh.deleteFile('users/user-1/photo');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://example.invalid/api/cloudinary/delete');
   });
 });
