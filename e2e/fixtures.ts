@@ -257,8 +257,17 @@ export async function submitUpload(page: Page, name: string, folderId?: string):
   // arrive over the network, so pressing the button first would upload files
   // that the quota should have refused — the waiters are registered before the
   // navigation because the responses can otherwise land first.
-  const profileLoaded = page.waitForResponse((r) => r.url().includes('/rest/v1/profiles'));
-  const usageLoaded = page.waitForResponse((r) => r.url().includes('/rest/v1/files'));
+  //
+  // Both now come from profiles: usage is profiles.bytes_used, a counter kept
+  // by the trigger in migrations/007, rather than a walk over every row in
+  // files. The two requests differ only by what they select.
+  const profiles = (url: string) => url.includes('/rest/v1/profiles');
+  const profileLoaded = page.waitForResponse(
+    (r) => profiles(r.url()) && !r.url().includes('bytes_used')
+  );
+  const usageLoaded = page.waitForResponse(
+    (r) => profiles(r.url()) && r.url().includes('bytes_used')
+  );
 
   await page.goto(folderId ? `/upload/${folderId}` : '/upload');
   await Promise.all([profileLoaded, usageLoaded]);

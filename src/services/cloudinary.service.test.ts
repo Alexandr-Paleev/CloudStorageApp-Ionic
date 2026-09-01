@@ -198,7 +198,10 @@ describe('deleteFile', () => {
     vi.resetModules();
     const fresh = (await import('./cloudinary.service')).default;
 
-    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    // Typed, so mock.calls carries the URL rather than an empty tuple.
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => ({ ok: true }) as Response
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await fresh.deleteFile('users/user-1/photo');
@@ -211,7 +214,10 @@ describe('deleteFile', () => {
     vi.resetModules();
     const fresh = (await import('./cloudinary.service')).default;
 
-    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    // Typed, so mock.calls carries the URL rather than an empty tuple.
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) => ({ ok: true }) as Response
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await fresh.deleteFile('users/user-1/photo');
