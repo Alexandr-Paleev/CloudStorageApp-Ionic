@@ -46,6 +46,15 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+    -- The three backends this app pays for. Google Drive and Dropbox hold the
+    -- bytes in the user's own account, so they cost the plan nothing and must
+    -- not be counted — counting them would also break the feature that exists
+    -- for exactly this moment: when local storage is full, uploads overflow
+    -- into a connected Drive. Same list as LOCAL_PROVIDERS in
+    -- src/providers/ProviderManager.ts, and the reason the client-side check
+    -- is called canUploadToLocal().
+    HOSTED CONSTANT TEXT[] := ARRAY['cloudinary', 'r2', 'supabase_storage'];
+
     v_user  UUID;
     v_delta BIGINT;
     v_limit BIGINT;
@@ -53,10 +62,10 @@ DECLARE
 BEGIN
     IF TG_OP = 'INSERT' THEN
         v_user := NEW.user_id;
-        v_delta := NEW.size;
+        v_delta := CASE WHEN NEW.storage_type = ANY (HOSTED) THEN NEW.size ELSE 0 END;
     ELSIF TG_OP = 'DELETE' THEN
         v_user := OLD.user_id;
-        v_delta := -OLD.size;
+        v_delta := -CASE WHEN OLD.storage_type = ANY (HOSTED) THEN OLD.size ELSE 0 END;
     ELSE
         -- Moving a file between accounts would make both counters wrong, and
         -- nothing in the app does it.
@@ -64,7 +73,14 @@ BEGIN
             RAISE EXCEPTION 'a file cannot change owner';
         END IF;
         v_user := NEW.user_id;
-        v_delta := NEW.size - OLD.size;
+        v_delta := CASE WHEN NEW.storage_type = ANY (HOSTED) THEN NEW.size ELSE 0 END
+                 - CASE WHEN OLD.storage_type = ANY (HOSTED) THEN OLD.size ELSE 0 END;
+    END IF;
+
+    -- A file in the user's own cloud changes nothing here: no limit to check,
+    -- no counter to move, and no reason to take a lock on the profile.
+    IF v_delta = 0 THEN
+        RETURN CASE TG_OP WHEN 'DELETE' THEN OLD ELSE NEW END;
     END IF;
 
     -- FOR UPDATE is the whole point: a second upload for the same account
@@ -84,10 +100,12 @@ BEGIN
     END IF;
 
     IF v_delta > 0 AND v_used + v_delta > v_limit THEN
-        -- 53100 is disk_full: the client can recognise it without matching on
-        -- the message text. supabase-js surfaces it as error.code.
+        -- PostgREST turns a SQLSTATE of the form PTnnn into HTTP nnn, so a
+        -- browser writing this row directly is refused with the same 413 that
+        -- /api answers with — and supabase-js surfaces the code, so the client
+        -- recognises the refusal without matching on message text.
         RAISE EXCEPTION USING
-            ERRCODE = '53100',
+            ERRCODE = 'PT413',
             MESSAGE = format(
                 'Storage limit exceeded: %s of %s bytes used, this file needs %s more',
                 v_used, v_limit, v_delta
@@ -126,6 +144,8 @@ AS $$
       LEFT JOIN (
           SELECT user_id, SUM(size) AS total
             FROM public.files
+           -- Same three backends the trigger counts, for the same reason.
+           WHERE storage_type IN ('cloudinary', 'r2', 'supabase_storage')
            GROUP BY user_id
       ) t ON t.user_id = ids.id
      WHERE p.id = ids.id

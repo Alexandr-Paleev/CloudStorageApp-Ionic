@@ -77,6 +77,28 @@ describe('uploadFile', () => {
     });
   });
 
+  it('records the size the provider says it stored, not the one that was picked', async () => {
+    // Cloudinary can hand back a different number than what was sent, and the
+    // row should describe the asset that exists.
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(
+      provider({ upload: vi.fn(async () => ({ ...uploaded, bytes: 512 })) })
+    );
+
+    await storageService.uploadFile('user-1', file('photo.png', 'image/png', 4096));
+
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    expect(metadata.size).toBe(512);
+  });
+
+  it('falls back to the file size for a provider that reports nothing', async () => {
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(provider());
+
+    await storageService.uploadFile('user-1', file('report.pdf', 'application/pdf', 2048));
+
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    expect(metadata.size).toBe(2048);
+  });
+
   it('strips path separators out of the name before storing it', async () => {
     // The stored name is a label, not a path — the provider decides where the
     // bytes go — but a name carrying separators still has no business in a row
@@ -138,6 +160,28 @@ describe('uploadFile', () => {
         tags: { context: 'storage.uploadFile.cleanup' },
       })
     );
+  });
+
+  it('reports a quota rejection from the database as a quota problem', async () => {
+    // The trigger from migrations/007 refuses the insert with PT413 — which
+    // PostgREST answers as HTTP 413 — and that is an expected answer rather
+    // than a fault: the user needs a sentence they can act on, and Sentry does
+    // not need the noise.
+    const r2 = provider();
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+    vi.mocked(supabaseService.saveFileMetadata).mockRejectedValue(
+      Object.assign(new Error('Storage limit exceeded: 524288000 of 524288000 bytes used'), {
+        code: 'PT413',
+      })
+    );
+
+    await expect(storageService.uploadFile('user-1', file())).rejects.toThrow(
+      /Storage limit exceeded\. The file was not kept/
+    );
+
+    // Still rolled back: the bytes reached the bucket before the row was tried.
+    expect(r2.delete).toHaveBeenCalledWith(uploaded.path);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it('retries an upload the server may yet accept', async () => {

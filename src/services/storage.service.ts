@@ -5,6 +5,7 @@ import { withRetry } from '../utils/retry.utils';
 import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '../observability/sentry';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
+import { isQuotaRejection } from '../utils/quota.utils';
 
 export type { FileMetadata, Folder };
 
@@ -73,7 +74,9 @@ const storageService = {
 
       return await supabaseService.saveFileMetadata({
         name: sanitizedName,
-        size: file.size,
+        // What the provider says it stored, when it says: the row should
+        // describe the asset that exists, not the one that was picked.
+        size: result.bytes ?? file.size,
         type: file.type,
         download_url: result.url,
         storage_path: result.path,
@@ -82,10 +85,14 @@ const storageService = {
         user_id: userId,
       });
     } catch (dbError) {
-      Sentry.captureException(dbError, {
-        tags: { context: 'storage.uploadFile' },
-        extra: { fileName: file.name, userId },
-      });
+      const overQuota = isQuotaRejection(dbError);
+
+      if (!overQuota) {
+        Sentry.captureException(dbError, {
+          tags: { context: 'storage.uploadFile' },
+          extra: { fileName: file.name, userId },
+        });
+      }
 
       try {
         await provider.delete(result.path);
@@ -95,6 +102,16 @@ const storageService = {
           tags: { context: 'storage.uploadFile.cleanup' },
           extra: { path: result.path, userId },
         });
+      }
+
+      if (overQuota) {
+        // Drive and Dropbox really are a way out of this: the trigger does not
+        // count what lives in the user's own cloud (see migrations/007), so an
+        // upload routed there succeeds while the plan is full.
+        throw new Error(
+          'Storage limit exceeded. The file was not kept — free up space, ' +
+            'upgrade to Pro, or upload to Google Drive / Dropbox instead.'
+        );
       }
 
       throw new Error(

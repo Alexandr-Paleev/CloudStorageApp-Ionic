@@ -81,10 +81,19 @@ Share links are listed on the file they belong to, with their state and a way to
 - ✅ Images routed to Cloudinary, other files to R2/Supabase — Pro users can pick a provider by hand
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
-- ⚠️ Quota is enforced server-side **on the R2 path only** — `/api/r2/presign-upload`
-  refuses to sign a URL past the limit. Cloudinary (unsigned preset) and Supabase
-  Storage upload straight from the browser, so on those two paths the check is still
-  client-side and advisory. Images route to Cloudinary, so this is the common case.
+- ✅ Quota is enforced in the database, on every path. A file exists in this app
+  only once its row lands in `files`, whichever bucket holds the bytes, so a
+  trigger there is what actually holds the line — including for uploads that go
+  from the browser straight to a provider. `/api` refuses over-quota uploads
+  before the bytes travel; the trigger is what makes that refusal binding.
+  Google Drive and Dropbox are not counted: those files live in the user's own
+  cloud, which is what makes overflowing into a connected Drive work at all.
+- ⚠️ The size the trigger checks is the one written on the row, and the row is
+  written by the browser. No path can skip the check, and no two uploads can
+  claim the same free space — but a caller crafting the insert by hand can
+  declare a smaller number than it uploaded. Closing that needs a size the
+  server has verified, which needs the server to see the bytes, which is the
+  4.5 MB request limit these direct uploads exist to avoid.
 
 ### 💳 Billing
 
@@ -159,7 +168,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 # Vite inlines every VITE_ variable into the public bundle — even ones no code
 # reads. Anything prefixed here is published.
 VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
-VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset_name
 
 # Required: API endpoint for file deletion
 VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete
@@ -212,8 +220,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `005` — creates `shared_links`, the table public share links live in
    - `006` — drops a dead policy on `files` and writes the Storage bucket and
      its policies down, so they stop living only in the dashboard
+   - `007` — adds `profiles.bytes_used` and the trigger that keeps it and
+     enforces the storage limit. **Apply it before deploying the code**: the
+     API and the client both read that column, and without it uploads fail
 
-   All seven are safe to re-run, so there is no need to track which ones have
+   All eight are safe to re-run, so there is no need to track which ones have
    already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
@@ -224,11 +235,14 @@ DROPBOX_APP_KEY=your_dropbox_app_key
 #### Cloudinary
 
 1. Register on [Cloudinary](https://cloudinary.com/users/register/free)
-2. Create an **Upload Preset**:
-   - Settings → Upload → Upload presets → Add upload preset
-   - Preset name: `cloud-storage-app` (or any other)
-   - Signing mode: `Unsigned`
-   - Asset folder: leave empty
+2. No upload preset. Uploads are signed per request by `/api/cloudinary/sign`,
+   which needs `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and
+   `CLOUDINARY_API_SECRET` set server-side (see the Vercel step below).
+   - If you previously created an **unsigned** preset for this app, disable it:
+     Settings → Upload → Upload presets. An unsigned preset lets anyone holding
+     the cloud name — which ships in the client bundle — write into the account
+     without having one here, and it is the path on which the storage quota was
+     checked by nothing but the browser.
 3. Enable PDF delivery: Settings → Security → Allow delivery of PDF and ZIP files
 
 #### Vercel API (for file deletion)
@@ -353,12 +367,12 @@ flowchart TB
     anon -->|"read own rows"| db
     ui -->|"authenticated calls"| api
     ui -->|"direct upload with a presigned URL"| r2
-    ui -->|"unsigned preset"| cloudinary
+    ui -->|"direct upload, signed by /api"| cloudinary
 
     api --> db
     api --> sb_store
     api -->|"presign, delete"| r2
-    api -->|"delete, ownership checked"| cloudinary
+    api -->|"sign upload, delete — both ownership checked"| cloudinary
     api -->|"checkout, portal"| stripe
     api -->|"OAuth exchange, token refresh"| dropbox
     ui --> drive
@@ -377,24 +391,31 @@ and Dropbox refresh tokens are only ever read server-side. The client talks to
 Postgres directly, but always through the anon key with RLS applied, and only
 for rows it owns.
 
-Uploads are the deliberate exception: files go from the browser straight to R2
-using a presigned URL, because proxying them through a serverless function would
-cap uploads at Vercel's 4.5 MB request body limit. The quota is therefore
-enforced when the URL is signed, and the approved size is signed into it.
+Uploads are the deliberate exception: files go from the browser straight to the
+provider — a presigned URL for R2, a per-request signature for Cloudinary —
+because proxying them through a serverless function would cap uploads at
+Vercel's 4.5 MB request body limit. That means no server sees the bytes, so the
+quota cannot be enforced by watching them go past. It is enforced where the
+upload has to end up instead: a trigger on `files` checks the limit and updates
+the counter in one statement, under a row lock, so two simultaneous uploads
+cannot both fit into the same remaining space. `/api` still refuses over-quota
+uploads first, to save the round trip — but it is the pre-flight, not the gate.
 
 ### Security decisions worth knowing
 
-| Decision                                                                       | Reason                                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Billing columns are server-write only                                          | RLS has no column-level granularity, so a self-update policy would let anyone set `tier = 'pro'`                                                                                                                                                                                                      |
-| Dropbox refresh tokens live in `dropbox_connections`, never in the browser     | an XSS could otherwise reach the user's Dropbox indefinitely                                                                                                                                                                                                                                          |
-| Share tokens are stored as SHA-256 hashes                                      | a leak of `shared_links` then reveals nothing usable                                                                                                                                                                                                                                                  |
-| `assertServiceRoleKey` refuses to start on an anon key                         | swapping the two keys fails silently: queries return nothing instead of erroring                                                                                                                                                                                                                      |
-| Ownership is checked in `/api`, never trusted from the client                  | the presigned URL writes straight to the bucket, so the client check is advisory                                                                                                                                                                                                                      |
-| Quota is checked in `/api` **for R2 only** — a known gap, not a claim          | Cloudinary and Supabase Storage receive the upload directly from the browser; nothing server-side sees it                                                                                                                                                                                             |
-| The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
-| Demo accounts are swept by email prefix, never by age alone                    | the sweep runs with the service-role key; a filter on age alone would eventually reach a real account                                                                                                                                                                                                 |
-| The demo rate limit is 20/hour per address, and per instance                   | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what every `/api` route here still wants |
+| Decision                                                                              | Reason                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Billing columns are server-write only                                                 | RLS has no column-level granularity, so a self-update policy would let anyone set `tier = 'pro'`                                                                                                                                                                                                      |
+| Dropbox refresh tokens live in `dropbox_connections`, never in the browser            | an XSS could otherwise reach the user's Dropbox indefinitely                                                                                                                                                                                                                                          |
+| Share tokens are stored as SHA-256 hashes                                             | a leak of `shared_links` then reveals nothing usable                                                                                                                                                                                                                                                  |
+| `assertServiceRoleKey` refuses to start on an anon key                                | swapping the two keys fails silently: queries return nothing instead of erroring                                                                                                                                                                                                                      |
+| Ownership is checked in `/api`, never trusted from the client                         | the presigned URL writes straight to the bucket, so the client check is advisory                                                                                                                                                                                                                      |
+| The storage quota is enforced by a trigger on `files`, not only in `/api`             | uploads go from the browser straight to the provider, so no handler sees them; the row is the one thing every path must reach, and a row lock there also closes the check-then-act race the API check had on its own                                                                                  |
+| Cloudinary uploads are signed per request, never by an unsigned preset                | an unsigned preset is writable by anyone holding the cloud name, which ships in the client bundle — and it was the path production used for every image                                                                                                                                               |
+| The quota trusts the size on the row, and this says so rather than implying otherwise | uploads never pass through a server, so nothing server-side can weigh them; the trigger makes the limit unskippable and the race impossible, and the declared size is the honest boundary of what that buys                                                                                           |
+| The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag        | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
+| Demo accounts are swept by email prefix, never by age alone                           | the sweep runs with the service-role key; a filter on age alone would eventually reach a real account                                                                                                                                                                                                 |
+| The demo rate limit is 20/hour per address, and per instance                          | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what every `/api` route here still wants |
 
 ### Security headers
 
@@ -531,7 +552,7 @@ cloud-storage-app/
 │   ├── App.tsx                    # Main component
 │   └── main.tsx                   # Entry point
 ├── api/                           # Vercel Functions — anything holding a secret
-│   ├── cloudinary/delete.ts       # Ownership-checked asset deletion
+│   ├── cloudinary/[action].ts     # sign (quota-checked) and delete (ownership-checked)
 │   ├── demo/session.ts            # Throwaway account for "Try the demo"
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here

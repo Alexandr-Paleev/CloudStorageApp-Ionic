@@ -42,7 +42,9 @@ function setupTables(profile: TableAnswer, files: TableAnswer) {
 
 /** A profile on the given tier, with the given bytes already stored. */
 function account(limit: number, used: number) {
-  setupTables({ data: [{ storage_limit: limit }] }, { data: [{ size: used }] });
+  // Both numbers come off the profile now: bytes_used is a counter kept by the
+  // trigger in migrations/007, not a sum this handler takes for itself.
+  setupTables({ data: [{ storage_limit: limit, bytes_used: used }] }, { data: [] });
 }
 
 beforeEach(() => {
@@ -151,16 +153,26 @@ describe('presign-upload: quota enforcement', () => {
     expect(res.statusCode).not.toBe(413);
   });
 
-  it('fails loudly when usage cannot be read', async () => {
-    // An undercount here would hand out URLs beyond the quota.
-    setupTables(
-      { data: [{ storage_limit: TIER_LIMITS.free.storage_limit }] },
-      { error: { message: 'timeout' } }
-    );
+  it('names the missing migration rather than leaking a column error', async () => {
+    // Deploy order: the code reads a column that arrives with 007. If the two
+    // ever land out of order, the log should say which one is missing.
+    setupTables({ error: { message: 'column profiles.bytes_used does not exist' } }, { data: [] });
     const res = mockResponse();
     await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
 
     expect(res.statusCode).toBe(500);
+    expect((res.body as { message: string }).message).toContain('migrations/007');
+  });
+
+  it('treats a profile that does not exist as an empty account, not as no limit', async () => {
+    setupTables({ data: [] }, { data: [] });
+    const res = mockResponse();
+    await handler(
+      mockRequest({ body: { fileName: 'a.pdf', size: TIER_LIMITS.free.storage_limit + 1 } }),
+      res
+    );
+
+    expect(res.statusCode).toBe(413);
   });
 });
 

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
+import { isQuotaRejection } from '../utils/quota.utils';
 
 const supabaseService = {
   /**
@@ -38,34 +39,39 @@ const supabaseService = {
   },
 
   /**
-   * Total bytes a user stores, across every folder and every provider.
-   * getFiles() defaults to root-level files only, so it cannot be used here —
-   * anything inside a folder would silently escape the storage quota. Paged
-   * because PostgREST caps how many rows it returns per request.
+   * Bytes the account has stored with the backends this app pays for.
+   *
+   * Google Drive and Dropbox are not counted: those files live in the user's
+   * own cloud. The figure comes from profiles.bytes_used, a counter kept by
+   * the trigger in migrations/007 — the same one that enforces the limit.
    */
   async getTotalStorageUsed(userId: string): Promise<number> {
-    const pageSize = 1000;
-    let total = 0;
-    let page = 0;
+    // One row, not every row. This used to page through the whole files table
+    // on each call — and it is called before every upload, alongside the same
+    // walk happening again inside the API. profiles.bytes_used is kept by the
+    // trigger from migrations/007, which is also what enforces the limit.
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('bytes_used')
+      .eq('id', userId)
+      .maybeSingle();
 
-    for (;;) {
-      const { data, error } = await supabase
-        .from('files')
-        .select('size')
-        .eq('user_id', userId)
-        .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
 
-      if (error) {
-        Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
-        throw error;
+      // Deploy order: this column arrives with migrations/007. lib/quota.ts
+      // says the same thing on the server side; without it the symptom is a
+      // meter stuck at 0 B and every upload failing, which points nowhere.
+      if (/bytes_used/.test(error.message ?? '')) {
+        throw new Error(
+          'profiles.bytes_used is missing — apply migrations/007_enforce_storage_quota.sql'
+        );
       }
 
-      const rows = (data || []) as { size: number }[];
-      total += rows.reduce((sum, row) => sum + row.size, 0);
-
-      if (rows.length < pageSize) return total;
-      page += 1;
+      throw error;
     }
+
+    return (data as { bytes_used: number } | null)?.bytes_used ?? 0;
   },
 
   /**
@@ -145,7 +151,12 @@ const supabaseService = {
       .single();
 
     if (error) {
-      Sentry.captureException(error, { tags: { context: 'supabase.saveFileMetadata' } });
+      // An account that ran out of space is not a fault to report — the caller
+      // turns this into a sentence the user can act on. Reporting it here as
+      // well is what made the skip in storage.service.uploadFile ineffective.
+      if (!isQuotaRejection(error)) {
+        Sentry.captureException(error, { tags: { context: 'supabase.saveFileMetadata' } });
+      }
       throw error;
     }
 

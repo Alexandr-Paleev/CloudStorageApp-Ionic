@@ -80,10 +80,19 @@ class ProviderManager {
 
     const driveProvider = this.getProvider('googledrive') as GoogleDriveProvider;
     const isDriveConnected = await driveProvider.isConnected();
-    const canUploadLocal = await options.canUploadToLocal(file.size);
-    const shouldUseGoogleDrive = options.useGoogleDrive || (!canUploadLocal && isDriveConnected);
 
-    if (shouldUseGoogleDrive && isDriveConnected) {
+    // Asked for by name, and it costs the plan nothing — so answer it before
+    // reading the quota at all. That read can fail (a profiles blip, or the
+    // column from migrations/007 not being there yet), and a Drive upload
+    // failing because the *local* quota could not be read is a fault in the
+    // one path that exists for when local storage is unusable.
+    if (options.useGoogleDrive && isDriveConnected) {
+      return driveProvider;
+    }
+
+    const canUploadLocal = await options.canUploadToLocal(file.size);
+
+    if (!canUploadLocal && isDriveConnected) {
       return driveProvider;
     }
 

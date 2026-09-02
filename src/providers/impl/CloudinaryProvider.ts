@@ -19,6 +19,9 @@ export class CloudinaryProvider implements IStorageProvider {
       url: result.url,
       path: result.publicId,
       type: 'cloudinary',
+      // Cloudinary stores what it stores; the file that left the browser is
+      // not always the same size as the asset that arrives.
+      bytes: result.bytes,
     };
   }
 
@@ -26,17 +29,21 @@ export class CloudinaryProvider implements IStorageProvider {
     let resourceType: string | undefined;
     let finalPath = path;
 
-    // Check if it's a PDF, which is stored as 'raw' in Cloudinary
-    // Logic updated to handle both raw files and images with extension stripping
-    if (metadata?.type === 'application/pdf' || metadata?.name?.toLowerCase().endsWith('.pdf')) {
-      resourceType = 'raw';
-    } else {
-      // For images, Cloudinary usually stores public_id WITHOUT extension.
-      // If our path has an extension (like .jpg, .png), we should strip it.
-      // But only if it looks like an extension (3-4 chars after dot).
+    // Same split as resourceTypeFor() in api/cloudinary/[action].ts, which
+    // decided where the asset went in the first place: images to the image
+    // endpoint, everything else to raw. It used to ask "is this a PDF", which
+    // sent a .txt to the image branch and quietly failed to delete it — the
+    // row went away and the asset stayed, uncounted, forever.
+    const isImage = metadata?.type?.startsWith('image/') ?? false;
+
+    if (isImage) {
+      // Cloudinary drops the extension from an image's public_id. Strip it
+      // here too, but only when it looks like one.
       if (finalPath.match(/\.[a-z0-9]{3,4}$/i)) {
         finalPath = finalPath.replace(/\.[^/.]+$/, '');
       }
+    } else {
+      resourceType = 'raw';
     }
 
     await cloudinaryService.deleteFile(finalPath, resourceType);

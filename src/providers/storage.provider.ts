@@ -4,6 +4,15 @@ export interface StorageUploadResult {
   url: string;
   path: string;
   type: 'cloudinary' | 'googledrive' | 'r2' | 'supabase_storage' | 'dropbox';
+  /**
+   * Bytes the provider says it stored, where it says so at all.
+   *
+   * Preferred over File.size for the row: it is the size of the thing that
+   * actually exists, and Cloudinary in particular can hand back a different
+   * number than what was sent. It is still a figure this browser reports —
+   * see the quota note in README.md for what that does and does not buy.
+   */
+  bytes?: number;
 }
 
 export interface IStorageProvider {
