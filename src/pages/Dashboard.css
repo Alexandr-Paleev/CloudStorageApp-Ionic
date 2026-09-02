@@ -223,6 +223,55 @@ body.dark .new-folder-button {
   --color: #ffffff;
 }
 
+/* Search, filter and sort. Sits above the listing rather than in the toolbar:
+   on a phone the toolbar is already carrying three buttons, and a search field
+   that has to share a row with them stops being usable at the width where
+   finding a file matters most. */
+.file-filters {
+  margin: 8px 0 4px;
+}
+
+.file-filters ion-searchbar {
+  --background: #ffffff;
+  --border-radius: 12px;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  padding-inline: 0;
+}
+
+.file-filters-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-filters-row ion-segment {
+  flex: 1 1 220px;
+  --background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+}
+
+.file-filters-row ion-select {
+  flex: 0 0 auto;
+  max-width: 190px;
+  font-size: 14px;
+}
+
+.file-filters-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+body.dark .file-filters ion-searchbar {
+  --background: #1e293b;
+  --color: #f8fafc;
+}
+
+body.dark .file-filters-row ion-segment {
+  --background: rgba(255, 255, 255, 0.06);
+}
+
 body.dark .folder-card {
   background: #1e293b;
   border-color: rgba(255, 255, 255, 0.05);

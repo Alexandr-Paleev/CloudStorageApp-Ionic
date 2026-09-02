@@ -38,6 +38,8 @@ import {
   star,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
+import FileFilters, { type FileFiltersValue } from '../components/FileFilters';
+import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import storageService from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
@@ -64,14 +66,28 @@ const Dashboard: React.FC = () => {
     fileId: null,
   });
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FileFiltersValue>({
+    search: '',
+    sort: DEFAULT_SORT,
+    direction: DEFAULT_DIRECTION,
+    group: 'all',
+  });
 
   const PAGE_SIZE = 15;
 
   const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
-    queryKey: ['items', user?.id, folderId || 'root'],
+    /* The filters belong in the key: they are part of the question being
+       asked, so changing one has to fetch rather than re-render what the
+       previous question returned. */
+    queryKey: ['items', user?.id, folderId || 'root', filters],
     queryFn: ({ pageParam = 0 }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.getItems(user.id, folderId || null, pageParam as number, PAGE_SIZE);
+      return storageService.getItems(user.id, {
+        folderId: folderId || null,
+        page: pageParam as number,
+        pageSize: PAGE_SIZE,
+        ...filters,
+      });
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.files.length < PAGE_SIZE) return undefined;
@@ -250,6 +266,8 @@ const Dashboard: React.FC = () => {
               New Folder
             </IonButton>
           </div>
+
+          <FileFilters value={filters} onChange={setFilters} resultCount={items.files.length} />
 
           {items?.folders && items.folders.length > 0 && (
             <div className="folders-section">

@@ -87,3 +87,136 @@ describe('saveFileMetadata', () => {
     expect(Sentry.captureException).toHaveBeenCalled();
   });
 });
+
+describe('getFiles: the query the dashboard asks for', () => {
+  /** The chain getFiles walks, ending on .order(), which it awaits. */
+  function listing(rows: unknown[] = []) {
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      is: vi.fn(() => chain),
+      ilike: vi.fn(() => chain),
+      or: vi.fn(() => chain),
+      not: vi.fn(() => chain),
+      range: vi.fn(() => chain),
+      order: vi.fn(async () => ({ data: rows, error: null })),
+    };
+    from.mockReturnValue(chain);
+    return chain;
+  }
+
+  it('lists the root when no folder is named', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1');
+
+    expect(chain.is).toHaveBeenCalledWith('folder_id', null);
+    expect(chain.eq).toHaveBeenCalledWith('user_id', 'user-1');
+  });
+
+  it('lists one folder when it is', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { folderId: 'folder-1' });
+
+    expect(chain.eq).toHaveBeenCalledWith('folder_id', 'folder-1');
+    expect(chain.is).not.toHaveBeenCalled();
+  });
+
+  it('drops the folder filter while searching', async () => {
+    // The whole point of searching: a file two folders away still counts.
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { folderId: 'folder-1', search: 'invoice' });
+
+    expect(chain.eq).not.toHaveBeenCalledWith('folder_id', 'folder-1');
+    expect(chain.is).not.toHaveBeenCalled();
+  });
+
+  it('matches the name anywhere in it, case-insensitively', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { search: 'Invoice' });
+
+    expect(chain.ilike).toHaveBeenCalledWith('name', '%Invoice%');
+  });
+
+  it('escapes the wildcards a person can type by accident', async () => {
+    // Without this, searching for report_final also finds reportXfinal, and
+    // searching for "50%" finds everything.
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { search: 'report_50%' });
+
+    expect(chain.ilike).toHaveBeenCalledWith('name', '%report\\_50\\%%');
+  });
+
+  it('ignores a search that is only whitespace', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { search: '   ' });
+
+    expect(chain.ilike).not.toHaveBeenCalled();
+    expect(chain.is).toHaveBeenCalledWith('folder_id', null);
+  });
+
+  it('filters images by MIME prefix', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { group: 'images' });
+
+    expect(chain.ilike).toHaveBeenCalledWith('type', 'image/%');
+  });
+
+  it('treats application/ and text/ as documents', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { group: 'documents' });
+
+    expect(chain.or).toHaveBeenCalledWith('type.ilike.application/%,type.ilike.text/%');
+  });
+
+  it('builds "other" by refusing the other two groups', async () => {
+    // PostgREST has no "none of these", so each prefix is refused in turn.
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { group: 'other' });
+
+    expect(chain.not.mock.calls).toEqual([
+      ['type', 'ilike', 'image/%'],
+      ['type', 'ilike', 'application/%'],
+      ['type', 'ilike', 'text/%'],
+    ]);
+  });
+
+  it('asks for no type filter at all by default', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1');
+
+    expect(chain.ilike).not.toHaveBeenCalled();
+    expect(chain.or).not.toHaveBeenCalled();
+    expect(chain.not).not.toHaveBeenCalled();
+  });
+
+  it('sorts newest first unless told otherwise', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1');
+
+    expect(chain.order).toHaveBeenCalledWith('created_at', { ascending: false });
+  });
+
+  it.each([
+    ['name', 'asc', true],
+    ['size', 'desc', false],
+  ] as const)('sorts by %s %s', async (sort, direction, ascending) => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { sort, direction });
+
+    expect(chain.order).toHaveBeenCalledWith(sort, { ascending });
+  });
+
+  it('asks for one page at a time', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1', { page: 2, pageSize: 15 });
+
+    expect(chain.range).toHaveBeenCalledWith(30, 44);
+  });
+
+  it('asks for everything when no page is named', async () => {
+    const chain = listing();
+    await supabaseService.getFiles('user-1');
+
+    expect(chain.range).not.toHaveBeenCalled();
+  });
+});

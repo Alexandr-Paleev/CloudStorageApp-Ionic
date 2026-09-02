@@ -8,9 +8,11 @@ import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
 import r2Service from './r2.service';
 import type { PendingUpload } from './upload-store';
+import { isSearching, type FileQuery } from '../utils/file-query';
 
 export type { FileMetadata, Folder };
 export type { PendingUpload };
+export type { FileQuery };
 
 export type UploadProgress = {
   bytesTransferred: number;
@@ -205,13 +207,18 @@ const storageService = {
   /**
    * Get files and folders
    */
-  async getItems(userId: string, folderId: string | null = null, page?: number, pageSize?: number) {
+  async getItems(userId: string, options: FileQuery = {}) {
+    const { folderId = null, page } = options;
+
+    /* Folders are not searched, filtered or sorted with the files: they carry
+       none of the same fields, and a search that returned three folders and no
+       files would read as "nothing found". While a search is running the
+       listing is files only, and the dashboard says so. */
+    const wantsFolders = (page === 0 || page === undefined) && !isSearching(options);
+
     const [files, folders] = await Promise.all([
-      supabaseService.getFiles(userId, folderId, page, pageSize),
-      // Only fetch folders on the first page to avoid duplication in infinite scroll
-      page === 0 || page === undefined
-        ? supabaseService.getFolders(userId, folderId)
-        : Promise.resolve([] as Folder[]),
+      supabaseService.getFiles(userId, options),
+      wantsFolders ? supabaseService.getFolders(userId, folderId) : Promise.resolve([] as Folder[]),
     ]);
     return { files, folders };
   },

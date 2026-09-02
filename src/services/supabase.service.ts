@@ -2,23 +2,56 @@ import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
 import { isQuotaRejection } from '../utils/quota.utils';
+import {
+  DEFAULT_DIRECTION,
+  DEFAULT_SORT,
+  DOCUMENT_PREFIXES,
+  IMAGE_PREFIX,
+  escapeLike,
+  scopedToFolder,
+  type FileQuery,
+} from '../utils/file-query';
 
 const supabaseService = {
   /**
-   * Get all files for a user in a specific folder
+   * The files one screen of the dashboard shows.
+   *
+   * Searching, sorting and filtering all happen here rather than in the
+   * browser, because the list is paginated: a filter applied to the fifteen
+   * rows already loaded would find a file only if it was already visible.
    */
-  async getFiles(
-    userId: string,
-    folderId: string | null = null,
-    page?: number,
-    pageSize?: number
-  ): Promise<FileMetadata[]> {
+  async getFiles(userId: string, options: FileQuery = {}): Promise<FileMetadata[]> {
+    const {
+      folderId = null,
+      page,
+      pageSize,
+      search,
+      sort = DEFAULT_SORT,
+      direction = DEFAULT_DIRECTION,
+      group = 'all',
+    } = options;
+
     let query = supabase.from('files').select('*').eq('user_id', userId);
 
-    if (folderId) {
-      query = query.eq('folder_id', folderId);
-    } else {
-      query = query.is('folder_id', null);
+    // A search reaches across folders — see scopedToFolder() for why.
+    if (scopedToFolder(options)) {
+      query = folderId ? query.eq('folder_id', folderId) : query.is('folder_id', null);
+    }
+
+    if (search && search.trim()) {
+      query = query.ilike('name', `%${escapeLike(search.trim())}%`);
+    }
+
+    if (group === 'images') {
+      query = query.ilike('type', `${IMAGE_PREFIX}%`);
+    } else if (group === 'documents') {
+      query = query.or(DOCUMENT_PREFIXES.map((prefix) => `type.ilike.${prefix}%`).join(','));
+    } else if (group === 'other') {
+      // Everything the other two groups would have claimed, refused one prefix
+      // at a time: PostgREST has no "none of these" operator.
+      for (const prefix of [IMAGE_PREFIX, ...DOCUMENT_PREFIXES]) {
+        query = query.not('type', 'ilike', `${prefix}%`);
+      }
     }
 
     // Apply pagination if provided
@@ -28,7 +61,7 @@ const supabaseService = {
       query = query.range(from, to);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order(sort, { ascending: direction === 'asc' });
 
     if (error) {
       Sentry.captureException(error, { tags: { context: 'supabase.getFiles' } });

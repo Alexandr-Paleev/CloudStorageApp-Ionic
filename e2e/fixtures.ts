@@ -311,6 +311,49 @@ export async function setStorageLimit(userId: string, bytes: number): Promise<vo
 }
 
 /**
+ * Rows put straight into the database, bypassing the upload.
+ *
+ * For scenarios about the *listing* — search, filters, ordering — where going
+ * through the upload page would spend ten seconds per file proving something
+ * three other specs already prove. The rows are shaped exactly as
+ * storage.service writes them, minus bytes in a bucket that nothing here
+ * reads.
+ */
+export async function seedFolder(userId: string, name: string): Promise<string> {
+  const response = await admin('/rest/v1/folders', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name, user_id: userId, parent_id: null }),
+  });
+  if (!response.ok) throw new Error(`could not seed a folder: ${await response.text()}`);
+  const [folder] = (await response.json()) as { id: string }[];
+  return folder.id;
+}
+
+export async function seedFile(
+  userId: string,
+  file: { name: string; type?: string; size?: number; folderId?: string | null }
+): Promise<void> {
+  const response = await admin('/rest/v1/files', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      name: file.name,
+      // Small on purpose: the trigger from migration 007 counts these against
+      // the account's quota exactly as it counts a real upload.
+      size: file.size ?? 1024,
+      type: file.type ?? 'application/pdf',
+      download_url: 'https://example.test/seeded',
+      storage_path: `${userId}/seeded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      storage_type: 'supabase_storage',
+      folder_id: file.folderId ?? null,
+      user_id: userId,
+    }),
+  });
+  if (!response.ok) throw new Error(`could not seed a file: ${await response.text()}`);
+}
+
+/**
  * A second browser context with no session at all — for testing what a
  * recipient sees. Cookies and localStorage are separate from `page`.
  */
