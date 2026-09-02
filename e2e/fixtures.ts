@@ -170,7 +170,7 @@ interface Fixtures {
    * Registering it here rather than deleting it in the test's own `finally` is
    * the whole point. When a test exceeds its timeout Playwright abandons the
    * body where it stands, so a `finally` never runs and the account survives;
-   * fixture teardown is given its own budget and runs anyway. That is exactly
+   * fixture teardown is given its own time limit and runs anyway. That is exactly
    * how this suite leaked accounts into a real project roughly one run in
    * three, and the symptom was never a failing cleanup — it was a timeout that
    * looked like an unrelated flake.

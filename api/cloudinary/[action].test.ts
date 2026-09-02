@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
 import { TIER_LIMITS } from '../../lib/tiers';
+import {
+  CLOUDINARY_DELETE_LIMIT,
+  CLOUDINARY_IP_LIMIT,
+  CLOUDINARY_SIGN_LIMIT,
+  resetRateLimits,
+} from '../../lib/rate-limit';
 
 const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -55,6 +61,9 @@ function account(limit: number, used: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Module-scope singletons: without this, what one test spends against a
+  // limit stays spent in the next.
+  resetRateLimits();
   authenticateUser.mockResolvedValue('user-1');
   withFiles([]);
   destroy.mockResolvedValue({ result: 'ok' });
@@ -348,5 +357,95 @@ describe('cloudinary: routing between the two actions', () => {
     const res = mockResponse();
     await handler(mockRequest({ query: { action: 'upload' }, body: {} }), res);
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('cloudinary: rate limiting', () => {
+  /** A request from a named address, so the per-address limit is isolated. */
+  const from = (ip: string, query: Record<string, string>, body: Record<string, unknown> = {}) =>
+    mockRequest({ query, body, headers: { authorization: 'Bearer t', 'x-forwarded-for': ip } });
+
+  it('stops signing uploads once the account has asked too often', async () => {
+    account(TIER_LIMITS.pro.storage_limit, 0);
+    for (let i = 0; i < CLOUDINARY_SIGN_LIMIT; i++) {
+      const ok = mockResponse();
+      await handler(sign(), ok);
+      expect(ok.statusCode).toBe(200);
+    }
+
+    const res = mockResponse();
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', expect.stringMatching(/^[1-9]\d*$/));
+  });
+
+  it('lets the account keep deleting after the signing limit is spent', async () => {
+    // The two actions do opposite things to the quota, so one running out says
+    // nothing about the other — and clearing space is how a full account
+    // recovers.
+    account(TIER_LIMITS.pro.storage_limit, 0);
+    for (let i = 0; i <= CLOUDINARY_SIGN_LIMIT; i++) {
+      await handler(sign(), mockResponse());
+    }
+
+    const res = mockResponse();
+    await handler(del('users/user-1/photo'), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('stops deleting once the account has asked too often', async () => {
+    // Each one is a call to Cloudinary's own API, against a limit of its own.
+    for (let i = 0; i < CLOUDINARY_DELETE_LIMIT; i++) {
+      await handler(del('users/user-1/photo'), mockResponse());
+    }
+
+    destroy.mockClear();
+    const res = mockResponse();
+    await handler(del('users/user-1/photo'), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('charges the account, not the address it shares with an office', async () => {
+    account(TIER_LIMITS.pro.storage_limit, 0);
+    for (let i = 0; i < CLOUDINARY_SIGN_LIMIT; i++) {
+      await handler(sign(), mockResponse());
+    }
+
+    authenticateUser.mockResolvedValue('user-2');
+    const res = mockResponse();
+    await handler(sign(), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('caps an address before it validates a token', async () => {
+    for (let i = 0; i < CLOUDINARY_IP_LIMIT; i++) {
+      await handler(
+        from('203.0.113.9', { action: 'delete' }, { publicId: 'users/user-1/x' }),
+        mockResponse()
+      );
+    }
+
+    authenticateUser.mockClear();
+    const res = mockResponse();
+    await handler(from('203.0.113.9', { action: 'delete' }, { publicId: 'users/user-1/x' }), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(authenticateUser).not.toHaveBeenCalled();
+  });
+
+  it('does not let an unknown action eat into the limit of the one it misspells', async () => {
+    for (let i = 0; i < CLOUDINARY_DELETE_LIMIT; i++) {
+      await handler(mockRequest({ query: { action: 'delet' }, body: {} }), mockResponse());
+    }
+
+    const res = mockResponse();
+    await handler(del('users/user-1/photo'), res);
+
+    expect(res.statusCode).toBe(200);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockRequest, mockResponse, mockSupabase, type RecordedCall } from '../lib/test-utils';
 import { hashShareToken } from '../lib/share';
+import { SHARE_CREATE_LIMIT, SHARE_IP_LIMIT, resetRateLimits } from '../lib/rate-limit';
 
 const APP_URL = 'https://app.example';
 const TOKEN = 'test-token-value';
@@ -75,6 +76,9 @@ function writes(): RecordedCall[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The limiters are module-scope singletons: without this, the eleventh test
+  // in this file would be the one that finds the create limit spent.
+  resetRateLimits();
   authenticateUser.mockResolvedValue('user-1');
   signedUrl.mockResolvedValue('https://r2.example/signed');
   db.storage.createSignedUrl.mockResolvedValue({
@@ -279,5 +283,119 @@ describe('share: method routing', () => {
     const res = mockResponse();
     await handler(mockRequest({ method: 'PATCH' }), res);
     expect(res.statusCode).toBe(405);
+  });
+});
+
+describe('share: rate limiting', () => {
+  /** A POST from a given address, so the per-address limit can be isolated. */
+  const postFrom = (ip: string) =>
+    mockRequest({
+      method: 'POST',
+      body: { fileId: FILE_ID },
+      headers: { authorization: 'Bearer t', origin: APP_URL, 'x-forwarded-for': ip },
+    });
+
+  beforeEach(() => {
+    setup({ files: { data: [{ id: FILE_ID }] }, shared_links: { data: [] } });
+  });
+
+  it('refuses to keep minting links for one account', async () => {
+    for (let i = 0; i < SHARE_CREATE_LIMIT; i++) {
+      const ok = mockResponse();
+      await handler(post({ fileId: FILE_ID }), ok);
+      expect(ok.statusCode).toBe(201);
+    }
+
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(429);
+    // Nothing was written: the refusal happens before the insert, not after.
+    expect(writes()).toHaveLength(SHARE_CREATE_LIMIT);
+  });
+
+  it('says when to try again', async () => {
+    for (let i = 0; i <= SHARE_CREATE_LIMIT; i++) {
+      await handler(post({ fileId: FILE_ID }), mockResponse());
+    }
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    const [header, value] = (res.setHeader as unknown as { mock: { calls: string[][] } }).mock
+      .calls[0];
+    expect(header).toBe('Retry-After');
+    expect(Number(value)).toBeGreaterThan(0);
+    expect(Number(value)).toBeLessThanOrEqual(60);
+  });
+
+  it('charges the account, not the address it happens to share', async () => {
+    for (let i = 0; i < SHARE_CREATE_LIMIT; i++) {
+      await handler(post({ fileId: FILE_ID }), mockResponse());
+    }
+
+    // Same address, different account — an office behind one NAT.
+    authenticateUser.mockResolvedValue('user-2');
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('still lets the owner revoke a link after the create limit is spent', async () => {
+    // Revocation is the brake for a link that got out. Refusing it would leave
+    // that link live for exactly as long as the refusal lasted.
+    for (let i = 0; i < SHARE_CREATE_LIMIT + 1; i++) {
+      await handler(post({ fileId: FILE_ID }), mockResponse());
+    }
+
+    setup({ shared_links: { data: [{ id: 'link-1' }] } });
+    const res = mockResponse();
+    await handler(del({ id: 'link-1' }), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('caps every method for one address, including the anonymous one', async () => {
+    for (let i = 0; i < SHARE_IP_LIMIT; i++) {
+      await handler(postFrom('203.0.113.9'), mockResponse());
+    }
+
+    // Opening a link needs no token, so the address is the only limit it has.
+    const res = mockResponse();
+    await handler(
+      mockRequest({
+        method: 'GET',
+        query: { token: TOKEN },
+        headers: { 'x-forwarded-for': '203.0.113.9' },
+      }),
+      res
+    );
+
+    expect(res.statusCode).toBe(429);
+  });
+
+  it('refuses before it checks the token, so an anonymous flood costs nothing', async () => {
+    for (let i = 0; i < SHARE_IP_LIMIT; i++) {
+      await handler(postFrom('198.51.100.4'), mockResponse());
+    }
+
+    authenticateUser.mockClear();
+    const res = mockResponse();
+    await handler(postFrom('198.51.100.4'), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(authenticateUser).not.toHaveBeenCalled();
+  });
+
+  it('leaves other addresses alone', async () => {
+    for (let i = 0; i < SHARE_IP_LIMIT; i++) {
+      await handler(postFrom('203.0.113.9'), mockResponse());
+    }
+
+    authenticateUser.mockResolvedValue('user-2');
+    const res = mockResponse();
+    await handler(postFrom('192.0.2.7'), res);
+
+    expect(res.statusCode).toBe(201);
   });
 });

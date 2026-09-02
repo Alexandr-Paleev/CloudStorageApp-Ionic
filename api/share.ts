@@ -11,6 +11,13 @@ import {
   shareUnusableReason,
   shareUrl,
 } from '../lib/share';
+import {
+  RateLimiter,
+  SHARE_CREATE_LIMIT,
+  SHARE_IP_LIMIT,
+  clientIp,
+  tooManyRequests,
+} from '../lib/rate-limit';
 
 /**
  * Public share links.
@@ -28,6 +35,24 @@ import {
 
 const SIGNED_URL_TTL = 3600;
 const BUCKET = 'files';
+
+/**
+ * Two limits, because the route has two kinds of caller.
+ *
+ * `byAddress` covers every method and runs before anything else, including the
+ * token check, so an anonymous caller cannot make this route do work — a hash,
+ * a lookup, a signature — by asking repeatedly. `byUser` covers creation only,
+ * and is keyed on the account rather than the address: a share link is minted
+ * by a person who is signed in, and counting those against an address would
+ * charge one office visitor for what their colleagues did.
+ *
+ * Revocation is deliberately outside `byUser`. It is the owner's emergency
+ * brake for a link that got out, and refusing it protects nothing — the link
+ * stays live for exactly as long as the refusal lasts. It still counts against
+ * the address, which is what bounds the cost of a loop.
+ */
+const byAddress = new RateLimiter(SHARE_IP_LIMIT);
+const byUser = new RateLimiter(SHARE_CREATE_LIMIT);
 
 interface FileRow {
   id: string;
@@ -64,6 +89,17 @@ async function downloadUrlFor(file: FileRow): Promise<string> {
 
 async function createLink(req: VercelRequest, res: VercelResponse) {
   const userId = await authenticateUser(req);
+
+  // After authentication, so the limit belongs to the account rather than to
+  // whoever shares its address.
+  if (!byUser.allow(userId)) {
+    return tooManyRequests(
+      res,
+      byUser.retryAfterSeconds(userId),
+      'Too many share links created. Try again in a minute.'
+    );
+  }
+
   const { fileId, expiresInDays } = req.body as { fileId?: string; expiresInDays?: number };
 
   if (!fileId) {
@@ -179,6 +215,15 @@ async function revokeLink(req: VercelRequest, res: VercelResponse) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const ip = clientIp(req.headers, req.socket?.remoteAddress);
+  if (!byAddress.allow(ip)) {
+    return tooManyRequests(
+      res,
+      byAddress.retryAfterSeconds(ip),
+      'Too many requests. Try again in a minute.'
+    );
+  }
+
   try {
     switch (req.method) {
       case 'POST':

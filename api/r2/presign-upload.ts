@@ -5,14 +5,53 @@ import { authenticateUser, AuthError } from '../../lib/auth';
 import { getS3Client, getR2BucketName } from '../../lib/r2';
 import { sanitizeFileName } from '../../lib/filename';
 import { readQuota, quotaRejection } from '../../lib/quota';
+import {
+  RateLimiter,
+  PRESIGN_IP_LIMIT,
+  PRESIGN_LIMIT,
+  clientIp,
+  tooManyRequests,
+} from '../../lib/rate-limit';
+
+/**
+ * The quota says how much an account may store; these say how fast it may ask.
+ *
+ * `byAddress` runs before the token is checked, because checking one costs a
+ * round trip to Supabase and a caller with no token would otherwise get that
+ * work for free, as often as they liked. `byUser` runs after, keyed on the
+ * account: signing an upload URL is an authenticated act, and an address can be
+ * shared by an entire office.
+ *
+ * Neither replaces the quota. A caller under both limits still cannot store
+ * more than the plan allows — the trigger on public.files sees to that.
+ */
+const byAddress = new RateLimiter(PRESIGN_IP_LIMIT);
+const byUser = new RateLimiter(PRESIGN_LIMIT);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const ip = clientIp(req.headers, req.socket?.remoteAddress);
+  if (!byAddress.allow(ip)) {
+    return tooManyRequests(
+      res,
+      byAddress.retryAfterSeconds(ip),
+      'Too many upload requests. Try again in a minute.'
+    );
+  }
+
   try {
     const userId = await authenticateUser(req);
+
+    if (!byUser.allow(userId)) {
+      return tooManyRequests(
+        res,
+        byUser.retryAfterSeconds(userId),
+        'Too many upload requests. Try again in a minute.'
+      );
+    }
 
     const { fileName, contentType, size } = req.body as {
       fileName?: string;
