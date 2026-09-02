@@ -15,8 +15,14 @@ function bigFile(size = 20 * MiB, name = 'movie.mp4'): File {
 function fakeStore() {
   const records = new Map<string, PendingUpload>();
   const saves: PendingUpload[] = [];
+  /** Writes that carried the file itself, which should be exactly one. */
+  const fileWrites: string[] = [];
 
   const store: UploadStore = {
+    async create(record) {
+      fileWrites.push(record.key);
+      await store.save(record);
+    },
     async save(record) {
       records.set(record.key, record);
       saves.push(record);
@@ -32,11 +38,11 @@ function fakeStore() {
     },
   };
 
-  return { store, records, saves };
+  return { store, records, saves, fileWrites };
 }
 
 function setup(overrides: { putPart?: ReturnType<typeof vi.fn> } = {}) {
-  const { store, records, saves } = fakeStore();
+  const { store, records, saves, fileWrites } = fakeStore();
 
   const api = vi.fn(async (action: string, body: unknown) => {
     if (action === 'multipart-create') {
@@ -60,6 +66,7 @@ function setup(overrides: { putPart?: ReturnType<typeof vi.fn> } = {}) {
     putPart,
     records,
     saves,
+    fileWrites,
   };
 }
 
@@ -142,6 +149,16 @@ describe('a whole upload', () => {
     // One save for the new record, then one per part.
     const withParts = saves.filter((r) => r.completed.length > 0);
     expect(withParts.map((r) => r.completed.length)).toEqual([1, 2, 3]);
+  });
+
+  it('hands the file to storage once, not once per part', async () => {
+    // The bookkeeping is rewritten after every part. With the file in the same
+    // record, a 2 GB upload in 250 parts would have written 2 GB 250 times.
+    const { uploader, fileWrites, saves } = setup();
+    await uploader.start({ file: bigFile() });
+
+    expect(fileWrites).toHaveLength(1);
+    expect(saves.length).toBeGreaterThan(1);
   });
 
   it('clears the record once the object exists', async () => {
@@ -343,6 +360,7 @@ describe('abandoning an upload', () => {
       }),
       putPart: vi.fn(),
       store: {
+        create: async () => undefined,
         save: async () => undefined,
         get: async () => undefined,
         list: async () => [],

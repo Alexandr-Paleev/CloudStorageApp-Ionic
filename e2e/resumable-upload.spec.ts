@@ -121,6 +121,14 @@ const unfinished = (page: Page) => page.locator('ion-card', { hasText: 'Unfinish
 test.describe('A large file, in parts', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
+  /* Twenty megabytes of parts travel through Playwright's interception layer
+     rather than a socket, and a hosted runner is slower at that than a laptop
+     by a wide margin. The generosity is about the harness, not the feature:
+     every assertion below still fails on a wrong answer, just not on a slow
+     one. */
+  test.describe.configure({ timeout: 90_000 });
+  const arrival = { timeout: 45_000 };
+
   test('goes up in parts and is recorded once', async ({ page }) => {
     const calls = await stubR2(page);
     const name = `e2e-large-${Date.now()}.bin`;
@@ -129,8 +137,8 @@ test.describe('A large file, in parts', () => {
     await chooseLargeFile(page, name);
     await page.locator('ion-button', { hasText: 'Upload' }).click();
 
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard$/, arrival);
+    await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible(arrival);
 
     expect(calls.parts.sort()).toEqual([1, 2, 3]);
 
@@ -176,8 +184,8 @@ test.describe('A large file, in parts', () => {
       const resumed = await stubR2(page);
       await page.locator('ion-button', { hasText: 'Resume' }).click();
 
-      await expect(page).toHaveURL(/\/dashboard$/);
-      await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible();
+      await expect(page).toHaveURL(/\/dashboard$/, arrival);
+      await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible(arrival);
 
       expect(resumed.signed).toEqual([[2, 3]]);
       expect(resumed.parts.sort()).toEqual([2, 3]);
@@ -223,8 +231,8 @@ test.describe('A large file, in parts', () => {
 
     // A failed part is retried on its own — the other two are not sent again,
     // which is the difference between this and retrying the whole upload.
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard$/, arrival);
+    await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible(arrival);
     expect(calls.parts.sort()).toEqual([1, 2, 3]);
     expect(calls.completed[0]).toHaveLength(PART_COUNT);
   });

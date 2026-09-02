@@ -229,7 +229,9 @@ export function createMultipartUploader(deps: MultipartDeps) {
         updatedAt: Date.now(),
       };
 
-      await store.save(record);
+      // create() rather than save(): this is the one write that carries the
+      // file itself, and every write after it carries only the bookkeeping.
+      await store.create(record);
       return this.run(record, { onProgress, signal });
     },
 
