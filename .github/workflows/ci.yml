@@ -58,6 +58,13 @@ jobs:
       # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
       - run: npm run build
 
+      # A byte count rather than a score, so it cannot be flaky: the check fails
+      # when what the browser fetches before first paint grows past its budget.
+      # scripts/check-bundle-size.js holds the numbers and why each one is what
+      # it is, and prints the table onto the run page either way.
+      - name: Bundle size
+        run: npm run --silent size | tee -a "$GITHUB_STEP_SUMMARY"
+
       - run: npm run test:coverage
 
       # Puts the numbers on the run page, so a pull request shows what its
@@ -74,6 +81,25 @@ jobs:
             exit 0
           fi
           node scripts/coverage-summary.js >> "$GITHUB_STEP_SUMMARY"
+
+      # The other half: what happens once the bytes have arrived — render
+      # blocking, layout shift, contrast, metadata. Audits dist/ directly
+      # rather than a preview deployment; lighthouserc.js says why, and holds
+      # the thresholds.
+      #
+      # lhci is run through npx rather than added to devDependencies: it brings
+      # Lighthouse and its Chrome tooling, some 40 MB installed, for a check
+      # that runs here and occasionally on a laptop.
+      - name: Lighthouse
+        run: npm run --silent lighthouse
+
+      - name: Upload Lighthouse reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
+          retention-days: 7
 
   e2e:
     name: Playwright

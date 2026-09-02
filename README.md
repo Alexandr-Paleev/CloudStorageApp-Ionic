@@ -1,12 +1,13 @@
 # ☁️ Cloud Storage App
 
+[![CI](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Alexandr-Paleev/CloudStorageApp-Ionic?sort=semver)](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 [![Demo](https://img.shields.io/badge/Demo-Live-success)](https://cloud-storage-app-ionic-v0.vercel.app)
 
 A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Supabase, with Stripe billing and five storage backends.
 
-🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[v3.1.0 release](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.1.0)**
+🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[Releases](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)** | 📓 **[Changelog](CHANGELOG.md)**
 
 > ⚡ **No sign-up needed.** "Just looking? Open a demo account", at the foot of
 > the login page, opens a private account seeded with a few files and deletes it
@@ -20,6 +21,31 @@ A modern, **open-source** web application for storing, viewing, and managing fil
 > showcase rather than as a product.
 
 > 💳 **The demo runs Stripe in test mode.** Real cards are declined — upgrade with `4242 4242 4242 4242`, any future expiry, any CVC. No money changes hands.
+
+## 🔎 Engineering highlights
+
+Three things in this repository worth more than the feature list, each written
+up where it happened:
+
+- **[An `anon` key deployed under the name `SUPABASE_SERVICE_ROLE_KEY`](#-postmortem-the-anon-key-that-was-named-supabase_service_role_key)** —
+  for 221 days, across three environments, with every check green. It fails
+  silently: RLS reduces every server-side query to zero rows, so handlers report
+  missing data for rows that plainly exist. The lesson was to verify what a
+  secret *is*, not what the variable is called — `assertServiceRoleKey` now
+  refuses to start on the wrong one.
+- **[Privilege escalation through a row-level security policy](docs/decisions/0002-billing-is-server-write-only.md)** —
+  `profiles` shipped the obvious "users may update their own row" policy. RLS has
+  no column-level granularity, so that included `tier`, and any user could grant
+  themselves the paid plan from the browser with the published anon key.
+- **[A storage quota enforced on one provider out of three, with a race on that one](docs/decisions/0004-quota-lives-in-the-database.md)** —
+  images go straight from the browser to Cloudinary, so no server saw them and
+  the limit rested on a check in the client. Even the guarded path was
+  check-then-act: two parallel uploads both passed. It is now a trigger on the
+  row every upload must reach, holding a lock while it counts.
+
+Every decision of this kind has a short record in
+**[`docs/decisions/`](docs/decisions/)** — context, decision, and the
+consequences that cost something.
 
 ## 📋 Project Description
 
@@ -481,6 +507,45 @@ Two changes, both cheap:
 The remaining 239 KB gzipped is Ionic, and it is structural rather than
 something to tune — the framework registers its components eagerly.
 
+#### The number is now a budget, not a note in a README
+
+`npm run size` measures what `dist/index.html` actually pulls in — the entry
+script, every preloaded chunk, every stylesheet — and fails when it grows past
+a ceiling set just above today's figure. It runs on every push and prints the
+table onto the run page:
+
+| | Measured | Budget |
+| --- | ---: | ---: |
+| First load (JS + CSS) | 401.0 kB | 420 kB |
+| Largest chunk (Ionic) | 239.4 kB | 250 kB |
+| All assets, route chunks included | 485.1 kB | 520 kB |
+
+A budget set to a round number nobody measured gets raised the first time it is
+hit. These are set a few percent above the build, so the pull request that adds
+a 40 KB dependency is the one that has to justify it.
+
+#### Lighthouse, on the same run
+
+`npm run lighthouse` audits the built `dist/` — the shell and both static legal
+pages — with the desktop preset. Current scores:
+
+| | Performance | Accessibility | Best practices | SEO |
+| --- | ---: | ---: | ---: | ---: |
+| App shell | 97 | 100 | 100 | 100 |
+| Privacy policy | 100 | 100 | 100 | 100 |
+| Terms of service | 100 | 100 | 100 | 100 |
+
+CI asserts accessibility, best practices and SEO at ≥ 95 — near-deterministic
+audits of markup and metadata — and performance at ≥ 80, low enough that a busy
+runner cannot fail the build on its own and high enough to catch a blocking
+script returning to the critical path.
+
+The legal pages did not start at 100. The first run found body text at `#999`
+on white (2.8:1, against the 4.5:1 that text needs), links distinguished by
+colour alone, no meta description, and four GitHub links pointing at a username
+that does not exist — leftovers of a rename that the earlier link sweep missed
+because these two pages are static HTML and nothing else references them.
+
 ## 🚀 Deployment
 
 ### Vercel (recommended)
@@ -629,12 +694,19 @@ npm run test:e2e
 # Type-check src and api, then build
 npm run build
 
+# What the browser downloads before first paint, against its budget
+npm run size
+
+# Lighthouse against dist/ — the same audit CI asserts on
+npm run lighthouse
+
 # Regenerate the demo seed files and the link-preview image
 npm run generate:demo-assets
 ```
 
 GitHub Actions runs lint, both type-check passes, an audit of production
-dependencies, unit and e2e tests on every pull request. `main` is protected:
+dependencies, a bundle-size budget, Lighthouse, unit and e2e tests on every
+pull request. `main` is protected:
 those checks are required, and changes land through pull requests only.
 
 ### What the tests cover, and what they deliberately do not
