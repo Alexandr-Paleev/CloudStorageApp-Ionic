@@ -35,6 +35,7 @@ import {
   cloudDownloadOutline,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import storageService from '../services/storage.service';
 import shareService from '../services/share.service';
 import ShareLinks from '../components/ShareLinks';
@@ -47,6 +48,7 @@ const FileView: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const offlineQueue = useOfflineQueue();
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -81,8 +83,19 @@ const FileView: React.FC = () => {
     mutationFn: () => {
       if (!fileId) throw new Error('File ID is required');
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.deleteFile(fileId, user.id);
+      const userId = user.id;
+
+      return offlineQueue.runOrQueue({ kind: 'deleteFile', fileId }, () =>
+        storageService.deleteFile(fileId, userId)
+      );
     },
+    /* Without this TanStack pauses the mutation while the browser reports no
+       network and never calls mutationFn at all — the change would live only
+       in this tab's memory, and a reload would lose it. The queue in
+       services/mutation-queue.ts is what makes it durable, and it only gets
+       the chance if the attempt is actually made. */
+    networkMode: 'always' as const,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
@@ -94,8 +107,21 @@ const FileView: React.FC = () => {
     mutationFn: (name: string) => {
       if (!fileId) throw new Error('File ID is required');
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.renameFile(fileId, user.id, name);
+      const userId = user.id;
+
+      /* A rename typed on a train is the change most worth keeping: it costs
+         nothing to send later, and losing it means typing it again. */
+      return offlineQueue.runOrQueue({ kind: 'renameFile', fileId, name }, () =>
+        storageService.renameFile(fileId, userId, name)
+      );
     },
+    /* Without this TanStack pauses the mutation while the browser reports no
+       network and never calls mutationFn at all — the change would live only
+       in this tab's memory, and a reload would lose it. The queue in
+       services/mutation-queue.ts is what makes it durable, and it only gets
+       the chance if the attempt is actually made. */
+    networkMode: 'always' as const,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['file', fileId, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });

@@ -224,6 +224,26 @@ body.dark .new-folder-button {
   --color: #ffffff;
 }
 
+/* Amber rather than red: nothing is broken and nothing was lost — the change
+   is written down and waiting. Red here would read as a failure. */
+.offline-queue-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  font-size: 13px;
+}
+
+.offline-queue-banner ion-icon {
+  font-size: 20px;
+  color: #d97706;
+  flex: 0 0 auto;
+}
+
 /* One click back to anywhere above, instead of an arrow that always went to
    the root. Wraps rather than scrolls: a deep path on a phone is worth two
    lines, and a horizontally scrolling bar hides exactly the part people are
