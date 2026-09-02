@@ -92,6 +92,7 @@
 }
 
 .folder-card {
+  position: relative;
   background: #ffffff;
   padding: 16px;
   border-radius: 16px;
@@ -221,6 +222,122 @@
 body.dark .new-folder-button {
   --background: rgba(30, 30, 30, 0.5);
   --color: #ffffff;
+}
+
+/* One click back to anywhere above, instead of an arrow that always went to
+   the root. Wraps rather than scrolls: a deep path on a phone is worth two
+   lines, and a horizontally scrolling bar hides exactly the part people are
+   looking for. */
+.folder-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 4px 0 8px;
+  font-size: 14px;
+}
+
+.crumb-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  border-radius: 8px;
+  color: #4f46e5;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.crumb:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.crumb--current {
+  font-weight: 600;
+  cursor: default;
+  padding: 4px 6px;
+}
+
+.crumb-separator {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Small and quiet: the card's job is to open the folder, and this is the
+   exception rather than the invitation. */
+.folder-menu-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  --color: #94a3b8;
+  height: 28px;
+}
+
+body.dark .crumb {
+  color: #a5b4fc;
+}
+
+body.dark .crumb-separator {
+  color: #64748b;
+}
+
+/* Search, filter and sort. Sits above the listing rather than in the toolbar:
+   on a phone the toolbar is already carrying three buttons, and a search field
+   that has to share a row with them stops being usable at the width where
+   finding a file matters most. */
+.file-filters {
+  margin: 8px 0 4px;
+}
+
+.file-filters ion-searchbar {
+  --background: #ffffff;
+  --border-radius: 12px;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  padding-inline: 0;
+}
+
+.file-filters-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-filters-row ion-segment {
+  flex: 1 1 220px;
+  --background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+}
+
+.file-filters-row ion-select {
+  flex: 0 0 auto;
+  max-width: 190px;
+  font-size: 14px;
+}
+
+.file-filters-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+body.dark .file-filters ion-searchbar {
+  --background: #1e293b;
+  --color: #f8fafc;
+}
+
+body.dark .file-filters-row ion-segment {
+  --background: rgba(255, 255, 255, 0.06);
 }
 
 body.dark .folder-card {

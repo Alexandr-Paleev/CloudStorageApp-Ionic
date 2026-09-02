@@ -2,23 +2,56 @@ import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
 import { isQuotaRejection } from '../utils/quota.utils';
+import {
+  DEFAULT_DIRECTION,
+  DEFAULT_SORT,
+  DOCUMENT_PREFIXES,
+  IMAGE_PREFIX,
+  escapeLike,
+  scopedToFolder,
+  type FileQuery,
+} from '../utils/file-query';
 
 const supabaseService = {
   /**
-   * Get all files for a user in a specific folder
+   * The files one screen of the dashboard shows.
+   *
+   * Searching, sorting and filtering all happen here rather than in the
+   * browser, because the list is paginated: a filter applied to the fifteen
+   * rows already loaded would find a file only if it was already visible.
    */
-  async getFiles(
-    userId: string,
-    folderId: string | null = null,
-    page?: number,
-    pageSize?: number
-  ): Promise<FileMetadata[]> {
+  async getFiles(userId: string, options: FileQuery = {}): Promise<FileMetadata[]> {
+    const {
+      folderId = null,
+      page,
+      pageSize,
+      search,
+      sort = DEFAULT_SORT,
+      direction = DEFAULT_DIRECTION,
+      group = 'all',
+    } = options;
+
     let query = supabase.from('files').select('*').eq('user_id', userId);
 
-    if (folderId) {
-      query = query.eq('folder_id', folderId);
-    } else {
-      query = query.is('folder_id', null);
+    // A search reaches across folders — see scopedToFolder() for why.
+    if (scopedToFolder(options)) {
+      query = folderId ? query.eq('folder_id', folderId) : query.is('folder_id', null);
+    }
+
+    if (search && search.trim()) {
+      query = query.ilike('name', `%${escapeLike(search.trim())}%`);
+    }
+
+    if (group === 'images') {
+      query = query.ilike('type', `${IMAGE_PREFIX}%`);
+    } else if (group === 'documents') {
+      query = query.or(DOCUMENT_PREFIXES.map((prefix) => `type.ilike.${prefix}%`).join(','));
+    } else if (group === 'other') {
+      // Everything the other two groups would have claimed, refused one prefix
+      // at a time: PostgREST has no "none of these" operator.
+      for (const prefix of [IMAGE_PREFIX, ...DOCUMENT_PREFIXES]) {
+        query = query.not('type', 'ilike', `${prefix}%`);
+      }
     }
 
     // Apply pagination if provided
@@ -28,7 +61,7 @@ const supabaseService = {
       query = query.range(from, to);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order(sort, { ascending: direction === 'asc' });
 
     if (error) {
       Sentry.captureException(error, { tags: { context: 'supabase.getFiles' } });
@@ -164,35 +197,73 @@ const supabaseService = {
   },
 
   /**
-   * Delete folder and its contents (recursive) with user ownership check
-   * Note: This should ideally be a database function for performance
+   * The chain from the root down to one folder.
+   *
+   * Every folder the account owns is read in one query and the chain is walked
+   * here, rather than asking the database once per ancestor: folders are few —
+   * a person has dozens, not thousands — and a breadcrumb bar that costs one
+   * round trip per level would be visibly slow at exactly the depth where it
+   * starts being useful.
    */
-  async deleteFolder(folderId: string, userId: string): Promise<void> {
-    const { data: folder, error: folderError } = await supabase
+  async getFolderPath(folderId: string, userId: string): Promise<Folder[]> {
+    const { data, error } = await supabase.from('folders').select('*').eq('user_id', userId);
+
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.getFolderPath' } });
+      throw error;
+    }
+
+    /* The row type marks id as optional because the schema is shared with the
+       shape used before an insert; a row that came back from the database
+       always has one. */
+    const byId = new Map(
+      (data || []).filter((f) => !!f.id).map((f) => [f.id as string, f as Folder])
+    );
+    const path: Folder[] = [];
+    /* Nothing in the schema forbids a cycle in parent_id, and a breadcrumb bar
+       is a poor place to discover one: without this the loop never ends. */
+    const seen = new Set<string>();
+
+    let current = byId.get(folderId);
+    while (current) {
+      const id = current.id as string;
+      if (seen.has(id)) break;
+      seen.add(id);
+      path.unshift(current);
+      current = current.parent_id ? byId.get(current.parent_id) : undefined;
+    }
+
+    return path;
+  },
+
+  async renameFolder(folderId: string, userId: string, name: string): Promise<Folder> {
+    const { data, error } = await supabase
       .from('folders')
-      .select('id, user_id')
+      .update({ name })
       .eq('id', folderId)
       .eq('user_id', userId)
+      .select()
       .single();
 
-    if (folderError || !folder) {
-      throw new Error('Folder not found or access denied');
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.renameFolder' } });
+      throw error;
     }
 
-    const { data: subfolders } = await supabase
-      .from('folders')
-      .select('id')
-      .eq('parent_id', folderId)
-      .eq('user_id', userId);
+    return data as Folder;
+  },
 
-    if (subfolders) {
-      for (const sub of subfolders) {
-        await this.deleteFolder(sub.id, userId);
-      }
-    }
-
-    await supabase.from('files').delete().eq('folder_id', folderId).eq('user_id', userId);
-
+  /**
+   * Removes one folder row, and only that.
+   *
+   * It used to delete the whole subtree — subfolders, and every `files` row
+   * inside them — with one call. The rows went, and the objects they pointed
+   * at stayed in Cloudinary, R2 and Storage: unreachable, unlisted, and
+   * charged for. Emptying a folder is now storage.service's job, because it is
+   * the layer that can reach a provider; by the time this runs there is
+   * nothing left inside.
+   */
+  async deleteFolderRow(folderId: string, userId: string): Promise<void> {
     const { error } = await supabase
       .from('folders')
       .delete()
@@ -200,7 +271,7 @@ const supabaseService = {
       .eq('user_id', userId);
 
     if (error) {
-      Sentry.captureException(error, { tags: { context: 'supabase.deleteFolder' } });
+      Sentry.captureException(error, { tags: { context: 'supabase.deleteFolderRow' } });
       throw error;
     }
   },

@@ -36,7 +36,9 @@ test.describe('Folders', () => {
     // showed up only under parallel load, as an empty input after a full round
     // of pressSequentially — so the retry re-types rather than waiting longer
     // on a value that is never going to arrive.
-    const name = page.locator('ion-alert input');
+    /* Scoped by its header: the dashboard renders several alerts, and each one
+       with an input keeps that input in the DOM whether it is showing or not. */
+    const name = page.getByLabel('New Folder').getByPlaceholder('Folder name');
     await expect(async () => {
       await name.click();
       await name.press('ControlOrMeta+a');
@@ -51,7 +53,7 @@ test.describe('Folders', () => {
     const inserted = page.waitForResponse(
       (r) => r.url().includes('/rest/v1/folders') && r.request().method() === 'POST'
     );
-    await page.locator('ion-alert button', { hasText: 'Create' }).click();
+    await page.getByLabel('New Folder').locator('button', { hasText: 'Create' }).click();
     expect((await inserted).status(), 'the folder should have been created').toBe(201);
 
     const card = page.locator('.folder-card', { hasText: folder });

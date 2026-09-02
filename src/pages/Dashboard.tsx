@@ -16,6 +16,7 @@ import {
   IonRefresher,
   IonRefresherContent,
   IonAlert,
+  IonActionSheet,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonList,
@@ -30,6 +31,7 @@ import {
   documentTextOutline,
   imageOutline,
   folderOpen,
+  ellipsisHorizontal,
   arrowBack,
   createOutline,
   trashOutline,
@@ -38,7 +40,10 @@ import {
   star,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
-import storageService from '../services/storage.service';
+import FileFilters, { type FileFiltersValue } from '../components/FileFilters';
+import FolderBreadcrumbs from '../components/FolderBreadcrumbs';
+import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
+import storageService, { type Folder } from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
@@ -64,14 +69,32 @@ const Dashboard: React.FC = () => {
     fileId: null,
   });
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [folderMenu, setFolderMenu] = useState<Folder | null>(null);
+  const [folderAction, setFolderAction] = useState<'rename' | 'delete' | null>(null);
+  const [renaming, setRenaming] = useState<Folder | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null);
+  const [filters, setFilters] = useState<FileFiltersValue>({
+    search: '',
+    sort: DEFAULT_SORT,
+    direction: DEFAULT_DIRECTION,
+    group: 'all',
+  });
 
   const PAGE_SIZE = 15;
 
   const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
-    queryKey: ['items', user?.id, folderId || 'root'],
+    /* The filters belong in the key: they are part of the question being
+       asked, so changing one has to fetch rather than re-render what the
+       previous question returned. */
+    queryKey: ['items', user?.id, folderId || 'root', filters],
     queryFn: ({ pageParam = 0 }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.getItems(user.id, folderId || null, pageParam as number, PAGE_SIZE);
+      return storageService.getItems(user.id, {
+        folderId: folderId || null,
+        page: pageParam as number,
+        pageSize: PAGE_SIZE,
+        ...filters,
+      });
     },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.files.length < PAGE_SIZE) return undefined;
@@ -102,6 +125,47 @@ const Dashboard: React.FC = () => {
       return storageService.getFolder(folderId, user.id);
     },
     enabled: !!user?.id && !!folderId,
+  });
+
+  /* The chain above the current folder, for the breadcrumb bar and for the
+     back button — which used to go to the root from any depth. */
+  const { data: folderPath = [] } = useQuery({
+    queryKey: ['folderPath', user?.id, folderId],
+    queryFn: () => {
+      if (!user?.id || !folderId) return [];
+      return storageService.getFolderPath(folderId, user.id);
+    },
+    enabled: !!user?.id && !!folderId,
+  });
+
+  const parentId = folderPath.length > 1 ? (folderPath[folderPath.length - 2].id ?? null) : null;
+
+  const openFolder = (id: string | null) => navigate(id ? `/dashboard/${id}` : '/dashboard');
+
+  const renameFolderMutation = useMutation({
+    mutationFn: ({ folder, name }: { folder: Folder; name: string }) => {
+      if (!user?.id || !folder.id) throw new Error('User not authenticated');
+      return storageService.renameFolder(folder.id, user.id, name);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['folder', folderId] });
+      queryClient.invalidateQueries({ queryKey: ['folderPath', user?.id] });
+    },
+    onError: (err: Error) => setErrorToast(err.message),
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (folder: Folder) => {
+      if (!user?.id || !folder.id) throw new Error('User not authenticated');
+      return storageService.deleteFolder(folder.id, user.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
+      // Deleting a folder deletes its files, so the meter moves too.
+      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+    },
+    onError: (err: Error) => setErrorToast(err.message),
   });
 
   const deleteFileMutation = useMutation({
@@ -168,7 +232,9 @@ const Dashboard: React.FC = () => {
         <IonToolbar>
           <IonButtons slot="start">
             {folderId && (
-              <IonButton onClick={() => navigate('/dashboard')} color="dark">
+              /* The folder above, not the root: from two levels down those are
+                 different places, and only one of them is "back". */
+              <IonButton onClick={() => openFolder(parentId)} color="dark" title="Up one folder">
                 <IonIcon icon={arrowBack} />
               </IonButton>
             )}
@@ -251,6 +317,12 @@ const Dashboard: React.FC = () => {
             </IonButton>
           </div>
 
+          {folderId && folderPath.length > 0 && (
+            <FolderBreadcrumbs path={folderPath} onNavigate={openFolder} />
+          )}
+
+          <FileFilters value={filters} onChange={setFilters} resultCount={items.files.length} />
+
           {items?.folders && items.folders.length > 0 && (
             <div className="folders-section">
               <IonText color="dark" className="section-title">
@@ -275,6 +347,22 @@ const Dashboard: React.FC = () => {
                         <IonText color="dark" className="folder-name">
                           {f.name}
                         </IonText>
+
+                        {/* stopPropagation, or opening the menu also opens the
+                            folder the menu belongs to. */}
+                        <IonButton
+                          fill="clear"
+                          size="small"
+                          className="folder-menu-button"
+                          aria-label={`Actions for ${f.name}`}
+                          data-testid={`folder-actions-${f.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFolderMenu(f);
+                          }}
+                        >
+                          <IonIcon icon={ellipsisHorizontal} />
+                        </IonButton>
                       </div>
                     </IonCol>
                   ))}
@@ -380,6 +468,66 @@ const Dashboard: React.FC = () => {
             </IonInfiniteScroll>
           </div>
         </div>
+
+        <IonActionSheet
+          isOpen={!!folderMenu}
+          header={folderMenu?.name}
+          /* The dialog opens here rather than in the button handler: Ionic
+             presents one overlay at a time, and an alert asked for while the
+             sheet is still dismissing never appears. */
+          onDidDismiss={() => {
+            const folder = folderMenu;
+            setFolderMenu(null);
+            if (folderAction === 'rename') setRenaming(folder);
+            if (folderAction === 'delete') setDeletingFolder(folder);
+            setFolderAction(null);
+          }}
+          buttons={[
+            { text: 'Rename', handler: () => setFolderAction('rename') },
+            { text: 'Delete', role: 'destructive', handler: () => setFolderAction('delete') },
+            { text: 'Cancel', role: 'cancel' },
+          ]}
+        />
+
+        <IonAlert
+          isOpen={!!renaming}
+          onDidDismiss={() => setRenaming(null)}
+          header="Rename folder"
+          inputs={[
+            { name: 'name', type: 'text', value: renaming?.name, placeholder: 'Folder name' },
+          ]}
+          buttons={[
+            { text: 'Cancel', role: 'cancel' },
+            {
+              text: 'Save',
+              handler: (data: { name?: string }) => {
+                const name = data.name?.trim();
+                if (!renaming || !name || name === renaming.name) return;
+                renameFolderMutation.mutate({ folder: renaming, name });
+              },
+            },
+          ]}
+        />
+
+        <IonAlert
+          isOpen={!!deletingFolder}
+          onDidDismiss={() => setDeletingFolder(null)}
+          header="Delete folder?"
+          /* Said in full, because it cannot be undone and because what goes is
+             more than what was clicked: every file inside, and every folder
+             below it. */
+          message={`“${deletingFolder?.name}” and everything inside it — files and subfolders — will be deleted from storage. This cannot be undone.`}
+          buttons={[
+            { text: 'Cancel', role: 'cancel' },
+            {
+              text: 'Delete',
+              role: 'destructive',
+              handler: () => {
+                if (deletingFolder) deleteFolderMutation.mutate(deletingFolder);
+              },
+            },
+          ]}
+        />
 
         <IonToast
           isOpen={deleteFileMutation.isError}

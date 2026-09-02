@@ -8,9 +8,11 @@ import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
 import r2Service from './r2.service';
 import type { PendingUpload } from './upload-store';
+import { isSearching, type FileQuery } from '../utils/file-query';
 
 export type { FileMetadata, Folder };
 export type { PendingUpload };
+export type { FileQuery };
 
 export type UploadProgress = {
   bytesTransferred: number;
@@ -205,13 +207,18 @@ const storageService = {
   /**
    * Get files and folders
    */
-  async getItems(userId: string, folderId: string | null = null, page?: number, pageSize?: number) {
+  async getItems(userId: string, options: FileQuery = {}) {
+    const { folderId = null, page } = options;
+
+    /* Folders are not searched, filtered or sorted with the files: they carry
+       none of the same fields, and a search that returned three folders and no
+       files would read as "nothing found". While a search is running the
+       listing is files only, and the dashboard says so. */
+    const wantsFolders = (page === 0 || page === undefined) && !isSearching(options);
+
     const [files, folders] = await Promise.all([
-      supabaseService.getFiles(userId, folderId, page, pageSize),
-      // Only fetch folders on the first page to avoid duplication in infinite scroll
-      page === 0 || page === undefined
-        ? supabaseService.getFolders(userId, folderId)
-        : Promise.resolve([] as Folder[]),
+      supabaseService.getFiles(userId, options),
+      wantsFolders ? supabaseService.getFolders(userId, folderId) : Promise.resolve([] as Folder[]),
     ]);
     return { files, folders };
   },
@@ -311,8 +318,56 @@ const storageService = {
     });
   },
 
+  async renameFolder(folderId: string, userId: string, name: string): Promise<Folder> {
+    const { validateAndSanitizeName } = await import('../schemas/file.schema');
+    return supabaseService.renameFolder(folderId, userId, validateAndSanitizeName(name));
+  },
+
+  /** The chain from the root down to a folder, for the breadcrumb bar. */
+  async getFolderPath(folderId: string, userId: string): Promise<Folder[]> {
+    return supabaseService.getFolderPath(folderId, userId);
+  },
+
+  /**
+   * Deletes a folder, everything under it, and the objects behind them.
+   *
+   * The files go through deleteFile one at a time — the same path a single
+   * deletion takes, provider first and the row second. That is the whole
+   * reason this moved up a layer: the previous version deleted the `files`
+   * rows straight from the database, which left every object orphaned in
+   * Cloudinary, R2 or Storage, unreachable and still charged for.
+   *
+   * Depth first, so a subfolder is empty before its parent is removed, and a
+   * failure halfway leaves a consistent half: what is gone is gone from both
+   * places, and what remains is still listed and still deletable.
+   */
   async deleteFolder(folderId: string, userId: string): Promise<void> {
-    await supabaseService.deleteFolder(folderId, userId);
+    const children = await supabaseService.getFolders(userId, folderId);
+    for (const child of children) {
+      if (child.id) await this.deleteFolder(child.id, userId);
+    }
+
+    /* Paged rather than fetched whole: a folder with a thousand files would
+       otherwise arrive in one response before the first deletion starts. */
+    for (;;) {
+      const files = await supabaseService.getFiles(userId, {
+        folderId,
+        page: 0,
+        pageSize: 50,
+      });
+      if (files.length === 0) break;
+
+      /* A row with no id cannot be deleted and would spin this loop forever,
+         since the next page would return it again. */
+      const deletable = files.filter((file): file is typeof file & { id: string } => !!file.id);
+      if (deletable.length === 0) break;
+
+      for (const file of deletable) {
+        await this.deleteFile(file.id, userId);
+      }
+    }
+
+    await supabaseService.deleteFolderRow(folderId, userId);
   },
 };
 
