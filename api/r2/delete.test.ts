@@ -18,9 +18,9 @@ vi.mock('../../lib/r2', () => ({
   getR2BucketName: () => 'bucket',
 }));
 
-import handler from './delete';
+import handler from './[action]';
 
-const del = (key?: string) => mockRequest({ body: { key } });
+const del = (key?: string) => mockRequest({ query: { action: 'delete' }, body: { key } });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -31,7 +31,7 @@ beforeEach(() => {
 describe('r2 delete', () => {
   it('refuses anything but POST', async () => {
     const res = mockResponse();
-    await handler(mockRequest({ method: 'GET' }), res);
+    await handler(mockRequest({ method: 'GET', query: { action: 'delete' } }), res);
     expect(res.statusCode).toBe(405);
   });
 

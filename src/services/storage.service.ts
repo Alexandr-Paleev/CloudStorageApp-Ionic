@@ -6,8 +6,11 @@ import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '../observability/sentry';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
+import r2Service from './r2.service';
+import type { PendingUpload } from './upload-store';
 
 export type { FileMetadata, Folder };
+export type { PendingUpload };
 
 export type UploadProgress = {
   bytesTransferred: number;
@@ -49,6 +52,10 @@ const storageService = {
       preferredProvider?: string;
       allowedProviders?: string[];
       storageLimit?: number;
+      /** Aborting this pauses a resumable upload rather than failing it: the
+       *  parts already in the bucket stay, and so does the record that knows
+       *  which ones they were. */
+      signal?: AbortSignal;
     }
   ): Promise<FileMetadata> {
     const provider = await providerManager.selectProvider(file, userId, {
@@ -58,16 +65,38 @@ const storageService = {
       allowedProviders: options?.allowedProviders,
     });
 
-    const result = await withRetry(() => provider.upload(file, userId, onProgress), {
-      maxRetries: 2,
-      // A rejected upload (quota, auth) fails the same way every time — surface
-      // it immediately instead of making the user wait through the backoff
-      shouldRetry: isRetriableError,
-      onRetry: (error, attempt) => {
-        console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
-      },
-    });
+    const result = await withRetry(
+      () => provider.upload(file, userId, onProgress, { signal: options?.signal, folderId }),
+      {
+        maxRetries: 2,
+        // A rejected upload (quota, auth) fails the same way every time — surface
+        // it immediately instead of making the user wait through the backoff
+        shouldRetry: isRetriableError,
+        onRetry: (error, attempt) => {
+          console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
+        },
+      }
+    );
 
+    return this.finalizeUpload(userId, file, result, provider, folderId);
+  },
+
+  /**
+   * Writes the row that makes an uploaded object a file in this app.
+   *
+   * Shared by a fresh upload and a resumed one, because the interesting part is
+   * what happens when it fails: the object is already in the bucket, and a row
+   * that never lands would leave it there uncounted and invisible. The delete
+   * below is a compensating transaction — the bucket and the database cannot
+   * share one.
+   */
+  async finalizeUpload(
+    userId: string,
+    file: { name: string; type: string; size: number },
+    result: { url: string; path: string; type: string; bytes?: number },
+    provider: { delete: (path: string) => Promise<void> },
+    folderId: string | null
+  ): Promise<FileMetadata> {
     try {
       const { validateAndSanitizeName } = await import('../schemas/file.schema');
       const sanitizedName = validateAndSanitizeName(file.name);
@@ -80,7 +109,7 @@ const storageService = {
         type: file.type,
         download_url: result.url,
         storage_path: result.path,
-        storage_type: result.type,
+        storage_type: result.type as FileMetadata['storage_type'],
         folder_id: folderId,
         user_id: userId,
       });
@@ -118,6 +147,59 @@ const storageService = {
         `Failed to finalize upload: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`
       );
     }
+  },
+
+  /**
+   * Uploads that were interrupted and can still be finished.
+   *
+   * Only R2 has them: it is the only provider here that uploads in parts, and
+   * therefore the only one where "half an upload" is a thing that exists.
+   */
+  async resumableUploads(): Promise<PendingUpload[]> {
+    return r2Service.resumableUploads();
+  },
+
+  /**
+   * Finishes an interrupted upload and records the file.
+   *
+   * Takes the same path to the row as a fresh upload, including the
+   * compensating delete — from the database's point of view nothing about this
+   * file is unusual, and the quota trigger weighs it exactly the same.
+   */
+  async resumeUpload(
+    userId: string,
+    record: PendingUpload,
+    onProgress?: (progress: UploadProgress) => void,
+    signal?: AbortSignal
+  ): Promise<FileMetadata> {
+    const result = await r2Service.resumeUpload(
+      record,
+      (percent) => {
+        if (onProgress) {
+          onProgress({
+            bytesTransferred: Math.round((percent / 100) * record.size),
+            totalBytes: record.size,
+            progress: percent,
+          });
+        }
+      },
+      signal
+    );
+
+    const provider = providerManager.getProvider('r2');
+
+    return this.finalizeUpload(
+      userId,
+      { name: record.fileName, type: record.contentType, size: record.size },
+      { url: result.url, path: result.key, type: 'r2', bytes: record.size },
+      provider,
+      record.folderId
+    );
+  },
+
+  /** Abandons an interrupted upload and releases the parts R2 is holding. */
+  async discardUpload(record: PendingUpload): Promise<void> {
+    await r2Service.discardUpload(record);
   },
 
   /**

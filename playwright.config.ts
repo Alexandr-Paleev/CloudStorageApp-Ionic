@@ -3,6 +3,19 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 8100;
 const baseURL = `http://localhost:${PORT}`;
 
+/**
+ * A second dev server, for the one spec that needs R2 to exist.
+ *
+ * VITE_R2_BUCKET_NAME is what ProviderManager reads to decide whether R2 is
+ * available, and it is baked into the client at load time — there is no way to
+ * turn it on for a single test. Setting it on the main server would divert
+ * every other spec's uploads to R2 as well, and those specs are there to
+ * exercise Supabase Storage. So: one server without it, one with, and a project
+ * pointed at each.
+ */
+const R2_PORT = 8101;
+const r2BaseURL = `http://localhost:${R2_PORT}`;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -29,14 +42,33 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /resumable-upload\.spec\.ts/,
+    },
+    {
+      /* Same browser, different origin: the one where R2 is configured. */
+      name: 'chromium-r2',
+      use: { ...devices['Desktop Chrome'], baseURL: r2BaseURL },
+      testMatch: /resumable-upload\.spec\.ts/,
     },
   ],
 
   /* Requires a working .env — src/env.ts validates it on startup */
-  webServer: {
-    command: 'npm run dev',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: `npm run dev -- --port ${R2_PORT}`,
+      url: r2BaseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      /* The only difference from the server above, and the reason there are
+         two. No R2 credentials are set: the spec that runs here answers every
+         /api/r2/* call itself. */
+      env: { ...process.env, VITE_R2_BUCKET_NAME: 'e2e-r2-bucket' } as Record<string, string>,
+    },
+  ],
 });

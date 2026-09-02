@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
@@ -22,12 +22,18 @@ import {
   IonAlert,
 } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
-import storageService, { UploadProgress, FileMetadata } from '../services/storage.service';
+import storageService, {
+  UploadProgress,
+  FileMetadata,
+  PendingUpload,
+} from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import googleDriveAuthService from '../services/googledrive-auth.service';
 import { useProfile } from '../hooks/useProfile';
 import ProviderSelector from '../components/ProviderSelector';
+import ResumableUploads from '../components/ResumableUploads';
 import { formatFileSize } from '../utils/format.utils';
+import { shouldUseMultipart } from '../../lib/multipart';
 import { useAnalytics } from '../hooks/useAnalytics';
 
 const Upload: React.FC = () => {
@@ -42,6 +48,12 @@ const Upload: React.FC = () => {
   const [showGoogleDriveAlert, setShowGoogleDriveAlert] = useState(false);
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
   const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
+  const [paused, setPaused] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  /* Held in a ref rather than in state: aborting must not wait for a render,
+     and nothing about the controller itself belongs on screen. */
+  const abortRef = useRef<AbortController | null>(null);
   const { profile } = useProfile();
   const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
 
@@ -55,6 +67,14 @@ const Upload: React.FC = () => {
     enabled: !!user?.id,
   });
 
+  /* Read from IndexedDB, so an upload interrupted by a closed tab is offered
+     again when the page comes back. */
+  const { data: resumable = [] } = useQuery({
+    queryKey: ['resumableUploads', user?.id],
+    queryFn: () => storageService.resumableUploads(),
+    enabled: !!user?.id,
+  });
+
   const { data: isGoogleDriveConnected } = useQuery({
     queryKey: ['googleDriveConnected'],
     queryFn: () => googleDriveAuthService.isAuthorized(),
@@ -64,6 +84,9 @@ const Upload: React.FC = () => {
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       if (!user?.id) throw new Error('User not authenticated');
+
+      abortRef.current = new AbortController();
+      setPaused(false);
 
       return storageService.uploadFile(
         user.id,
@@ -77,6 +100,7 @@ const Upload: React.FC = () => {
           preferredProvider,
           allowedProviders: profile?.allowed_providers,
           storageLimit: profile?.storage_limit,
+          signal: abortRef.current.signal,
         }
       );
     },
@@ -89,19 +113,76 @@ const Upload: React.FC = () => {
         folder_id: folderId || undefined,
       });
 
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
-      if (folderId) {
-        navigate(`/dashboard/${folderId}`);
-      } else {
-        navigate('/dashboard');
-      }
+      finishUpload(result);
     },
     onError: (err: Error) => {
+      // Pausing raises too — it is how the part loop stops — but it is not a
+      // failure, and saying so in red would be a lie about what happened.
+      if (err.name === 'UploadPausedError' || err.name === 'AbortError') {
+        setPaused(true);
+        queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+        return;
+      }
+
       setError(err.message);
       setUploadProgress(null);
     },
   });
+
+  const finishUpload = (result: FileMetadata) => {
+    queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+    navigate(folderId ? `/dashboard/${folderId}` : '/dashboard');
+    return result;
+  };
+
+  const resumeMutation = useMutation({
+    mutationFn: async (upload: PendingUpload) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      abortRef.current = new AbortController();
+      setBusyKey(upload.key);
+      setPaused(false);
+      setUploadProgress({ bytesTransferred: 0, totalBytes: upload.size, progress: 0 });
+
+      return storageService.resumeUpload(
+        user.id,
+        upload,
+        setUploadProgress,
+        abortRef.current.signal
+      );
+    },
+    onSuccess: finishUpload,
+    onError: (err: Error) => {
+      setBusyKey(null);
+      if (err.name === 'UploadPausedError' || err.name === 'AbortError') {
+        setPaused(true);
+        queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+        return;
+      }
+      setError(err.message);
+      setUploadProgress(null);
+    },
+    onSettled: () => setBusyKey(null),
+  });
+
+  const discardMutation = useMutation({
+    mutationFn: async (upload: PendingUpload) => {
+      setBusyKey(upload.key);
+      await storageService.discardUpload(upload);
+    },
+    onSettled: () => {
+      setBusyKey(null);
+      queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+    },
+  });
+
+  const pauseUpload = () => abortRef.current?.abort();
+
+  /* Whether this upload is one that can be paused at all: a single PUT has no
+     parts to come back to. */
+  const isResumable = !!selectedFile && shouldUseMultipart(selectedFile.size);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,6 +242,13 @@ const Upload: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding">
+        <ResumableUploads
+          uploads={resumable}
+          busyKey={busyKey}
+          onResume={(upload) => resumeMutation.mutate(upload)}
+          onDiscard={(upload) => discardMutation.mutate(upload)}
+        />
+
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>Select File</IonCardTitle>
@@ -204,7 +292,9 @@ const Upload: React.FC = () => {
 
             {uploadProgress && (
               <div style={{ marginTop: '20px' }}>
-                <IonLabel>Uploading... {uploadProgress.progress.toFixed(1)}%</IonLabel>
+                <IonLabel>
+                  {paused ? 'Paused at' : 'Uploading...'} {uploadProgress.progress.toFixed(1)}%
+                </IonLabel>
                 <IonProgressBar value={uploadProgress.progress / 100} />
                 <IonLabel
                   style={{ fontSize: '12px', color: '#666', marginTop: '5px', display: 'block' }}
@@ -212,6 +302,31 @@ const Upload: React.FC = () => {
                   {formatFileSize(uploadProgress.bytesTransferred)} /{' '}
                   {formatFileSize(uploadProgress.totalBytes)}
                 </IonLabel>
+
+                {/* Only large files go up in parts, and only those can be
+                    picked up again — offering to pause a single PUT would
+                    promise something the protocol cannot deliver. */}
+                {isResumable &&
+                  !paused &&
+                  (uploadMutation.isPending || resumeMutation.isPending) && (
+                    <IonButton
+                      size="small"
+                      fill="outline"
+                      onClick={pauseUpload}
+                      style={{ marginTop: '10px' }}
+                    >
+                      Pause
+                    </IonButton>
+                  )}
+
+                {paused && (
+                  <IonLabel
+                    color="medium"
+                    style={{ display: 'block', marginTop: '8px', fontSize: '13px' }}
+                  >
+                    The parts already sent are kept. Resume it above, now or after a reload.
+                  </IonLabel>
+                )}
               </div>
             )}
 

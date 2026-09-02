@@ -21,3 +21,4 @@ are amended rather than rewritten when a decision is reversed.
 | [0006](0006-dependabot-skips-majors.md)          | Dependabot skips majors, and `npm audit` backstops that         | v3.1.0   |
 | [0007](0007-rate-limits-are-per-instance.md)     | Rate limits live in module scope, not in a shared counter       | unreleased |
 | [0008](0008-two-actions-one-function.md)         | Two Cloudinary actions share one serverless function            | unreleased |
+| [0009](0009-resumable-uploads-keep-state-in-the-browser.md) | A resumable upload keeps its state in the browser | unreleased |

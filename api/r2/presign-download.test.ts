@@ -22,9 +22,10 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: (...args: unknown[]) => signedUrl(...args),
 }));
 
-import handler from './presign-download';
+import handler from './[action]';
 
-const ask = (body: Record<string, unknown>) => mockRequest({ body });
+const ask = (body: Record<string, unknown>) =>
+  mockRequest({ query: { action: 'presign-download' }, body });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,7 +36,7 @@ beforeEach(() => {
 describe('r2 presign-download', () => {
   it('refuses anything but POST', async () => {
     const res = mockResponse();
-    await handler(mockRequest({ method: 'GET' }), res);
+    await handler(mockRequest({ method: 'GET', query: { action: 'presign-download' } }), res);
     expect(res.statusCode).toBe(405);
   });
 

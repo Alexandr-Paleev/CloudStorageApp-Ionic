@@ -71,6 +71,17 @@ export const PRESIGN_LIMIT = 60;
 export const PRESIGN_IP_LIMIT = 120;
 
 /**
+ * Part URLs signed per user per minute, for resumable uploads.
+ *
+ * Higher than PRESIGN_LIMIT because these are not new uploads: a single large
+ * file asks once per batch of up to a hundred parts, and asks again for
+ * whatever is left when a paused upload resumes. A ceiling low enough to be
+ * hit by one person moving a big file would break the feature it guards, and
+ * this one is still thousands of parts a minute short of that.
+ */
+export const R2_PART_SIGN_LIMIT = 240;
+
+/**
  * Cloudinary upload authorizations per user per minute.
  *
  * The same number as PRESIGN_LIMIT and for the same reason: signing an upload
