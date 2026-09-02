@@ -113,7 +113,7 @@ async function chooseLargeFile(page: Page, name: string) {
     mimeType: 'application/octet-stream',
     buffer: Buffer.alloc(FILE_SIZE, 7),
   });
-  await expect(page.locator('#file-input').locator('xpath=../ion-item//h2')).toHaveText(name);
+  await expect(page.getByTestId('upload-queue')).toContainText(name);
 }
 
 const unfinished = (page: Page) => page.locator('ion-card', { hasText: 'Unfinished uploads' });
@@ -168,7 +168,8 @@ test.describe('A large file, in parts', () => {
     await page.waitForRequest((request) => request.url().includes('/__r2-part/1'));
     await page.locator('ion-button', { hasText: 'Pause' }).click();
 
-    await expect(page.locator('text=/Paused at/')).toBeVisible();
+    // The state is now per file, in the queue row rather than in one bar.
+    await expect(page.locator('.upload-queue-item--paused')).toBeVisible();
     await expect(unfinished(page)).toBeVisible();
     await expect(unfinished(page)).toContainText(`1 of ${PART_COUNT} parts`);
 
