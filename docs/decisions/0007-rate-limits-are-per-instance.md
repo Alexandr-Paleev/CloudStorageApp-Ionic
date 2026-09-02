@@ -1,6 +1,6 @@
 # 0007 — Rate limits live in module scope, not in a shared counter
 
-Accepted · unreleased · [`lib/rate-limit.ts`](../../lib/rate-limit.ts)
+Accepted · shipped in v4.0.0 · [`lib/rate-limit.ts`](../../lib/rate-limit.ts)
 
 ## Context
 

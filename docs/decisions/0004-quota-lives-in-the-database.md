@@ -1,6 +1,6 @@
 # 0004 — The storage quota is enforced by a trigger, not by the API
 
-Accepted · unreleased · migration [`007`](../../migrations/007_enforce_storage_quota.sql)
+Accepted · shipped in v4.0.0 · migration [`007`](../../migrations/007_enforce_storage_quota.sql)
 
 ## Context
 

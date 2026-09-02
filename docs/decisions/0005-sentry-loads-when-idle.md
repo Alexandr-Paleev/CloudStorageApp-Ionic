@@ -1,6 +1,6 @@
 # 0005 — Sentry loads after first paint, and Session Replay stays off
 
-Accepted · unreleased · [`src/observability/sentry.ts`](../../src/observability/sentry.ts)
+Accepted · shipped in v4.0.0 · [`src/observability/sentry.ts`](../../src/observability/sentry.ts)
 
 ## Context
 

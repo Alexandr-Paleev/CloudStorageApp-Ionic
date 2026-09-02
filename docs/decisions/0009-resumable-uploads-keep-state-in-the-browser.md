@@ -1,6 +1,6 @@
 # 0009 — A resumable upload keeps its state in the browser
 
-Accepted · unreleased · [`src/services/multipart.upload.ts`](../../src/services/multipart.upload.ts), [`src/services/upload-store.ts`](../../src/services/upload-store.ts)
+Accepted · shipped in v4.0.0 · [`src/services/multipart.upload.ts`](../../src/services/multipart.upload.ts), [`src/services/upload-store.ts`](../../src/services/upload-store.ts)
 
 ## Context
 
