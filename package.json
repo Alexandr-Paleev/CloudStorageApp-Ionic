@@ -40,6 +40,8 @@
     "generate:icons": "node scripts/generate-icons.js",
     "prepare": "husky",
     "test:coverage": "vitest run --coverage",
+    "size": "node scripts/check-bundle-size.js",
+    "lighthouse": "npx --yes @lhci/cli@0.15 autorun",
     "generate:demo-assets": "node scripts/generate-demo-assets.js"
   },
   "dependencies": {
