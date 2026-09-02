@@ -19,6 +19,10 @@ vi.mock('./supabase.service', () => ({
     getTotalStorageUsed: vi.fn(),
     getFileMetadata: vi.fn(),
     deleteFileMetadata: vi.fn(),
+    getFolders: vi.fn(),
+    getFiles: vi.fn(),
+    deleteFolderRow: vi.fn(),
+    renameFolder: vi.fn(),
   },
 }));
 
@@ -297,5 +301,135 @@ describe('getFileMetadata', () => {
 
     expect(file?.download_url).toBe('https://cdn.example/stale');
     expect(Sentry.captureException).toHaveBeenCalled();
+  });
+});
+
+describe('deleteFolder', () => {
+  type Row = { id: string; name: string; storage_type: string; storage_path: string };
+
+  /** A tree, as the two queries deleteFolder walks would answer it. */
+  function tree(layout: {
+    folders: Record<string, { id: string }[]>;
+    files: Record<string, Row[]>;
+  }) {
+    vi.mocked(supabaseService.getFolders).mockImplementation(
+      async (_userId: string, parentId?: string | null) =>
+        (layout.folders[parentId ?? 'root'] ?? []) as never
+    );
+
+    /* Emptied as they are read: deleteFolder pages until a folder answers
+       nothing, so a static list would loop forever. */
+    const remaining = Object.fromEntries(
+      Object.entries(layout.files).map(([key, rows]) => [key, [...rows]])
+    );
+    vi.mocked(supabaseService.getFiles).mockImplementation(
+      async (_userId: string, options?: { folderId?: string | null }) => {
+        const key = options?.folderId ?? 'root';
+        const rows = remaining[key] ?? [];
+        return rows.splice(0, rows.length) as never;
+      }
+    );
+
+    vi.mocked(supabaseService.getFileMetadata).mockImplementation(
+      async (fileId: string) =>
+        Object.values(layout.files)
+          .flat()
+          .find((f) => f.id === fileId) as never
+    );
+
+    vi.mocked(supabaseService.deleteFileMetadata).mockResolvedValue(undefined as never);
+    vi.mocked(supabaseService.deleteFolderRow).mockResolvedValue(undefined as never);
+  }
+
+  const row = (id: string): Row => ({
+    id,
+    name: `${id}.pdf`,
+    storage_type: 'r2',
+    storage_path: `user-1/${id}`,
+  });
+
+  it('deletes the objects, not only the rows', async () => {
+    // The whole reason this moved out of supabase.service: it used to delete
+    // the files rows straight from the database, leaving every object in the
+    // bucket — unreachable, unlisted and still charged for.
+    const p = provider();
+    vi.mocked(providerManager.getProvider).mockReturnValue(p as never);
+    tree({ folders: {}, files: { 'folder-1': [row('file-1'), row('file-2')] } });
+
+    await storageService.deleteFolder('folder-1', 'user-1');
+
+    expect(p.delete).toHaveBeenCalledTimes(2);
+    expect(supabaseService.deleteFileMetadata).toHaveBeenCalledTimes(2);
+  });
+
+  it('empties a subfolder before removing the folder above it', async () => {
+    const p = provider();
+    vi.mocked(providerManager.getProvider).mockReturnValue(p as never);
+    tree({
+      folders: { 'folder-1': [{ id: 'folder-2' }] },
+      files: { 'folder-2': [row('file-deep')] },
+    });
+
+    await storageService.deleteFolder('folder-1', 'user-1');
+
+    const removed = vi.mocked(supabaseService.deleteFolderRow).mock.calls.map(([id]) => id);
+    expect(removed).toEqual(['folder-2', 'folder-1']);
+  });
+
+  it('removes the folder row last, once nothing is left inside', async () => {
+    const p = provider();
+    vi.mocked(providerManager.getProvider).mockReturnValue(p as never);
+    tree({ folders: {}, files: { 'folder-1': [row('file-1')] } });
+
+    const order: string[] = [];
+    p.delete.mockImplementation(async () => {
+      order.push('object');
+    });
+    vi.mocked(supabaseService.deleteFolderRow).mockImplementation(async () => {
+      order.push('folder');
+    });
+
+    await storageService.deleteFolder('folder-1', 'user-1');
+
+    expect(order).toEqual(['object', 'folder']);
+  });
+
+  it('keeps the folder when a file could not be removed from storage', async () => {
+    // A folder row deleted anyway would strand the file: still in the bucket,
+    // no longer listed anywhere, and impossible to retry from the interface.
+    const p = provider({
+      delete: vi.fn(async () => {
+        throw new Error('bucket unreachable');
+      }),
+    });
+    vi.mocked(providerManager.getProvider).mockReturnValue(p as never);
+    tree({ folders: {}, files: { 'folder-1': [row('file-1')] } });
+
+    await expect(storageService.deleteFolder('folder-1', 'user-1')).rejects.toThrow(
+      /bucket unreachable/
+    );
+    expect(supabaseService.deleteFolderRow).not.toHaveBeenCalled();
+  });
+
+  it('removes an empty folder without asking a provider for anything', async () => {
+    const p = provider();
+    vi.mocked(providerManager.getProvider).mockReturnValue(p as never);
+    tree({ folders: {}, files: {} });
+
+    await storageService.deleteFolder('folder-1', 'user-1');
+
+    expect(p.delete).not.toHaveBeenCalled();
+    expect(supabaseService.deleteFolderRow).toHaveBeenCalledWith('folder-1', 'user-1');
+  });
+});
+
+describe('renameFolder', () => {
+  it('sanitises the name the same way creating one does', async () => {
+    vi.mocked(supabaseService.renameFolder).mockResolvedValue({ id: 'f1' } as never);
+
+    await storageService.renameFolder('f1', 'user-1', '  Invoices  ');
+
+    const [, , name] = vi.mocked(supabaseService.renameFolder).mock.calls[0];
+    expect(name).toBe('Invoices');
   });
 });

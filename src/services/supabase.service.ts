@@ -197,35 +197,73 @@ const supabaseService = {
   },
 
   /**
-   * Delete folder and its contents (recursive) with user ownership check
-   * Note: This should ideally be a database function for performance
+   * The chain from the root down to one folder.
+   *
+   * Every folder the account owns is read in one query and the chain is walked
+   * here, rather than asking the database once per ancestor: folders are few —
+   * a person has dozens, not thousands — and a breadcrumb bar that costs one
+   * round trip per level would be visibly slow at exactly the depth where it
+   * starts being useful.
    */
-  async deleteFolder(folderId: string, userId: string): Promise<void> {
-    const { data: folder, error: folderError } = await supabase
+  async getFolderPath(folderId: string, userId: string): Promise<Folder[]> {
+    const { data, error } = await supabase.from('folders').select('*').eq('user_id', userId);
+
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.getFolderPath' } });
+      throw error;
+    }
+
+    /* The row type marks id as optional because the schema is shared with the
+       shape used before an insert; a row that came back from the database
+       always has one. */
+    const byId = new Map(
+      (data || []).filter((f) => !!f.id).map((f) => [f.id as string, f as Folder])
+    );
+    const path: Folder[] = [];
+    /* Nothing in the schema forbids a cycle in parent_id, and a breadcrumb bar
+       is a poor place to discover one: without this the loop never ends. */
+    const seen = new Set<string>();
+
+    let current = byId.get(folderId);
+    while (current) {
+      const id = current.id as string;
+      if (seen.has(id)) break;
+      seen.add(id);
+      path.unshift(current);
+      current = current.parent_id ? byId.get(current.parent_id) : undefined;
+    }
+
+    return path;
+  },
+
+  async renameFolder(folderId: string, userId: string, name: string): Promise<Folder> {
+    const { data, error } = await supabase
       .from('folders')
-      .select('id, user_id')
+      .update({ name })
       .eq('id', folderId)
       .eq('user_id', userId)
+      .select()
       .single();
 
-    if (folderError || !folder) {
-      throw new Error('Folder not found or access denied');
+    if (error) {
+      Sentry.captureException(error, { tags: { context: 'supabase.renameFolder' } });
+      throw error;
     }
 
-    const { data: subfolders } = await supabase
-      .from('folders')
-      .select('id')
-      .eq('parent_id', folderId)
-      .eq('user_id', userId);
+    return data as Folder;
+  },
 
-    if (subfolders) {
-      for (const sub of subfolders) {
-        await this.deleteFolder(sub.id, userId);
-      }
-    }
-
-    await supabase.from('files').delete().eq('folder_id', folderId).eq('user_id', userId);
-
+  /**
+   * Removes one folder row, and only that.
+   *
+   * It used to delete the whole subtree — subfolders, and every `files` row
+   * inside them — with one call. The rows went, and the objects they pointed
+   * at stayed in Cloudinary, R2 and Storage: unreachable, unlisted, and
+   * charged for. Emptying a folder is now storage.service's job, because it is
+   * the layer that can reach a provider; by the time this runs there is
+   * nothing left inside.
+   */
+  async deleteFolderRow(folderId: string, userId: string): Promise<void> {
     const { error } = await supabase
       .from('folders')
       .delete()
@@ -233,7 +271,7 @@ const supabaseService = {
       .eq('user_id', userId);
 
     if (error) {
-      Sentry.captureException(error, { tags: { context: 'supabase.deleteFolder' } });
+      Sentry.captureException(error, { tags: { context: 'supabase.deleteFolderRow' } });
       throw error;
     }
   },

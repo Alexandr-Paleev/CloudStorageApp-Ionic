@@ -319,11 +319,15 @@ export async function setStorageLimit(userId: string, bytes: number): Promise<vo
  * storage.service writes them, minus bytes in a bucket that nothing here
  * reads.
  */
-export async function seedFolder(userId: string, name: string): Promise<string> {
+export async function seedFolder(
+  userId: string,
+  name: string,
+  parentId: string | null = null
+): Promise<string> {
   const response = await admin('/rest/v1/folders', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ name, user_id: userId, parent_id: null }),
+    body: JSON.stringify({ name, user_id: userId, parent_id: parentId }),
   });
   if (!response.ok) throw new Error(`could not seed a folder: ${await response.text()}`);
   const [folder] = (await response.json()) as { id: string }[];

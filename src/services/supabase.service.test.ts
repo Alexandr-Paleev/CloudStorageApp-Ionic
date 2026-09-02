@@ -220,3 +220,63 @@ describe('getFiles: the query the dashboard asks for', () => {
     expect(chain.range).not.toHaveBeenCalled();
   });
 });
+
+describe('getFolderPath', () => {
+  /** Every folder the account owns, which is what the walk reads. */
+  function folders(rows: { id: string; name: string; parent_id: string | null }[]) {
+    const chain = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(async () => ({ data: rows, error: null })),
+    };
+    from.mockReturnValue(chain);
+    return chain;
+  }
+
+  const tree = [
+    { id: 'a', name: 'Work', parent_id: null },
+    { id: 'b', name: 'Invoices', parent_id: 'a' },
+    { id: 'c', name: '2024', parent_id: 'b' },
+    { id: 'x', name: 'Photos', parent_id: null },
+  ];
+
+  it('reads every folder once rather than once per level', async () => {
+    // One query, walked here: a breadcrumb bar that cost a round trip per
+    // ancestor would be slowest at exactly the depth that needs it.
+    const chain = folders(tree);
+    await supabaseService.getFolderPath('c', 'user-1');
+
+    expect(from).toHaveBeenCalledExactlyOnceWith('folders');
+    expect(chain.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the chain root first', async () => {
+    folders(tree);
+    const path = await supabaseService.getFolderPath('c', 'user-1');
+
+    expect(path.map((f) => f.name)).toEqual(['Work', 'Invoices', '2024']);
+  });
+
+  it('returns a single entry for a folder at the root', async () => {
+    folders(tree);
+    const path = await supabaseService.getFolderPath('x', 'user-1');
+
+    expect(path.map((f) => f.name)).toEqual(['Photos']);
+  });
+
+  it('returns nothing for a folder that is not there', async () => {
+    folders(tree);
+    await expect(supabaseService.getFolderPath('gone', 'user-1')).resolves.toEqual([]);
+  });
+
+  it('stops instead of looping when parents point at each other', async () => {
+    // Nothing in the schema forbids it, and a breadcrumb bar is a poor place
+    // to find out: without the guard this never returns.
+    folders([
+      { id: 'p', name: 'One', parent_id: 'q' },
+      { id: 'q', name: 'Two', parent_id: 'p' },
+    ]);
+
+    const path = await supabaseService.getFolderPath('p', 'user-1');
+    expect(path).toHaveLength(2);
+  });
+});
