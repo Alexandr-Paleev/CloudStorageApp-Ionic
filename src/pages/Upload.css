@@ -1,0 +1,104 @@
+/* The picker and the drop target are the same control: a person who drags a
+   file onto a page expects it to land, and a person who does not expects a
+   button. Two separate widgets for one action is the arrangement that makes
+   both of them hunt. */
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone:focus-visible {
+  border-color: #4f46e5;
+}
+
+/* Only while something is actually over it — a drop target that looks armed
+   at rest is just a box with a dashed border. */
+.upload-dropzone--active {
+  border-color: #4f46e5;
+  background: rgba(79, 70, 229, 0.06);
+}
+
+.upload-dropzone-icon {
+  font-size: 32px;
+  color: #4f46e5;
+}
+
+.upload-dropzone-hint {
+  font-size: 13px;
+}
+
+.upload-queue {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upload-queue-item {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.upload-queue-item--failed {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.04);
+}
+
+.upload-queue-item--done {
+  opacity: 0.7;
+}
+
+.upload-queue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-queue-name {
+  flex: 1;
+  font-weight: 500;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.upload-queue-icon--done {
+  color: #16a34a;
+}
+
+.upload-queue-icon--failed {
+  color: #dc2626;
+}
+
+.upload-queue-icon--paused {
+  color: #d97706;
+}
+
+.upload-queue-meta {
+  display: block;
+  font-size: 12px;
+  margin: 2px 0 6px;
+}
+
+body.dark .upload-dropzone {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark .upload-queue-item {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.05);
+}

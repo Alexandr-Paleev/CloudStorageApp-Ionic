@@ -12,7 +12,8 @@ import {
   IonCardContent,
   IonCardHeader,
   IonCardTitle,
-  IonItem,
+  IonIcon,
+  IonText,
   IonLabel,
   IonProgressBar,
   IonToast,
@@ -22,19 +23,28 @@ import {
   IonAlert,
 } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
-import storageService, {
-  UploadProgress,
-  FileMetadata,
-  PendingUpload,
-} from '../services/storage.service';
+import storageService, { FileMetadata, PendingUpload } from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import googleDriveAuthService from '../services/googledrive-auth.service';
 import { useProfile } from '../hooks/useProfile';
 import ProviderSelector from '../components/ProviderSelector';
 import ResumableUploads from '../components/ResumableUploads';
-import { formatFileSize } from '../utils/format.utils';
 import { shouldUseMultipart } from '../../lib/multipart';
+import UploadQueue from '../components/UploadQueue';
+import {
+  absorb,
+  enqueue,
+  nextPending,
+  overallProgress,
+  remove as removeFromQueue,
+  summarise,
+  summaryText,
+  update,
+  type QueueItem,
+} from '../utils/upload-queue';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { cloudUploadOutline } from 'ionicons/icons';
+import './Upload.css';
 
 const Upload: React.FC = () => {
   const { user } = useAuth();
@@ -42,8 +52,12 @@ const Upload: React.FC = () => {
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
   const { trackFileUpload } = useAnalytics();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  /* Resuming is not part of the queue: it continues an upload from a previous
+     session, whose File lives in IndexedDB rather than in a picker. */
+  const [resumeProgress, setResumeProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [showGoogleDriveAlert, setShowGoogleDriveAlert] = useState(false);
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
@@ -54,6 +68,12 @@ const Upload: React.FC = () => {
   /* Held in a ref rather than in state: aborting must not wait for a render,
      and nothing about the controller itself belongs on screen. */
   const abortRef = useRef<AbortController | null>(null);
+
+  /* The runner walks a local copy of the queue — state updates do not land in
+     the middle of a loop — and reads this to pick up files added while it was
+     already working. */
+  const queueRef = useRef<QueueItem[]>([]);
+  queueRef.current = queue;
   const { profile } = useProfile();
   const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
 
@@ -81,58 +101,101 @@ const Upload: React.FC = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      if (!user?.id) throw new Error('User not authenticated');
+  /**
+   * Sends the queue, one file at a time.
+   *
+   * Sequential on purpose. Parallel uploads would race for the same quota —
+   * the trigger on public.files serialises them anyway and the loser gets a
+   * 413 — and a progress bar per file is only honest if one of them is moving.
+   */
+  const runQueue = async () => {
+    if (!user?.id || isUploading) return;
 
-      abortRef.current = new AbortController();
-      setPaused(false);
+    setIsUploading(true);
+    setError('');
 
-      return storageService.uploadFile(
-        user.id,
-        file,
-        (progress) => {
-          setUploadProgress(progress);
-        },
-        folderId || null,
-        useGoogleDrive,
-        {
-          preferredProvider,
-          allowedProviders: profile?.allowed_providers,
-          storageLimit: profile?.storage_limit,
-          signal: abortRef.current.signal,
+    /* A local copy, because setQueue does not take effect inside this loop.
+       Every mutation goes through here so the screen and the walk agree. */
+    let items = queueRef.current;
+    const apply = (id: string, patch: Partial<QueueItem>) => {
+      items = update(items, id, patch);
+      setQueue(items);
+    };
+
+    try {
+      for (;;) {
+        items = absorb(items, queueRef.current);
+        const item = nextPending(items);
+        if (!item) break;
+
+        apply(item.id, { status: 'uploading', progress: 0, error: undefined });
+        abortRef.current = new AbortController();
+        setPaused(false);
+
+        try {
+          const result = await storageService.uploadFile(
+            user.id,
+            item.file,
+            (progress) => apply(item.id, { progress: progress.progress }),
+            folderId || null,
+            useGoogleDrive,
+            {
+              preferredProvider,
+              allowedProviders: profile?.allowed_providers,
+              storageLimit: profile?.storage_limit,
+              signal: abortRef.current.signal,
+            }
+          );
+
+          trackFileUpload({
+            file_type: item.file.type,
+            file_size: item.file.size,
+            storage_provider: result.storage_type,
+            folder_id: folderId || undefined,
+          });
+
+          apply(item.id, { status: 'done', progress: 100 });
+          invalidateAfterUpload();
+        } catch (err) {
+          const error = err as Error;
+
+          // Pausing raises too — it is how the part loop stops — but it is a
+          // decision, not a failure, and it stops the queue rather than
+          // marking the file broken and moving on.
+          if (error.name === 'UploadPausedError' || error.name === 'AbortError') {
+            apply(item.id, { status: 'paused' });
+            setPaused(true);
+            queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+            break;
+          }
+
+          /* The rest of the queue still goes: one file too large for the plan
+             should not strand the nine behind it. */
+          apply(item.id, { status: 'failed', error: error.message });
         }
-      );
-    },
-    onSuccess: (result: FileMetadata, file: File) => {
-      // Track file upload analytics
-      trackFileUpload({
-        file_type: file.type,
-        file_size: file.size,
-        storage_provider: result.storage_type,
-        folder_id: folderId || undefined,
-      });
-
-      finishUpload(result);
-    },
-    onError: (err: Error) => {
-      // Pausing raises too — it is how the part loop stops — but it is not a
-      // failure, and saying so in red would be a lie about what happened.
-      if (err.name === 'UploadPausedError' || err.name === 'AbortError') {
-        setPaused(true);
-        queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
-        return;
       }
+    } finally {
+      setIsUploading(false);
+    }
 
-      setError(err.message);
-      setUploadProgress(null);
-    },
-  });
+    /* Only leave when every file landed. A failure has to stay on screen next
+       to the file it belongs to, and a paused one is not finished at all —
+       navigating away from it would hide the queue and the card offering to
+       resume it in the same movement. */
+    const finished = summarise(items);
+    if (finished.finished && finished.failed === 0) {
+      navigate(folderId ? `/dashboard/${folderId}` : '/dashboard');
+    }
+  };
 
-  const finishUpload = (result: FileMetadata) => {
+  const invalidateAfterUpload = () => {
     queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
     queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
     queryClient.invalidateQueries({ queryKey: ['resumableUploads', user?.id] });
+  };
+
+  const finishUpload = (result: FileMetadata) => {
+    invalidateAfterUpload();
     navigate(folderId ? `/dashboard/${folderId}` : '/dashboard');
     return result;
   };
@@ -144,12 +207,12 @@ const Upload: React.FC = () => {
       abortRef.current = new AbortController();
       setBusyKey(upload.key);
       setPaused(false);
-      setUploadProgress({ bytesTransferred: 0, totalBytes: upload.size, progress: 0 });
+      setResumeProgress(0);
 
       return storageService.resumeUpload(
         user.id,
         upload,
-        setUploadProgress,
+        (progress) => setResumeProgress(progress.progress),
         abortRef.current.signal
       );
     },
@@ -162,7 +225,7 @@ const Upload: React.FC = () => {
         return;
       }
       setError(err.message);
-      setUploadProgress(null);
+      setResumeProgress(null);
     },
     onSettled: () => setBusyKey(null),
   });
@@ -180,39 +243,67 @@ const Upload: React.FC = () => {
 
   const pauseUpload = () => abortRef.current?.abort();
 
-  /* Whether this upload is one that can be paused at all: a single PUT has no
-     parts to come back to. */
-  const isResumable = !!selectedFile && shouldUseMultipart(selectedFile.size);
+  /** The file being sent right now, if any — what the Pause button acts on. */
+  const uploading = queue.find((item) => item.status === 'uploading');
+
+  /* Only a file large enough to go up in parts can be paused and continued: a
+     single PUT has nothing to come back to. */
+  const canPause = !!uploading && shouldUseMultipart(uploading.file.size);
+
+  const addFiles = (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return;
+
+    /* Copied out of the FileList here rather than inside the updater below.
+       React runs that updater whenever it gets round to it, and by then the
+       input has been cleared — a live FileList empties with it, so the picked
+       files would arrive as none. */
+    const picked = Array.from(files);
+
+    setError('');
+    setQueue((items) => enqueue(items, picked));
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setError('');
-      setUploadProgress(null);
-    }
+    addFiles(e.target.files);
+    // Cleared so picking the same file again still fires a change event.
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(e.dataTransfer?.files ?? null);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !user?.id) return;
+    if (!user?.id) return;
+
+    const waiting = queue.filter((item) => item.status === 'pending');
+    if (waiting.length === 0) return;
 
     setError('');
-    setUploadProgress({ bytesTransferred: 0, totalBytes: selectedFile.size, progress: 0 });
 
-    // Check if storage limit would be exceeded
-    const wouldExceedLimit =
-      storageSize !== undefined && storageSize + selectedFile.size > storageLimit;
+    /* The whole selection weighed at once. Checking file by file would wave
+       through five files that fit one at a time and not together — and the
+       trigger would then refuse the last of them mid-queue. */
+    const incoming = waiting.reduce((sum, item) => sum + item.file.size, 0);
+    const wouldExceedLimit = storageSize !== undefined && storageSize + incoming > storageLimit;
 
     if (wouldExceedLimit && !isGoogleDriveConnected && !useGoogleDrive) {
       setShowGoogleDriveAlert(true);
       return;
     }
 
-    try {
-      await uploadMutation.mutateAsync(selectedFile);
-    } catch (err) {
-      // Error handled in onError
-    }
+    await runQueue();
+  };
+
+  const summary = summarise(queue);
+  const overall = overallProgress(queue);
+
+  /** Puts a paused file back in line. */
+  const retryItem = (id: string) => {
+    setQueue((items) => update(items, id, { status: 'pending', progress: 0, error: undefined }));
+    setPaused(false);
   };
 
   const handleConnectGoogleDrive = async () => {
@@ -222,10 +313,8 @@ const Upload: React.FC = () => {
       setUseGoogleDrive(true);
       setPreferredProvider(undefined);
       setShowGoogleDriveAlert(false);
-      // Retry upload after connecting
-      if (selectedFile) {
-        await uploadMutation.mutateAsync(selectedFile);
-      }
+      // Carry on with the queue that was stopped by the alert
+      await runQueue();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect Google Drive');
     }
@@ -251,36 +340,54 @@ const Upload: React.FC = () => {
 
         <IonCard>
           <IonCardHeader>
-            <IonCardTitle>Select File</IonCardTitle>
+            <IonCardTitle>Select Files</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
             <input
               type="file"
               id="file-input"
+              multiple
               style={{ display: 'none' }}
               onChange={handleFileSelect}
-              disabled={uploadMutation.isPending}
+              disabled={isUploading}
             />
-            <IonButton
-              expand="block"
-              fill="outline"
-              onClick={() => document.getElementById('file-input')?.click()}
-              disabled={uploadMutation.isPending}
-            >
-              Choose File
-            </IonButton>
 
-            {selectedFile && (
-              <IonItem style={{ marginTop: '20px' }}>
-                <IonLabel>
-                  {/* data-hj-suppress masks file names from Hotjar recordings for privacy */}
-                  <h2 data-hj-suppress>{selectedFile.name}</h2>
-                  <p>
-                    {formatFileSize(selectedFile.size)} • {selectedFile.type}
-                  </p>
-                </IonLabel>
-              </IonItem>
-            )}
+            {/* A drop target as well as a button. preventDefault on dragOver is
+                what makes a drop possible at all — without it the browser
+                opens the file instead, replacing the app with the PDF. */}
+            <div
+              className={`upload-dropzone${dragging ? ' upload-dropzone--active' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById('file-input')?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  document.getElementById('file-input')?.click();
+                }
+              }}
+              data-testid="dropzone"
+            >
+              <IonIcon icon={cloudUploadOutline} className="upload-dropzone-icon" />
+              <IonText color="dark">
+                <strong>Choose files</strong> or drop them here
+              </IonText>
+              <IonLabel color="medium" className="upload-dropzone-hint">
+                Several at a time — they go up one after another
+              </IonLabel>
+            </div>
+
+            <UploadQueue
+              items={queue}
+              running={isUploading}
+              onRemove={(id) => setQueue((items) => removeFromQueue(items, id))}
+              onRetry={retryItem}
+            />
 
             {profile?.tier === 'pro' && (
               <ProviderSelector
@@ -290,34 +397,32 @@ const Upload: React.FC = () => {
               />
             )}
 
-            {uploadProgress && (
+            {(isUploading || summary.total > 0 || resumeProgress !== null) && (
               <div style={{ marginTop: '20px' }}>
                 <IonLabel>
-                  {paused ? 'Paused at' : 'Uploading...'} {uploadProgress.progress.toFixed(1)}%
+                  {resumeProgress !== null
+                    ? `Resuming — ${resumeProgress.toFixed(0)}%`
+                    : `${
+                        isUploading
+                          ? `Uploading ${summary.done + 1} of ${summary.total}`
+                          : summaryText(summary)
+                      } — ${overall.toFixed(0)}%`}
                 </IonLabel>
-                <IonProgressBar value={uploadProgress.progress / 100} />
-                <IonLabel
-                  style={{ fontSize: '12px', color: '#666', marginTop: '5px', display: 'block' }}
-                >
-                  {formatFileSize(uploadProgress.bytesTransferred)} /{' '}
-                  {formatFileSize(uploadProgress.totalBytes)}
-                </IonLabel>
+                <IonProgressBar value={(resumeProgress ?? overall) / 100} />
 
                 {/* Only large files go up in parts, and only those can be
                     picked up again — offering to pause a single PUT would
                     promise something the protocol cannot deliver. */}
-                {isResumable &&
-                  !paused &&
-                  (uploadMutation.isPending || resumeMutation.isPending) && (
-                    <IonButton
-                      size="small"
-                      fill="outline"
-                      onClick={pauseUpload}
-                      style={{ marginTop: '10px' }}
-                    >
-                      Pause
-                    </IonButton>
-                  )}
+                {(canPause || resumeMutation.isPending) && !paused && (
+                  <IonButton
+                    size="small"
+                    fill="outline"
+                    onClick={pauseUpload}
+                    style={{ marginTop: '10px' }}
+                  >
+                    Pause
+                  </IonButton>
+                )}
 
                 {paused && (
                   <IonLabel
@@ -339,10 +444,16 @@ const Upload: React.FC = () => {
             <IonButton
               expand="block"
               onClick={handleUpload}
-              disabled={!selectedFile || uploadMutation.isPending}
+              disabled={summary.pending === 0 || isUploading}
               style={{ marginTop: '20px' }}
             >
-              {uploadMutation.isPending ? <IonSpinner name="crescent" /> : 'Upload'}
+              {isUploading ? (
+                <IonSpinner name="crescent" />
+              ) : summary.pending > 1 ? (
+                `Upload ${summary.pending} files`
+              ) : (
+                'Upload'
+              )}
             </IonButton>
           </IonCardContent>
         </IonCard>

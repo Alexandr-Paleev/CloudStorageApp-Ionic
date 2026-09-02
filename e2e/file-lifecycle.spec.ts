@@ -28,7 +28,9 @@ test.describe('A file, end to end', () => {
         mimeType: 'text/plain',
         buffer: Buffer.from('uploaded by the end-to-end suite'),
       });
-      await expect(page.locator('ion-item h2')).toHaveText(original);
+      // The picked file waits in the queue until Upload is pressed; one file
+      // is the same path as ten.
+      await expect(page.getByTestId('upload-queue')).toContainText(original);
 
       await page.locator('ion-button', { hasText: 'Upload' }).click();
 
