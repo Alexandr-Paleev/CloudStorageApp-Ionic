@@ -7,13 +7,12 @@ import {
   DEMO_RATE_WINDOW_MS,
   DEMO_SEED,
   DEMO_SWEEP_LIMIT,
-  RateLimiter,
-  clientIp,
   demoEmail,
   demoPassword,
   demoStoragePath,
   isExpiredDemoUser,
 } from '../../lib/demo';
+import { RateLimiter, clientIp, tooManyRequests } from '../../lib/rate-limit';
 
 /**
  * POST /api/demo/session — hands an anonymous visitor a signed-in account.
@@ -158,8 +157,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(404).json({ message: 'Not found' });
   }
 
-  if (!limiter.allow(clientIp(req.headers, req.socket?.remoteAddress))) {
-    return res.status(429).json({ message: 'Too many demo sessions. Try again later.' });
+  const ip = clientIp(req.headers, req.socket?.remoteAddress);
+  if (!limiter.allow(ip)) {
+    return tooManyRequests(
+      res,
+      limiter.retryAfterSeconds(ip),
+      'Too many demo sessions. Try again later.'
+    );
   }
 
   try {

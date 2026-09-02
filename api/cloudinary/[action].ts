@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { readQuota, quotaRejection } from '../../lib/quota';
+import {
+  CLOUDINARY_DELETE_LIMIT,
+  CLOUDINARY_IP_LIMIT,
+  CLOUDINARY_SIGN_LIMIT,
+  RateLimiter,
+  clientIp,
+  tooManyRequests,
+} from '../../lib/rate-limit';
 
 /**
  * Two actions, one serverless function: /api/cloudinary/sign and
@@ -12,6 +20,20 @@ import { readQuota, quotaRejection } from '../../lib/quota';
  * a thirteenth. See resolveHandler() in vite-plugin-dev-api.ts for the dev
  * server's side of the same routing.
  */
+
+/**
+ * A limit per address and one per account, as on /api/r2/presign-upload —
+ * this is the same act on the provider most of this account's files go to.
+ *
+ * The two actions are counted apart because they are not the same shape of
+ * work: signing authorizes bytes that count against the quota, while deleting
+ * gives bytes back and is the thing a person does in a run of ten. Both of
+ * them reach outside this deployment, which is what the address limit in
+ * front of the token check is really protecting.
+ */
+const byAddress = new RateLimiter(CLOUDINARY_IP_LIMIT);
+const bySigningUser = new RateLimiter(CLOUDINARY_SIGN_LIMIT);
+const byDeletingUser = new RateLimiter(CLOUDINARY_DELETE_LIMIT);
 
 /**
  * Images go to Cloudinary's image endpoint; everything else is `raw`.
@@ -144,16 +166,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
+  const ip = clientIp(req.headers, req.socket?.remoteAddress);
+  if (!byAddress.allow(ip)) {
+    tooManyRequests(
+      res,
+      byAddress.retryAfterSeconds(ip),
+      'Too many requests. Try again in a minute.'
+    );
+    return;
+  }
+
   try {
     const userId = await authenticateUser(req);
 
     const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
     if (action === 'sign') {
+      if (!bySigningUser.allow(userId)) {
+        tooManyRequests(
+          res,
+          bySigningUser.retryAfterSeconds(userId),
+          'Too many upload requests. Try again in a minute.'
+        );
+        return;
+      }
       await signUpload(req, res, userId);
       return;
     }
     if (action !== 'delete') {
       res.status(404).json({ message: `Unknown action "${action ?? ''}"` });
+      return;
+    }
+
+    // After the action is known, so an unknown segment cannot eat into the limit
+    // of the one it was misspelled from.
+    if (!byDeletingUser.allow(userId)) {
+      tooManyRequests(
+        res,
+        byDeletingUser.retryAfterSeconds(userId),
+        'Too many deletions. Try again in a minute.'
+      );
       return;
     }
 

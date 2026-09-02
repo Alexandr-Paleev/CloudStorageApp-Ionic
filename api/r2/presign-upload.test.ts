@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
 import { TIER_LIMITS } from '../../lib/tiers';
+import { PRESIGN_IP_LIMIT, PRESIGN_LIMIT, resetRateLimits } from '../../lib/rate-limit';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
@@ -49,6 +50,9 @@ function account(limit: number, used: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The limiters are module-scope singletons, so a spent limit would otherwise
+  // follow one test into the next.
+  resetRateLimits();
   signedCommands.length = 0;
   authenticateUser.mockResolvedValue('user-1');
   account(TIER_LIMITS.free.storage_limit, 0);
@@ -201,5 +205,84 @@ describe('presign-upload: the signed URL', () => {
     const res = mockResponse();
     await handler(mockRequest({ body: { fileName: 'a.bin', size: 1 } }), res);
     expect(signedCommands[0].input).toMatchObject({ ContentType: 'application/octet-stream' });
+  });
+});
+
+describe('presign-upload: rate limiting', () => {
+  const upload = (overrides: Record<string, unknown> = {}) =>
+    mockRequest({ body: { fileName: 'a.pdf', size: 1 }, ...overrides });
+
+  /** A request from a given address, so the per-address limit is isolated. */
+  const uploadFrom = (ip: string) =>
+    upload({ headers: { authorization: 'Bearer t', 'x-forwarded-for': ip } });
+
+  it('stops signing once the account has asked too often', async () => {
+    for (let i = 0; i < PRESIGN_LIMIT; i++) {
+      const ok = mockResponse();
+      await handler(upload(), ok);
+      expect(ok.statusCode).toBe(200);
+    }
+
+    const res = mockResponse();
+    await handler(upload(), res);
+
+    expect(res.statusCode).toBe(429);
+    // The limit is spent, so no further URL was signed.
+    expect(signedCommands).toHaveLength(PRESIGN_LIMIT);
+  });
+
+  it('says when to try again', async () => {
+    for (let i = 0; i <= PRESIGN_LIMIT; i++) {
+      await handler(upload(), mockResponse());
+    }
+    const res = mockResponse();
+    await handler(upload(), res);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', expect.stringMatching(/^[1-9]\d*$/));
+  });
+
+  it('charges the account, not the address it shares with everyone else', async () => {
+    for (let i = 0; i < PRESIGN_LIMIT; i++) {
+      await handler(upload(), mockResponse());
+    }
+
+    authenticateUser.mockResolvedValue('user-2');
+    const res = mockResponse();
+    await handler(upload(), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('caps an address before it validates a token', async () => {
+    // Validating one costs a round trip to Supabase, so a caller with no valid
+    // token must not be able to buy that work by asking repeatedly.
+    for (let i = 0; i < PRESIGN_IP_LIMIT; i++) {
+      await handler(uploadFrom('203.0.113.9'), mockResponse());
+    }
+
+    authenticateUser.mockClear();
+    const res = mockResponse();
+    await handler(uploadFrom('203.0.113.9'), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(authenticateUser).not.toHaveBeenCalled();
+  });
+
+  it('does not answer 429 to a method it would refuse anyway', async () => {
+    // 405 first: a GET was never going to sign anything, and counting it would
+    // let a misconfigured client eat into the limit of a caller who could.
+    const res = mockResponse();
+    await handler(mockRequest({ method: 'GET' }), res);
+    expect(res.statusCode).toBe(405);
+  });
+
+  it('leaves the quota to the quota', async () => {
+    // Being under the rate limit says nothing about having room to store the
+    // file; the two refusals are different and answer differently.
+    account(TIER_LIMITS.free.storage_limit, TIER_LIMITS.free.storage_limit);
+    const res = mockResponse();
+    await handler(upload(), res);
+
+    expect(res.statusCode).toBe(413);
   });
 });

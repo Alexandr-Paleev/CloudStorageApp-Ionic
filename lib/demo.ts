@@ -103,63 +103,7 @@ export function demoStoragePath(userId: string, name: string, timestamp: number)
   return `${userId}/${timestamp}_${name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 }
 
-/**
- * A fixed-window limiter held in module scope.
- *
- * Honest about what this is: Vercel runs several instances and recycles them,
- * so the ceiling is per-instance and resets on a cold start. That is enough to
- * stop a loop from creating accounts faster than the sweep removes them, and it
- * is not a defence against a distributed attempt. A shared counter (Vercel KV,
- * Upstash) is the real answer and is what every other /api route needs too.
- */
-export class RateLimiter {
-  private hits = new Map<string, number[]>();
-
-  constructor(
-    private readonly limit: number,
-    private readonly windowMs: number
-  ) {}
-
-  allow(key: string, now: number = Date.now()): boolean {
-    const cutoff = now - this.windowMs;
-
-    // Sweeping every call keeps the map bounded by the number of active keys
-    // rather than by every key ever seen.
-    for (const [k, times] of this.hits) {
-      const live = times.filter((t) => t > cutoff);
-      if (live.length === 0) this.hits.delete(k);
-      else this.hits.set(k, live);
-    }
-
-    const times = this.hits.get(key) ?? [];
-    if (times.length >= this.limit) return false;
-
-    times.push(now);
-    this.hits.set(key, times);
-    return true;
-  }
-}
-
-/**
- * The address a rate limit should count against.
- *
- * Vercel always sets x-forwarded-for, so production takes the first branch.
- * The other two matter where it does not — `npm run dev`, `vercel dev`, a
- * self-hosted deployment behind a proxy that was never configured to forward
- * it. Falling straight through to a single "unknown" bucket there means every
- * visitor shares one budget, which is how this locked out its own test suite
- * on the fifth run.
- */
-export function clientIp(
-  headers: Record<string, string | string[] | undefined>,
-  socketAddress?: string
-): string {
-  const first = (value: string | string[] | undefined) => {
-    const raw = Array.isArray(value) ? value[0] : value;
-    return raw?.split(',')[0]?.trim();
-  };
-
-  return (
-    first(headers['x-forwarded-for']) || first(headers['x-real-ip']) || socketAddress || 'unknown'
-  );
-}
+/* The limiter these two constants feed, and the address it counts against, now
+   live in lib/rate-limit.ts: /api/share and /api/r2/presign-upload needed the
+   same thing, and the copy that guarded this endpoint was the only one there
+   was. */
