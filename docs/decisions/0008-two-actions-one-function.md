@@ -1,6 +1,6 @@
 # 0008 — Two Cloudinary actions share one serverless function
 
-Accepted · unreleased · [`api/cloudinary/[action].ts`](../../api/cloudinary/%5Baction%5D.ts)
+Accepted · shipped in v4.0.0 · [`api/cloudinary/[action].ts`](../../api/cloudinary/%5Baction%5D.ts)
 
 ## Context
 

@@ -65,5 +65,6 @@ Fixed, documented, and kept in the open rather than quietly patched:
 ## What runs on every pull request
 
 `npm audit --omit=dev --audit-level=high` fails the build on a high-severity
-advisory in production dependencies. Lint, both type-checks, 401 unit tests and
-24 Playwright tests run alongside it, and `main` requires them to pass.
+advisory in production dependencies. Lint, both type-checks, a bundle-size
+budget, Lighthouse, 466 unit tests and 28 Playwright tests run alongside it, and
+`main` requires them to pass.

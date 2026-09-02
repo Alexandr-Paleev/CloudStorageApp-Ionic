@@ -12,6 +12,14 @@ import { test, expect, submitUpload, supabaseReady } from './fixtures';
 test.describe('Folders', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
+  /* Six seconds when it runs alone, over thirty when four workers are busy on
+     a hosted runner — measured, not guessed: the flaky retries pass in 6.2s
+     while the first attempt times out. The retry loop below can spend twenty
+     of the default thirty on its own before this test reaches its first
+     assertion, which leaves nothing for the rest of it. The budget is the
+     problem here, not the speed. */
+  test.describe.configure({ timeout: 90_000 });
+
   test('a file uploaded into a folder stays out of the root listing', async ({ page }) => {
     const folder = `e2e-folder-${Date.now()}`;
     const inside = `e2e-inside-${Date.now()}.txt`;
