@@ -12,11 +12,23 @@ export class R2Provider implements IStorageProvider {
   async upload(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    options?: { signal?: AbortSignal; folderId?: string | null }
   ): Promise<StorageUploadResult> {
-    const result = await r2Service.uploadFile(file, userId, (p) => {
-      if (onProgress) onProgress({ bytesTransferred: 0, totalBytes: file.size, progress: p });
-    });
+    const result = await r2Service.uploadFile(
+      file,
+      userId,
+      (p) => {
+        if (onProgress) {
+          onProgress({
+            bytesTransferred: Math.round((p / 100) * file.size),
+            totalBytes: file.size,
+            progress: p,
+          });
+        }
+      },
+      options
+    );
     return {
       url: result.url,
       path: result.key,

@@ -35,6 +35,16 @@ reasoning behind the larger decisions lives in
   a share link opened by an anonymous second browser context, quota refusals,
   folder scoping and the demo entry point. Every test gets its own account from
   a fixture rather than sharing one.
+- **Resumable uploads.** A file over 16 MB goes to R2 in parts, each retried on
+  its own, and can be paused and picked up again — including after a reload, a
+  crash or a lost connection. The ETags and the file itself are kept in
+  IndexedDB, so nothing about resuming needs server state
+  ([ADR 0009](docs/decisions/0009-resumable-uploads-keep-state-in-the-browser.md)).
+  The upload page lists unfinished uploads with how much of each is already in
+  storage, and offers to resume or discard them. Covered end to end with R2 stubbed
+  through `page.route`: parts, a pause, a reload, a resume that sends only what
+  was missing, a discard that reaches `multipart-abort`, and a part the network
+  refused once.
 - **A bundle-size budget** (`npm run size`) that fails CI when what the browser
   fetches before first paint grows past a ceiling set just above today's build,
   and prints the table onto the run page.
@@ -44,6 +54,15 @@ reasoning behind the larger decisions lives in
   `SECURITY.md`, and this changelog.
 
 ### Changed
+- **The three R2 routes became one.** `/api/r2/presign-upload`,
+  `presign-download` and `delete` now resolve to `api/r2/[action].ts`, which
+  also serves the four multipart actions. The paths did not change; the Hobby
+  plan's twelve-function ceiling was already reached, and this returned two
+  slots while adding four routes
+  ([ADR 0008](docs/decisions/0008-two-actions-one-function.md)).
+- A paused or cancelled upload is no longer retried. `isRetriableError` treated
+  an abort as an unknown failure worth another attempt, which restarted work
+  the user had just stopped — three times, with backoff.
 
 - **Cloudinary uploads are signed per request.** They used to go through an
   unsigned upload preset, which is writable by anyone holding the cloud name —

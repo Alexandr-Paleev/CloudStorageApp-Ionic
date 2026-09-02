@@ -37,7 +37,10 @@ export interface IStorageProvider {
   upload(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    /** Only R2 acts on these today: it is the one provider whose uploads are
+     *  long enough to be worth pausing and resuming. The rest ignore them. */
+    options?: { signal?: AbortSignal; folderId?: string | null }
   ): Promise<StorageUploadResult>;
 
   /**

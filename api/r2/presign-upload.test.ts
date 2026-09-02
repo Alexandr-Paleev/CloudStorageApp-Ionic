@@ -35,7 +35,15 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
   },
 }));
 
-import handler from './presign-upload';
+import handler from './[action]';
+
+/**
+ * The seven R2 routes share one function now (see api/r2/[action].ts), so the
+ * segment Vercel would have matched has to be supplied by hand. Everything in
+ * this file exercises the presign-upload action.
+ */
+const withAction = (overrides: Record<string, unknown> = {}) =>
+  mockRequest({ query: { action: 'presign-upload' }, ...overrides });
 
 function setupTables(profile: TableAnswer, files: TableAnswer) {
   db.client = mockSupabase({ profiles: profile, files }).client;
@@ -61,20 +69,20 @@ beforeEach(() => {
 describe('presign-upload: request validation', () => {
   it('refuses anything but POST', async () => {
     const res = mockResponse();
-    await handler(mockRequest({ method: 'GET' }), res);
+    await handler(withAction({ method: 'GET' }), res);
     expect(res.statusCode).toBe(405);
   });
 
   it('answers 401 when the caller is not authenticated', async () => {
     authenticateUser.mockRejectedValue(new FakeAuthError('Missing authorization token'));
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 1 } }), res);
     expect(res.statusCode).toBe(401);
   });
 
   it('requires a file name', async () => {
     const res = mockResponse();
-    await handler(mockRequest({ body: { size: 1 } }), res);
+    await handler(withAction({ body: { size: 1 } }), res);
     expect(res.statusCode).toBe(400);
   });
 
@@ -86,7 +94,7 @@ describe('presign-upload: request validation', () => {
     ['Infinity', Number.POSITIVE_INFINITY],
   ])('rejects a size that is %s', async (_label, size) => {
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size } }), res);
     expect(res.statusCode).toBe(400);
   });
 });
@@ -95,7 +103,7 @@ describe('presign-upload: quota enforcement', () => {
   it('signs an upload that fits', async () => {
     account(TIER_LIMITS.free.storage_limit, 100 * MB);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ uploadUrl: 'https://r2.example/signed-url' });
@@ -104,7 +112,7 @@ describe('presign-upload: quota enforcement', () => {
   it('refuses an upload that would cross the limit', async () => {
     account(TIER_LIMITS.free.storage_limit, 495 * MB);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
 
     expect(res.statusCode).toBe(413);
     expect(signedCommands).toHaveLength(0);
@@ -114,14 +122,14 @@ describe('presign-upload: quota enforcement', () => {
     // Exactly at the limit: nothing stored is over quota, but the file is.
     account(100, 100);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 1 } }), res);
     expect(res.statusCode).toBe(413);
   });
 
   it('states the numbers in units a person can read', async () => {
     account(TIER_LIMITS.free.storage_limit, 495 * MB);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 10 * MB } }), res);
 
     const { message } = res.body as { message: string };
     expect(message).toContain('500.0 MB');
@@ -132,7 +140,7 @@ describe('presign-upload: quota enforcement', () => {
     // Cancelling Pro drops the limit to 500 MB with 3 GB already stored.
     account(TIER_LIMITS.free.storage_limit, 3 * GB);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 1 } }), res);
 
     expect(res.statusCode).toBe(413);
     expect((res.body as { message: string }).message).toMatch(/over the limit/);
@@ -141,7 +149,7 @@ describe('presign-upload: quota enforcement', () => {
   it('honours the tier stored on the profile, not a hardcoded free limit', async () => {
     account(TIER_LIMITS.pro.storage_limit, 2 * GB);
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'big.zip', size: 1 * GB } }), res);
+    await handler(withAction({ body: { fileName: 'big.zip', size: 1 * GB } }), res);
 
     expect(res.statusCode).toBe(200);
   });
@@ -151,7 +159,7 @@ describe('presign-upload: quota enforcement', () => {
     // and reject a legitimate upload with 413.
     setupTables({ error: { message: 'connection reset' } }, { data: [] });
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 1 } }), res);
 
     expect(res.statusCode).toBe(500);
     expect(res.statusCode).not.toBe(413);
@@ -162,7 +170,7 @@ describe('presign-upload: quota enforcement', () => {
     // ever land out of order, the log should say which one is missing.
     setupTables({ error: { message: 'column profiles.bytes_used does not exist' } }, { data: [] });
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 1 } }), res);
 
     expect(res.statusCode).toBe(500);
     expect((res.body as { message: string }).message).toContain('migrations/007');
@@ -172,7 +180,7 @@ describe('presign-upload: quota enforcement', () => {
     setupTables({ data: [] }, { data: [] });
     const res = mockResponse();
     await handler(
-      mockRequest({ body: { fileName: 'a.pdf', size: TIER_LIMITS.free.storage_limit + 1 } }),
+      withAction({ body: { fileName: 'a.pdf', size: TIER_LIMITS.free.storage_limit + 1 } }),
       res
     );
 
@@ -185,7 +193,7 @@ describe('presign-upload: the signed URL', () => {
     // Without ContentLength in the signature the client could upload something
     // far larger than the quota check approved.
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.pdf', size: 42 } }), res);
+    await handler(withAction({ body: { fileName: 'a.pdf', size: 42 } }), res);
 
     expect(res.statusCode).toBe(200);
     expect(signedCommands[0].input).toMatchObject({ ContentLength: 42 });
@@ -194,7 +202,7 @@ describe('presign-upload: the signed URL', () => {
   it('scopes the key to the caller, whatever name they send', async () => {
     authenticateUser.mockResolvedValue('user-abc');
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: '../../escape.pdf', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: '../../escape.pdf', size: 1 } }), res);
 
     const { key } = res.body as { key: string };
     expect(key.startsWith('users/user-abc/')).toBe(true);
@@ -203,14 +211,14 @@ describe('presign-upload: the signed URL', () => {
 
   it('defaults the content type rather than signing an empty one', async () => {
     const res = mockResponse();
-    await handler(mockRequest({ body: { fileName: 'a.bin', size: 1 } }), res);
+    await handler(withAction({ body: { fileName: 'a.bin', size: 1 } }), res);
     expect(signedCommands[0].input).toMatchObject({ ContentType: 'application/octet-stream' });
   });
 });
 
 describe('presign-upload: rate limiting', () => {
   const upload = (overrides: Record<string, unknown> = {}) =>
-    mockRequest({ body: { fileName: 'a.pdf', size: 1 }, ...overrides });
+    withAction({ body: { fileName: 'a.pdf', size: 1 }, ...overrides });
 
   /** A request from a given address, so the per-address limit is isolated. */
   const uploadFrom = (ip: string) =>
@@ -272,7 +280,7 @@ describe('presign-upload: rate limiting', () => {
     // 405 first: a GET was never going to sign anything, and counting it would
     // let a misconfigured client eat into the limit of a caller who could.
     const res = mockResponse();
-    await handler(mockRequest({ method: 'GET' }), res);
+    await handler(withAction({ method: 'GET' }), res);
     expect(res.statusCode).toBe(405);
   });
 

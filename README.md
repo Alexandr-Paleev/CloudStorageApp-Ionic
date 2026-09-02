@@ -105,6 +105,7 @@ Share links are listed on the file they belong to, with their state and a way to
 - ✅ **500 MB** free per user, **5 GB** on Pro
 - ✅ Five backends: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
 - ✅ Images routed to Cloudinary, other files to R2/Supabase — Pro users can pick a provider by hand
+- ✅ Files over 16 MB go to R2 in parts, and can be paused and resumed — including after a reload
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
 - ✅ Quota is enforced in the database, on every path. A file exists in this app
@@ -270,6 +271,34 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      without having one here, and it is the path on which the storage quota was
      checked by nothing but the browser.
 3. Enable PDF delivery: Settings → Security → Allow delivery of PDF and ZIP files
+
+#### Cloudflare R2
+
+1. Create a bucket and an API token with object read/write on it, then set
+   `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET_NAME`
+   server-side, plus `VITE_R2_BUCKET_NAME` so the client knows R2 is available.
+2. **Add a CORS policy to the bucket.** Uploads go from the browser straight to
+   R2, so without one every upload fails at the preflight:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://your-project.vercel.app", "http://localhost:8100"],
+       "AllowedMethods": ["GET", "PUT"],
+       "AllowedHeaders": ["*"],
+       "ExposeHeaders": ["ETag"]
+     }
+   ]
+   ```
+
+   `ExposeHeaders: ["ETag"]` is the line that is easy to miss and hard to
+   diagnose. Large files go up in parts, and the browser has to read each
+   part's `ETag` to tell R2 how to reassemble them; without it the parts upload
+   perfectly and the final assembly is rejected. The client says so by name
+   rather than letting that happen.
+3. Optional but recommended: a lifecycle rule that aborts incomplete multipart
+   uploads after a few days. An upload nobody resumes leaves its parts in the
+   bucket, and they are billable.
 
 #### Vercel API (for file deletion)
 
@@ -706,7 +735,9 @@ npm run generate:demo-assets
 
 GitHub Actions runs lint, both type-check passes, an audit of production
 dependencies, a bundle-size budget, Lighthouse, unit and e2e tests on every
-pull request. `main` is protected:
+pull request. The e2e suite runs against two dev servers: one as deployed, and
+one with `VITE_R2_BUCKET_NAME` set, where the resumable-upload spec answers
+every `/api/r2/*` call itself. `main` is protected:
 those checks are required, and changes land through pull requests only.
 
 ### What the tests cover, and what they deliberately do not
