@@ -1,3 +1,5 @@
+import { idbRun, type DatabaseSpec } from './idb';
+
 /**
  * Changes made while the network was not there.
  *
@@ -32,6 +34,16 @@ export type PendingOp =
 export interface QueuedMutation {
   id: string;
   op: PendingOp;
+  /**
+   * Who made the change.
+   *
+   * A device can be shared, and an account can be switched between queueing
+   * and sending. Without this the queue is executed as whoever happens to be
+   * signed in when the network returns — one person's deletions running
+   * against another person's files, and one person's pending changes hiding
+   * rows on another person's dashboard.
+   */
+  userId: string;
   createdAt: number;
   attempts: number;
   lastError?: string;
@@ -210,67 +222,20 @@ export function looksOffline(error: unknown): boolean {
   );
 }
 
-const DB_NAME = 'cloud-storage-mutations';
-const DB_VERSION = 1;
-const STORE = 'pending';
+const DATABASE: DatabaseSpec = {
+  name: 'cloud-storage-mutations',
+  version: 1,
+  stores: [{ name: 'pending', options: { keyPath: 'id' } }],
+};
 
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available'));
-      return;
-    }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: 'id' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open the mutation queue'));
-  });
-}
-
-/**
- * One IndexedDB request, as a promise that settles when the data is really
- * there.
- *
- * On `transaction.oncomplete`, not on `request.onsuccess`: the request
- * succeeding only means the write was accepted, and the transaction can still
- * be in flight. Resolving early means the next read — the one that counts what
- * is queued — can open its own transaction first and answer with the state
- * from before the write.
- */
-function run<T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => IDBRequest<T>) {
-  return open().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(STORE, mode);
-        const request = work(tx.objectStore(STORE));
-
-        let result: T;
-        request.onsuccess = () => {
-          result = request.result;
-        };
-        request.onerror = () => reject(request.error ?? new Error('Mutation queue request failed'));
-
-        tx.oncomplete = () => {
-          db.close();
-          resolve(result);
-        };
-        tx.onabort = () => {
-          db.close();
-          reject(tx.error ?? new Error('Mutation queue transaction aborted'));
-        };
-      })
-  );
-}
+const run = <T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => IDBRequest<T>) =>
+  idbRun(DATABASE, 'pending', mode, work);
 
 export interface MutationStore {
-  add(op: PendingOp): Promise<QueuedMutation>;
-  list(): Promise<QueuedMutation[]>;
+  add(op: PendingOp, userId: string): Promise<QueuedMutation>;
+  /** Only this account's changes. Everything reads through here, so nobody
+   *  sees or sends somebody else's. */
+  list(userId: string): Promise<QueuedMutation[]>;
   save(entry: QueuedMutation): Promise<void>;
   remove(id: string): Promise<void>;
 }
@@ -281,21 +246,26 @@ export interface MutationStore {
  * back.
  */
 export const mutationStore: MutationStore = {
-  async add(op) {
+  async add(op, userId) {
     const entry: QueuedMutation = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       op,
+      userId,
       createdAt: Date.now(),
       attempts: 0,
     };
+    /* Deliberately not swallowed, unlike the reads below. A write that fails
+       silently is a change the user was told was kept and was not. */
     await run('readwrite', (store) => store.put(entry));
     return entry;
   },
 
-  async list() {
+  async list(userId) {
     try {
       const all = await run<QueuedMutation[]>('readonly', (store) => store.getAll());
-      return all.sort((a, b) => a.createdAt - b.createdAt);
+      return all
+        .filter((entry) => entry.userId === userId)
+        .sort((a, b) => a.createdAt - b.createdAt);
     } catch {
       return [];
     }
@@ -335,9 +305,10 @@ export interface FlushResult {
  */
 export async function flushQueue(
   perform: (op: PendingOp) => Promise<void>,
+  userId: string,
   store: MutationStore = mutationStore
 ): Promise<FlushResult> {
-  const all = await store.list();
+  const all = await store.list(userId);
   const queued = coalesce(all);
   const discarded: QueuedMutation[] = [];
 
@@ -378,6 +349,6 @@ export async function flushQueue(
     }
   }
 
-  const rest = await store.list();
+  const rest = await store.list(userId);
   return { sent, failed, discarded, remaining: rest.length };
 }

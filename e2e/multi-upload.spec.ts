@@ -71,7 +71,9 @@ test.describe('Uploading several files', () => {
     });
 
     await test.step('a file can be taken out before the run starts', async () => {
-      await page.getByLabel(`Remove ${names[2]}`).click();
+      // Scoped to the ion-button: the aria-label lands on it and on the native
+      // button it renders, which is two matches for one control.
+      await page.locator(`ion-button[aria-label="Remove ${names[2]}"]`).click();
       await expect(page.locator('.upload-queue-item')).toHaveCount(2);
     });
 

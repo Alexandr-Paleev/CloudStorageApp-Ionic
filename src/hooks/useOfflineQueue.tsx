@@ -26,6 +26,20 @@ import {
 const OFFLINE_QUEUE_KEY = ['offlineQueue'] as const;
 
 /**
+ * Runs a rename through the same validation the service would have applied.
+ *
+ * Imported lazily for the same reason the storage layer is: this provider is
+ * mounted at the root of the app and the schema is not needed until somebody
+ * renames something.
+ */
+async function sanitiseOp(op: PendingOp): Promise<PendingOp> {
+  if (op.kind !== 'renameFile' && op.kind !== 'renameFolder') return op;
+
+  const { validateAndSanitizeName } = await import('../schemas/file.schema');
+  return { ...op, name: validateAndSanitizeName(op.name) };
+}
+
+/**
  * Changes made offline, and the moment they are sent.
  *
  * The queue itself is in services/mutation-queue.ts; this is the part that
@@ -46,8 +60,9 @@ function useOfflineQueueState() {
      survive the trip — the mutation runs in one instance of this hook and the
      list is rendered from another. */
   const { data: queued = [] } = useQuery({
-    queryKey: OFFLINE_QUEUE_KEY,
-    queryFn: () => mutationStore.list(),
+    queryKey: [...OFFLINE_QUEUE_KEY, user?.id],
+    queryFn: () => mutationStore.list(user!.id),
+    enabled: !!user?.id,
     /* Without this the query is paused exactly when it matters: TanStack holds
        queries while the browser reports no network, and IndexedDB does not
        need one. */
@@ -95,10 +110,13 @@ function useOfflineQueueState() {
   const flushing = useRef<Promise<FlushResult> | null>(null);
 
   const flush = useCallback(async () => {
+    /* Nothing to send on behalf of nobody — and asking would run one account's
+       queue as another. */
+    if (!user?.id) return { sent: 0, failed: 0, discarded: [], remaining: 0 };
     if (flushing.current) return flushing.current;
 
     const run = (async () => {
-      const result = await flushQueue(perform);
+      const result = await flushQueue(perform, user!.id);
       await refresh();
       setLastResult(result);
 
@@ -125,10 +143,17 @@ function useOfflineQueueState() {
     flushing.current = run;
     try {
       return await run;
+    } catch (error) {
+      /* Never rejects. The online handler calls this as `void flush()`, so a
+         rejection here is an unhandled promise rejection rather than anything
+         a user or a caller can act on — and the queue is still on disk, which
+         is the part that matters. */
+      Sentry.captureException(error, { tags: { context: 'offlineQueue.flush' } });
+      return { sent: 0, failed: 0, discarded: [], remaining: ops.length };
     } finally {
       flushing.current = null;
     }
-  }, [perform, refresh, queryClient, user?.id]);
+  }, [perform, refresh, queryClient, user, ops.length]);
 
   /**
    * Does the thing, or writes it down if the network is not there.
@@ -149,8 +174,18 @@ function useOfflineQueueState() {
          reliably fail: it can hang on a token refresh that will never happen,
          and a change waiting inside a promise nobody watches is exactly what
          this queue exists to prevent. */
+      if (!user?.id) throw new NotSignedIn();
+
+      /* Sanitised before it is written down, because the offline path skips
+         the service that would otherwise do it. Without this an impossible
+         name is accepted, shown on the dashboard as though it had been saved,
+         and then refused three times by the server and thrown away — and even
+         a valid name would be displayed unsanitised, differing from what the
+         server eventually stores. */
+      const checked = await sanitiseOp(op);
+
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        await mutationStore.add(op);
+        await mutationStore.add(checked, user.id);
         await refresh();
         return { queued: true };
       }
@@ -168,12 +203,12 @@ function useOfflineQueueState() {
       } catch (error) {
         if (!looksOffline(error)) throw error;
 
-        await mutationStore.add(op);
+        await mutationStore.add(checked, user.id);
         await refresh();
         return { queued: true };
       }
     },
-    [refresh]
+    [refresh, user]
   );
 
   useEffect(() => {

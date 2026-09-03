@@ -36,6 +36,7 @@ import {
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import OfflineQueueBanner from '../components/OfflineQueueBanner';
 import storageService from '../services/storage.service';
 import shareService from '../services/share.service';
 import ShareLinks from '../components/ShareLinks';
@@ -49,6 +50,16 @@ const FileView: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const offlineQueue = useOfflineQueue();
+
+  /* A rename queued offline has to be visible here, or the page keeps showing
+     the old name and the only reasonable conclusion is that it did not work —
+     so the user renames it again, and the queue grows a second entry for a
+     decision they made once. */
+  const queuedRename = offlineQueue.ops.find(
+    (op): op is Extract<typeof op, { kind: 'renameFile' }> =>
+      op.kind === 'renameFile' && op.fileId === fileId
+  );
+  const queuedName = queuedRename?.name;
   const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -131,7 +142,7 @@ const FileView: React.FC = () => {
 
   const handleRename = () => {
     if (file) {
-      setNewName(file.name);
+      setNewName(queuedName ?? file.name);
       setShowRenameModal(true);
     }
   };
@@ -251,6 +262,12 @@ const FileView: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
+          <OfflineQueueBanner
+            pending={offlineQueue.pending}
+            discarded={offlineQueue.lastResult?.discarded ?? []}
+            onRetry={() => offlineQueue.flush()}
+          />
+
           <div className="file-view-loader">
             <IonSpinner color="primary" />
           </div>
@@ -290,7 +307,7 @@ const FileView: React.FC = () => {
               <IonIcon icon={arrowBack} />
             </IonButton>
           </IonButtons>
-          <IonTitle>{file.name}</IonTitle>
+          <IonTitle>{queuedName ?? file.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
 

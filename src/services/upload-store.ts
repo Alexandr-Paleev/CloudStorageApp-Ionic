@@ -1,3 +1,5 @@
+import { idbRun, type DatabaseSpec } from './idb';
+
 /**
  * The record of an upload that has not finished yet.
  *
@@ -11,6 +13,57 @@
  * a previous session, so the alternative is asking them to find the file
  * again, which is not resuming.
  */
+
+export interface CompletedPart {
+  partNumber: number;
+  etag: string;
+}
+
+export interface PendingUpload {
+  /** The object key, which is also this record's primary key: R2 hands it out
+   *  once and it is unique per upload by construction (it carries a timestamp
+   *  and the user id). */
+  key: string;
+  uploadId: string;
+  fileName: string;
+  size: number;
+  contentType: string;
+  partSize: number;
+  partCount: number;
+  /** Parts R2 has acknowledged, with the ETags the completion needs. */
+  completed: CompletedPart[];
+  file: File;
+  folderId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+const DATABASE: DatabaseSpec = {
+  name: 'cloud-storage-uploads',
+  version: 2,
+  stores: [{ name: 'pending', options: { keyPath: 'key' } }, { name: 'files' }],
+};
+
+/**
+ * Two stores, and the reason is write amplification.
+ *
+ * The bookkeeping is rewritten after every part that lands — that is what makes
+ * an upload resumable at any point. With the File in the same record, so was
+ * the file: a two-gigabyte upload in 250 parts would have handed IndexedDB two
+ * gigabytes 250 times. Chrome keeps a disk-backed File by reference, so the
+ * real cost varies, but nothing about the design should depend on that.
+ *
+ * The file is written once, when the upload opens, and read back only when
+ * there is something to resume.
+ */
+const STORE = 'pending';
+const BLOBS = 'files';
+
+const run = <T>(
+  mode: IDBTransactionMode,
+  work: (store: IDBObjectStore) => IDBRequest<T>,
+  storeName: string = STORE
+) => idbRun(DATABASE, storeName, mode, work);
 
 /** What the metadata store holds: everything but the bytes. */
 type StoredRecord = Omit<PendingUpload, 'file'>;
@@ -45,69 +98,9 @@ export interface PendingUpload {
   updatedAt: number;
 }
 
-const DB_NAME = 'cloud-storage-uploads';
-const DB_VERSION = 2;
-
-/**
- * Two stores, and the reason is write amplification.
- *
- * The bookkeeping is rewritten after every part that lands — that is what makes
- * an upload resumable at any point. With the File in the same record, so was
- * the file: a two-gigabyte upload in 250 parts would have handed IndexedDB two
- * gigabytes 250 times. Chrome keeps a disk-backed File by reference, so the
- * real cost varies, but nothing about the design should depend on that.
- *
- * The file is written once, when the upload opens, and read back only when
- * there is something to resume.
- */
-const STORE = 'pending';
-const BLOBS = 'files';
-
 /** Records older than this are rubbish: R2's own lifecycle rule sweeps
  *  abandoned parts, and a week-old File reference is usually stale anyway. */
 export const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available'));
-      return;
-    }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: 'key' });
-      }
-      if (!db.objectStoreNames.contains(BLOBS)) {
-        db.createObjectStore(BLOBS);
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Could not open the upload store'));
-  });
-}
-
-function run<T>(
-  mode: IDBTransactionMode,
-  work: (store: IDBObjectStore) => IDBRequest<T>,
-  storeName: string = STORE
-): Promise<T> {
-  return open().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(storeName, mode);
-        const request = work(tx.objectStore(storeName));
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error('Upload store request failed'));
-        tx.oncomplete = () => db.close();
-      })
-  );
-}
 
 export interface UploadStore {
   /** Writes the file and the bookkeeping. Called once, when the upload opens. */

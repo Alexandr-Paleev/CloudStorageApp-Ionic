@@ -14,19 +14,21 @@ vi.mock('../services/storage.service', () => ({ default: {} }));
 function Probe() {
   const offline = useOfflineQueue();
 
+  const queueIt = (op: queue.PendingOp) =>
+    offline
+      .runOrQueue(op, async () => {
+        throw new TypeError('Failed to fetch');
+      })
+      .catch(() => undefined);
+
   return (
     <div>
       <span data-testid="count">{offline.ops.length}</span>
+      <button onClick={() => queueIt({ kind: 'deleteFile', fileId: 'f1' })}>delete</button>
       <button
-        onClick={() =>
-          offline
-            .runOrQueue({ kind: 'deleteFile', fileId: 'f1' }, async () => {
-              throw new TypeError('Failed to fetch');
-            })
-            .catch(() => undefined)
-        }
+        onClick={() => queueIt({ kind: 'renameFile', fileId: 'f1', name: '  report .pdf  ' })}
       >
-        delete
+        rename
       </button>
     </div>
   );
@@ -43,18 +45,21 @@ function show() {
   );
 }
 
+let stored: queue.QueuedMutation[] = [];
+
 beforeEach(async () => {
   vi.restoreAllMocks();
   /* The hook asks before it tries: with the browser reporting no network the
      change is written down without a request being made at all. */
   vi.stubGlobal('navigator', { onLine: false });
   const rows: queue.QueuedMutation[] = [];
-  vi.spyOn(queue.mutationStore, 'add').mockImplementation(async (op) => {
-    const entry = { id: `q${rows.length}`, op, createdAt: rows.length, attempts: 0 };
+  vi.spyOn(queue.mutationStore, 'add').mockImplementation(async (op, userId) => {
+    const entry = { id: `q${rows.length}`, op, userId, createdAt: rows.length, attempts: 0 };
     rows.push(entry);
     return entry;
   });
   vi.spyOn(queue.mutationStore, 'list').mockImplementation(async () => rows);
+  stored = rows;
   vi.spyOn(queue.mutationStore, 'remove').mockResolvedValue(undefined);
 });
 
@@ -71,5 +76,26 @@ describe('the offline queue, as a component sees it', () => {
     screen.getByText('delete').click();
 
     await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('1'));
+  });
+});
+
+describe('a name queued offline', () => {
+  it('is sanitised before it is written down', async () => {
+    // The offline path skips the service that would normally do it, so an
+    // impossible name would be shown as saved and then refused three times by
+    // the server and thrown away.
+    show();
+    screen.getByText('rename').click();
+
+    await waitFor(() => expect(stored).toHaveLength(1));
+    expect((stored[0].op as { name: string }).name).toBe('report .pdf');
+  });
+
+  it('is recorded against the account that made it', async () => {
+    show();
+    screen.getByText('delete').click();
+
+    await waitFor(() => expect(stored).toHaveLength(1));
+    expect(stored[0].userId).toBe('user-1');
   });
 });

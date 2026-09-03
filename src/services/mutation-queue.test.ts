@@ -15,9 +15,12 @@ import {
 } from './mutation-queue';
 
 let clock = 1_000;
+const OWNER = 'user-1';
+
 const queued = (op: PendingOp, overrides: Partial<QueuedMutation> = {}): QueuedMutation => ({
   id: `q${clock}`,
   op,
+  userId: OWNER,
   createdAt: clock++,
   attempts: 0,
   ...overrides,
@@ -27,13 +30,13 @@ const queued = (op: PendingOp, overrides: Partial<QueuedMutation> = {}): QueuedM
 function fakeStore(entries: QueuedMutation[] = []) {
   let rows = [...entries];
   const store: MutationStore = {
-    async add(op) {
-      const entry = queued(op);
+    async add(op, userId) {
+      const entry = queued(op, { userId });
       rows.push(entry);
       return entry;
     },
-    async list() {
-      return [...rows].sort((a, b) => a.createdAt - b.createdAt);
+    async list(userId) {
+      return rows.filter((row) => row.userId === userId).sort((a, b) => a.createdAt - b.createdAt);
     },
     async save(entry) {
       rows = rows.map((row) => (row.id === entry.id ? entry : row));
@@ -179,9 +182,13 @@ describe('flushQueue', () => {
     ]);
     const seen: string[] = [];
 
-    const result = await flushQueue(async (op) => {
-      seen.push(op.kind);
-    }, store);
+    const result = await flushQueue(
+      async (op) => {
+        seen.push(op.kind);
+      },
+      OWNER,
+      store
+    );
 
     expect(seen).toEqual(['renameFile', 'deleteFile']);
     expect(result).toMatchObject({ sent: 2, failed: 0, remaining: 0 });
@@ -195,9 +202,13 @@ describe('flushQueue', () => {
     ]);
     const names: string[] = [];
 
-    await flushQueue(async (op) => {
-      names.push((op as { name: string }).name);
-    }, store);
+    await flushQueue(
+      async (op) => {
+        names.push((op as { name: string }).name);
+      },
+      OWNER,
+      store
+    );
 
     expect(names).toEqual(['second']);
   });
@@ -212,10 +223,14 @@ describe('flushQueue', () => {
     ]);
     let calls = 0;
 
-    const result = await flushQueue(async () => {
-      calls += 1;
-      if (calls === 2) throw new TypeError('Failed to fetch');
-    }, store);
+    const result = await flushQueue(
+      async () => {
+        calls += 1;
+        if (calls === 2) throw new TypeError('Failed to fetch');
+      },
+      OWNER,
+      store
+    );
 
     expect(calls).toBe(2);
     expect(result.sent).toBe(1);
@@ -225,9 +240,13 @@ describe('flushQueue', () => {
   it('keeps a change the server refused, and counts the attempt', async () => {
     const { store, rows } = fakeStore([queued({ kind: 'deleteFile', fileId: 'f1' })]);
 
-    await flushQueue(async () => {
-      throw new Error('File not found or access denied');
-    }, store);
+    await flushQueue(
+      async () => {
+        throw new Error('File not found or access denied');
+      },
+      OWNER,
+      store
+    );
 
     expect(rows()[0]).toMatchObject({ attempts: 1, lastError: 'File not found or access denied' });
   });
@@ -237,9 +256,13 @@ describe('flushQueue', () => {
       queued({ kind: 'deleteFile', fileId: 'f1' }, { attempts: MAX_ATTEMPTS - 1 }),
     ]);
 
-    const result = await flushQueue(async () => {
-      throw new Error('File not found or access denied');
-    }, store);
+    const result = await flushQueue(
+      async () => {
+        throw new Error('File not found or access denied');
+      },
+      OWNER,
+      store
+    );
 
     expect(result.failed).toBe(1);
     expect(rows()).toHaveLength(0);
@@ -252,10 +275,14 @@ describe('flushQueue', () => {
     ]);
     const sent: string[] = [];
 
-    const result = await flushQueue(async (op) => {
-      if (op.kind === 'deleteFile') throw new Error('File not found or access denied');
-      sent.push(op.kind);
-    }, store);
+    const result = await flushQueue(
+      async (op) => {
+        if (op.kind === 'deleteFile') throw new Error('File not found or access denied');
+        sent.push(op.kind);
+      },
+      OWNER,
+      store
+    );
 
     expect(sent).toEqual(['renameFile']);
     expect(result.sent).toBe(1);
@@ -265,7 +292,7 @@ describe('flushQueue', () => {
     const { store } = fakeStore([]);
     const perform = vi.fn();
 
-    await expect(flushQueue(perform, store)).resolves.toEqual({
+    await expect(flushQueue(perform, OWNER, store)).resolves.toEqual({
       sent: 0,
       failed: 0,
       discarded: [],
@@ -360,7 +387,7 @@ describe('flushQueue: what the review found', () => {
       queued({ kind: 'renameFile', fileId: 'f1', name: 'second' }),
     ]);
 
-    await flushQueue(async () => undefined, store);
+    await flushQueue(async () => undefined, OWNER, store);
 
     expect(rows()).toHaveLength(0);
   });
@@ -372,9 +399,13 @@ describe('flushQueue: what the review found', () => {
     ]);
     const sent: string[] = [];
 
-    await flushQueue(async (op) => {
-      sent.push(op.kind);
-    }, store);
+    await flushQueue(
+      async (op) => {
+        sent.push(op.kind);
+      },
+      OWNER,
+      store
+    );
 
     expect(sent).toEqual(['deleteFile']);
     expect(rows()).toHaveLength(0);
@@ -389,9 +420,13 @@ describe('flushQueue: what the review found', () => {
       queued({ kind: 'deleteFile', fileId: 'f2' }),
     ]);
 
-    const result = await flushQueue(async () => {
-      throw new NotSignedIn();
-    }, store);
+    const result = await flushQueue(
+      async () => {
+        throw new NotSignedIn();
+      },
+      OWNER,
+      store
+    );
 
     expect(result).toMatchObject({ sent: 0, failed: 0 });
     expect(rows()).toHaveLength(2);
@@ -403,14 +438,69 @@ describe('flushQueue: what the review found', () => {
       queued({ kind: 'renameFile', fileId: 'f1', name: 'x' }, { attempts: MAX_ATTEMPTS - 1 }),
     ]);
 
-    const result = await flushQueue(async () => {
-      throw new Error('Invalid file or folder name');
-    }, store);
+    const result = await flushQueue(
+      async () => {
+        throw new Error('Invalid file or folder name');
+      },
+      OWNER,
+      store
+    );
 
     expect(result.discarded).toHaveLength(1);
     expect(result.discarded[0]).toMatchObject({
       lastError: 'Invalid file or folder name',
       op: { kind: 'renameFile' },
     });
+  });
+});
+
+describe('whose changes these are', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { onLine: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends only the signed-in account own changes', async () => {
+    // A device can be shared, and an account can be switched between queueing
+    // and sending. Running one person's deletions against another person's
+    // files is the failure this prevents.
+    const { store, rows } = fakeStore([
+      queued({ kind: 'deleteFile', fileId: 'mine' }),
+      queued({ kind: 'deleteFile', fileId: 'theirs' }, { userId: 'user-2' }),
+    ]);
+    const sent: string[] = [];
+
+    await flushQueue(
+      async (op) => {
+        sent.push((op as { fileId: string }).fileId);
+      },
+      OWNER,
+      store
+    );
+
+    expect(sent).toEqual(['mine']);
+    // The other account's change is still there, waiting for its owner.
+    expect(rows().map((row) => row.userId)).toEqual(['user-2']);
+  });
+
+  it('does not coalesce across accounts', async () => {
+    const { store } = fakeStore([
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'mine' }),
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'theirs' }, { userId: 'user-2' }),
+    ]);
+    const names: string[] = [];
+
+    await flushQueue(
+      async (op) => {
+        names.push((op as { name: string }).name);
+      },
+      OWNER,
+      store
+    );
+
+    expect(names).toEqual(['mine']);
   });
 });
