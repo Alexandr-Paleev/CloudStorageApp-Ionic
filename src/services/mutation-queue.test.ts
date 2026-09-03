@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   MAX_ATTEMPTS,
+  NotSignedIn,
   RequestTimeout,
   applyPending,
   withDeadline,
@@ -130,7 +131,12 @@ describe('looksOffline', () => {
   it.each([
     ['Failed to fetch', true],
     ['NetworkError when attempting to fetch resource', true],
-    ['connection reset', true],
+    ['Load failed', true],
+    // A refusal that merely mentions a connection is still a refusal. Treating
+    // this as "no network" told the user their file was deleted while it sat
+    // in the bucket, and queued a change that had already been answered.
+    ['Failed to delete file from storage: connection refused by R2', false],
+    ['connection reset', false],
     ['File not found or access denied', false],
     ['Storage limit exceeded', false],
   ])('%s -> %s', (message, expected) => {
@@ -262,6 +268,7 @@ describe('flushQueue', () => {
     await expect(flushQueue(perform, store)).resolves.toEqual({
       sent: 0,
       failed: 0,
+      discarded: [],
       remaining: 0,
     });
     expect(perform).not.toHaveBeenCalled();
@@ -332,5 +339,78 @@ describe('applyPending', () => {
     // the listing is not.
     const before = listing();
     expect(applyPending(before, [{ kind: 'deleteFile', fileId: 'elsewhere' }])).toEqual(before);
+  });
+});
+
+describe('flushQueue: what the review found', () => {
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { onLine: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('removes the entries coalescing threw away, not just the run', async () => {
+    // Left in the store they are sent on the next flush — and a rename that a
+    // later rename replaced would then reach the server after it, putting the
+    // old name back on the file.
+    const { store, rows } = fakeStore([
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'first' }),
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'second' }),
+    ]);
+
+    await flushQueue(async () => undefined, store);
+
+    expect(rows()).toHaveLength(0);
+  });
+
+  it('drops a rename a deletion made pointless, rather than replaying it', async () => {
+    const { store, rows } = fakeStore([
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'new name' }),
+      queued({ kind: 'deleteFile', fileId: 'f1' }),
+    ]);
+    const sent: string[] = [];
+
+    await flushQueue(async (op) => {
+      sent.push(op.kind);
+    }, store);
+
+    expect(sent).toEqual(['deleteFile']);
+    expect(rows()).toHaveLength(0);
+  });
+
+  it('stops without blaming the changes when nobody is signed in', async () => {
+    // The provider lives at the root of the app, so a flush can fire on the
+    // login page or in the moment after a reload before the session is back.
+    // Counting those as refusals discarded the whole queue after three.
+    const { store, rows } = fakeStore([
+      queued({ kind: 'deleteFile', fileId: 'f1' }),
+      queued({ kind: 'deleteFile', fileId: 'f2' }),
+    ]);
+
+    const result = await flushQueue(async () => {
+      throw new NotSignedIn();
+    }, store);
+
+    expect(result).toMatchObject({ sent: 0, failed: 0 });
+    expect(rows()).toHaveLength(2);
+    expect(rows().every((row) => row.attempts === 0)).toBe(true);
+  });
+
+  it('names what it gave up on, so the interface can say so', async () => {
+    const { store } = fakeStore([
+      queued({ kind: 'renameFile', fileId: 'f1', name: 'x' }, { attempts: MAX_ATTEMPTS - 1 }),
+    ]);
+
+    const result = await flushQueue(async () => {
+      throw new Error('Invalid file or folder name');
+    }, store);
+
+    expect(result.discarded).toHaveLength(1);
+    expect(result.discarded[0]).toMatchObject({
+      lastError: 'Invalid file or folder name',
+      op: { kind: 'renameFile' },
+    });
   });
 });

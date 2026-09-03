@@ -136,6 +136,22 @@ export function applyPending<
  */
 export const REQUEST_DEADLINE_MS = 8_000;
 
+/**
+ * The flush ran with nobody signed in.
+ *
+ * Distinct from a refusal on purpose: the server never saw the request, so the
+ * change is still perfectly good and must not spend an attempt. This happens
+ * more easily than it sounds — the provider sits at the root of the app, so
+ * its online listener is alive on the login page, after a sign-out, and in the
+ * moment after a reload before Supabase has restored the session.
+ */
+export class NotSignedIn extends Error {
+  constructor() {
+    super('Nobody is signed in, so the queue cannot be sent yet');
+    this.name = 'NotSignedIn';
+  }
+}
+
 export class RequestTimeout extends Error {
   constructor() {
     super('The request did not answer in time');
@@ -182,10 +198,15 @@ export function looksOffline(error: unknown): boolean {
   const name = typeof asError?.name === 'string' ? asError.name : '';
   const message = typeof asError?.message === 'string' ? asError.message : '';
 
-  return (
-    name === 'TypeError' ||
-    name === 'RequestTimeout' ||
-    /network|fetch|offline|connection/i.test(message)
+  if (name === 'RequestTimeout') return true;
+
+  /* Narrow on purpose. A loose match on "network" or "connection" swallowed
+     real refusals — `Failed to delete file from storage: connection refused by
+     R2` is the server answering, and treating it as no-network told the user
+     their file was deleted while it sat in the bucket. What is matched here is
+     the shape fetch itself uses when the request never left the device. */
+  return /^(TypeError: )?(Failed to fetch|NetworkError|Load failed|Network request failed)/i.test(
+    message
   );
 }
 
@@ -297,6 +318,9 @@ export interface FlushResult {
   sent: number;
   /** Given up on: the server answered, and the answer will not change. */
   failed: number;
+  /** Which ones, and why — so the interface can say what was lost rather than
+   *  letting the banner disappear as though everything went through. */
+  discarded: QueuedMutation[];
   /** Still queued, because the network went away again. */
   remaining: number;
 }
@@ -313,7 +337,19 @@ export async function flushQueue(
   perform: (op: PendingOp) => Promise<void>,
   store: MutationStore = mutationStore
 ): Promise<FlushResult> {
-  const queued = coalesce(await store.list());
+  const all = await store.list();
+  const queued = coalesce(all);
+  const discarded: QueuedMutation[] = [];
+
+  /* The entries coalescing threw away have to leave the store, not just the
+     run. Left behind they are sent on the next flush — and a rename that a
+     later rename replaced would then travel to the server *after* it, putting
+     the old name back on the file. */
+  const keeping = new Set(queued.map((entry) => entry.id));
+  for (const entry of all) {
+    if (!keeping.has(entry.id)) await store.remove(entry.id);
+  }
+
   let sent = 0;
   let failed = 0;
 
@@ -323,8 +359,10 @@ export async function flushQueue(
       await store.remove(entry.id);
       sent += 1;
     } catch (error) {
-      if (looksOffline(error)) {
-        return { sent, failed, remaining: queued.length - sent - failed };
+      /* Two ways to stop without blaming the change: no network, and nobody
+         signed in. Neither reached the server, so neither spends an attempt. */
+      if (error instanceof NotSignedIn || looksOffline(error)) {
+        return { sent, failed, discarded, remaining: queued.length - sent - failed };
       }
 
       const attempts = entry.attempts + 1;
@@ -332,6 +370,7 @@ export async function flushQueue(
 
       if (attempts >= MAX_ATTEMPTS) {
         await store.remove(entry.id);
+        discarded.push({ ...entry, attempts, lastError: message });
         failed += 1;
       } else {
         await store.save({ ...entry, attempts, lastError: message });
@@ -340,5 +379,5 @@ export async function flushQueue(
   }
 
   const rest = await store.list();
-  return { sent, failed, remaining: rest.length };
+  return { sent, failed, discarded, remaining: rest.length };
 }

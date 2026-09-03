@@ -1,7 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import * as Sentry from '../observability/sentry';
 import {
+  NotSignedIn,
+  REQUEST_DEADLINE_MS,
   coalesce,
   flushQueue,
   withDeadline,
@@ -54,7 +65,7 @@ function useOfflineQueueState() {
   /** Runs one queued change for real. */
   const perform = useCallback(
     async (op: PendingOp) => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!user?.id) throw new NotSignedIn();
 
       /* Imported here rather than at the top of the file: this provider sits
          in App.tsx, and a static import would pull the whole storage layer —
@@ -78,17 +89,45 @@ function useOfflineQueueState() {
     [user?.id]
   );
 
+  /* One flush at a time. The browser fires `online` more than once on a flaky
+     connection, and "Try now" can land on top of a flush already running —
+     two passes would read the same queue and perform every change twice. */
+  const flushing = useRef<Promise<FlushResult> | null>(null);
+
   const flush = useCallback(async () => {
-    const result = await flushQueue(perform);
-    await refresh();
-    setLastResult(result);
+    if (flushing.current) return flushing.current;
 
-    if (result.sent > 0 || result.failed > 0) {
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+    const run = (async () => {
+      const result = await flushQueue(perform);
+      await refresh();
+      setLastResult(result);
+
+      /* Something the server refused three times is gone for good. Saying so
+         is the least this owes the user, who watched it apply on screen. */
+      for (const entry of result.discarded) {
+        Sentry.captureException(new Error(`Queued change discarded: ${entry.lastError}`), {
+          tags: { context: 'offlineQueue.discarded', kind: entry.op.kind },
+        });
+      }
+
+      if (result.sent > 0 || result.failed > 0) {
+        queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
+        queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+        /* Renaming a folder changes the breadcrumb bar and the page title, and
+           neither lives in the items query. */
+        queryClient.invalidateQueries({ queryKey: ['folder'] });
+        queryClient.invalidateQueries({ queryKey: ['folderPath'] });
+      }
+
+      return result;
+    })();
+
+    flushing.current = run;
+    try {
+      return await run;
+    } finally {
+      flushing.current = null;
     }
-
-    return result;
   }, [perform, refresh, queryClient, user?.id]);
 
   /**
@@ -101,7 +140,11 @@ function useOfflineQueueState() {
   const runOrQueue = useCallback(
     /* The trailing comma is load-bearing in a .tsx file: without it the
        parser reads <T> as the start of a JSX element. */
-    async <T,>(op: PendingOp, action: () => Promise<T>): Promise<{ queued: boolean }> => {
+    async <T,>(
+      op: PendingOp,
+      action: () => Promise<T>,
+      { deadline = REQUEST_DEADLINE_MS }: { deadline?: number | null } = {}
+    ): Promise<{ queued: boolean }> => {
       /* Asked before trying, because a request made with no network does not
          reliably fail: it can hang on a token refresh that will never happen,
          and a change waiting inside a promise nobody watches is exactly what
@@ -113,7 +156,14 @@ function useOfflineQueueState() {
       }
 
       try {
-        await withDeadline(action());
+        /* The deadline exists to notice a request that hangs because there is
+           no network. It cannot cancel what it gives up on, so it is only
+           applied where a second execution is harmless: deleting a folder
+           walks its whole tree, one request per file, and legitimately takes
+           longer than any deadline worth setting — timing it out would queue a
+           deletion that is still running and later replay it against a
+           half-deleted tree. */
+        await (deadline === null ? action() : withDeadline(action(), deadline));
         return { queued: false };
       } catch (error) {
         if (!looksOffline(error)) throw error;
@@ -129,6 +179,16 @@ function useOfflineQueueState() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  /* Sent on startup as well as on the browser's online event. The case this
+     feature was written for — queue a change on a train, close the tab, open
+     the app at home — produces no online event at all, because this session
+     was never offline. */
+  useEffect(() => {
+    if (!user?.id) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    void flush();
+  }, [user?.id, flush]);
 
   useEffect(() => {
     /* The browser's own signal, which fires when the interface comes back —

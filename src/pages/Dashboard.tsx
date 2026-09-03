@@ -180,8 +180,12 @@ const Dashboard: React.FC = () => {
       if (!user?.id || !folder.id) throw new Error('User not authenticated');
       const folderId = folder.id;
 
-      return offlineQueue.runOrQueue({ kind: 'deleteFolder', folderId }, () =>
-        storageService.deleteFolder(folderId, user.id)
+      /* No deadline: this walks the whole tree, one request per file, and is
+         the one operation a timeout would duplicate rather than rescue. */
+      return offlineQueue.runOrQueue(
+        { kind: 'deleteFolder', folderId },
+        () => storageService.deleteFolder(folderId, user.id),
+        { deadline: null }
       );
     },
     /* Without this TanStack pauses the mutation while the browser reports no
@@ -361,7 +365,11 @@ const Dashboard: React.FC = () => {
             </IonButton>
           </div>
 
-          <OfflineQueueBanner pending={offlineQueue.pending} onRetry={() => offlineQueue.flush()} />
+          <OfflineQueueBanner
+            pending={offlineQueue.pending}
+            discarded={offlineQueue.lastResult?.discarded ?? []}
+            onRetry={() => offlineQueue.flush()}
+          />
 
           {folderId && folderPath.length > 0 && (
             <FolderBreadcrumbs path={folderPath} onNavigate={openFolder} />

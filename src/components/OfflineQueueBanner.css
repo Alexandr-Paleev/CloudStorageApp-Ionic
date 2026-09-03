@@ -1,0 +1,29 @@
+/* Amber rather than red: nothing is broken and nothing was lost — the change
+   is written down and waiting. Red here would read as a failure. */
+.offline-queue-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  font-size: 13px;
+}
+
+.offline-queue-banner ion-icon {
+  font-size: 20px;
+  color: #d97706;
+  flex: 0 0 auto;
+}
+
+/* Red, and only when something was actually lost. */
+.offline-queue-banner--failed {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.offline-queue-banner--failed ion-icon {
+  color: #dc2626;
+}
