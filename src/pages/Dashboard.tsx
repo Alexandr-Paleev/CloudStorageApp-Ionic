@@ -287,7 +287,10 @@ const Dashboard: React.FC = () => {
               </IonButton>
             )}
           </IonButtons>
-          <IonTitle>{folderId && currentFolder ? currentFolder.name : 'Folder'}</IonTitle>
+          {/* At the root you are not inside a folder, and the bar said "Folder"
+              anyway — on the dashboard, in the mobile header, and in the hero
+              screenshot of the README. */}
+          <IonTitle>{folderId && currentFolder ? currentFolder.name : 'My Files'}</IonTitle>
           <IonButtons slot="end">
             {/* The only permanent way into billing: UpgradeBanner appears at
                 80% usage, so without this a user could not reach the plans at

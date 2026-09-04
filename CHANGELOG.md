@@ -12,7 +12,7 @@ reasoning behind the larger decisions lives in
 
 Nothing yet.
 
-## [4.0.0] — 2026-09-02
+## [4.0.0] — 2026-09-04
 
 ### Added
 
@@ -21,6 +21,38 @@ Nothing yet.
   sweeps it after 24 hours. It is a real account — same RLS, same quota, same
   Stripe test-mode checkout — because a demo on a different code path stops
   proving anything.
+- **A way to find a file.** A search box, six orderings and a filter by type,
+  every one of which changes the query rather than the page already on screen —
+  the dashboard loads fifteen rows at a time, so a filter applied in the browser
+  would search whatever happened to be loaded. Search terms are escaped for
+  `ilike`: `%` and `_` are wildcards, so looking for `report_final.pdf` also
+  found `reportXfinal.pdf`, and looking for `50%` found everything.
+- **Folders that can be walked.** `folders.parent_id` has been in the schema
+  since migration `000` and nothing in the interface used it: there was one back
+  arrow, and from two levels down it went to the root rather than to the folder
+  above. There is now a breadcrumb path, real nesting, and rename and delete on
+  a folder — `deleteFolder` had been sitting in the service without a button.
+- **Several files at once, by picker or by drop.** The upload page queues a
+  selection and works through it a file at a time, with progress per file, and a
+  failure stops that file rather than the queue. The same file picked twice is
+  skipped: identity is name, size and last-modified date, because the picker
+  hands back a new `File` object every time and uploading the same bytes twice
+  costs the quota twice. The queue's state lives outside React, which is what
+  makes those rules testable without mounting anything.
+- **Changes made offline are kept.** The app was half a PWA: the service worker
+  served the shell and the last listing, so someone offline could look at their
+  files and do nothing to them — a rename on a train failed with a network error
+  and lost the new name. Renaming and deleting a file or a folder now goes to
+  IndexedDB, shows on screen at once, and is sent when the connection returns.
+  The queue is coalesced first (three renames of one file are one rename; a
+  rename followed by a delete is only the delete), retried three times, and what
+  it finally gives up on is reported rather than quietly dropped. Uploads and
+  folder creation are deliberately not queued — the bytes are solved by
+  resumable uploads, and a folder's id comes from the database, so anything
+  queued against one created offline would have nothing to point at. The
+  TanStack cache is not edited either: the queue is applied over it at render,
+  so the cache stays a truthful snapshot of the server and the queue stays the
+  record of what has not reached it.
 - **Rate limits on every route that mints something.** `/api/share`,
   `/api/r2/presign-upload` and `/api/cloudinary/*` count requests per account
   after the token check and per address before it, and answer `429` with
@@ -37,8 +69,10 @@ Nothing yet.
   `src/` with a note saying Playwright covered the pages; it did not.
 - **E2E tests that touch the product**, not only its shell: the file lifecycle,
   a share link opened by an anonymous second browser context, quota refusals,
-  folder scoping and the demo entry point. Every test gets its own account from
-  a fixture rather than sharing one.
+  folder scoping and navigation, search, a multi-file upload, the offline queue
+  and the demo entry point. Every test gets its own account from a fixture
+  rather than sharing one, which is also what let the CI run go back to four
+  workers.
 - **Resumable uploads.** A file over 16 MB goes to R2 in parts, each retried on
   its own, and can be paused and picked up again — including after a reload, a
   crash or a lost connection. The ETags and the file itself are kept in
@@ -117,6 +151,9 @@ Nothing yet.
   4.5:1 that text needs), links distinguished by colour alone, and no meta
   description. Found by the first Lighthouse run, which scored the terms page
   84 for accessibility; all three pages now score 100.
+- The dashboard's title bar said "Folder" at the root, where there is no folder
+  to name. It says "My Files" — visible on every phone-width header and in the
+  README's own hero screenshot.
 
 ### Security
 
