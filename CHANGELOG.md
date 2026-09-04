@@ -12,6 +12,15 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **The login page no longer scrolls on a laptop.** The card is 799px tall and
+  a MacBook with a bookmarks bar showing gives it 720, so the wordmark went off
+  the top and a scrollbar appeared — the demo entry, 78px of it, was what
+  finally pushed it over. Spacing is trimmed below 820px of viewport height and
+  left alone above it: a login form that is merely compact still reads as
+  designed, one that scrolls reads as broken. An e2e test now measures the page
+  at 1440×720, because every element on it was added one at a time and none of
+  them was the one that broke it.
+
 - **The dependency audit no longer fails the build because npmjs.com was
   down.** `npm audit --audit-level=high` exits 1 when it finds a vulnerability
   and exits 1 when the audit endpoint answers 503 — which it did twice in one
