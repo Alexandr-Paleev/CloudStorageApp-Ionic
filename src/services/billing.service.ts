@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { UserProfile } from '../types/billing.types';
 import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../lib/tiers';
+import { apiUrl } from '../utils/api.utils';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const {
@@ -46,7 +47,7 @@ const billingService = {
 
   async createCheckoutSession(): Promise<string> {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/stripe/create-checkout', {
+    const response = await fetch(apiUrl('/api/stripe/create-checkout'), {
       method: 'POST',
       headers,
     });
@@ -65,7 +66,7 @@ const billingService = {
 
   async createPortalSession(): Promise<string> {
     const headers = await getAuthHeaders();
-    const response = await fetch('/api/stripe/create-portal', {
+    const response = await fetch(apiUrl('/api/stripe/create-portal'), {
       method: 'POST',
       headers,
     });

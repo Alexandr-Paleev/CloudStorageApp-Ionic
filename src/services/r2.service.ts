@@ -3,6 +3,7 @@ import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { shouldUseMultipart } from '../../lib/multipart';
 import { createMultipartUploader, type PartUploadOptions } from './multipart.upload';
 import { uploadStore, type PendingUpload } from './upload-store';
+import { apiUrl } from '../utils/api.utils';
 
 const r2BucketName = import.meta.env.VITE_R2_BUCKET_NAME;
 
@@ -70,7 +71,7 @@ function putWithProgress(
 
 /** POST to one of the actions api/r2/[action].ts serves. */
 async function callApi(action: string, body: unknown): Promise<Record<string, unknown>> {
-  const res = await fetch(`/api/r2/${action}`, {
+  const res = await fetch(apiUrl(`/api/r2/${action}`), {
     method: 'POST',
     headers: await getAuthHeaders(),
     body: JSON.stringify(body),

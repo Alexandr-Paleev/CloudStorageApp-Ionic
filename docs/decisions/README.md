@@ -22,3 +22,5 @@ are amended rather than rewritten when a decision is reversed.
 | [0007](0007-rate-limits-are-per-instance.md)     | Rate limits live in module scope, not in a shared counter       | v4.0.0     |
 | [0008](0008-two-actions-one-function.md)         | Two Cloudinary actions share one serverless function            | v4.0.0     |
 | [0009](0009-resumable-uploads-keep-state-in-the-browser.md) | A resumable upload keeps its state in the browser | v4.0.0     |
+| [0010](0010-the-native-shell-has-its-own-origin.md) | The native shell has its own origin, and the API says so | unreleased |
+| [0011](0011-majors-are-taken-by-hand.md)         | Majors are taken by hand, in one deliberate piece               | unreleased |

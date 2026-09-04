@@ -2,10 +2,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { getAppUrl } from '../../lib/app-url';
+import { applyCors } from '../../lib/cors';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

@@ -22,6 +22,7 @@ import {
   clientIp,
   tooManyRequests,
 } from '../../lib/rate-limit';
+import { applyCors } from '../../lib/cors';
 
 /**
  * Everything R2, behind one serverless function.
@@ -322,6 +323,10 @@ const ACTIONS: Record<
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

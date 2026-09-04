@@ -127,8 +127,24 @@ export default defineConfig({
           if (id.includes('@sentry')) return 'sentry';
           if (id.includes('@ionic') || id.includes('ionicons')) return 'ionic';
           if (id.includes('@supabase')) return 'supabase';
+          /**
+           * React itself belongs in this chunk, not only react-dom and the
+           * router.
+           *
+           * It used to fall through to `vendor`, and the split survived on
+           * luck: react-dom in one chunk reading React out of another works
+           * only while Rollup happens to evaluate them in that order. Adding
+           * @capacitor/* to vendor was enough to reverse it — react-dom ran
+           * first and read `__SECRET_INTERNALS_…` off an uninitialised
+           * binding, which is a blank page and one console error, in the
+           * browser and in the native shell alike.
+           *
+           * `npm run dev` never showed it: Vite serves unbundled modules
+           * there, so this whole function is inert, and the e2e suite runs
+           * against the dev server.
+           */
           if (
-            id.includes('react-dom') ||
+            /node_modules\/(react|react-dom|scheduler)\//.test(path) ||
             id.includes('react-router') ||
             id.includes('@remix-run')
           ) {

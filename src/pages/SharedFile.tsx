@@ -14,6 +14,7 @@ import {
 import { cloudDownloadOutline, documentOutline, lockClosedOutline } from 'ionicons/icons';
 import { formatFileSize } from '../utils/format.utils';
 import './SharedFile.css';
+import { apiUrl } from '../utils/api.utils';
 
 interface SharedFile {
   name: string;
@@ -37,7 +38,7 @@ const SharedFilePage: React.FC = () => {
 
     async function load() {
       try {
-        const response = await fetch(`/api/share?token=${encodeURIComponent(token ?? '')}`);
+        const response = await fetch(apiUrl(`/api/share?token=${encodeURIComponent(token ?? '')}`));
         const body = await response.json();
         if (cancelled) return;
 

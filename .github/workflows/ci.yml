@@ -65,6 +65,18 @@ jobs:
       - name: Bundle size
         run: npm run --silent size | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The one check that runs the built bundle rather than the source.
+      # `npm run dev` serves unbundled modules, so manualChunks in
+      # vite.config.ts is inert there and the Playwright suite — which runs
+      # against that dev server — cannot see it. A chunk split that puts
+      # react-dom and React in different chunks paints nothing, and every
+      # other step here stays green while it does.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test the built bundle
+        run: npm run --silent smoke
+
       - run: npm run test:coverage
 
       # Puts the numbers on the run page, so a pull request shows what its

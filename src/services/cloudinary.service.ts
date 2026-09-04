@@ -2,6 +2,7 @@ import * as Sentry from '../observability/sentry';
 import { UploadProgress } from './storage.service';
 import { supabase } from '../supabase/supabase.config';
 import { httpErrorFrom } from '../utils/http.utils';
+import { apiUrl } from '../utils/api.utils';
 
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 /**
@@ -11,7 +12,8 @@ const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
  * deletion a silent no-op — which stopped being cosmetic once the quota
  * rollback started relying on it to remove an asset whose row was refused.
  */
-const deleteApiUrl = import.meta.env.VITE_CLOUDINARY_DELETE_API_URL || '/api/cloudinary/delete';
+const deleteApiUrl =
+  import.meta.env.VITE_CLOUDINARY_DELETE_API_URL || apiUrl('/api/cloudinary/delete');
 
 /** What /api/cloudinary/sign hands back for exactly one upload. */
 type UploadAuthorization = {
@@ -52,7 +54,7 @@ async function authHeaders(): Promise<Record<string, string>> {
  * good manners. The server now signs each upload, and refuses with 413 first.
  */
 async function authorizeUpload(file: File): Promise<UploadAuthorization> {
-  const response = await fetch('/api/cloudinary/sign', {
+  const response = await fetch(apiUrl('/api/cloudinary/sign'), {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify({ fileName: file.name, size: file.size, contentType: file.type }),

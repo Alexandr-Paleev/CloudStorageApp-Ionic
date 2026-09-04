@@ -321,11 +321,14 @@ describe('share: rate limiting', () => {
     const res = mockResponse();
     await handler(post({ fileId: FILE_ID }), res);
 
-    const [header, value] = (res.setHeader as unknown as { mock: { calls: string[][] } }).mock
-      .calls[0];
-    expect(header).toBe('Retry-After');
-    expect(Number(value)).toBeGreaterThan(0);
-    expect(Number(value)).toBeLessThanOrEqual(60);
+    /* By name rather than by position: every answer also carries the CORS
+       headers now, and which one lands first is not what this test is about. */
+    const calls = (res.setHeader as unknown as { mock: { calls: string[][] } }).mock.calls;
+    const retryAfter = calls.find(([header]) => header === 'Retry-After');
+
+    expect(retryAfter).toBeDefined();
+    expect(Number(retryAfter?.[1])).toBeGreaterThan(0);
+    expect(Number(retryAfter?.[1])).toBeLessThanOrEqual(60);
   });
 
   it('charges the account, not the address it happens to share', async () => {

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { refreshAccessToken } from '../../lib/dropbox';
+import { applyCors } from '../../lib/cors';
 
 /**
  * Hands the caller a fresh access token for their own Dropbox connection.
@@ -10,6 +11,10 @@ import { refreshAccessToken } from '../../lib/dropbox';
  * policy, deliberately.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

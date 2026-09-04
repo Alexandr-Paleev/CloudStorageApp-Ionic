@@ -18,6 +18,7 @@ import {
   clientIp,
   tooManyRequests,
 } from '../lib/rate-limit';
+import { applyCors } from '../lib/cors';
 
 /**
  * Public share links.
@@ -215,6 +216,10 @@ async function revokeLink(req: VercelRequest, res: VercelResponse) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   const ip = clientIp(req.headers, req.socket?.remoteAddress);
   if (!byAddress.allow(ip)) {
     return tooManyRequests(

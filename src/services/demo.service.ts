@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/supabase.config';
+import { apiUrl } from '../utils/api.utils';
 
 interface DemoSession {
   access_token: string;
@@ -15,7 +16,7 @@ interface DemoSession {
  */
 export const demoService = {
   async start(): Promise<void> {
-    const response = await fetch('/api/demo/session', { method: 'POST' });
+    const response = await fetch(apiUrl('/api/demo/session'), { method: 'POST' });
 
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { message?: string };
