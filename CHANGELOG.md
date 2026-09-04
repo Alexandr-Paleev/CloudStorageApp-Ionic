@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.1.0] — 2026-09-04
+
 ### Added
 
 - **An iOS app, built and run rather than promised.** The README had offered
@@ -350,7 +354,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.0.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v2.1.0...v3.0.0
