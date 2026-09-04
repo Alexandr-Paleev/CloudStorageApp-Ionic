@@ -30,6 +30,31 @@ test.describe('Login page', () => {
     await expect(page.locator('ion-button.submit-button')).toContainText('Sign In');
   });
 
+  /**
+   * The whole page has to be on screen on a laptop.
+   *
+   * 1440×720 is a MacBook with a bookmarks bar showing — the size this is most
+   * often looked at. The card was 799px tall the day the demo entry was added,
+   * against 720 of room, and the wordmark went off the top: every element the
+   * page is judged on had been added one at a time, and none of them was the
+   * one that broke it.
+   */
+  test('fits a laptop screen without scrolling', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 720 });
+    await page.goto('/login');
+    await expect(page.locator('.demo-entry, .auth-form-card')).not.toHaveCount(0);
+
+    const overflow = await page.evaluate(() => {
+      const scroller = document
+        .querySelector('ion-content')
+        ?.shadowRoot?.querySelector('.inner-scroll');
+      const target = (scroller as HTMLElement) ?? document.documentElement;
+      return target.scrollHeight - target.clientHeight;
+    });
+
+    expect(overflow, 'the login page scrolls vertically on a laptop').toBeLessThanOrEqual(1);
+  });
+
   /* IonInput is a controlled web component — this guards the value round-trip */
   test('keeps typed credentials in the form', async ({ page }) => {
     const email = page.locator('input[type="email"]');

@@ -145,3 +145,45 @@ body.dark .demo-caption {
 body.dark .switch-auth-button {
   --color: #94a3b8;
 }
+
+/**
+ * The card is 799px tall, and a laptop with a bookmarks bar has about 720 to
+ * give it. Adding the demo entry — 78px of it — is what pushed the page over:
+ * before, it fitted with a pixel to spare.
+ *
+ * Trimmed by height rather than by width, and only where it is needed: on a
+ * screen tall enough for the full spacing, nothing here applies. The logo,
+ * the gap under the wordmark and the padding inside the card are what give the
+ * page its air, so they are reduced rather than removed — a login form that is
+ * merely compact still reads as designed, one that scrolls reads as broken.
+ *
+ * Below roughly 700px the page scrolls again, and should: at that point the
+ * honest answer is a scrollbar, not type too small to read.
+ */
+@media (max-height: 820px) {
+  .brand-container {
+    margin-bottom: 20px;
+  }
+
+  .brand-logo-circle {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+  }
+
+  .login-logo-icon {
+    font-size: 44px;
+  }
+
+  .brand-title {
+    font-size: 24px;
+  }
+
+  .auth-form-card {
+    padding: 24px;
+  }
+
+  .divider-container {
+    margin: 16px 0;
+  }
+}
