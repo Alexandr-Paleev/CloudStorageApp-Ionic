@@ -1,5 +1,8 @@
 import { supabase } from '../supabase/supabase.config';
 import { User } from '@supabase/supabase-js';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
+import { NATIVE_AUTH_CALLBACK } from '../native/deep-links';
 
 export type AuthUser = User | null;
 
@@ -67,7 +70,15 @@ export const authService = {
    * Sign in with Google OAuth
    */
   async signInWithGoogle(): Promise<void> {
-    const { error } = await supabase.auth.signInWithOAuth({
+    /* Two things differ on a device, and both follow from the page not having
+       a real origin there. The address Google is asked to come back to is a
+       custom scheme rather than a URL, and the sign-in page is opened in the
+       system browser rather than in place: letting the WebView navigate to
+       Google would replace the app with a web page it cannot come back from —
+       and Google refuses to sign anyone in inside an embedded WebView anyway. */
+    const native = Capacitor.isNativePlatform();
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         queryParams: {
@@ -75,9 +86,14 @@ export const authService = {
           prompt: 'consent',
         },
         scopes: 'openid email profile https://www.googleapis.com/auth/drive.file',
-        redirectTo: window.location.origin + '/dashboard',
+        redirectTo: native ? NATIVE_AUTH_CALLBACK : window.location.origin + '/dashboard',
+        skipBrowserRedirect: native,
       },
     });
     if (error) throw error;
+
+    if (native && data?.url) {
+      await Browser.open({ url: data.url });
+    }
   },
 };

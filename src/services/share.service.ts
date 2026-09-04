@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/supabase.config';
+import { apiUrl } from '../utils/api.utils';
 
 export interface ShareLink {
   url: string;
@@ -29,7 +30,7 @@ const shareService = {
    * only its hash, so a lost link cannot be recovered, only replaced.
    */
   async createLink(fileId: string, expiresInDays?: number): Promise<ShareLink> {
-    const response = await fetch('/api/share', {
+    const response = await fetch(apiUrl('/api/share'), {
       method: 'POST',
       headers: await authHeaders(),
       body: JSON.stringify({ fileId, expiresInDays }),
@@ -62,7 +63,7 @@ const shareService = {
   },
 
   async revokeLink(id: string): Promise<void> {
-    const response = await fetch(`/api/share?id=${encodeURIComponent(id)}`, {
+    const response = await fetch(apiUrl(`/api/share?id=${encodeURIComponent(id)}`), {
       method: 'DELETE',
       headers: await authHeaders(),
     });

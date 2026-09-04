@@ -12,6 +12,14 @@ const envSchema = z.object({
   // Cloudflare R2 - Optional (credentials are server-side only)
   VITE_R2_BUCKET_NAME: z.string().optional(),
 
+  /**
+   * Where the app's own API routes live, for a build whose page is not served
+   * from the same origin as its functions — that is, the iOS and Android
+   * shells, where the WebView loads from `capacitor://localhost`. Ignored on
+   * the web, where a relative path already reaches them; see utils/api.utils.
+   */
+  VITE_API_ORIGIN: z.string().url().optional(),
+
   // Google Drive - Optional
   VITE_GOOGLE_CLIENT_ID: z.string().optional(),
 

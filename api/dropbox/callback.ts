@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { getAppUrl } from '../../lib/app-url';
 import { assertSameOrigin, exchangeCode } from '../../lib/dropbox';
+import { applyCors } from '../../lib/cors';
 
 /**
  * Exchanges the OAuth code for tokens and keeps the refresh token here.
@@ -11,6 +12,10 @@ import { assertSameOrigin, exchangeCode } from '../../lib/dropbox';
  * that would hand an attacker permanent access — never reaches the client.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

@@ -9,6 +9,7 @@ import {
   clientIp,
   tooManyRequests,
 } from '../../lib/rate-limit';
+import { applyCors } from '../../lib/cors';
 
 /**
  * Two actions, one serverless function: /api/cloudinary/sign and
@@ -161,6 +162,10 @@ async function ownsAsset(userId: string, publicId: string): Promise<boolean> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     res.status(405).json({ message: 'Method not allowed' });
     return;

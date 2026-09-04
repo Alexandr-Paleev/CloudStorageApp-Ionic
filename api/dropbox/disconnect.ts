@@ -1,9 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
+import { applyCors } from '../../lib/cors';
 
 /** Forgets the stored refresh token. Disconnecting has to happen server-side
  *  now that the browser no longer holds one. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  /* Before anything else: a preflight from the native shell carries no
+     Authorization header, and everything below expects one. */
+  if (applyCors(req, res)) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

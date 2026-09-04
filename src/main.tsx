@@ -6,6 +6,7 @@ import { initSentry } from './observability/sentry';
 import { initializeGA4, trackApiErrorStandalone } from './hooks/useAnalytics';
 import { initHotjar } from './analytics/hotjar';
 import { initDarkMode } from './theme/dark-mode';
+import { initDeepLinks } from './native/deep-links';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -29,6 +30,10 @@ initSentry();
 // Syncs body.dark with the OS. Before render, so the first paint is already in
 // the right theme rather than flashing the light one.
 initDarkMode();
+
+// Hands the OAuth callback back to the app on a device. No-op in a browser,
+// where the redirect lands on a page and Supabase reads it off the URL itself.
+initDeepLinks();
 
 // Initialize Analytics (GA4 + Hotjar)
 initializeGA4();

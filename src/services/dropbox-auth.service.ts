@@ -1,5 +1,6 @@
 import { env } from '../env';
 import { supabase } from '../supabase/supabase.config';
+import { apiUrl } from '../utils/api.utils';
 
 const VERIFIER_KEY = 'dropbox_code_verifier';
 const STATE_KEY = 'dropbox_oauth_state';
@@ -98,7 +99,7 @@ const dropboxAuthService = {
       throw new Error('Dropbox authorization state mismatch. Please reconnect.');
     }
 
-    const response = await fetch('/api/dropbox/callback', {
+    const response = await fetch(apiUrl('/api/dropbox/callback'), {
       method: 'POST',
       headers: await authHeaders(),
       body: JSON.stringify({ code, codeVerifier, redirectUri }),
@@ -122,7 +123,7 @@ const dropboxAuthService = {
       return accessToken;
     }
 
-    const response = await fetch('/api/dropbox/token', {
+    const response = await fetch(apiUrl('/api/dropbox/token'), {
       method: 'POST',
       headers: await authHeaders(),
     });
@@ -149,7 +150,7 @@ const dropboxAuthService = {
     expiresAt = 0;
     purgeLegacyTokens();
 
-    await fetch('/api/dropbox/disconnect', {
+    await fetch(apiUrl('/api/dropbox/disconnect'), {
       method: 'POST',
       headers: await authHeaders(),
     }).catch(() => {

@@ -12,6 +12,34 @@ reasoning behind the larger decisions lives in
 
 ### Added
 
+- **An iOS app, built and run rather than promised.** The README had offered
+  iOS and Android in three places since v1 and no repository had ever contained
+  either project. `ios/` now exists, and the app launches on an iPhone 17
+  simulator under iOS 26.5. Capacitor went from 6.2.1 to 8.5.1 to get there —
+  the 2024 template predates Xcode 16's script sandboxing — which also moved
+  plugin distribution from CocoaPods to Swift Package Manager.
+- **`VITE_API_ORIGIN`, and an `apiUrl()` that knows when to use it.** Eleven
+  calls named their route with a path — right in a browser, where the page and
+  the functions share a deployment, and a 404 in a Capacitor WebView, which
+  serves the page from `capacitor://localhost` and resolves that path against a
+  local file server. The demo account, the Cloudinary signature, all of R2 and
+  with it resumable uploads, Stripe, share links and Dropbox were every one of
+  them broken in the shell. The web build is unchanged: the origin is applied
+  only when `Capacitor.isNativePlatform()` says so, so a preview deployment
+  still calls its own copy. See [ADR 0010](docs/decisions/0010-the-native-shell-has-its-own-origin.md).
+- **CORS for the two shell origins**, `capacitor://localhost` and
+  `http://localhost`, by name rather than by `*` — these routes read bearer
+  tokens and open Stripe sessions. The preflight is answered before the code
+  that expects an `Authorization` header, since a preflight never carries one.
+- **Sign in with Google on a device**, through the system browser and back
+  through `com.cloudstorage.app://auth/callback`. `redirectTo` was
+  `window.location.origin + '/dashboard'`, which on a device is an address
+  neither Google nor Supabase will accept — and Google refuses to sign anyone
+  in inside an embedded WebView regardless. Needs the callback listed in
+  Supabase's URL configuration to work end to end.
+- **A smoke test that opens the built bundle in a browser** (`npm run smoke`),
+  in CI beside the bundle-size check. See below for what it was written for.
+
 - **Accessibility is now asserted on the rendered DOM**, at WCAG 2.1 A and AA,
   by `@axe-core/playwright` — the login page, the dashboard with folders and
   files on it, the upload page with a queue, the file view and the plans page.
@@ -26,6 +54,20 @@ reasoning behind the larger decisions lives in
   project already makes.
 
 ### Fixed
+
+- **A blank page from the production build**, in the browser and in the app
+  alike. `manualChunks` put `react-dom` and the router in a `react` chunk and
+  left React itself to fall through to `vendor`; that only works while Rollup
+  happens to evaluate `vendor` first, and adding a dependency was enough to
+  reverse it. react-dom then read `__SECRET_INTERNALS_…` off an uninitialised
+  binding and rendered nothing.
+
+  Worth the entry for how it hid rather than for the fix, which is one regular
+  expression. Lint, 621 unit tests, the whole Playwright suite and the bundle
+  budgets were green on a build that painted nothing: `npm run dev` serves
+  unbundled modules, so the chunk split is inert there, and the e2e suite runs
+  against that dev server. No check in this repository had ever executed the
+  file the browser downloads. One does now.
 
 - **A delete button nested inside the button that opens the file.** Each row was
   a `div` with `role="button"` wrapped around an `ion-item`, which broke three
@@ -44,6 +86,13 @@ reasoning behind the larger decisions lives in
   the native button inside Ionic's shadow DOM.
 - **Progress bars and spinners with nothing to announce.** A spinner that
   replaces a button's label leaves the button nameless while it works.
+
+### Changed
+
+- **The dependency policy has a second half**, written down in
+  [ADR 0011](docs/decisions/0011-majors-are-taken-by-hand.md): Dependabot skips
+  majors, and majors are taken by hand, one family at a time, with the test
+  suite as the evidence. Capacitor 6 → 8 was the first one under it.
 
 ## [4.0.0] — 2026-09-04
 

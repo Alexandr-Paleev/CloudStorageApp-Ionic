@@ -53,7 +53,7 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 
 - Securely store files in the cloud (PDFs, images, documents)
 - View and manage files through a user-friendly interface
-- Use the app on both web and mobile devices (iOS/Android)
+- Use the app in a browser, as an installable PWA, or as a native iOS build
 - Automatically expand storage via Google Drive when the limit is exceeded
 - Upgrade to a paid tier for more space and additional providers
 
@@ -162,7 +162,9 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ **PWA** — installable on phone or computer. Offline it serves the shell and
   the last listing _and_ accepts renames and deletions, which wait in IndexedDB
   until the network comes back
-- ✅ **iOS/Android** — native app support via Capacitor
+- ✅ **iOS** — built with Capacitor 8 and run on an iPhone 17 simulator
+  (iOS 26.5); `ios/` is in the repository. Android is supported by Capacitor
+  and has not been built here — see [Mobile app](#-mobile-app)
 
 > 📱 **PWA Ready!** Install the app on your device: [Testing Guide](PWA_TESTING.md)
 
@@ -233,6 +235,12 @@ VITE_BILLING_DEMO_MODE=true
 # was left on. /api/demo/session answers 404 unless DEMO_ENABLED is set too.
 VITE_DEMO_ENABLED=true
 DEMO_ENABLED=true
+
+# Where the native shells find the API. Only the iOS and Android builds read
+# it: a Capacitor WebView serves the page from capacitor://localhost, so a
+# relative /api path resolves against a local file server and 404s. The web
+# build ignores it and keeps calling its own deployment — see ADR 0010.
+VITE_API_ORIGIN=https://your-project.vercel.app
 
 # Optional: Dropbox (Pro tier provider)
 VITE_DROPBOX_APP_KEY=your_dropbox_app_key
@@ -597,34 +605,75 @@ because these two pages are static HTML and nothing else references them.
 1. Install Vercel CLI: `npm install -g vercel`
 2. Deploy: `vercel --prod`
 
-## 📱 Mobile App Publication
+## 📱 Mobile app
+
+The iOS project is in `ios/` and the app runs: built with Capacitor 8 against
+Xcode 26.6, launched on an iPhone 17 simulator under iOS 26.5.
+
+<p align="center">
+  <img src="docs/screenshots/ios-login.png" alt="The app running on an iPhone 17 simulator: the sign-in card, Sign in with Google, and Just looking? Open a demo account" width="320">
+</p>
+
+```bash
+npm run build
+npx cap sync ios
+npx cap open ios     # then Run, or:
+npx cap run ios --target "<simulator id from npx cap run ios --list>"
+```
+
+**Requirements**: a Mac with Xcode. CocoaPods is *not* needed — Capacitor 8
+distributes plugins through Swift Package Manager. Publishing to the App Store
+additionally needs an Apple Developer account ($99/year).
+
+### What the shell needed that the browser did not
+
+A Capacitor WebView serves the page from `capacitor://localhost`, and that one
+fact broke three things. All three are fixed;
+[ADR 0010](docs/decisions/0010-the-native-shell-has-its-own-origin.md) has the
+reasoning.
+
+- **Eleven `fetch` calls named their route with a path.** Correct in a browser,
+  where the page and the functions share a deployment; a 404 in the shell.
+  `apiUrl()` prefixes `VITE_API_ORIGIN` when — and only when — the app is
+  running natively, so the web build still calls its own deployment.
+- **The API had to be told who is calling.** `capacitor://localhost` and
+  `http://localhost` are answered by name, never `*`: these routes read bearer
+  tokens and open Stripe sessions.
+- **Sign in with Google could not come back to a page.** It leaves through the
+  system browser and returns through `com.cloudstorage.app://auth/callback`.
+
+### Two settings that live outside this repository
+
+Email and password sign-in works on the device as built. Google does not until
+both of these are in place:
+
+1. **Supabase → Authentication → URL Configuration**: add
+   `com.cloudstorage.app://auth/callback` to the redirect allow-list.
+2. **Google Cloud console**: add an iOS OAuth client for the bundle id
+   `com.cloudstorage.app`.
+
+### If `codesign` refuses the bundle
+
+> `App.app: resource fork, Finder information, or similar detritus not allowed`
+
+This repository lives in an iCloud-synced folder, and the file provider stamps
+`com.apple.FinderInfo` on directories it syncs — including the ones
+`npx cap run ios` creates under `ios/DerivedData`, which codesign then refuses.
+Xcode's own derived-data location is outside the synced tree, so opening the
+project and pressing Run works; the CLI's in-project path is what fails. To
+stay on the command line, point the build somewhere else:
+
+```bash
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+  -destination "id=<simulator id>" -derivedDataPath ~/Library/Developer/Xcode/DerivedData/CloudStorage build
+```
 
 ### Android
 
-```bash
-# Build web app
-npm run build
+Not built here. Capacitor supports it and `npx cap add android` is the same one
+command, but it needs a JDK and the Android SDK, and nothing in this project
+has been run against either — so the README does not claim it.
 
-# Add Android platform
-npx cap add android
-
-# Open in Android Studio
-npx cap open android
-```
-
-In Android Studio, build APK or AAB for Google Play Store.
-
-### iOS
-
-```bash
-# Add iOS platform
-npx cap add ios
-
-# Open in Xcode
-npx cap open ios
-```
-
-**Requirements**: Mac with Xcode installed and an Apple Developer account ($99/year).
 
 ## 📁 Project Structure
 
@@ -786,6 +835,14 @@ account per test and drives the real file lifecycle, share links, quota, folder
 navigation, search, a multi-file upload and the offline queue against a live
 Supabase project. Rendering a page in jsdom proves the markup exists; it does
 not prove an upload works.
+
+**One check runs the built bundle rather than the source.** `npm run smoke`
+opens `dist/` in a real browser and asks whether the page rendered anything at
+all. It exists because nothing else could: `npm run dev` serves unbundled
+modules, so `manualChunks` in `vite.config.ts` never executes there, and the
+Playwright suite runs against that dev server. A split that put React and
+react-dom in different chunks painted a blank page while lint, 621 unit tests,
+the whole e2e suite and the bundle budgets stayed green.
 
 **Accessibility is asserted on the rendered DOM**, at WCAG 2.1 A and AA, by
 `@axe-core/playwright` — on the login page, the dashboard with folders and
