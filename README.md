@@ -60,10 +60,10 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Dashboard with the storage meter, the Pro badge and a list of files" width="820">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard with the storage meter, the Pro badge, a search box, filters by type, folders and a list of files" width="820">
 </p>
 
-| Upload — Pro users pick the backend                                                                                                                              | Plans — Stripe in test mode                                                                           |
+| Upload — several files at once, and Pro users pick the backend                                                                                                                              | Plans — Stripe in test mode                                                                           |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | <img src="docs/screenshots/upload.png" alt="Upload screen with a provider picker: Auto, Cloudinary, Cloudflare R2, Supabase, Google Drive, Dropbox" width="420"> | <img src="docs/screenshots/pricing.png" alt="Free and Pro plans with a demo mode notice" width="420"> |
 
@@ -75,6 +75,14 @@ Share links are listed on the file they belong to, with their state and a way to
 
 <p align="center">
   <img src="docs/screenshots/share-links.png" alt="Share links panel showing an active link with its creation and expiry dates and a revoke button" width="820">
+</p>
+
+A change made with no network is written down rather than lost. The file is
+already gone from the list — the queue is applied over the cached listing at
+render — and the banner says the deletion has not reached the server yet:
+
+<p align="center">
+  <img src="docs/screenshots/offline-queue.png" alt="Dashboard offline: a banner reading one change waiting for the network with a Try now button, and the deleted file already absent from the list" width="820">
 </p>
 
 <p align="center">
@@ -93,11 +101,16 @@ Share links are listed on the file they belong to, with their state and a way to
 
 ### 📁 File Management
 
-- ✅ File upload with progress indicator
-- ✅ User file list view
+- ✅ Several files at once — picked or dropped onto the page — uploaded one after
+  another, with progress per file and a failure that stops that file rather than the queue
+- ✅ Search by name, six orderings and a filter by type. All three change the
+  query, not the fifteen rows already on screen
+- ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
-- ✅ File deletion (with full removal from Cloudinary)
-- ✅ File renaming
+- ✅ File renaming and deletion — removed from the provider, not just from the list
+- ✅ **Renames and deletions survive being offline.** The change is written to
+  IndexedDB, applied to the screen immediately, and sent when the connection
+  returns — coalesced, retried, and reported if it is finally refused
 - ✅ Metadata display (size, upload date, type)
 
 ### 💾 Storage
@@ -146,7 +159,9 @@ Share links are listed on the file they belong to, with their state and a way to
 ### 📱 Platforms
 
 - ✅ **Web** — works in any modern browser
-- ✅ **PWA** — can be installed as an app on phone/computer (Service Worker + offline support)
+- ✅ **PWA** — installable on phone or computer. Offline it serves the shell and
+  the last listing _and_ accepts renames and deletions, which wait in IndexedDB
+  until the network comes back
 - ✅ **iOS/Android** — native app support via Capacitor
 
 > 📱 **PWA Ready!** Install the app on your device: [Testing Guide](PWA_TESTING.md)
@@ -765,9 +780,10 @@ money and quota** has a test:
   into the bundle. Two implementations can drift; each side is tested.
 
 Pages are left to Playwright rather than jsdom: `e2e/` opens a throwaway
-account per test and drives the real file lifecycle, share links, quota and
-folder scoping against a live Supabase project. Rendering a page in jsdom
-proves the markup exists; it does not prove an upload works.
+account per test and drives the real file lifecycle, share links, quota, folder
+navigation, search, a multi-file upload and the offline queue against a live
+Supabase project. Rendering a page in jsdom proves the markup exists; it does
+not prove an upload works.
 
 ## 🔍 Postmortem: the `anon` key that was named `SUPABASE_SERVICE_ROLE_KEY`
 
