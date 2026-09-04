@@ -10,7 +10,40 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Accessibility is now asserted on the rendered DOM**, at WCAG 2.1 A and AA,
+  by `@axe-core/playwright` — the login page, the dashboard with folders and
+  files on it, the upload page with a queue, the file view and the plans page.
+  `eslint-plugin-jsx-a11y` reads the source and Lighthouse audits the built
+  shell, which behind a login form is an empty page and two static documents;
+  everything the app actually is had been checked by neither.
+- **A Playwright project at phone size** (Pixel 7), carrying the checks whose
+  subject is the phone: that nothing scrolls sideways, that the primary action
+  answers a tap and not only a mouse, and that the layout at that width is as
+  accessible as the wide one. Its own project rather than a second pass of the
+  whole suite, which would double the run to repeat assertions the desktop
+  project already makes.
+
+### Fixed
+
+- **A delete button nested inside the button that opens the file.** Each row was
+  a `div` with `role="button"` wrapped around an `ion-item`, which broke three
+  things at once: a list whose children were not list items, a list item with no
+  list above it, and one control inside another — undefined for a screen reader,
+  and unreachable by keyboard in the order the layout implies. The row is now
+  the list item, and the two actions are siblings: a button stretched over the
+  row to open it, and delete beside it. The folder cards had the same shape and
+  the same fix.
+- **Thirty-five icons announced as unlabelled images.** `ion-icon` renders with
+  `role="img"`, so every decorative one was an image with no alternative text.
+  They carry `aria-hidden` now.
+- **Six buttons with no accessible name**, all icon-only: sign out, the plans
+  link, up-one-folder, delete on a file row, and the three back buttons on the
+  file page. They had `title`, which is a tooltip for a mouse and not a name for
+  the native button inside Ionic's shadow DOM.
+- **Progress bars and spinners with nothing to announce.** A spinner that
+  replaces a button's label leaves the button nameless while it works.
 
 ## [4.0.0] — 2026-09-04
 

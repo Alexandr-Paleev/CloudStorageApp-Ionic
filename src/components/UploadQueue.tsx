@@ -59,7 +59,7 @@ const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onR
                   aria-label={`Remove ${item.file.name}`}
                   onClick={() => onRemove(item.id)}
                 >
-                  <IonIcon icon={close} />
+                  <IonIcon icon={close} aria-hidden="true" />
                 </IonButton>
               )}
             </div>
@@ -71,7 +71,12 @@ const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onR
               {item.status === 'paused' && ' • paused'}
             </IonLabel>
 
-            {item.status === 'uploading' && <IonProgressBar value={item.progress / 100} />}
+            {item.status === 'uploading' && (
+              <IonProgressBar
+                value={item.progress / 100}
+                aria-label={`Uploading ${item.file.name}`}
+              />
+            )}
 
             {item.status === 'paused' && (
               <IonButton size="small" fill="outline" onClick={() => onRetry(item.id)}>

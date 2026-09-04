@@ -42,7 +42,17 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: /resumable-upload\.spec\.ts/,
+      testIgnore: /(resumable-upload|mobile)\.spec\.ts/,
+    },
+    {
+      /* The size the README makes promises about. A whole second pass of the
+         suite at phone width would double the run for assertions the desktop
+         project already makes; this project carries the spec whose subject is
+         the phone itself — layout, touch, and the accessibility of a menu that
+         collapses at this width. */
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /mobile\.spec\.ts/,
     },
     {
       /* Same browser, different origin: the one where R2 is configured. */

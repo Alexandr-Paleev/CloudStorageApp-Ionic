@@ -71,7 +71,7 @@ const SharedFilePage: React.FC = () => {
         <div className="shared-file">
           {loading && (
             <div className="shared-file__state">
-              <IonSpinner />
+              <IonSpinner aria-label="Loading file" />
             </div>
           )}
 
@@ -104,7 +104,7 @@ const SharedFilePage: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <IonIcon icon={cloudDownloadOutline} slot="start" />
+                <IonIcon icon={cloudDownloadOutline} slot="start" aria-hidden="true" />
                 Download
               </IonButton>
 

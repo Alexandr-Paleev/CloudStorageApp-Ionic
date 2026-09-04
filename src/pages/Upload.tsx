@@ -373,7 +373,11 @@ const Upload: React.FC = () => {
               }}
               data-testid="dropzone"
             >
-              <IonIcon icon={cloudUploadOutline} className="upload-dropzone-icon" />
+              <IonIcon
+                icon={cloudUploadOutline}
+                className="upload-dropzone-icon"
+                aria-hidden="true"
+              />
               <IonText color="dark">
                 <strong>Choose files</strong> or drop them here
               </IonText>
@@ -408,7 +412,10 @@ const Upload: React.FC = () => {
                           : summaryText(summary)
                       } — ${overall.toFixed(0)}%`}
                 </IonLabel>
-                <IonProgressBar value={(resumeProgress ?? overall) / 100} />
+                <IonProgressBar
+                  value={(resumeProgress ?? overall) / 100}
+                  aria-label="Upload progress"
+                />
 
                 {/* Only large files go up in parts, and only those can be
                     picked up again — offering to pause a single PUT would
@@ -448,7 +455,7 @@ const Upload: React.FC = () => {
               style={{ marginTop: '20px' }}
             >
               {isUploading ? (
-                <IonSpinner name="crescent" />
+                <IonSpinner name="crescent" aria-label="Working" />
               ) : summary.pending > 1 ? (
                 `Upload ${summary.pending} files`
               ) : (

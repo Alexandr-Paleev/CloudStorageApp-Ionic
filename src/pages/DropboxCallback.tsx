@@ -45,7 +45,10 @@ const DropboxCallback: React.FC = () => {
             </IonText>
           ) : (
             <>
-              <IonSpinner style={{ width: '48px', height: '48px' }} />
+              <IonSpinner
+                style={{ width: '48px', height: '48px' }}
+                aria-label="Connecting Dropbox"
+              />
               <IonText>
                 <p style={{ marginTop: '16px', color: 'var(--ion-color-medium)' }}>
                   Connecting Dropbox...

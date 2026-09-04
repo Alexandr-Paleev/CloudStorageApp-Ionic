@@ -92,7 +92,7 @@ const Login: React.FC = () => {
           {/* Logo / Brand */}
           <div className="brand-container">
             <div className="brand-logo-circle">
-              <IonIcon icon={cloudUploadOutline} className="login-logo-icon" />
+              <IonIcon icon={cloudUploadOutline} className="login-logo-icon" aria-hidden="true" />
             </div>
             <h1 className="brand-title">Cloud Storage</h1>
             <p className="brand-subtitle">
@@ -109,6 +109,7 @@ const Login: React.FC = () => {
                     icon={personOutline}
                     slot="start"
                     className={`input-icon ${focusedInput === 'email' ? 'active' : ''}`}
+                    aria-hidden="true"
                   />
                   <IonInput
                     type="email"
@@ -131,6 +132,7 @@ const Login: React.FC = () => {
                     icon={lockClosedOutline}
                     slot="start"
                     className={`input-icon ${focusedInput === 'password' ? 'active' : ''}`}
+                    aria-hidden="true"
                   />
                   <IonInput
                     type="password"
@@ -154,7 +156,7 @@ const Login: React.FC = () => {
                 disabled={busy}
               >
                 {loading ? (
-                  <IonSpinner name="crescent" />
+                  <IonSpinner name="crescent" aria-label="Working" />
                 ) : isRegister ? (
                   'Create Account'
                 ) : (
@@ -186,7 +188,7 @@ const Login: React.FC = () => {
               }}
               disabled={busy}
             >
-              <IonIcon slot="start" icon={logoGoogle} className="google-icon" />
+              <IonIcon slot="start" icon={logoGoogle} className="google-icon" aria-hidden="true" />
               Sign in with Google
             </IonButton>
 
@@ -218,10 +220,10 @@ const Login: React.FC = () => {
                   data-testid="demo-login"
                 >
                   {demoLoading ? (
-                    <IonSpinner name="crescent" />
+                    <IonSpinner name="crescent" aria-label="Working" />
                   ) : (
                     <>
-                      <IonIcon slot="start" icon={flashOutline} />
+                      <IonIcon slot="start" icon={flashOutline} aria-hidden="true" />
                       Just looking? Open a demo account
                     </>
                   )}

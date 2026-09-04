@@ -72,7 +72,7 @@ const Pricing: React.FC = () => {
           className="ion-padding"
           style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
         >
-          <IonSpinner />
+          <IonSpinner aria-label="Loading plans" />
         </IonContent>
       </IonPage>
     );
@@ -120,7 +120,7 @@ const Pricing: React.FC = () => {
               <ul className="pricing-card__features">
                 {TIER_CONFIG.free.features.map((feature) => (
                   <li key={feature}>
-                    <IonIcon icon={checkmarkCircle} color="success" />
+                    <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" />
                     <span>{feature}</span>
                   </li>
                 ))}
@@ -147,7 +147,7 @@ const Pricing: React.FC = () => {
               <ul className="pricing-card__features">
                 {TIER_CONFIG.pro.features.map((feature) => (
                   <li key={feature}>
-                    <IonIcon icon={checkmarkCircle} color="success" />
+                    <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" />
                     <span>{feature}</span>
                   </li>
                 ))}
@@ -159,7 +159,11 @@ const Pricing: React.FC = () => {
                   onClick={handleManageSubscription}
                   disabled={portalLoading}
                 >
-                  {portalLoading ? <IonSpinner name="crescent" /> : 'Manage Subscription'}
+                  {portalLoading ? (
+                    <IonSpinner name="crescent" aria-label="Working" />
+                  ) : (
+                    'Manage Subscription'
+                  )}
                 </IonButton>
               ) : (
                 <IonButton
@@ -168,8 +172,12 @@ const Pricing: React.FC = () => {
                   onClick={handleUpgrade}
                   disabled={checkoutLoading}
                 >
-                  {checkoutLoading ? <IonSpinner name="crescent" /> : 'Upgrade to Pro'}
-                  {!checkoutLoading && <IonIcon icon={lockClosed} slot="end" />}
+                  {checkoutLoading ? (
+                    <IonSpinner name="crescent" aria-label="Working" />
+                  ) : (
+                    'Upgrade to Pro'
+                  )}
+                  {!checkoutLoading && <IonIcon icon={lockClosed} slot="end" aria-hidden="true" />}
                 </IonButton>
               )}
             </div>

@@ -52,7 +52,7 @@ const ShareLinks: React.FC<Props> = ({ fileId }) => {
   if (isLoading) {
     return (
       <div className="share-links share-links--loading">
-        <IonSpinner name="dots" />
+        <IonSpinner name="dots" aria-label="Loading share links" />
       </div>
     );
   }
@@ -92,7 +92,7 @@ const ShareLinks: React.FC<Props> = ({ fileId }) => {
                   disabled={revoke.isPending}
                   onClick={() => revoke.mutate(link.id)}
                 >
-                  <IonIcon icon={closeCircleOutline} slot="start" />
+                  <IonIcon icon={closeCircleOutline} slot="start" aria-hidden="true" />
                   Revoke
                 </IonButton>
               )}
