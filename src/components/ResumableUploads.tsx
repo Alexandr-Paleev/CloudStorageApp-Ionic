@@ -59,7 +59,7 @@ const ResumableUploads: React.FC<ResumableUploadsProps> = ({
                   {formatFileSize(upload.size)} • {Math.round(done * 100)}% sent (
                   {upload.completed.length} of {upload.partCount} parts)
                 </p>
-                <IonProgressBar value={done} />
+                <IonProgressBar value={done} aria-label={`${upload.fileName} — already uploaded`} />
               </IonLabel>
 
               <IonButton
@@ -68,7 +68,7 @@ const ResumableUploads: React.FC<ResumableUploadsProps> = ({
                 disabled={!!busyKey}
                 onClick={() => onResume(upload)}
               >
-                {busy ? <IonSpinner name="crescent" /> : 'Resume'}
+                {busy ? <IonSpinner name="crescent" aria-label="Working" /> : 'Resume'}
               </IonButton>
               <IonButton
                 slot="end"

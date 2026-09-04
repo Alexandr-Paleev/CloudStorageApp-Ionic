@@ -255,8 +255,8 @@ const FileView: React.FC = () => {
         <IonHeader className="ion-no-border">
           <IonToolbar>
             <IonButtons slot="start">
-              <IonButton onClick={() => navigate(-1)} color="dark">
-                <IonIcon icon={arrowBack} />
+              <IonButton onClick={() => navigate(-1)} color="dark" aria-label="Back">
+                <IonIcon icon={arrowBack} aria-hidden="true" />
               </IonButton>
             </IonButtons>
           </IonToolbar>
@@ -269,7 +269,7 @@ const FileView: React.FC = () => {
           />
 
           <div className="file-view-loader">
-            <IonSpinner color="primary" />
+            <IonSpinner color="primary" aria-label="Loading file" />
           </div>
         </IonContent>
       </IonPage>
@@ -282,8 +282,8 @@ const FileView: React.FC = () => {
         <IonHeader className="ion-no-border">
           <IonToolbar>
             <IonButtons slot="start">
-              <IonButton onClick={() => navigate(-1)} color="dark">
-                <IonIcon icon={arrowBack} />
+              <IonButton onClick={() => navigate(-1)} color="dark" aria-label="Back">
+                <IonIcon icon={arrowBack} aria-hidden="true" />
               </IonButton>
             </IonButtons>
             <IonTitle>File Not Found</IonTitle>
@@ -303,8 +303,8 @@ const FileView: React.FC = () => {
       <IonHeader className="ion-no-border">
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => navigate(-1)} color="dark">
-              <IonIcon icon={arrowBack} />
+            <IonButton onClick={() => navigate(-1)} color="dark" aria-label="Back">
+              <IonIcon icon={arrowBack} aria-hidden="true" />
             </IonButton>
           </IonButtons>
           <IonTitle>{queuedName ?? file.name}</IonTitle>
@@ -328,7 +328,7 @@ const FileView: React.FC = () => {
             ) : (
               <div className="preview-placeholder">
                 <div className="preview-icon-box">
-                  <IonIcon icon={documentTextOutline} className="preview-icon" />
+                  <IonIcon icon={documentTextOutline} className="preview-icon" aria-hidden="true" />
                 </div>
                 <IonText color="dark">
                   <h2 className="preview-title">No preview</h2>
@@ -364,7 +364,7 @@ const FileView: React.FC = () => {
                 className="premium-button download-button"
                 onClick={handleDownload}
               >
-                <IonIcon icon={cloudDownloadOutline} slot="start" />
+                <IonIcon icon={cloudDownloadOutline} slot="start" aria-hidden="true" />
                 Download Original
               </IonButton>
 
@@ -377,7 +377,7 @@ const FileView: React.FC = () => {
                       onClick={() => setShowShareSheet(true)}
                       className="action-button"
                     >
-                      <IonIcon icon={shareSocialOutline} />
+                      <IonIcon icon={shareSocialOutline} aria-hidden="true" />
                       <span className="action-button-label">Share</span>
                     </IonButton>
                   </IonCol>
@@ -389,7 +389,7 @@ const FileView: React.FC = () => {
                       disabled={sharePending}
                       className="action-button"
                     >
-                      <IonIcon icon={linkOutline} />
+                      <IonIcon icon={linkOutline} aria-hidden="true" />
                       <span className="action-button-label">Copy Link</span>
                     </IonButton>
                   </IonCol>
@@ -400,7 +400,7 @@ const FileView: React.FC = () => {
                       onClick={handleRename}
                       className="action-button"
                     >
-                      <IonIcon icon={createOutline} />
+                      <IonIcon icon={createOutline} aria-hidden="true" />
                       <span className="action-button-label">Rename</span>
                     </IonButton>
                   </IonCol>
@@ -415,11 +415,11 @@ const FileView: React.FC = () => {
                     >
                       {!deleteMutation.isPending ? (
                         <>
-                          <IonIcon icon={trashOutline} />
+                          <IonIcon icon={trashOutline} aria-hidden="true" />
                           <span className="action-button-label">Delete</span>
                         </>
                       ) : (
-                        <IonSpinner name="crescent" />
+                        <IonSpinner name="crescent" aria-label="Working" />
                       )}
                     </IonButton>
                   </IonCol>
@@ -484,7 +484,12 @@ const FileView: React.FC = () => {
                   margin: '0 auto 16px',
                 }}
               >
-                <IonIcon icon={trashOutline} color="danger" style={{ fontSize: '32px' }} />
+                <IonIcon
+                  icon={trashOutline}
+                  color="danger"
+                  style={{ fontSize: '32px' }}
+                  aria-hidden="true"
+                />
               </div>
               <IonText color="dark">
                 <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>

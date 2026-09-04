@@ -152,6 +152,7 @@
 }
 
 .file-list-item {
+  position: relative;
   margin-bottom: 12px;
   padding: 8px 4px;
   border-radius: 16px;
@@ -360,4 +361,42 @@ body.dark .file-meta-name {
 
 body.dark .section-title {
   color: #f8fafc;
+}
+
+/* The primary action of a row or a card.
+ *
+ * A real button, stretched over its container, rather than a role="button" on
+ * the container itself. The old shape put the delete button inside the button
+ * that opened the file — a control nested in a control, which is undefined
+ * behaviour for a screen reader and unreachable by keyboard in the order the
+ * layout implies. Stretched instead, the two are siblings: one focus stop for
+ * "open this", one for "delete this", and the whole surface still clickable.
+ */
+.row-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.row-open:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+/* Above the stretched button, or every click on them opens the row instead.
+   The folder menu is already positioned (top right of its card) — it needs the
+   stacking order and nothing else; giving it `position: relative` here dropped
+   it back into the flow and it re-appeared under the folder name. */
+.folder-menu-button {
+  z-index: 1;
+}
+
+.file-list-item ion-button[slot='end'] {
+  position: relative;
+  z-index: 1;
 }

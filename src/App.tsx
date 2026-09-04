@@ -44,7 +44,7 @@ const SharedFile = lazy(() => import('./pages/SharedFile'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-    <IonSpinner color="primary" />
+    <IonSpinner color="primary" aria-label="Loading" />
   </div>
 );
 

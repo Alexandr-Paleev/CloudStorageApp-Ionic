@@ -26,7 +26,12 @@ const SubscriptionSuccess: React.FC = () => {
         style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
       >
         <div style={{ textAlign: 'center', paddingTop: '30vh' }}>
-          <IonIcon icon={checkmarkCircleOutline} color="success" style={{ fontSize: '80px' }} />
+          <IonIcon
+            icon={checkmarkCircleOutline}
+            color="success"
+            style={{ fontSize: '80px' }}
+            aria-hidden="true"
+          />
           <IonText>
             <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '16px 0 8px' }}>
               Welcome to Pro!

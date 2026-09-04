@@ -282,8 +282,13 @@ const Dashboard: React.FC = () => {
             {folderId && (
               /* The folder above, not the root: from two levels down those are
                  different places, and only one of them is "back". */
-              <IonButton onClick={() => openFolder(parentId)} color="dark" title="Up one folder">
-                <IonIcon icon={arrowBack} />
+              <IonButton
+                onClick={() => openFolder(parentId)}
+                color="dark"
+                title="Up one folder"
+                aria-label="Up one folder"
+              >
+                <IonIcon icon={arrowBack} aria-hidden="true" />
               </IonButton>
             )}
           </IonButtons>
@@ -302,12 +307,13 @@ const Dashboard: React.FC = () => {
                 color="dark"
                 data-testid="pricing-link"
                 title={profile?.tier === 'pro' ? 'Manage subscription' : 'Plans'}
+                aria-label={profile?.tier === 'pro' ? 'Manage subscription' : 'Plans'}
               >
-                <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} />
+                <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} aria-hidden="true" />
               </IonButton>
             )}
-            <IonButton onClick={handleLogout} color="dark">
-              <IonIcon icon={logOutOutline} />
+            <IonButton onClick={handleLogout} color="dark" aria-label="Sign out">
+              <IonIcon icon={logOutOutline} aria-hidden="true" />
             </IonButton>
           </IonButtons>
         </IonToolbar>
@@ -354,7 +360,7 @@ const Dashboard: React.FC = () => {
               expand="block"
               onClick={() => navigate(folderId ? `/upload/${folderId}` : '/upload')}
             >
-              <IonIcon icon={add} slot="start" />
+              <IonIcon icon={add} slot="start" aria-hidden="true" />
               Upload
             </IonButton>
             <IonButton
@@ -363,7 +369,7 @@ const Dashboard: React.FC = () => {
               expand="block"
               onClick={() => setShowFolderAlert(true)}
             >
-              <IonIcon icon={createOutline} slot="start" />
+              <IonIcon icon={createOutline} slot="start" aria-hidden="true" />
               New Folder
             </IonButton>
           </div>
@@ -389,21 +395,24 @@ const Dashboard: React.FC = () => {
                 <IonRow>
                   {items.folders.map((f) => (
                     <IonCol size="6" sizeSm="4" sizeMd="3" key={f.id}>
-                      <div
-                        onClick={() => navigate(`/dashboard/${f.id}`)}
-                        className="folder-card"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            navigate(`/dashboard/${f.id}`);
-                          }
-                        }}
-                      >
-                        <IonIcon icon={folderOpen} className="folder-icon" />
+                      <div className="folder-card">
+                        <IonIcon icon={folderOpen} className="folder-icon" aria-hidden="true" />
                         <IonText color="dark" className="folder-name">
                           {f.name}
                         </IonText>
+
+                        {/* The card was the button, and the menu below was a
+                            button inside it. Now the card is a plain container
+                            and this one covers it, leaving the menu a sibling
+                            that keyboard and screen readers can reach on their
+                            own. */}
+                        <button
+                          type="button"
+                          className="row-open"
+                          onClick={() => navigate(`/dashboard/${f.id}`)}
+                        >
+                          <span className="sr-only">Open {f.name}</span>
+                        </button>
 
                         {/* stopPropagation, or opening the menu also opens the
                             folder the menu belongs to. */}
@@ -418,7 +427,7 @@ const Dashboard: React.FC = () => {
                             setFolderMenu(f);
                           }}
                         >
-                          <IonIcon icon={ellipsisHorizontal} />
+                          <IonIcon icon={ellipsisHorizontal} aria-hidden="true" />
                         </IonButton>
                       </div>
                     </IonCol>
@@ -435,7 +444,7 @@ const Dashboard: React.FC = () => {
 
             {isLoading && (
               <div className="files-loading">
-                <IonSpinner color="primary" />
+                <IonSpinner color="primary" aria-label="Loading files" />
               </div>
             )}
 
@@ -445,72 +454,92 @@ const Dashboard: React.FC = () => {
               items?.files.length === 0 &&
               (!items.folders || items.folders.length === 0) && (
                 <div className="files-empty">
-                  <IonIcon icon={cloud} className="files-empty-icon" />
+                  <IonIcon icon={cloud} className="files-empty-icon" aria-hidden="true" />
                   <p>No files yet. Upload something!</p>
                 </div>
               )}
 
             <IonList lines="none" className="files-list">
               {items?.files.map((file) => (
-                <div
+                /* The row is the list item itself. It used to be a div with
+                   role="button" wrapped around an ion-item, which broke three
+                   things at once: a list whose children were not list items, a
+                   list item with no list above it, and a delete button nested
+                   inside a button. The primary action is now a real button
+                   stretched over the row, and delete is its sibling — two
+                   controls side by side, inside one list item. */
+                <IonItem
                   key={file.id}
-                  className="glass-card file-list-item"
-                  onClick={() => navigate(`/file/${file.id}`)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      navigate(`/file/${file.id}`);
-                    }
-                  }}
+                  detail={false}
+                  lines="none"
+                  className="glass-card file-list-item file-item-inner"
                 >
-                  <IonItem detail={false} lines="none" className="file-item-inner">
-                    <div slot="start" className="file-thumbnail-container">
-                      {file.type?.startsWith('image/') ? (
-                        <div className="file-thumbnail-img-box">
-                          {/* getThumbnailUrl only resizes on Cloudinary — the
+                  <div slot="start" className="file-thumbnail-container">
+                    {file.type?.startsWith('image/') ? (
+                      <div className="file-thumbnail-img-box">
+                        {/* getThumbnailUrl only resizes on Cloudinary — the
                               other backends hand back the original, so a long
                               list would otherwise fetch every full-size image
                               at once. lazy + async decoding keeps the ones
                               below the fold out of the way; the dimensions
                               reserve the box so the list does not jump. */}
-                          <img
-                            src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
-                            alt={file.name}
-                            className="file-thumbnail-img"
-                            loading="lazy"
-                            decoding="async"
-                            width={100}
-                            height={100}
-                          />
-                        </div>
-                      ) : (
-                        <div className="file-icon-box">
-                          <IonIcon icon={getFileIcon(file.type)} className="file-icon" />
-                        </div>
-                      )}
-                    </div>
+                        <img
+                          src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
+                          alt={file.name}
+                          className="file-thumbnail-img"
+                          loading="lazy"
+                          decoding="async"
+                          width={100}
+                          height={100}
+                        />
+                      </div>
+                    ) : (
+                      <div className="file-icon-box">
+                        <IonIcon
+                          icon={getFileIcon(file.type)}
+                          className="file-icon"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                    <IonLabel className="ion-text-wrap">
-                      <h2 className="file-meta-name">{file.name}</h2>
-                      <p className="file-meta-details">
-                        {formatFileSize(file.size)} • {formatDateTime(file.created_at)}
-                      </p>
-                    </IonLabel>
+                  <IonLabel className="ion-text-wrap">
+                    <h2 className="file-meta-name">{file.name}</h2>
+                    <p className="file-meta-details">
+                      {formatFileSize(file.size)} • {formatDateTime(file.created_at)}
+                    </p>
+                  </IonLabel>
 
-                    <IonButton
-                      slot="end"
-                      fill="clear"
-                      color="medium"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFile(file.id!);
-                      }}
-                    >
-                      <IonIcon icon={trashOutline} color="danger" className="file-delete-icon" />
-                    </IonButton>
-                  </IonItem>
-                </div>
+                  {/* Stretched over the row rather than wrapped around it, so
+                        the whole card stays clickable without swallowing the
+                        delete button. */}
+                  <button
+                    type="button"
+                    className="row-open"
+                    onClick={() => navigate(`/file/${file.id}`)}
+                  >
+                    <span className="sr-only">Open {file.name}</span>
+                  </button>
+
+                  <IonButton
+                    slot="end"
+                    fill="clear"
+                    color="medium"
+                    aria-label={`Delete ${file.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteFile(file.id!);
+                    }}
+                  >
+                    <IonIcon
+                      icon={trashOutline}
+                      color="danger"
+                      className="file-delete-icon"
+                      aria-hidden="true"
+                    />
+                  </IonButton>
+                </IonItem>
               ))}
             </IonList>
 

@@ -752,7 +752,9 @@ GitHub Actions runs lint, both type-check passes, an audit of production
 dependencies, a bundle-size budget, Lighthouse, unit and e2e tests on every
 pull request. The e2e suite runs against two dev servers: one as deployed, and
 one with `VITE_R2_BUCKET_NAME` set, where the resumable-upload spec answers
-every `/api/r2/*` call itself. `main` is protected:
+every `/api/r2/*` call itself, and in three Playwright projects: Desktop
+Chrome, the same browser pointed at the R2 server, and Pixel 7 for the specs
+whose subject is the phone. `main` is protected:
 those checks are required, and changes land through pull requests only.
 
 ### What the tests cover, and what they deliberately do not
@@ -784,6 +786,22 @@ account per test and drives the real file lifecycle, share links, quota, folder
 navigation, search, a multi-file upload and the offline queue against a live
 Supabase project. Rendering a page in jsdom proves the markup exists; it does
 not prove an upload works.
+
+**Accessibility is asserted on the rendered DOM**, at WCAG 2.1 A and AA, by
+`@axe-core/playwright` — on the login page, the dashboard with folders and
+files on it, the upload page with a queue, the file view and the plans page.
+`eslint-plugin-jsx-a11y` reads the source and Lighthouse audits the built
+shell, which behind a login form is an empty page and two static documents;
+everything the app actually is had been checked by neither. The first run found
+five rule classes, including a delete button nested inside the button that
+opens the file, and a list whose children were not list items.
+
+**One project runs at phone size** (`mobile`, Pixel 7) rather than repeating the
+whole suite twice. It carries the checks whose subject is the phone itself:
+that nothing scrolls sideways, that the primary action answers a tap rather than
+only a mouse, and that the layout at that width is as accessible as the wide
+one. The app is sold as a PWA and shipped through Capacitor, and CI used to
+measure one browser at one size.
 
 ## 🔍 Postmortem: the `anon` key that was named `SUPABASE_SERVICE_ROLE_KEY`
 

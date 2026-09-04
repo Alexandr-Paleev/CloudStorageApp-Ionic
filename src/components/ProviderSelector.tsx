@@ -55,7 +55,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               disabled={!isAllowed}
               onClick={() => isAllowed && onSelect(provider)}
             >
-              <IonIcon icon={isAllowed ? info.icon : lockClosedOutline} />
+              <IonIcon icon={isAllowed ? info.icon : lockClosedOutline} aria-hidden="true" />
               <IonLabel>{info.label}</IonLabel>
             </IonChip>
           );

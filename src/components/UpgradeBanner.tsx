@@ -49,7 +49,7 @@ const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, 
         onClick={() => navigate('/pricing')}
         style={{ '--color': '#4f46e5' }}
       >
-        <IonIcon icon={rocketOutline} slot="start" />
+        <IonIcon icon={rocketOutline} slot="start" aria-hidden="true" />
         Upgrade
       </IonButton>
     </div>
