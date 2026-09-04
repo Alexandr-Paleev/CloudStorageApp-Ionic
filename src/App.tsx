@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { IonApp, IonSpinner, setupIonicReact } from '@ionic/react';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { OfflineQueueProvider } from './hooks/useOfflineQueue';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
@@ -57,73 +58,75 @@ const App: React.FC = () => (
   <IonApp>
     <ErrorBoundary>
       <AuthProvider>
-        <BrowserRouter>
-          <PageViewTracker />
-          <HotjarTracker />
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              {/* Public on purpose: Stripe reviews these before enabling live
+        <OfflineQueueProvider>
+          <BrowserRouter>
+            <PageViewTracker />
+            <HotjarTracker />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                {/* Public on purpose: Stripe reviews these before enabling live
                   payments, and app stores need a reachable privacy policy —
                   neither has an account to sign in with. */}
-              <Route path="/terms" element={<Legal document="terms" />} />
-              <Route path="/privacy" element={<Legal document="privacy" />} />
-              {/* Also public, and necessarily so: the token in the URL is the
+                <Route path="/terms" element={<Legal document="terms" />} />
+                <Route path="/privacy" element={<Legal document="privacy" />} />
+                {/* Also public, and necessarily so: the token in the URL is the
                   only credential a share link carries. */}
-              <Route path="/s/:token" element={<SharedFile />} />
-              <Route
-                path="/dashboard/:folderId?"
-                element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/upload/:folderId?"
-                element={
-                  <PrivateRoute>
-                    <Upload />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/file/:fileId"
-                element={
-                  <PrivateRoute>
-                    <FileView />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/pricing"
-                element={
-                  <PrivateRoute>
-                    <Pricing />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/subscription/success"
-                element={
-                  <PrivateRoute>
-                    <SubscriptionSuccess />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/auth/dropbox/callback"
-                element={
-                  <PrivateRoute>
-                    <DropboxCallback />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+                <Route path="/s/:token" element={<SharedFile />} />
+                <Route
+                  path="/dashboard/:folderId?"
+                  element={
+                    <PrivateRoute>
+                      <Dashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/upload/:folderId?"
+                  element={
+                    <PrivateRoute>
+                      <Upload />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/file/:fileId"
+                  element={
+                    <PrivateRoute>
+                      <FileView />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/pricing"
+                  element={
+                    <PrivateRoute>
+                      <Pricing />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/subscription/success"
+                  element={
+                    <PrivateRoute>
+                      <SubscriptionSuccess />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/auth/dropbox/callback"
+                  element={
+                    <PrivateRoute>
+                      <DropboxCallback />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </OfflineQueueProvider>
       </AuthProvider>
     </ErrorBoundary>
     <PWAUpdatePrompt />

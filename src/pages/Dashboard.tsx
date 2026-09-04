@@ -42,6 +42,9 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import FileFilters, { type FileFiltersValue } from '../components/FileFilters';
 import FolderBreadcrumbs from '../components/FolderBreadcrumbs';
+import OfflineQueueBanner from '../components/OfflineQueueBanner';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import { applyPending } from '../services/mutation-queue';
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import storageService, { type Folder } from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
@@ -60,6 +63,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
+  const offlineQueue = useOfflineQueue();
   const [showFolderAlert, setShowFolderAlert] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState<{
     isOpen: boolean;
@@ -104,10 +108,15 @@ const Dashboard: React.FC = () => {
     enabled: !!user?.id,
   });
 
-  const items = {
-    files: data?.pages.flatMap((page) => page.files) || [],
-    folders: data?.pages[0]?.folders || [],
-  };
+  /* The server's answer, plus whatever this device has queued and not yet
+     sent. The cache stays a truthful snapshot; the queue is applied on top. */
+  const items = applyPending(
+    {
+      files: data?.pages.flatMap((page) => page.files) || [],
+      folders: data?.pages[0]?.folders || [],
+    },
+    offlineQueue.ops
+  );
 
   const { data: storageSize } = useQuery({
     queryKey: ['storageSize', user?.id],
@@ -145,8 +154,19 @@ const Dashboard: React.FC = () => {
   const renameFolderMutation = useMutation({
     mutationFn: ({ folder, name }: { folder: Folder; name: string }) => {
       if (!user?.id || !folder.id) throw new Error('User not authenticated');
-      return storageService.renameFolder(folder.id, user.id, name);
+      const folderId = folder.id;
+
+      return offlineQueue.runOrQueue({ kind: 'renameFolder', folderId, name }, () =>
+        storageService.renameFolder(folderId, user.id, name)
+      );
     },
+    /* Without this TanStack pauses the mutation while the browser reports no
+       network and never calls mutationFn at all — the change would live only
+       in this tab's memory, and a reload would lose it. The queue in
+       services/mutation-queue.ts is what makes it durable, and it only gets
+       the chance if the attempt is actually made. */
+    networkMode: 'always' as const,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['folder', folderId] });
@@ -158,8 +178,23 @@ const Dashboard: React.FC = () => {
   const deleteFolderMutation = useMutation({
     mutationFn: (folder: Folder) => {
       if (!user?.id || !folder.id) throw new Error('User not authenticated');
-      return storageService.deleteFolder(folder.id, user.id);
+      const folderId = folder.id;
+
+      /* No deadline: this walks the whole tree, one request per file, and is
+         the one operation a timeout would duplicate rather than rescue. */
+      return offlineQueue.runOrQueue(
+        { kind: 'deleteFolder', folderId },
+        () => storageService.deleteFolder(folderId, user.id),
+        { deadline: null }
+      );
     },
+    /* Without this TanStack pauses the mutation while the browser reports no
+       network and never calls mutationFn at all — the change would live only
+       in this tab's memory, and a reload would lose it. The queue in
+       services/mutation-queue.ts is what makes it durable, and it only gets
+       the chance if the attempt is actually made. */
+    networkMode: 'always' as const,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       // Deleting a folder deletes its files, so the meter moves too.
@@ -171,8 +206,21 @@ const Dashboard: React.FC = () => {
   const deleteFileMutation = useMutation({
     mutationFn: (fileId: string) => {
       if (!user?.id) throw new Error('User not authenticated');
-      return storageService.deleteFile(fileId, user.id);
+      const userId = user.id;
+
+      /* Offline this is written down and applied to the listing; online it is
+         an ordinary delete. Either way the button does what it says. */
+      return offlineQueue.runOrQueue({ kind: 'deleteFile', fileId }, () =>
+        storageService.deleteFile(fileId, userId)
+      );
     },
+    /* Without this TanStack pauses the mutation while the browser reports no
+       network and never calls mutationFn at all — the change would live only
+       in this tab's memory, and a reload would lose it. The queue in
+       services/mutation-queue.ts is what makes it durable, and it only gets
+       the chance if the attempt is actually made. */
+    networkMode: 'always' as const,
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
@@ -316,6 +364,12 @@ const Dashboard: React.FC = () => {
               New Folder
             </IonButton>
           </div>
+
+          <OfflineQueueBanner
+            pending={offlineQueue.pending}
+            discarded={offlineQueue.lastResult?.discarded ?? []}
+            onRetry={() => offlineQueue.flush()}
+          />
 
           {folderId && folderPath.length > 0 && (
             <FolderBreadcrumbs path={folderPath} onNavigate={openFolder} />
