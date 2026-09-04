@@ -1,6 +1,6 @@
 # 0011 — Majors are taken by hand, in one deliberate piece
 
-Accepted · [`.github/dependabot.yml`](../../.github/dependabot.yml), [`package.json`](../../package.json)
+Accepted · shipped in v4.1.0 · [`.github/dependabot.yml`](../../.github/dependabot.yml), [`package.json`](../../package.json)
 
 ## Context
 

@@ -1,6 +1,6 @@
 # 0010 — The native shell has its own origin, and the API has to say so
 
-Accepted · [`src/utils/api.utils.ts`](../../src/utils/api.utils.ts), [`lib/cors.ts`](../../lib/cors.ts), [`src/native/deep-links.ts`](../../src/native/deep-links.ts)
+Accepted · shipped in v4.1.0 · [`src/utils/api.utils.ts`](../../src/utils/api.utils.ts), [`lib/cors.ts`](../../lib/cors.ts), [`src/native/deep-links.ts`](../../src/native/deep-links.ts)
 
 ## Context
 
