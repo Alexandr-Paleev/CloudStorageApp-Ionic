@@ -42,6 +42,7 @@
     "test:coverage": "vitest run --coverage",
     "size": "node scripts/check-bundle-size.js",
     "smoke": "node scripts/smoke-built-bundle.mjs",
+    "audit:prod": "node scripts/audit-production.mjs",
     "lighthouse": "npx --yes @lhci/cli@0.15 autorun",
     "generate:demo-assets": "node scripts/generate-demo-assets.js"
   },

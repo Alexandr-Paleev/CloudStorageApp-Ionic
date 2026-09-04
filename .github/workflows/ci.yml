@@ -40,8 +40,16 @@ jobs:
       # --omit=dev on purpose. A vulnerability in a build tool is not a
       # vulnerability in what the browser downloads or what the functions run,
       # and failing the build over one trains people to ignore the step.
+      #
+      # Run through a script rather than `npm audit --audit-level=high`
+      # directly, because that command exits 1 both when it finds something and
+      # when the audit endpoint answers 503 — which it did twice in one day,
+      # turning a required check red on someone else's uptime. The script asks
+      # for JSON and tells a verdict from an outage: a report is acted on, an
+      # unreachable registry is retried and then reported as not-checked. It
+      # also prints the moderate and low counts the old command swallowed.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: npm run --silent audit:prod
 
       - run: npm run lint
 

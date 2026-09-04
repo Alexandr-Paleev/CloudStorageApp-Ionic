@@ -10,7 +10,17 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The dependency audit no longer fails the build because npmjs.com was
+  down.** `npm audit --audit-level=high` exits 1 when it finds a vulnerability
+  and exits 1 when the audit endpoint answers 503 — which it did twice in one
+  day, both times on a required check. A check that turns red on someone else's
+  uptime gets re-run without being read, and a check nobody reads is the same as
+  no check. It now asks for JSON and tells the two apart: a report is acted on,
+  an unreachable registry is retried three times and then reported as
+  not-checked, because "could not check" is not "vulnerable". The moderate and
+  low counts, which the old command swallowed, are printed either way.
 
 ## [4.1.0] — 2026-09-04
 
