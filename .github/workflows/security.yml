@@ -1,0 +1,95 @@
+name: Security
+
+# Two checks that read the repository rather than run it, kept out of ci.yml
+# because they answer a different question and fail for different reasons.
+#
+# `npm run audit:prod` in CI already covers *published advisories in what ships*.
+# Neither of these does that:
+#
+#   * CodeQL reads this project's own code for the classes of bug an advisory
+#     never mentions, because nobody else wrote it — a tainted path reaching a
+#     query, a redirect built from a request, a secret compared without a
+#     constant-time function.
+#   * gitleaks reads the history for credentials. That is not hypothetical here:
+#     v3.1.0's postmortem is an anon key that sat in three environments for 221
+#     days under the name SUPABASE_SERVICE_ROLE_KEY, and the reason it lasted
+#     that long is that nothing ever looked.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Advisories and rules move without this repository changing, so the checks
+  # run on a schedule as well as on a diff.
+  schedule:
+    - cron: '0 6 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Writing the findings into the Security tab is the whole point; without
+      # this the run is green and tells nobody anything.
+      security-events: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          # security-and-quality over the default: the extra rules are the ones
+          # about code that is merely wrong rather than exploitable, which is
+          # most of what a reviewer would have said anyway.
+          queries: security-and-quality
+
+      # No build step. This project is TypeScript compiled by Vite, and CodeQL
+      # reads the source directly for these languages — running `npm run build`
+      # first would only give it the same files through a bundler.
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:javascript-typescript
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history, not the tip. A secret removed in the next commit
+          # is still in the repository, and a shallow clone is exactly how that
+          # gets missed.
+          fetch-depth: 0
+
+      # The binary rather than gitleaks/gitleaks-action. The tool is MIT; the
+      # action is under a commercial EULA that happens to be free for public
+      # repositories, and taking the licensed wrapper for a one-line invocation
+      # buys a licence question and some telemetry in exchange for nothing.
+      # Pinned, because "latest" in a security check is the check changing
+      # underneath you.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo install /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # --redact so a finding does not print the secret into a public log, which
+      # would be a second copy of the problem it just reported.
+      - name: Scan the history for secrets
+        run: gitleaks git --no-banner --redact --exit-code 1 .

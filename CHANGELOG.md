@@ -26,6 +26,31 @@ reasoning behind the larger decisions lives in
   That second one is calendar time, so it is the thing to start first if Android
   publication is ever wanted.
 
+
+- **CodeQL and gitleaks, in their own workflow.** `npm run audit:prod` already
+  covers published advisories in what ships; neither of these does that.
+
+  CodeQL reads this project's own code for the classes of bug an advisory never
+  mentions, because nobody else wrote it. It runs the `security-and-quality`
+  suite rather than the default, since the extra rules are the ones about code
+  that is merely wrong rather than exploitable — which is most of what a
+  reviewer would have said.
+
+  gitleaks reads the *history* for credentials, at full clone depth: a secret
+  removed in the next commit is still in the repository. Not hypothetical here —
+  v3.1.0's postmortem is an anon key that sat in three environments for 221
+  days, and what let it last was that nothing ever looked. Run before committing
+  the check: clean across 132 commits, which is the answer worth having on
+  record rather than assumed.
+
+  The binary, not `gitleaks/gitleaks-action`: the tool is MIT, the action is
+  under a commercial EULA that happens to be free for public repositories, and
+  taking the licensed wrapper for a one-line invocation buys a licence question
+  and some telemetry in exchange for nothing. Pinned to 8.30.1 — "latest" in a
+  security check is the check changing underneath you.
+
+  Both run weekly as well as on a diff, because advisories and rules move
+  without this repository changing.
 ## [4.3.0] — 2026-09-05
 
 ### Added
