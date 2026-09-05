@@ -4,8 +4,14 @@ import { Route, Routes } from 'react-router-dom';
 import UpgradeBanner from './UpgradeBanner';
 import { renderWithProviders } from '../test/utils';
 
-const { envMock } = vi.hoisted(() => ({ envMock: { VITE_BILLING_ENABLED: true } }));
+const { envMock, isNativePlatform } = vi.hoisted(() => ({
+  envMock: { VITE_BILLING_ENABLED: true },
+  isNativePlatform: vi.fn(() => false),
+}));
 vi.mock('../env', () => ({ env: envMock }));
+vi.mock('@capacitor/core', () => ({
+  Capacitor: { isNativePlatform: () => isNativePlatform() },
+}));
 
 const LIMIT = 500 * 1024 * 1024;
 
@@ -59,6 +65,19 @@ describe('UpgradeBanner', () => {
       expect(screen.queryByText('Storage full!')).not.toBeInTheDocument();
     } finally {
       envMock.VITE_BILLING_ENABLED = true;
+    }
+  });
+
+  /* Asserted at the call site rather than only on billingIsOffered, because
+     the way this regresses is someone reaching past it for the env flag —
+     which reads correct, and is correct on the web. */
+  it('stays hidden in the native shell, where Stripe is configured but unusable', () => {
+    isNativePlatform.mockReturnValue(true);
+    try {
+      show({ usedBytes: LIMIT });
+      expect(screen.queryByText('Storage full!')).not.toBeInTheDocument();
+    } finally {
+      isNativePlatform.mockReturnValue(false);
     }
   });
 });
