@@ -43,15 +43,20 @@ reasoning behind the larger decisions lives in
   Checkout with no waitlist in front of it. It held 0 rows, had 0 references in
   `src/`, `api/`, `lib/` or `e2e/`, and 0 lines in `migrations/`.
 
-  It was also accepting an anonymous `INSERT`: an audit on 2026-09-04 got a 201
-  from PostgREST for a request carrying nothing but the anon key. Unauthenticated
-  writes into a table nobody reads is the shape a spam sink takes, and nothing
-  would ever have noticed.
+  It was also accepting an anonymous `INSERT`, and the policies said so outright
+  rather than only the 201 an audit had got out of PostgREST on 2026-09-04:
+  **two** identical `FOR INSERT TO public WITH CHECK (true)` policies, alongside
+  **two** identical `SELECT` policies gating reads on a personal address written
+  into the policy body. Duplicated because the table was created by hand, twice,
+  in the dashboard. Unauthenticated writes into a table nobody reads is the shape
+  a spam sink takes, and nothing would ever have noticed.
 
   A pair of RLS policies would have closed that and left a table in the schema
   that no code opens. `migrations/008_drop_early_access.sql` drops it instead,
   and carries the description of what it was — which a `DROP` typed into the
-  dashboard would not have left behind.
+  dashboard would not have left behind. Applied to production on 2026-09-05: the
+  table and all four policies are gone, PostgREST answers `PGRST205` for it, and
+  the five tables the app actually uses are untouched.
 
 ## [4.2.0] — 2026-09-05
 
