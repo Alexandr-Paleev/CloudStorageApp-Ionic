@@ -12,6 +12,23 @@ reasoning behind the larger decisions lives in
 
 ### Changed
 
+- **There is one deployment of this app again.** A second Vercel project,
+  `cloud-storage-app-ionic`, had been serving a build from before v3.0.0 at a
+  hostname four characters from the real one — publicly, answering 200, with one
+  of the seven security headers the live deployment sets and no CSP at all. It
+  had not deployed in 102 days while the repository took 40 commits, so it was
+  no longer connected to anything; it simply kept answering.
+
+  It also held five environment variables, one of them a Cloudinary API secret
+  that had sat on an unwatched project for 254 days. **That secret should be
+  rotated regardless** — deleting the project removes the surface, not the
+  history.
+
+  Deleting it touched nothing: the live app is a different project, no custom
+  domain in the account pointed at the old one, and nothing in this repository
+  ever linked to it. `cloud-storage-app-ionic.vercel.app` now answers 404, and
+  the live deployment still answers 200 with all seven headers.
+
 - **The end-to-end suite stopped writing to the production database.** The four
   Supabase secrets in GitHub Actions had pointed at the project the app serves
   since they were set in August, so every push minted real users next to real
