@@ -79,11 +79,4 @@ describe('Account', () => {
     );
     expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
   });
-
-  /* Said on the page rather than only in the API docs: an erase that implies it
-     reaches storage it has no authority over is the more misleading option. */
-  it('says that files in the user own Drive or Dropbox are not touched', () => {
-    show();
-    expect(screen.getByText(/Google Drive or Dropbox stay there/i)).toBeInTheDocument();
-  });
 });

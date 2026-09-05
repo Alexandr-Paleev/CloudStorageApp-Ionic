@@ -68,13 +68,6 @@ const Account: React.FC = () => {
                 This deletes your account, every file you uploaded, your folders and every share
                 link you created. It cannot be undone, and support cannot restore it.
               </p>
-              {/* Said plainly rather than buried: an erase that implies it reaches
-                  storage it has no authority over would be the more misleading of
-                  the two options. */}
-              <p className="account-note">
-                Files the app placed in your own Google Drive or Dropbox stay there — they live in
-                your storage account, and deleting this one does not reach into it.
-              </p>
             </IonText>
 
             <label className="account-label" htmlFor="delete-confirm">

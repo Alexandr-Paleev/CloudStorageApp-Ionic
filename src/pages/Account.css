@@ -24,11 +24,6 @@
   padding: 16px;
 }
 
-.account-note {
-  color: var(--ion-color-medium);
-  font-size: 14px;
-}
-
 .account-label {
   display: block;
   font-size: 14px;

@@ -100,8 +100,14 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Protected routes (authorized users only)
 - ✅ **Account deletion from inside the app**, at `/account`. Files, folders,
   share links, profile and login, in the order the missing foreign keys demand —
-  bytes first, rows second, the user last. Files placed in your own Google Drive
-  or Dropbox stay there, and the page says so
+  bytes first, rows second, the user last
+
+> **What account deletion does not reach.** Files the app placed in *your own*
+> Google Drive or Dropbox stay where they are. They live in a storage account
+> you control, put there under your own OAuth grant, and this app holds no
+> standing authority to delete from either — the Dropbox refresh token is
+> erased along with the row that held it. Everything the app stores on your
+> behalf — Supabase Storage, Cloudflare R2, Cloudinary — goes.
 
 ### 📁 File Management
 

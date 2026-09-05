@@ -38,10 +38,10 @@ reasoning behind the larger decisions lives in
   was briefly unreachable. A failure to delete the *user* does throw, because
   that is the part the request was actually for.
 
-  What it cannot reach is said on the page rather than buried: files the app
-  placed in the user's own Google Drive or Dropbox stay there. They live in
-  storage the person controls, put there with their own OAuth grant, and the app
-  holds no standing authority over either.
+  What it cannot reach is documented in the README rather than shown in the
+  flow: files the app placed in the user's own Google Drive or Dropbox stay
+  there. They live in storage the person controls, put there with their own
+  OAuth grant, and the app holds no standing authority over either.
 
 ### Changed
 
