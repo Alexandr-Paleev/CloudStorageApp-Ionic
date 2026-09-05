@@ -32,6 +32,25 @@ before, took an afternoon. It moved plugin distribution from CocoaPods to Swift
 Package Manager, which is why `brew install cocoapods` — the first thing the
 plan called for — turned out not to be needed at all.
 
+The second was React 18 → 19 with Ionic 8 → 9, together, because Ionic 9 is the
+release that supports React 19. Measured on both sides:
+
+| | before | after |
+| --- | ---: | ---: |
+| application code changed | — | none |
+| unit tests | 621 in 6.81s | 621 in 6.59s |
+| e2e | 41 in 1.2m | 41 in 1.1m |
+| first load, gzip | 408.6 kB | 431.0 kB |
+| largest chunk (ionic) | 241.5 kB | 248.4 kB |
+
+Two things came out of it that the install alone would not have. The 22.4 kB is
+one: a bundle budget turned the price of a major into a red check on the pull
+request that pays it, which is the only moment anyone can weigh it. The other
+is that four unit tests failed while the same interaction passed in a real
+browser — Ionic 9 moved onto `@lit/react`, whose node build attaches no event
+listeners, and Vitest had been resolving it. A green suite would have shipped
+that silently.
+
 ## Consequences
 
 - The contradiction between "skip majors" and a repository that takes them is
