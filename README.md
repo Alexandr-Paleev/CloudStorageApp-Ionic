@@ -4,6 +4,8 @@
 [![Release](https://img.shields.io/github/v/release/Alexandr-Paleev/CloudStorageApp-Ionic?sort=semver)](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Demo](https://img.shields.io/badge/Demo-Live-success)](https://cloud-storage-app-ionic-v0.vercel.app)
+[![Coverage — server](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAlexandr-Paleev%2FCloudStorageApp-Ionic%2Fbadges%2Fcoverage-server.json)](#what-the-tests-cover-and-what-they-deliberately-do-not)
+[![Coverage — client](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAlexandr-Paleev%2FCloudStorageApp-Ionic%2Fbadges%2Fcoverage-client.json)](#what-the-tests-cover-and-what-they-deliberately-do-not)
 
 A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Supabase, with Stripe billing and five storage backends.
 
@@ -867,6 +869,13 @@ places: `server` executes the Vercel handlers and the `lib/` helpers under
 node, `client` renders the React layer under jsdom. CI prints their coverage
 as two tables — a single blended percentage would hide which half a pull
 request moved.
+
+The two badges at the top of this file are those two numbers, and they are
+deliberately not averaged into one. The client badge is red, and it is meant to
+be: `src/pages` has no tests at all, which is roughly six hundred statements of
+the four page components. That is the largest untested thing in the repository
+and it is named here rather than hidden behind an average that would read
+`~48%` and sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
 money and quota** has a test:

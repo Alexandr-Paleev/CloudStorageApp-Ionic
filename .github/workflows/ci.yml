@@ -21,6 +21,14 @@ jobs:
   check:
     name: Lint, types, unit tests
     runs-on: ubuntu-latest
+
+    # Only for the badges step below, and only it uses the write. Declared here
+    # because a job with no `permissions:` block gets whatever the repository
+    # default happens to be, which is a thing that changes in a settings page
+    # rather than in this file.
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v7
 
@@ -101,6 +109,39 @@ jobs:
             exit 0
           fi
           node scripts/coverage-summary.js >> "$GITHUB_STEP_SUMMARY"
+
+      # The same two numbers, for the two badges in the README.
+      #
+      # They live on an orphan `badges` branch rather than in main. shields.io
+      # reads whatever raw.githubusercontent serves, so a branch is enough, and
+      # a branch nothing builds from cannot start a loop: committing a badge to
+      # main would trigger this workflow, which would commit a badge.
+      #
+      # No gist and no third-party coverage service either. Both would work;
+      # both would put the number somewhere this repository does not control,
+      # for a file that is 120 bytes.
+      #
+      # main only. A branch's coverage is not this project's coverage, and a
+      # badge that moved with whatever was last pushed anywhere would be worse
+      # than none.
+      - name: Publish coverage badges
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        run: |
+          [ -f coverage/coverage-summary.json ] || exit 0
+          node scripts/coverage-summary.js --badges "$RUNNER_TEMP/badges"
+
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          # A fresh orphan every time: this branch is a publishing surface, not
+          # a history, and letting it grow a commit per push would make `git
+          # clone` pay for a decoration.
+          git checkout --orphan badges-tmp
+          git rm -rf --quiet . >/dev/null 2>&1 || true
+          cp "$RUNNER_TEMP"/badges/*.json .
+          git add ./*.json
+          git commit --quiet -m "coverage badges for ${GITHUB_SHA::7}"
+          git push --force origin badges-tmp:badges
 
       # The other half: what happens once the bytes have arrived — render
       # blocking, layout shift, contrast, metadata. Audits dist/ directly
