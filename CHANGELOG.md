@@ -12,6 +12,31 @@ reasoning behind the larger decisions lives in
 
 ### Removed
 
+- **Two production dependencies that nothing imports.** `@sentry/tracing` has
+  zero occurrences outside `package.json` — it was superseded by `@sentry/react`
+  (already installed, and what `src/observability/` actually uses) and abandoned
+  upstream two majors ago.
+
+  `esbuild` was pinned into `dependencies` in February to fix a Vercel build,
+  and it fixed the wrong thing: the break came from a hand-pinned
+  `@esbuild/darwin-arm64` — a macOS-only binary in a Linux build — and the
+  remedy was to stop declaring the binary, not to declare the compiler. Nothing
+  in `src/`, `api/` or `lib/` imports it, and Vite never used the root copy
+  anyway: it resolves its own nested `esbuild@0.21.5`, while tsx and Vitest
+  bring theirs. Each of them installs the right platform binary through
+  `optionalDependencies`, which is the mechanism the pin had been substituting
+  for.
+
+  The audit is the measurable part: production dependencies go from 106 to 100,
+  and the one `low` advisory — a development-server file read, in a compiler
+  that never reached production — leaves the production report entirely. It
+  reads **0 critical, 0 high, 2 moderate, 0 low**; the two moderates are
+  `react-router`, which needs the v7 migration and is named in the README.
+
+  It also settles Dependabot #39, which had been held open since August because
+  the policy in [ADR 0006](docs/decisions/0006-dependabot-skips-majors.md) calls
+  `0.27 → 0.28` a major. There is no longer a direct dependency to bump.
+
 - **The `early_access` table, which existed in production and nowhere else.** A
   Pro-plan waitlist — email, status, notes — created by hand in the dashboard
   for a feature that was never built; billing shipped in v3.0.0 as Stripe
