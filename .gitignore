@@ -32,7 +32,17 @@ dist-ssr
 
 # Capacitor
 .capacitor
-android
+# ios/ and android/ are both committed — Capacitor recommends it, and native
+# edits (Info.plist, AndroidManifest.xml, URL schemes, permissions) otherwise
+# live on one machine only. What is ignored is what each build regenerates.
+android/app/build/
+android/app/src/main/assets/public/
+android/app/src/main/res/xml/config.xml
+android/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/
+android/local.properties
+android/**/.idea/
 
 # The iOS project is committed on purpose: Info.plist carries the OAuth URL
 # scheme the app cannot sign in without, and a native folder regenerated on
@@ -70,4 +80,12 @@ CLAUDE.md
 *.tsbuildinfo
 
 # macOS/iCloud duplicates — "file 2.ext"
-* 2.*
+# iCloud conflict copies. This repository lives under ~/Documents, which macOS
+# syncs to iCloud Drive when "Desktop & Documents Folders" is on, and iCloud
+# resolves a conflict by writing a second file beside the first: "gradlew 2",
+# "config 3.xml", and — the one that actually cost time — a stray
+# ".git/refs/heads/feat/android-shell 2", which is an invalid ref name and made
+# `git fetch` fail outright. The real fix is to move the repository out of a
+# synced folder; this only keeps the copies out of commits.
+* [0-9]
+* [0-9].*

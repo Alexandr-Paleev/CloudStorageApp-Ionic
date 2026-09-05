@@ -43,6 +43,18 @@ reasoning behind the larger decisions lives in
   there. They live in storage the person controls, put there with their own
   OAuth grant, and the app holds no standing authority over either.
 
+- **An Android app, built and run** — `android/` is in the repository and the app
+  launches on a Pixel 7 emulator. The README had promised Android since v1, and
+  the last release had to say honestly that it had never been built. Now it has.
+
+  It needed one native thing iOS already had: an `intent-filter` for
+  `com.cloudstorage.app://auth/callback`, which is how Android declares what
+  `CFBundleURLTypes` declares on iOS. Without it Google sign-in leaves and never
+  comes back. Everything else carried over untouched — `apiUrl()` had already
+  solved the relative-`/api` problem for both shells, which is the payoff of
+  having solved it properly once.
+
+
 - **The four Capacitor plugins that had been sitting in `package.json` unused
   since v1 now do something.** They were worse than absent: they read as native
   support that did not exist, and they left the shell indistinguishable from the
@@ -61,6 +73,23 @@ reasoning behind the larger decisions lives in
   is genuinely broken.
 
 ### Fixed
+
+- **The sign-in gradient stopped short of the top edge on a phone.** It was
+  painted on a `div` inside `ion-content`, and the safe-area inset lands on the
+  scroll container — so the child began below it and a strip of the page's own
+  background showed above. It is now `ion-content`'s own `--background`, which
+  covers the inset too. Free on the web, where the inset is zero.
+
+- **`StatusBar.setOverlaysWebView` was being called on Android, where it does
+  nothing.** It is implemented with the `SYSTEM_UI_FLAG_*` constants, which
+  stopped having an effect at API 35; the call is gone rather than left reading
+  as though it worked. What actually decides edge-to-edge there is Capacitor's
+  own `SystemBars`: given `viewport-fit=cover` in the viewport meta — this app
+  has it — and a WebView at or past version 140, it hands the insets to CSS.
+  Below 140 it insets the WebView on purpose, working around a Chromium
+  safe-area bug. That is what the band across the top of
+  `docs/screenshots/android-login.png` is: the Android 15 emulator image ships
+  WebView 124. Nothing in the app can override it, and nothing should try.
 
 - **A black band across the top of every screen on iOS**, found by running the
   build rather than by reading it. `StatusBar.setOverlaysWebView(false)` is the

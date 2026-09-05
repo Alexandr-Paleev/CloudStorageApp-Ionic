@@ -23,12 +23,23 @@ export const isNative = (): boolean => Capacitor.isNativePlatform();
 /**
  * Status bar and keyboard, set once at startup.
  *
- * The status bar is left **overlaying** the WebView, which is the iOS default
- * and was worth trying to change exactly once. `setOverlaysWebView(false)` is
- * the reflex carried over from Android, and on a simulator it produces a solid
- * black band across the top of every screen: the call insets the WebView, and
- * what fills the gap is the window background, not the page. The login gradient
- * ran out under a black stripe with no clock in it.
+ * The status bar **overlays** the WebView on both platforms, which took one
+ * mistake on each to arrive at.
+ *
+ * On iOS the reflex is `setOverlaysWebView(false)`, and on the simulator that
+ * produced a solid black band across every screen: the call insets the WebView
+ * and what fills the gap is the window background, not the page. The login
+ * gradient ended under a black stripe with no clock in it.
+ *
+ * Android reaches the same place without being asked, and asking is the second
+ * mistake. `setOverlaysWebView` there is implemented with the `SYSTEM_UI_FLAG_*`
+ * constants, which do nothing from API 35 onwards — the first Android build
+ * still showed a white band above the gradient with the call in place. What
+ * actually decides it is Capacitor's own `SystemBars`: given
+ * `viewport-fit=cover` in the viewport meta (this app has it) and a WebView at
+ * or past version 140, it passes the insets to CSS and the page draws edge to
+ * edge. Below 140 it insets the WebView instead, deliberately, to work around a
+ * Chromium safe-area bug — which is what the band was.
  *
  * Overlaying is also what the design already assumes. Ionic derives
  * `--ion-safe-area-top` from `env(safe-area-inset-top)` and every `ion-header`

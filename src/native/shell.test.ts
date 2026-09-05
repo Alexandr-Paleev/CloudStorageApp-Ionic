@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { isNativePlatform, statusBar, keyboard, share, haptics } = vi.hoisted(() => ({
+const { isNativePlatform, platform, statusBar, keyboard, share, haptics } = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
+  platform: vi.fn(() => 'web'),
   statusBar: { setOverlaysWebView: vi.fn(), setStyle: vi.fn() },
   keyboard: { setResizeMode: vi.fn(), setAccessoryBarVisible: vi.fn() },
   share: { canShare: vi.fn(), share: vi.fn() },
@@ -9,7 +10,7 @@ const { isNativePlatform, statusBar, keyboard, share, haptics } = vi.hoisted(() 
 }));
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => isNativePlatform() },
+  Capacitor: { isNativePlatform: () => isNativePlatform(), getPlatform: () => platform() },
 }));
 vi.mock('@capacitor/status-bar', () => ({
   StatusBar: statusBar,
@@ -37,6 +38,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   isNativePlatform.mockReturnValue(false);
+  platform.mockReturnValue('web');
   document.body.classList.remove('dark');
   statusBar.setOverlaysWebView.mockResolvedValue(undefined);
   statusBar.setStyle.mockResolvedValue(undefined);
@@ -65,13 +67,27 @@ describe('the native shell', () => {
      with the window background: a solid black band with no clock in it, seen on
      the simulator before this test existed. Ionic's safe-area padding already
      keeps every header clear, and the login gradient wants the top edge. */
-  it('leaves the status bar overlaying, and sizes the keyboard to the body', async () => {
+  it('never insets the WebView on iOS, and sizes the keyboard to the body', async () => {
     isNativePlatform.mockReturnValue(true);
+    platform.mockReturnValue('ios');
     await initNativeShell();
 
     expect(statusBar.setOverlaysWebView).not.toHaveBeenCalled();
     expect(keyboard.setResizeMode).toHaveBeenCalledWith({ mode: 'body' });
     expect(keyboard.setAccessoryBarVisible).toHaveBeenCalledWith({ isVisible: true });
+  });
+
+  /* Nor on Android, where the same call is implemented with SYSTEM_UI_FLAG_*
+     constants that do nothing from API 35 on. What decides it there is
+     Capacitor's own SystemBars, from viewport-fit=cover and the WebView
+     version — not anything this module can ask for. */
+  it('does not ask Android either, where the call is a no-op', async () => {
+    isNativePlatform.mockReturnValue(true);
+    platform.mockReturnValue('android');
+    await initNativeShell();
+
+    expect(statusBar.setOverlaysWebView).not.toHaveBeenCalled();
+    expect(keyboard.setResizeMode).toHaveBeenCalledWith({ mode: 'body' });
   });
 
   /* Style.Dark is light glyphs on a dark bar — named for the theme, not the
