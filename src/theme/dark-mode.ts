@@ -1,3 +1,5 @@
+import { syncStatusBarStyle } from '../native/shell';
+
 /**
  * Keeps `body.dark` in step with the operating system.
  *
@@ -28,7 +30,13 @@ export function initDarkMode(): void {
   if (typeof window === 'undefined' || !window.matchMedia) return;
 
   const query = window.matchMedia(DARK);
-  const apply = (matches: boolean) => document.body.classList.toggle('dark', matches);
+  const apply = (matches: boolean) => {
+    document.body.classList.toggle('dark', matches);
+    /* On a device the status bar is outside the page and does not follow the
+       stylesheet, so it has to be told. A dark page under a light status bar is
+       the most visible way for a shell to look unfinished. No-op on the web. */
+    void syncStatusBarStyle();
+  };
 
   apply(query.matches);
 

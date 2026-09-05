@@ -42,6 +42,7 @@ import shareService from '../services/share.service';
 import ShareLinks from '../components/ShareLinks';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
+import { offerSystemShare, warnFeedback } from '../native/shell';
 import './FileView.css';
 
 const FileView: React.FC = () => {
@@ -154,6 +155,9 @@ const FileView: React.FC = () => {
   };
 
   const handleDelete = () => {
+    /* The one place in this app where a tap starts something irreversible. A
+       phone can say that in a way a dialog cannot. */
+    warnFeedback();
     setShowDeleteModal(true);
   };
 
@@ -202,6 +206,14 @@ const FileView: React.FC = () => {
   const handleCopyLink = async () => {
     const url = await ensureShareLink();
     if (!url) return;
+
+    /* On a device this is the system share sheet, which is where a person
+       expects a link to go — into Messages, or Mail, or whatever they actually
+       use. Copying to a clipboard they then have to paste somewhere is what a
+       web page does because it has no other option. Returns false wherever
+       there is no sheet, and the clipboard below is the fallback rather than a
+       second-best. */
+    if (await offerSystemShare(url, file?.name ?? 'Shared file')) return;
 
     try {
       await navigator.clipboard.writeText(url);

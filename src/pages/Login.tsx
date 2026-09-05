@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   IonContent,
@@ -21,10 +21,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/auth.service';
 import demoService from '../services/demo.service';
 import { env } from '../env';
+import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/shell';
 import './Login.css';
 import './Legal.css';
 
 const Login: React.FC = () => {
+  /* This page is a deep indigo gradient in both themes, and on a device the
+     status bar sits on top of it. Without this the clock follows body.dark and
+     turns dark-on-dark in the light theme — invisible. Restored on the way out,
+     because every other screen is light. No-op in a browser. */
+  useEffect(() => {
+    void setStatusBarForDarkBackground(true);
+    return () => {
+      void syncStatusBarStyle();
+    };
+  }, []);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
