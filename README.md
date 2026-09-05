@@ -949,9 +949,18 @@ count was measuring the wrong thing:
   which changed.
 
 Production dependencies went from nine vulnerabilities (four high) to three
-(one low, two moderate, none high). The two that remain are `react-router`,
+(one low, two moderate, none high). The two that remained were `react-router`,
 which needs the v7 migration, and a pinned `esbuild` — both known, neither
 hidden.
+
+The `esbuild` one turned out not to be a production dependency at all. It had
+been pinned into `dependencies` to fix a Vercel build that a hand-pinned
+`@esbuild/darwin-arm64` had broken — the remedy for which was to stop declaring
+the binary, not to declare the compiler. No file imports it, and Vite resolves
+its own nested copy regardless. Dropping the declaration took production
+dependencies from 106 to 100 and the report to **0 critical, 0 high, 2 moderate,
+0 low**, which is the same lesson one layer down: an advisory count is only as
+honest as the boundary it is counted against.
 
 **What changed.** One CI step, which is the part that matters more than the
 upgrades:
