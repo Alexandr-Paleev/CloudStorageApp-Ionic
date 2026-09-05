@@ -99,8 +99,8 @@ const Login: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent fullscreen>
-        <div className="bg-gradient-primary login-container">
+      <IonContent fullscreen className="login-content">
+        <div className="login-container">
           {/* Logo / Brand */}
           <div className="brand-container">
             <div className="brand-logo-circle">

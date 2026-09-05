@@ -32,7 +32,17 @@ dist-ssr
 
 # Capacitor
 .capacitor
-android
+# ios/ and android/ are both committed — Capacitor recommends it, and native
+# edits (Info.plist, AndroidManifest.xml, URL schemes, permissions) otherwise
+# live on one machine only. What is ignored is what each build regenerates.
+android/app/build/
+android/app/src/main/assets/public/
+android/app/src/main/res/xml/config.xml
+android/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/
+android/local.properties
+android/**/.idea/
 
 # The iOS project is committed on purpose: Info.plist carries the OAuth URL
 # scheme the app cannot sign in without, and a native folder regenerated on
