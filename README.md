@@ -173,8 +173,10 @@ render — and the banner says the deletion has not reached the server yet:
   the last listing _and_ accepts renames and deletions, which wait in IndexedDB
   until the network comes back
 - ✅ **iOS** — built with Capacitor 8 and run on an iPhone 17 simulator
-  (iOS 26.5); `ios/` is in the repository. Android is supported by Capacitor
-  and has not been built here — see [Mobile app](#-mobile-app)
+  (iOS 26.5); `ios/` is in the repository
+- ✅ **Android** — built with the same Capacitor 8 and run on a Pixel 7
+  emulator (Android 15); `android/` is in the repository — see
+  [Mobile app](#-mobile-app)
 
 > 📱 **PWA Ready!** Install the app on your device: [Testing Guide](PWA_TESTING.md)
 
@@ -691,10 +693,39 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
 
 ### Android
 
-Not built here. Capacitor supports it and `npx cap add android` is the same one
-command, but it needs a JDK and the Android SDK, and nothing in this project
-has been run against either — so the README does not claim it.
+`android/` is in the repository and the app runs: built with Capacitor 8 against
+JDK 21 and the Android 35 SDK, launched on a Pixel 7 emulator running Android 15.
 
+```bash
+npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Requirements**: a JDK 21 and the Android SDK — `brew install openjdk@21` and
+`brew install --cask android-commandlinetools`, then `sdkmanager` for
+`platform-tools`, `platforms;android-35`, `build-tools;35.0.0`, `emulator` and a
+system image. Android Studio is not needed to build or run; it is only an editor.
+
+**Sign-in needed the one native thing iOS already had.** An `intent-filter` in
+`AndroidManifest.xml` for `com.cloudstorage.app://auth/callback` — what
+`CFBundleURLTypes` does on iOS. Without it Google sign-in leaves the app and
+never comes back. Nothing else needed changing: `apiUrl()` had already solved
+the relative-`/api` problem for both shells.
+
+<img src="docs/screenshots/android-login.png" alt="The app running on a Pixel 7 emulator: the sign-in card, Sign in with Google, and Just looking? Open a demo account" width="320">
+
+**About the band across the top of that screenshot.** It is not the app. Capacitor
+hands the display cutouts to CSS only when the WebView is at version 140 or
+newer; below that it insets the WebView itself, deliberately, to work around a
+Chromium safe-area bug. The Android 15 emulator image ships WebView **124**, so
+it takes the older path. `StatusBar.setOverlaysWebView` cannot override it — that
+API is implemented with `SYSTEM_UI_FLAG_*` constants which stopped having any
+effect at API 35, and calling it was removed for reading as though it worked.
+
+**Not done**: publication. That needs a Play Console account, and the app is not
+for sale.
 
 ## 📁 Project Structure
 

@@ -1,5 +1,21 @@
 /* Login Page Styles */
 
+/*
+ * The gradient belongs to ion-content, not to a div inside it.
+ *
+ * It used to sit on the inner container, and on a phone that leaves a strip of
+ * ion-content's own background above it: Capacitor hands the status-bar inset
+ * to the page as a CSS variable, Ionic turns it into padding on the scroll
+ * container, and the child starts below it. On the first Android build that
+ * read as a white band across the top of the sign-in screen.
+ *
+ * Painted here it covers the inset as well, which is what a full-bleed
+ * background is for — and it costs nothing on the web, where the inset is zero.
+ */
+.login-content {
+  --background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
+}
+
 .login-container {
   min-height: 100%;
   display: flex;

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cloud Storage</string>
+    <string name="title_activity_main">Cloud Storage</string>
+    <string name="package_name">com.cloudstorage.app</string>
+    <string name="custom_url_scheme">com.cloudstorage.app</string>
+</resources>
