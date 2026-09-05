@@ -126,22 +126,33 @@ jobs:
       # than none.
       - name: Publish coverage badges
         if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           [ -f coverage/coverage-summary.json ] || exit 0
           node scripts/coverage-summary.js --badges "$RUNNER_TEMP/badges"
 
+          # In its own repository under RUNNER_TEMP, and emphatically not in the
+          # checkout. The first version of this step ran `git checkout --orphan`
+          # and `git rm -rf .` here, which is a correct way to build an orphan
+          # commit and a catastrophic way to treat a working tree other steps
+          # still need: it deleted the repository out from under Lighthouse,
+          # which failed with exit 254 one tenth of a second after starting.
+          #
+          # A fresh orphan every time, because this branch is a publishing
+          # surface rather than a history: a commit per push would make `git
+          # clone` pay for a decoration.
+          mkdir -p "$RUNNER_TEMP/badges-repo"
+          cd "$RUNNER_TEMP/badges-repo"
+          git init --quiet --initial-branch=badges
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          # A fresh orphan every time: this branch is a publishing surface, not
-          # a history, and letting it grow a commit per push would make `git
-          # clone` pay for a decoration.
-          git checkout --orphan badges-tmp
-          git rm -rf --quiet . >/dev/null 2>&1 || true
           cp "$RUNNER_TEMP"/badges/*.json .
           git add ./*.json
           git commit --quiet -m "coverage badges for ${GITHUB_SHA::7}"
-          git push --force origin badges-tmp:badges
+          git push --force --quiet \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            badges:badges
 
       # The other half: what happens once the bytes have arrived — render
       # blocking, layout shift, contrast, metadata. Audits dist/ directly

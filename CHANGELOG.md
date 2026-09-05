@@ -70,6 +70,13 @@ reasoning behind the larger decisions lives in
   branch nothing builds from cannot start a loop, which committing a badge to
   `main` would. No gist and no third-party coverage service: both would work,
   and both would put a 120-byte file somewhere this repository does not control.
+
+  The orphan is built in its own repository under `RUNNER_TEMP`. The first
+  version did it in the checkout — `git checkout --orphan` and `git rm -rf .`,
+  which is a correct way to build an orphan commit and a catastrophic way to
+  treat a working tree other steps still need. It deleted the repository out
+  from under Lighthouse, which failed with exit 254 a tenth of a second after
+  starting, on `main`, after the badges had already published.
 ## [4.3.0] — 2026-09-05
 
 ### Added
