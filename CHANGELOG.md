@@ -10,6 +10,25 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Changed
+
+- **The end-to-end suite stopped writing to the production database.** The four
+  Supabase secrets in GitHub Actions had pointed at the project the app serves
+  since they were set in August, so every push minted real users next to real
+  ones, and a run that died before its `afterAll` left them there. They now
+  point at `cloudstorage-ci`, a second free-tier project that exists for nothing
+  else.
+
+  It is the same schema by construction — `migrations/` applied in order, 000
+  through 008 — and by check: columns, indexes, triggers and RLS policies were
+  diffed against production and came back identical, 40 columns, 16 indexes, 2
+  triggers and 4 policies on each side. That is worth more than the isolation it
+  buys, because it is the first evidence that `migrations/` describes the whole
+  database rather than most of it — and the `early_access` table dropped in this
+  same release was the standing proof that it had not.
+
+  The full suite passes against it: 41 tests, three projects, 1.2 minutes.
+
 ### Removed
 
 - **Two production dependencies that nothing imports.** `@sentry/tracing` has
