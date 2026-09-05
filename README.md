@@ -399,8 +399,7 @@ The app will be available at: `http://localhost:8100`
 
 ## 📦 Tech Stack
 
-- **UI Framework**: Ionic React 8.0
-- **Frontend**: React 19 + Ionic 9 + TypeScript
+- **Frontend**: React 19 + Ionic 9 + TypeScript 5.9
 - **File Storage**: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
 - **Database**: Supabase (PostgreSQL, RLS)
 - **Authentication**: Supabase Auth
@@ -959,14 +958,17 @@ upgrades:
 
 ```yaml
 - name: Audit production dependencies
-  run: npm audit --omit=dev --audit-level=high
+  run: npm run audit:prod
 ```
 
-`--omit=dev` is load-bearing. A vulnerability in a build tool is not a
-vulnerability in what the browser downloads, and a step that fails over one
-trains people to skip reading it. The ignore rule stays — it was right about
-churn — but it is no longer the only thing standing between an advisory and this
-repository.
+The step ran `npm audit --omit=dev --audit-level=high` directly until v4.2.0,
+when a registry outage failed it twice in a day and the command moved into
+[`scripts/audit-production.mjs`](scripts/audit-production.mjs) — which tells a
+verdict from an unreachable endpoint. `--omit=dev` is load-bearing and unchanged
+in either form. A vulnerability in a build tool is not a vulnerability in what
+the browser downloads, and a step that fails over one trains people to skip
+reading it. The ignore rule stays — it was right about churn — but it is no
+longer the only thing standing between an advisory and this repository.
 
 The habit this adds to the [first postmortem](#-postmortem-the-anon-key-that-was-named-supabase_service_role_key)'s
 two: a policy that suppresses noise needs something else watching for what it

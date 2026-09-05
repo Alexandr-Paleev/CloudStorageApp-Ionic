@@ -23,8 +23,14 @@ family so that `@aws-sdk`'s three packages move together.
   nobody is told at all. Four high-severity `undici` advisories reached
   production dependencies through `@vercel/node` and sat there with every check
   green.
-- The backstop is `npm audit --omit=dev --audit-level=high` in CI, which fails
-  the build rather than waiting for a pull request this rule will never allow.
-  The comment in `dependabot.yml` keeps a marker where the wrong sentence stood.
+- The backstop is a production-dependency audit in CI, which fails the build
+  rather than waiting for a pull request this rule will never allow. The comment
+  in `dependabot.yml` keeps a marker where the wrong sentence stood.
+- *Amended in v4.2.0:* that audit was `npm audit --omit=dev --audit-level=high`
+  until the registry answered 503 twice in one day and failed a required check
+  over someone else's uptime. It is now
+  [`scripts/audit-production.mjs`](../../scripts/audit-production.mjs), which
+  separates a verdict from an unreachable endpoint. The threshold, the
+  `--omit=dev` and the reasoning above are unchanged.
 - Majors are still owed a periodic manual pass. Nothing automates that, and this
   record does not pretend otherwise.
