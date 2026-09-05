@@ -45,6 +45,25 @@ reasoning behind the larger decisions lives in
 
 ### Changed
 
+- **The native build no longer offers a way to buy anything.** App Store
+  guideline 3.1.1 requires digital content consumed inside an app to be sold
+  through In-App Purchase, and Pro storage is that; the rule also covers buttons
+  and links steering the user to buy it elsewhere, so redirecting the plans page
+  would not have satisfied it. All three routes into billing — the plans page,
+  the dashboard header button that is its only permanent entry, and the banner
+  at 80% of quota — now ask one predicate, `billingIsOffered()`, which is false
+  in a Capacitor shell whatever `VITE_BILLING_ENABLED` says.
+
+  A runtime check rather than a second build, for the reason `apiUrl()` is one:
+  a single `npm run build` makes both bundles, and a second configuration is a
+  second thing to keep in step — one whose first symptom, out of step, is a
+  rejection weeks later.
+
+  The cost is stated rather than hidden: someone who fills 500 MB in the app
+  cannot buy more from inside it. They can on the web, with the same account.
+  [ADR 0012](docs/decisions/0012-the-native-build-sells-nothing.md) has the
+  reasoning, including why In-App Purchase is deferred and not refused.
+
 - **There is one deployment of this app again.** A second Vercel project,
   `cloud-storage-app-ionic`, had been serving a build from before v3.0.0 at a
   hostname four characters from the real one — publicly, answering 200, with one
