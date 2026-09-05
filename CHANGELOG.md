@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.3.0] — 2026-09-05
+
 ### Added
 
 - **An account can be deleted, from inside the app.** Both stores require it of
@@ -606,7 +610,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v3.1.0...v4.0.0
