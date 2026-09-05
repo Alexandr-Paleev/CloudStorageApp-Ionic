@@ -77,6 +77,39 @@ reasoning behind the larger decisions lives in
   treat a working tree other steps still need. It deleted the repository out
   from under Lighthouse, which failed with exit 254 a tenth of a second after
   starting, on `main`, after the badges had already published.
+
+- **The four pages nobody tested.** `src/pages` was 0% of 684 statements — the
+  largest untested thing in the repository, and the reason the client coverage
+  badge is red. Thirty-one tests later it is 40.8%, and `src/` overall goes from
+  33.6% to 44.0%.
+
+  Behaviour, not markup, which is what those files are actually made of:
+
+  - **Upload** — that the queue is sequential, asserted by counting uploads in
+    flight rather than by reading the code; that one refused file does not
+    strand the nine behind it, which is the entire reason the page has a queue;
+    that pausing stops the walk instead of marking the file broken; and that it
+    refuses to navigate away while anything failed, because leaving hides the
+    error next to the file it belongs to.
+  - **Dashboard** — the storage meter, the only number here a user is asked to
+    act on: read off the profile rather than a constant, honest about how far
+    over the limit an account is, and falling back to the free tier before the
+    profile arrives rather than reading as an account with no room.
+  - **FileView** — that Copy mints a share link rather than handing out
+    `download_url`, which is either permanent and unrevocable or dead in an
+    hour; and that pressing it twice reuses the first link instead of leaving
+    two live tokens for one file.
+  - **Login** — that a wrong password stays on the form and says so, that the
+    demo account explains a refusal instead of being a button that does nothing,
+    and that either request in flight locks the card, since two sessions opened
+    at once would race to write the same auth store.
+
+  Where jsdom stops, the tests say so rather than mock their way to a green test
+  of nothing. `IonAlert` and `IonModal` mount their contents through Ionic's own
+  runtime, which does not run under jsdom, so what happens *after* a
+  confirmation is pressed is asserted in `e2e/file-lifecycle.spec.ts` against a
+  real browser. What the unit tests claim is the half they can see: that neither
+  a delete nor a rename happens on the tap that opens the sheet.
 ## [4.3.0] — 2026-09-05
 
 ### Added
