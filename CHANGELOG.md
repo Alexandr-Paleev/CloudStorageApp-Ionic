@@ -51,6 +51,25 @@ reasoning behind the larger decisions lives in
 
   Both run weekly as well as on a diff, because advisories and rules move
   without this repository changing.
+
+- **Two coverage badges, not one.** The numbers were already printed into the
+  Actions run summary and read by nobody who did not open it. They are now on
+  the README.
+
+  Two, because `scripts/coverage-summary.js` already refuses to blend them and
+  says why: the handlers and the React layer are covered by separate suites in
+  separate runtimes, and one percentage hides which half a pull request moved.
+  A single badge would do that to a reader who never opens the run, and it would
+  flatter the figure — the server half is the half that decides access, money
+  and quota, and it is at 90.9%. The client badge reads 32.7% and is red, which
+  is the point: `src/pages` has no tests at all, about six hundred statements.
+  An average would read ~48% and sound fine.
+
+  Published to an orphan `badges` branch that nothing builds from. shields.io
+  reads whatever `raw.githubusercontent` serves, so a branch is enough — and a
+  branch nothing builds from cannot start a loop, which committing a badge to
+  `main` would. No gist and no third-party coverage service: both would work,
+  and both would put a 120-byte file somewhere this repository does not control.
 ## [4.3.0] — 2026-09-05
 
 ### Added
