@@ -28,6 +28,7 @@ import {
 import {
   add,
   logOutOutline,
+  personCircleOutline,
   documentTextOutline,
   imageOutline,
   folderOpen,
@@ -312,6 +313,19 @@ const Dashboard: React.FC = () => {
                 <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} aria-hidden="true" />
               </IonButton>
             )}
+            {/* Both stores require a person who can create an account to be
+                able to delete it from inside the app, and to find that without
+                being told where it is — Apple 5.1.1(v), Google's account
+                deletion policy. The page behind it is where it lives. */}
+            <IonButton
+              onClick={() => navigate('/account')}
+              color="dark"
+              data-testid="account-link"
+              title="Account"
+              aria-label="Account"
+            >
+              <IonIcon icon={personCircleOutline} aria-hidden="true" />
+            </IonButton>
             <IonButton onClick={handleLogout} color="dark" aria-label="Sign out">
               <IonIcon icon={logOutOutline} aria-hidden="true" />
             </IonButton>

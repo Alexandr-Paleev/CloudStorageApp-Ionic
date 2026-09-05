@@ -98,6 +98,10 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Google Account sign-in
 - ✅ **One-click demo** — a throwaway account, seeded and signed in, no sign-up
 - ✅ Protected routes (authorized users only)
+- ✅ **Account deletion from inside the app**, at `/account`. Files, folders,
+  share links, profile and login, in the order the missing foreign keys demand —
+  bytes first, rows second, the user last. Files placed in your own Google Drive
+  or Dropbox stay there, and the page says so
 
 ### 📁 File Management
 

@@ -10,6 +10,39 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **An account can be deleted, from inside the app.** Both stores require it of
+  anything that lets a person sign up — Apple in guideline 5.1.1(v), Google in
+  its account deletion policy — and neither accepts a support address or a
+  deactivation. There was no way to do it at all: `grep` for a deletion path
+  found only the sweep that retires demo accounts.
+
+  `/account`, reached from the dashboard header, shows which account is signed
+  in and deletes it behind a typed confirmation. `DELETE /api/account/delete`
+  does the work, because most of it is beyond what a browser is allowed to do:
+  `auth.admin.deleteUser` needs the service-role key, and the R2 and Cloudinary
+  credentials never leave a function.
+
+  The order is the interesting part. `files.user_id` and `folders.user_id` are
+  plain UUID columns with **no** foreign key to `auth.users` — only `profiles`
+  and `dropbox_connections` cascade — so deleting the account first would strand
+  every row and every byte it owns, invisibly: the rows stay, RLS keeps matching
+  them against an `auth.uid()` nobody will present again, and the storage stays
+  paid for. Bytes go first, then rows, then the user. Each provider stores under
+  a per-user prefix, which is what makes that possible without walking the rows
+  — and walking the rows would miss objects whose upload half-failed.
+
+  Storage failures are collected and reported rather than thrown: someone who
+  has asked to be deleted must not be left with an account because one bucket
+  was briefly unreachable. A failure to delete the *user* does throw, because
+  that is the part the request was actually for.
+
+  What it cannot reach is said on the page rather than buried: files the app
+  placed in the user's own Google Drive or Dropbox stay there. They live in
+  storage the person controls, put there with their own OAuth grant, and the app
+  holds no standing authority over either.
+
 ### Changed
 
 - **The end-to-end suite stopped writing to the production database.** The four
