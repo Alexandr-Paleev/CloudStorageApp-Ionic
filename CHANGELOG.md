@@ -37,6 +37,22 @@ reasoning behind the larger decisions lives in
   the policy in [ADR 0006](docs/decisions/0006-dependabot-skips-majors.md) calls
   `0.27 → 0.28` a major. There is no longer a direct dependency to bump.
 
+- **The `early_access` table, which existed in production and nowhere else.** A
+  Pro-plan waitlist — email, status, notes — created by hand in the dashboard
+  for a feature that was never built; billing shipped in v3.0.0 as Stripe
+  Checkout with no waitlist in front of it. It held 0 rows, had 0 references in
+  `src/`, `api/`, `lib/` or `e2e/`, and 0 lines in `migrations/`.
+
+  It was also accepting an anonymous `INSERT`: an audit on 2026-09-04 got a 201
+  from PostgREST for a request carrying nothing but the anon key. Unauthenticated
+  writes into a table nobody reads is the shape a spam sink takes, and nothing
+  would ever have noticed.
+
+  A pair of RLS policies would have closed that and left a table in the schema
+  that no code opens. `migrations/008_drop_early_access.sql` drops it instead,
+  and carries the description of what it was — which a `DROP` typed into the
+  dashboard would not have left behind.
+
 ## [4.2.0] — 2026-09-05
 
 ### Changed

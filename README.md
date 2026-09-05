@@ -273,8 +273,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `007` — adds `profiles.bytes_used` and the trigger that keeps it and
      enforces the storage limit. **Apply it before deploying the code**: the
      API and the client both read that column, and without it uploads fail
+   - `008` — drops `early_access`, a Pro-plan waitlist table that existed in the
+     database, in no migration and in no line of code, and was accepting
+     anonymous writes. On a new project it finds nothing and does nothing
 
-   All eight are safe to re-run, so there is no need to track which ones have
+   All nine are safe to re-run, so there is no need to track which ones have
    already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
