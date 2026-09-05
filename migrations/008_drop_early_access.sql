@@ -16,11 +16,22 @@
 --     is why nothing in this directory has ever mentioned it.
 --
 -- Left alone it is not dramatic, but it is not free either. An audit on
--- 2026-09-04 found the table accepting an anonymous INSERT: PostgREST answered
--- 201 to a request carrying nothing but the anon key, and the test row was
--- removed with the service role immediately. Unauthenticated writes into a
--- table nobody reads is the shape a spam sink takes, and it will not be noticed
--- by anyone, because nothing looks at it.
+-- 2026-09-04 found the table accepting an anonymous INSERT — PostgREST answered
+-- 201 to a request carrying nothing but the anon key — and pg_policies said the
+-- same thing outright:
+--
+--   "Enable insert for everyone"    INSERT  {public}  WITH CHECK (true)
+--   "Anyone can join waitlist"      INSERT  {public}  WITH CHECK (true)
+--   "Admins can view waitlist"      SELECT  {public}  USING (auth.jwt()->>'email' = '<personal address>')
+--   "Only admins can view waitlist" SELECT  {public}  USING (auth.jwt()->>'email' = '<personal address>')
+--
+-- Two of each, identical, because the table was created by hand twice. The read
+-- side also hardcodes one person's address into a policy body, which is a second
+-- reason not to keep it: an authorisation rule that names an individual has no
+-- way to be right for anyone else, and no test can tell you it went stale.
+--
+-- Unauthenticated writes into a table nobody reads is the shape a spam sink
+-- takes, and it will not be noticed by anyone, because nothing looks at it.
 --
 -- The alternative was a pair of policies. That leaves a table in the schema
 -- that no code opens, which costs more than it sounds like here: every file in
@@ -30,7 +41,8 @@
 -- So it goes, and this file is the record of what it was — which is the part a
 -- DROP in the dashboard would not have left behind.
 --
--- Safe to run twice.
+-- Applied to production on 2026-09-05. Safe to run twice — it was, and the
+-- second run was a no-op.
 
 BEGIN;
 
