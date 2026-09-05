@@ -400,7 +400,7 @@ The app will be available at: `http://localhost:8100`
 ## 📦 Tech Stack
 
 - **UI Framework**: Ionic React 8.0
-- **Frontend**: React 18 + TypeScript
+- **Frontend**: React 19 + Ionic 9 + TypeScript
 - **File Storage**: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
 - **Database**: Supabase (PostgreSQL, RLS)
 - **Authentication**: Supabase Auth

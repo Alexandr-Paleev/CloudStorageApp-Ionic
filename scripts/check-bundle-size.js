@@ -22,20 +22,26 @@ const zlib = require('node:zlib');
 const DIST = path.resolve(__dirname, '..', 'dist');
 
 const BUDGETS = {
-  /* 401.0 kB today. Ionic is 239 of it and is structural — the framework
+  /* 431.0 kB today. Ionic is 248 of it and is structural — the framework
      registers its components eagerly — so this ceiling is really about what
-     gets added next to it. */
-  firstLoad: 420,
+     gets added next to it.
+
+     Raised from 420 for React 19 and Ionic 9, which cost 22.4 kB gzip between
+     them: react-dom 19 is 18.4 of it, and Ionic 9's move onto @lit/react the
+     remaining 6.9. Raised deliberately and once, with the figure written down —
+     the check earned its keep by making that number appear at the moment
+     someone was in a position to decide whether to pay it. */
+  firstLoad: 445,
 
   /* The largest single chunk, which is and should remain Ionic. A new entry
      here means something else grew into framework territory without anyone
-     noticing. */
-  largestChunk: 250,
+     noticing. 248.4 kB today, up from 241.5 on Ionic 8. */
+  largestChunk: 260,
 
-  /* Everything under dist/assets, route chunks included: 485.1 kB today. Sentry
+  /* Everything under dist/assets, route chunks included: 524.0 kB today. Sentry
      (49.6) sits here rather than in the first load, and this is what would
      catch it quietly moving back. */
-  total: 520,
+  total: 540,
 };
 
 function gzipped(file) {

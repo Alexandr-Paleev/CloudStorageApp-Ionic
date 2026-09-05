@@ -24,6 +24,29 @@ export default defineConfig({
         },
       },
       {
+        /**
+         * Resolve like a browser, not like a server.
+         *
+         * Ionic 9 builds its React components on `@lit/react`, which ships two
+         * copies: a browser one that attaches properties and event listeners in
+         * `useLayoutEffect`, and a node one for server rendering that attaches
+         * nothing. Vitest runs in node even with a jsdom environment, so it
+         * picked the second — and every Ionic control rendered as markup that
+         * answered no events. Four tests that fire `ionInput` at a searchbar
+         * failed, while the same interaction passed in the e2e suite, which
+         * drives a real browser.
+         */
+        resolve: {
+          conditions: ['browser'],
+        },
+        /* Vitest transforms modules through Vite's SSR pipeline, which resolves
+           by its own condition list — setting it on `resolve` alone leaves the
+           node build in place. */
+        ssr: {
+          resolve: {
+            conditions: ['browser'],
+          },
+        },
         test: {
           name: 'client',
           environment: 'jsdom',

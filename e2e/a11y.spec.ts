@@ -41,7 +41,11 @@ test.describe('Accessibility', () => {
     const { page, close } = await anonymousPage(browser);
     try {
       await page.goto('/login');
-      await expect(page.locator('ion-input[type="email"]')).toBeVisible();
+      /* The native input, not the `ion-input` host. Ionic 9 sets component
+         props as properties rather than attributes, so `ion-input[type=...]`
+         matches nothing while `host.type` is still 'email' — and the thing a
+         person actually types into is this one anyway. */
+      await expect(page.locator('input[type="email"]')).toBeVisible();
 
       const { violations } = await scan(page);
       expect(summarise(violations)).toBe('');

@@ -10,7 +10,40 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Changed
+
+- **React 19 and Ionic 9**, taken together because Ionic 9 is the release that
+  supports React 19, and taken by hand under
+  [ADR 0011](docs/decisions/0011-majors-are-taken-by-hand.md). Not one line of
+  application code had to change: types, lint, 621 unit tests and 41 e2e are
+  green on the upgraded tree, and the unit suite runs in the same six and a half
+  seconds it did before.
+
+  One selector had to change: Ionic 9 sets component props as properties rather
+  than attributes, so `ion-input[type="email"]` now matches nothing while
+  `host.type` is still `'email'`. Attributes the DOM itself reflects — `slot`,
+  `aria-*`, `title` — are unaffected, which is why nothing else in the suite or
+  the stylesheets moved.
+
+  It cost **22.4 kB gzip** on the first load — react-dom 19 is 18.4 of it and
+  Ionic 9's move onto `@lit/react` the remaining 6.9 — so the bundle budgets go
+  from 420/250/520 kB to 445/260/540. Raised once, deliberately, with the figure
+  written down: the check earned its keep by putting that number in front of
+  someone at the moment they could still decide whether to pay it.
+
 ### Fixed
+
+- **The unit suite was testing Ionic's server build.** Ionic 9 builds its React
+  components on `@lit/react`, which ships two copies — a browser one that
+  attaches properties and event listeners in `useLayoutEffect`, and a node one
+  for server rendering that attaches nothing at all. Vitest runs in node even
+  under a jsdom environment, so it resolved the second, and every Ionic control
+  rendered as markup that answered no events: four searchbar tests failed while
+  the same interaction passed in the e2e suite, which drives a real browser.
+
+  The jsdom project now resolves the `browser` condition — on `ssr.resolve` as
+  well as `resolve`, because Vitest transforms modules through Vite's SSR
+  pipeline and that has a condition list of its own.
 
 - **The login page no longer scrolls on a laptop.** The card is 799px tall and
   a MacBook with a bookmarks bar showing gives it 720, so the wordmark went off
