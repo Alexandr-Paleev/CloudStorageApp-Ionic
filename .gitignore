@@ -80,4 +80,12 @@ CLAUDE.md
 *.tsbuildinfo
 
 # macOS/iCloud duplicates — "file 2.ext"
-* 2.*
+# iCloud conflict copies. This repository lives under ~/Documents, which macOS
+# syncs to iCloud Drive when "Desktop & Documents Folders" is on, and iCloud
+# resolves a conflict by writing a second file beside the first: "gradlew 2",
+# "config 3.xml", and — the one that actually cost time — a stray
+# ".git/refs/heads/feat/android-shell 2", which is an invalid ref name and made
+# `git fetch` fail outright. The real fix is to move the repository out of a
+# synced folder; this only keeps the copies out of commits.
+* [0-9]
+* [0-9].*
