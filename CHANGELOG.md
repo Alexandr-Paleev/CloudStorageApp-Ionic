@@ -12,6 +12,37 @@ reasoning behind the larger decisions lives in
 
 ### Added
 
+- **An account can be deleted, from inside the app.** Both stores require it of
+  anything that lets a person sign up — Apple in guideline 5.1.1(v), Google in
+  its account deletion policy — and neither accepts a support address or a
+  deactivation. There was no way to do it at all: `grep` for a deletion path
+  found only the sweep that retires demo accounts.
+
+  `/account`, reached from the dashboard header, shows which account is signed
+  in and deletes it behind a typed confirmation. `DELETE /api/account/delete`
+  does the work, because most of it is beyond what a browser is allowed to do:
+  `auth.admin.deleteUser` needs the service-role key, and the R2 and Cloudinary
+  credentials never leave a function.
+
+  The order is the interesting part. `files.user_id` and `folders.user_id` are
+  plain UUID columns with **no** foreign key to `auth.users` — only `profiles`
+  and `dropbox_connections` cascade — so deleting the account first would strand
+  every row and every byte it owns, invisibly: the rows stay, RLS keeps matching
+  them against an `auth.uid()` nobody will present again, and the storage stays
+  paid for. Bytes go first, then rows, then the user. Each provider stores under
+  a per-user prefix, which is what makes that possible without walking the rows
+  — and walking the rows would miss objects whose upload half-failed.
+
+  Storage failures are collected and reported rather than thrown: someone who
+  has asked to be deleted must not be left with an account because one bucket
+  was briefly unreachable. A failure to delete the *user* does throw, because
+  that is the part the request was actually for.
+
+  What it cannot reach is documented in the README rather than shown in the
+  flow: files the app placed in the user's own Google Drive or Dropbox stay
+  there. They live in storage the person controls, put there with their own
+  OAuth grant, and the app holds no standing authority over either.
+
 - **The four Capacitor plugins that had been sitting in `package.json` unused
   since v1 now do something.** They were worse than absent: they read as native
   support that did not exist, and they left the shell indistinguishable from the
@@ -46,6 +77,25 @@ reasoning behind the larger decisions lives in
   restores the theme's own choice on the way out.
 
 ### Changed
+
+- **The native build no longer offers a way to buy anything.** App Store
+  guideline 3.1.1 requires digital content consumed inside an app to be sold
+  through In-App Purchase, and Pro storage is that; the rule also covers buttons
+  and links steering the user to buy it elsewhere, so redirecting the plans page
+  would not have satisfied it. All three routes into billing — the plans page,
+  the dashboard header button that is its only permanent entry, and the banner
+  at 80% of quota — now ask one predicate, `billingIsOffered()`, which is false
+  in a Capacitor shell whatever `VITE_BILLING_ENABLED` says.
+
+  A runtime check rather than a second build, for the reason `apiUrl()` is one:
+  a single `npm run build` makes both bundles, and a second configuration is a
+  second thing to keep in step — one whose first symptom, out of step, is a
+  rejection weeks later.
+
+  The cost is stated rather than hidden: someone who fills 500 MB in the app
+  cannot buy more from inside it. They can on the web, with the same account.
+  [ADR 0012](docs/decisions/0012-the-native-build-sells-nothing.md) has the
+  reasoning, including why In-App Purchase is deferred and not refused.
 
 - **There is one deployment of this app again.** A second Vercel project,
   `cloud-storage-app-ionic`, had been serving a build from before v3.0.0 at a

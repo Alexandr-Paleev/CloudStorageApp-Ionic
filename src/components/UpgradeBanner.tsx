@@ -1,7 +1,7 @@
 import { IonButton, IonIcon, IonText } from '@ionic/react';
 import { rocketOutline } from 'ionicons/icons';
 import { useNavigate } from 'react-router-dom';
-import { env } from '../env';
+import { billingIsOffered } from '../utils/billing.utils';
 import { storageMeter } from '../utils/quota.utils';
 
 interface UpgradeBannerProps {
@@ -16,7 +16,7 @@ const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, 
   // percentage the bar disagrees with.
   const { ratio: usagePercent } = storageMeter(usedBytes, storageLimit);
 
-  if (!env.VITE_BILLING_ENABLED || tier === 'pro' || usagePercent < 0.8) return null;
+  if (!billingIsOffered() || tier === 'pro' || usagePercent < 0.8) return null;
 
   return (
     <div

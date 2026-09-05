@@ -28,6 +28,7 @@ import {
 import {
   add,
   logOutOutline,
+  personCircleOutline,
   documentTextOutline,
   imageOutline,
   folderOpen,
@@ -50,7 +51,7 @@ import storageService, { type Folder } from '../services/storage.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
-import { env } from '../env';
+import { billingIsOffered } from '../utils/billing.utils';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -300,8 +301,9 @@ const Dashboard: React.FC = () => {
             {/* The only permanent way into billing: UpgradeBanner appears at
                 80% usage, so without this a user could not reach the plans at
                 all, and a Pro user had no route to the customer portal.
-                Hidden where Stripe is not configured — see VITE_BILLING_ENABLED. */}
-            {env.VITE_BILLING_ENABLED && (
+                Hidden where Stripe is not configured, and in the native shell,
+                which sells nothing at all — see billingIsOffered. */}
+            {billingIsOffered() && (
               <IonButton
                 onClick={() => navigate('/pricing')}
                 color="dark"
@@ -312,6 +314,19 @@ const Dashboard: React.FC = () => {
                 <IonIcon icon={profile?.tier === 'pro' ? star : rocketOutline} aria-hidden="true" />
               </IonButton>
             )}
+            {/* Both stores require a person who can create an account to be
+                able to delete it from inside the app, and to find that without
+                being told where it is — Apple 5.1.1(v), Google's account
+                deletion policy. The page behind it is where it lives. */}
+            <IonButton
+              onClick={() => navigate('/account')}
+              color="dark"
+              data-testid="account-link"
+              title="Account"
+              aria-label="Account"
+            >
+              <IonIcon icon={personCircleOutline} aria-hidden="true" />
+            </IonButton>
             <IonButton onClick={handleLogout} color="dark" aria-label="Sign out">
               <IonIcon icon={logOutOutline} aria-hidden="true" />
             </IonButton>

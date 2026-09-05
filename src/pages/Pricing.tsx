@@ -15,6 +15,7 @@ import { checkmarkCircle, lockClosed, informationCircle } from 'ionicons/icons';
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { env } from '../env';
+import { billingIsOffered } from '../utils/billing.utils';
 import { useProfile } from '../hooks/useProfile';
 import billingService, { SubscriptionExistsError } from '../services/billing.service';
 import { TIER_CONFIG } from '../types/billing.types';
@@ -59,9 +60,11 @@ const Pricing: React.FC = () => {
     }
   };
 
-  // Reachable by URL even with the header link hidden, and every button here
-  // would hit a /api/stripe route that has no keys in this environment.
-  if (!env.VITE_BILLING_ENABLED) {
+  // Reachable by URL even with the header link hidden — on the web because a
+  // deployment without Stripe keys would answer every button here with a 500,
+  // and in the native shell because App Store guideline 3.1.1 does not allow a
+  // route to a purchase made anywhere but In-App Purchase. See billingIsOffered.
+  if (!billingIsOffered()) {
     return <Navigate to="/dashboard" replace />;
   }
 
