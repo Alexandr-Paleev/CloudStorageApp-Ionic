@@ -36,6 +36,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Upload = lazy(() => import('./pages/Upload'));
 const FileView = lazy(() => import('./pages/FileView'));
 const Pricing = lazy(() => import('./pages/Pricing'));
+const Account = lazy(() => import('./pages/Account'));
 const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
 const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -102,6 +103,14 @@ const App: React.FC = () => (
                   element={
                     <PrivateRoute>
                       <Pricing />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/account"
+                  element={
+                    <PrivateRoute>
+                      <Account />
                     </PrivateRoute>
                   }
                 />

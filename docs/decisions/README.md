@@ -24,3 +24,4 @@ are amended rather than rewritten when a decision is reversed.
 | [0009](0009-resumable-uploads-keep-state-in-the-browser.md) | A resumable upload keeps its state in the browser | v4.0.0     |
 | [0010](0010-the-native-shell-has-its-own-origin.md) | The native shell has its own origin, and the API says so | v4.1.0     |
 | [0011](0011-majors-are-taken-by-hand.md)         | Majors are taken by hand, in one deliberate piece               | v4.1.0     |
+| [0012](0012-the-native-build-sells-nothing.md)   | The native build sells nothing                                   | v4.3.0     |

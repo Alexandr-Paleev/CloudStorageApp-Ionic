@@ -150,6 +150,12 @@ export async function deleteUser(userId: string): Promise<void> {
     const deleted = await admin(`/auth/v1/admin/users/${userId}`, { method: 'DELETE' });
     if (deleted.ok) return;
 
+    // Already gone is the state this function exists to reach, so it is not a
+    // failure. A test that deletes its own account through the app — which is
+    // now a thing the app can do — would otherwise fail in teardown, having
+    // passed.
+    if (deleted.status === 404) return;
+
     if (attempt === 2) {
       throw new Error(
         `could not delete ${userId}: ${deleted.status} ${await deleted.text().catch(() => '')}`
