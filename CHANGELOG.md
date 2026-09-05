@@ -10,7 +10,21 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`docs/store-submission.md`** — what an App Store and Play submission would
+  need, decided once rather than invented at the keyboard with a review deadline
+  in front of you. It carries the App Privacy and Data safety answers with the
+  file each one is derived from, the asset sizes, and the two review notes worth
+  handing Apple: that the demo account is on the login screen, and that the
+  missing upgrade button is deliberate rather than broken.
+
+  Its useful half is what it says is *blocked*. Sign in with Apple cannot be
+  written speculatively — the Services ID and the `.p8` key exist only inside a
+  paid developer account — and a personal Play Console account must run a closed
+  test with twelve testers for fourteen days before it may apply for production.
+  That second one is calendar time, so it is the thing to start first if Android
+  publication is ever wanted.
 
 ## [4.3.0] — 2026-09-05
 

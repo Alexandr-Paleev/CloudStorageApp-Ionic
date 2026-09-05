@@ -725,7 +725,9 @@ API is implemented with `SYSTEM_UI_FLAG_*` constants which stopped having any
 effect at API 35, and calling it was removed for reading as though it worked.
 
 **Not done**: publication. That needs a Play Console account, and the app is not
-for sale.
+for sale. [`docs/store-submission.md`](docs/store-submission.md) is the checklist
+for if that changes — what is already done, what each store's privacy form wants,
+and the two items that cannot be started without paying.
 
 ## 📁 Project Structure
 
