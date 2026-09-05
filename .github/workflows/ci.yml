@@ -143,8 +143,15 @@ jobs:
       # without the optional secrets it reports as skipped rather than failing.
       #
       # demo.spec.ts additionally needs DEMO_ENABLED, and deletes the account it
-      # opens rather than leaving it for the endpoint's 24-hour sweep — this
-      # runs on every push, against a real project.
+      # opens rather than leaving it for the endpoint's 24-hour sweep.
+      #
+      # The four secrets point at `cloudstorage-ci`, a second Supabase project
+      # that exists only for this job. They pointed at production until
+      # 2026-09-05, which meant every push minted real users in the database the
+      # app serves, and a suite that died before its afterAll left them there.
+      # The schema is the same one: migrations/ applied in order, verified
+      # column-for-column, index-for-index and policy-for-policy against
+      # production.
       - name: Write .env
         run: |
           cat > .env <<'EOF'
