@@ -77,10 +77,9 @@ only one selector in the suite broke.
   opens a pull request for React 19, Ionic 9 or ESLint 10; they wait for a
   reason and a person. The cost is drift — and drift is exactly what put a
   2024 mobile toolchain in front of a 2026 Xcode.
-- `npm audit --omit=dev --audit-level=high` in CI remains the backstop for the
-  case this policy cannot cover: a security fix that only exists behind a
-  major. That reasoning belongs to [0006](0006-dependabot-skips-majors.md) and
-  is unchanged.
+- The production-dependency audit in CI remains the backstop for the case this
+  policy cannot cover: a security fix that only exists behind a major. That
+  reasoning belongs to [0006](0006-dependabot-skips-majors.md) and is unchanged.
 - The test suite is what makes this affordable, and it is fair to say so out
   loud only with the measurement attached. For Capacitor: 621 unit tests and
   the full Playwright run, green before and after, with no source change
