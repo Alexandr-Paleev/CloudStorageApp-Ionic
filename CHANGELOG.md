@@ -15,9 +15,15 @@ reasoning behind the larger decisions lives in
 - **React 19 and Ionic 9**, taken together because Ionic 9 is the release that
   supports React 19, and taken by hand under
   [ADR 0011](docs/decisions/0011-majors-are-taken-by-hand.md). Not one line of
-  application code had to change: types, lint, 621 unit tests and 41 e2e were
-  green on the upgraded tree, and the suite ran in the same six and a half
+  application code had to change: types, lint, 621 unit tests and 41 e2e are
+  green on the upgraded tree, and the unit suite runs in the same six and a half
   seconds it did before.
+
+  One selector had to change: Ionic 9 sets component props as properties rather
+  than attributes, so `ion-input[type="email"]` now matches nothing while
+  `host.type` is still `'email'`. Attributes the DOM itself reflects — `slot`,
+  `aria-*`, `title` — are unaffected, which is why nothing else in the suite or
+  the stylesheets moved.
 
   It cost **22.4 kB gzip** on the first load — react-dom 19 is 18.4 of it and
   Ionic 9's move onto `@lit/react` the remaining 6.9 — so the bundle budgets go

@@ -38,18 +38,36 @@ release that supports React 19. Measured on both sides:
 | | before | after |
 | --- | ---: | ---: |
 | application code changed | — | none |
+| test code changed | — | two lines |
 | unit tests | 621 in 6.81s | 621 in 6.59s |
-| e2e | 41 in 1.2m | 41 in 1.1m |
+| e2e | 41 in 1.2m | 41 in 1.3m |
 | first load, gzip | 408.6 kB | 431.0 kB |
 | largest chunk (ionic) | 241.5 kB | 248.4 kB |
 
-Two things came out of it that the install alone would not have. The 22.4 kB is
-one: a bundle budget turned the price of a major into a red check on the pull
-request that pays it, which is the only moment anyone can weigh it. The other
-is that four unit tests failed while the same interaction passed in a real
-browser — Ionic 9 moved onto `@lit/react`, whose node build attaches no event
-listeners, and Vitest had been resolving it. A green suite would have shipped
-that silently.
+Three things came out of it that the install alone would not have.
+
+The 22.4 kB is one: a bundle budget turned the price of a major into a red
+check on the pull request that pays it, which is the only moment anyone can
+weigh it.
+
+The second is that four unit tests failed while the same interaction passed in
+a real browser. Ionic 9 moved onto `@lit/react`, whose node build attaches no
+event listeners, and Vitest had been resolving it. A green suite would have
+shipped that silently.
+
+The third is the one worth remembering, because it is about how the upgrade was
+checked rather than about the upgrade. **The e2e suite passed locally and failed
+in CI**, on `ion-input[type="email"]` matching nothing. Both were telling the
+truth: Playwright reuses a running dev server outside CI, and the one on this
+machine had been started before the upgrade — the local run had been driving
+Ionic 8 for an hour. CI, which always starts its own, was the only honest
+measurement of the two.
+
+The failure it exposed is real and will outlive this record: Ionic 9 sets
+component props as **properties**, not attributes, so `ion-input[type=...]`
+selects nothing while `host.type` is still `'email'`. Native attributes that
+the DOM reflects — `slot`, `aria-*`, `title` — are unaffected, which is why
+only one selector in the suite broke.
 
 ## Consequences
 
