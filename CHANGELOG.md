@@ -10,6 +10,41 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **The four Capacitor plugins that had been sitting in `package.json` unused
+  since v1 now do something.** They were worse than absent: they read as native
+  support that did not exist, and they left the shell indistinguishable from the
+  website it wraps — which is what App Store guideline 4.2 turns down.
+
+  `Share` puts a link into the system sheet, where a person expects it to go,
+  instead of a clipboard they then have to paste somewhere; the clipboard stays
+  as the fallback for any device that reports no sheet. `Keyboard` sizes the
+  body rather than the whole WebView, so a focused field no longer takes the
+  header off the top of the screen. `Haptics` answers the one tap in the app
+  that starts something irreversible. `StatusBar` follows the theme, and follows
+  it again when the OS changes it while the app is open.
+
+  Everything is behind one `Capacitor.isNativePlatform()` check rather than
+  behind caught errors — a caught error is indistinguishable from a plugin that
+  is genuinely broken.
+
+### Fixed
+
+- **A black band across the top of every screen on iOS**, found by running the
+  build rather than by reading it. `StatusBar.setOverlaysWebView(false)` is the
+  reflex carried over from Android; on iOS it insets the WebView and fills the
+  gap with the window background, so the login gradient ended under a black
+  stripe with no clock in it. The call is gone. Ionic already derives
+  `--ion-safe-area-top` from `env(safe-area-inset-top)` and every `ion-header`
+  pads itself by it, which is the mechanism that was being replaced by a worse
+  one.
+
+  The login page then needed the other half: it is a deep indigo gradient in
+  both themes, so following `body.dark` put dark glyphs on a dark ground in the
+  light theme and the clock vanished. It now asks for light glyphs on entry and
+  restores the theme's own choice on the way out.
+
 ### Changed
 
 - **There is one deployment of this app again.** A second Vercel project,

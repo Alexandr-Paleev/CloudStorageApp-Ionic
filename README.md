@@ -612,6 +612,15 @@ because these two pages are static HTML and nothing else references them.
 The iOS project is in `ios/` and the app runs: built with Capacitor 8 against
 Xcode 26.6, launched on an iPhone 17 simulator under iOS 26.5.
 
+Four Capacitor plugins do the work that makes it a shell rather than a frame
+around a website: the system share sheet for links, a keyboard that resizes the
+body instead of the whole WebView, haptic feedback on the one irreversible tap,
+and a status bar that follows the theme. The status bar is left **overlaying**
+the page — `setOverlaysWebView(false)` is the Android reflex, and on iOS it
+insets the WebView and fills the gap with the window background, which is a
+black band with no clock in it. Ionic's `--ion-safe-area-top` already keeps
+every header clear of it.
+
 <p align="center">
   <img src="docs/screenshots/ios-login.png" alt="The app running on an iPhone 17 simulator: the sign-in card, Sign in with Google, and Just looking? Open a demo account" width="320">
 </p>
