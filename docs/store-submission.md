@@ -133,9 +133,10 @@ Two things reviewers ask for, both already true:
 - **The version the shells display.** Both were left at the Capacitor default of
   `1.0` through four releases — `MARKETING_VERSION` in the Xcode project and
   `versionName` in `android/app/build.gradle` — so a submission would have gone
-  out as version 1.0 of an app the repository calls 4.4.0. Both now say 4.4.0
-  and neither is derived from `package.json`, so a release that forgets them
-  drifts again silently. The build counters beside them (`CURRENT_PROJECT_VERSION`
+  out as version 1.0 of an app whose `package.json` said otherwise. Both now
+  track the release, and neither is derived from `package.json`, so a release
+  that forgets them drifts again silently: **bumping them is a step in cutting a
+  release**, not something the build does. The build counters beside them (`CURRENT_PROJECT_VERSION`
   and `versionCode`) are a different number: they increment per *upload*, not
   per release, and 1 is correct until something is actually uploaded.
 - **Export compliance.** The app uses only standard HTTPS, so
