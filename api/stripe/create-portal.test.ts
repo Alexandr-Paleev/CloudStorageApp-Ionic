@@ -30,9 +30,18 @@ function withProfile(row: Record<string, unknown> | null) {
 
 const post = () => mockRequest({ headers: { authorization: 'Bearer t', origin: APP_URL } });
 
+/* One caller per test. The billing limiter allows six a minute and keys on the
+   user, so a file that signs every test in as the same person starts handing
+   out 429s partway down — a failure that moves as tests are added rather than
+   pointing at what broke. */
+let signedIn = 'user-0';
+let callers = 0;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  authenticateUser.mockResolvedValue('user-1');
+  callers += 1;
+  signedIn = `user-${callers}`;
+  authenticateUser.mockResolvedValue(signedIn);
   withProfile({ stripe_customer_id: 'cus_1' });
   createPortalSession.mockResolvedValue({ url: 'https://billing.stripe.com/session' });
 });
