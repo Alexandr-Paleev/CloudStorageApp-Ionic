@@ -5,6 +5,7 @@ import {
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
@@ -271,9 +272,12 @@ async function multipartComplete(req: VercelRequest, res: VercelResponse, userId
     return bad(res, 'every part needs a partNumber and an etag');
   }
 
-  await getS3Client().send(
+  const client = getS3Client();
+  const Bucket = getR2BucketName();
+
+  await client.send(
     new CompleteMultipartUploadCommand({
-      Bucket: getR2BucketName(),
+      Bucket,
       Key: key,
       UploadId: uploadId,
       MultipartUpload: {
@@ -282,7 +286,37 @@ async function multipartComplete(req: VercelRequest, res: VercelResponse, userId
     })
   );
 
-  return res.status(200).json({ key });
+  /**
+   * Weigh what actually arrived.
+   *
+   * Everything up to here trusted a number from the browser. `multipart-create`
+   * checks the quota against the `size` in its body, and nothing binds the
+   * upload to it: parts are signed without a `ContentLength`, so a create that
+   * declares one byte can be followed by a thousand parts of any size. The
+   * single-PUT path does not have this hole — `presign-upload` puts
+   * `ContentLength` into the signed headers, and R2 refuses a body that does not
+   * match — and the comment there says so. This path was added later and did not
+   * inherit it.
+   *
+   * The row that records the file is written by the browser too, under RLS, so
+   * the quota trigger sums a number the account also chooses. That is a bigger
+   * change than this one. What this closes is the part that costs money: bytes
+   * that are actually in the bucket, past a limit, with nothing to notice them.
+   */
+  const stored = await client.send(new HeadObjectCommand({ Bucket, Key: key }));
+  const size = stored.ContentLength ?? 0;
+
+  const rejection = quotaRejection(await readQuota(userId), size);
+  if (rejection) {
+    /* Delete rather than leave it: an object over the limit is billable and
+       nothing else will come back for it — the browser is about to be told the
+       upload failed. */
+    await client.send(new DeleteObjectCommand({ Bucket, Key: key }));
+    return res.status(413).json({ message: rejection });
+  }
+
+  /* Returned so the row records what was stored rather than what was promised. */
+  return res.status(200).json({ key, size });
 }
 
 /**

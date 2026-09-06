@@ -242,6 +242,44 @@ describe('multipart-complete', () => {
     expect(res.statusCode).toBe(400);
     expect(send).not.toHaveBeenCalled();
   });
+
+  /** R2 answers per command; only the HeadObject one carries a size. */
+  const bucketHolding = (bytes: number) =>
+    send.mockImplementation(async (command: { constructor: { name: string } }) =>
+      command.constructor.name === 'HeadObjectCommand' ? { ContentLength: bytes } : {}
+    );
+
+  const sentCommands = () => send.mock.calls.map((c) => c[0].constructor.name);
+
+  /* Everything before this point trusted a number from the browser:
+     `multipart-create` weighs the quota against the `size` in its body, and
+     nothing binds the upload to it — parts are signed without a ContentLength,
+     so a create declaring one byte can be followed by a thousand parts of any
+     size. The single-PUT path signs ContentLength and R2 refuses a body that
+     does not match; this one was added later and did not inherit that. */
+  it('records what was stored, not what was promised', async () => {
+    bucketHolding(64 * 1024 * 1024);
+
+    const res = mockResponse();
+    await handler(complete({ parts: [{ partNumber: 1, etag: '"a"' }] }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ key: 'users/user-1/movie.mp4', size: 64 * 1024 * 1024 });
+    expect(sentCommands()).toContain('HeadObjectCommand');
+  });
+
+  it('deletes an assembled object that does not fit, and says why', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    bucketHolding(TIER_LIMITS.free.storage_limit + 1);
+
+    const res = mockResponse();
+    await handler(complete({ parts: [{ partNumber: 1, etag: '"a"' }] }), res);
+
+    expect(res.statusCode).toBe(413);
+    expect((res.body as { message: string }).message).toMatch(/Storage limit exceeded/);
+    // Left in the bucket it would be billable, and nothing comes back for it.
+    expect(sentCommands()).toContain('DeleteObjectCommand');
+  });
 });
 
 describe('multipart-abort', () => {

@@ -10,6 +10,73 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Fixed
+
+- **The multipart upload path did not enforce the storage quota.** v4.0.0 moved
+  the quota into the database precisely because the client had been the only
+  thing guarding it. The resumable path added in the same release did not
+  inherit the fix, and this is that story a second time on the road built after
+  it.
+
+  `presign-upload` puts `ContentLength` into the signed headers, so R2 refuses a
+  body that is not the size the quota was checked against — its own comment says
+  so. `multipart-create` checks the quota against the `size` in its body and
+  then binds nothing: `UploadPartCommand` is signed without a `ContentLength`, a
+  part may be any size, and `multipart-complete` assembled whatever arrived and
+  answered 200. A create declaring one byte followed by a thousand parts is
+  storage that is paid for and counted by nobody.
+
+  `multipart-complete` now weighs the assembled object with `HeadObject`,
+  re-checks the quota against that number, and deletes the object and answers
+  413 when it does not fit — an object over the limit is billable and nothing
+  comes back for it, since the browser is about to be told the upload failed.
+  The response carries the measured `size` so the row records what was stored
+  rather than what was promised.
+
+  **Applied to production**, along with `migrations/009` and `010`, and the
+  native deep link `com.cloudstorage.app://auth/callback` was added to Supabase's
+  redirect allow-list — Google sign-in had been failing in both shells because
+  the one setting the code's own comment asks for had never been made. The
+  minimum password length went from 6 to 8; the HaveIBeenPwned check that
+  belongs beside it is a paid-plan feature and the API refuses it with a 402,
+  which is why it was off in the first place.
+
+  What this does *not* close is the row itself. `files` is written by the
+  browser under RLS, so the trigger still sums a number the account chooses;
+  moving that write server-side is a larger change than this one and is not
+  disguised as part of it. What is closed is the half that costs money: bytes
+  actually sitting in the bucket, past a limit, with nothing to notice them.
+
+## [4.5.0] — 2026-09-06
+
+### Fixed
+
+- **A stored cross-site scripting hole in share links.** `files.download_url` is
+  written by the browser under a policy that lets an account write anything into
+  its own row; `FileMetadataSchema` had dropped its `.url()` check with a comment
+  saying it rejected long signed URLs; and there was no constraint on the column.
+  `/api/share` then returned that value **verbatim** for every provider that
+  stores a delivery URL rather than a private object — Cloudinary, Google Drive
+  and Dropbox — and `SharedFile.tsx` made it the `href` of the Download button.
+
+  So a `javascript:` URL saved against one's own file and shared through
+  `/s/<token>` was script running on this origin, in the recipient's session.
+  The Content-Security-Policy does not stop that: `script-src` carries
+  `'unsafe-inline'`, and that directive is what governs `javascript:` URLs.
+  Ten of the twenty rows in production are Cloudinary, so the path was live.
+
+  Fixed in three places, because two of them are code and code paths gain
+  entrances: `lib/safe-url.ts` allows `http:` and `https:` and nothing else;
+  `api/share.ts` refuses to hand out anything that fails it; `SharedFile.tsx`
+  asks again before rendering. `migrations/010` adds the CHECK constraint that
+  PostgREST cannot be talked past — all twenty existing rows are `https`, so it
+  validates without a rewrite. **Not applied to production yet.**
+
+  A scheme allowlist rather than a denylist for `javascript:`: a denylist has to
+  be right about every scheme a browser will navigate, including the ones with
+  whitespace and control characters in the middle that `new URL()` normalises
+  away. `lib/safe-url.test.ts` covers exactly those.
+
 ### Added
 
 - **A `LICENSE` file, which the badge had been promising since v1.** The README
@@ -52,8 +119,10 @@ reasoning behind the larger decisions lives in
 - **The native shells stop claiming to be version 1.0.** `MARKETING_VERSION` in
   the Xcode project and `versionName` in `android/app/build.gradle` had been left
   at the Capacitor default through four releases, so a store submission would
-  have gone out as version 1.0 of an app this repository calls 4.4.0. Both now
-  read 4.4.0. The build counters beside them are a different number and stay at
+  have gone out as version 1.0 of an app this repository called 4.4.0. Both now
+  track the release and read 4.5.0 — neither is derived from `package.json`, so
+  keeping them in step is a step in cutting a release rather than something the
+  build does. The build counters beside them are a different number and stay at
   1: they increment per upload, not per release, and nothing has been uploaded.
 
 - **A rate limit on the two billing routes.** `create-checkout` and
@@ -76,13 +145,25 @@ reasoning behind the larger decisions lives in
   reads production dependencies is unaffected. Recorded here so the next person
   to run `npm audit` does not go looking for a fix that does not exist.
 
-- **`migrations/009` pins the `search_path` on `handle_new_user`.** It was the
-  only one of the schema's four SECURITY DEFINER functions without one. Not
-  exploitable here — the single table it touches is fully qualified, and no role
-  holds CREATE on `public` to shadow anything with — but the second of those is a
-  property of the current grants rather than of the function, and the sort of
-  thing a later migration changes without anyone connecting the two. **Not
-  applied to production.**
+- **`migrations/009` pins two `search_path`s and takes back three grants.**
+  `handle_new_user` had no pinned path — not exploitable here, since the one
+  table it touches is fully qualified and no role holds CREATE on `public`, but
+  the second of those is a property of the current grants rather than of the
+  function. Running Supabase's own linter afterwards found a second function in
+  the same state, `handle_updated_at`, which the first pass had missed because
+  it is not SECURITY DEFINER.
+
+  The same linter reported what no amount of reading the migrations would have:
+  `handle_new_user`, `handle_updated_at` and `enforce_storage_quota` all carry
+  `anon=X` and `authenticated=X` — the default a function inherits when nobody
+  writes a REVOKE. Probed against production: PostgREST answers 404 for the
+  first two (a function returning `trigger` has no callable signature) and
+  Postgres itself refuses the third. Nothing is exploitable. What makes it worth
+  a migration is `recount_storage_used`, which is granted to `postgres` and
+  `service_role` only and answers 401 — that is the posture all of them should
+  have had, and three of them differ from it by accident rather than by
+  decision. Proved on the CI project, including that sign-up still creates a
+  profile row afterwards. **Not applied to production.**
 
 ## [4.4.0] — 2026-09-06
 
@@ -886,7 +967,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...HEAD
+[4.5.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.1.0...v4.2.0

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isSafeHttpUrl } from '../../lib/safe-url';
 
 const sanitizeFileName = (name: string): string => {
   // eslint-disable-next-line no-control-regex
@@ -73,7 +74,13 @@ export const FileMetadataSchema = z.object({
     ),
   size: z.number().positive(),
   type: z.string(),
-  download_url: z.string(), // Removed .url() validation to prevent issues with complex signed URLs
+  /* A scheme allowlist rather than `.url()`. The full check was removed
+     because it rejected the long signed URLs R2 and Supabase Storage hand back;
+     this asks only the question that matters — whether the value can execute
+     when something puts it in an href — and every signed URL passes it. */
+  download_url: z
+    .string()
+    .refine(isSafeHttpUrl, { message: 'download_url must be an http(s) URL' }),
   storage_path: z.string(),
   // Must stay in step with StorageUploadResult['type'] and the providers
   // registered in ProviderManager: a value here that no provider implements
