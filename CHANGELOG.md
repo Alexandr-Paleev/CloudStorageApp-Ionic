@@ -33,6 +33,14 @@ reasoning behind the larger decisions lives in
   The response carries the measured `size` so the row records what was stored
   rather than what was promised.
 
+  **Applied to production**, along with `migrations/009` and `010`, and the
+  native deep link `com.cloudstorage.app://auth/callback` was added to Supabase's
+  redirect allow-list — Google sign-in had been failing in both shells because
+  the one setting the code's own comment asks for had never been made. The
+  minimum password length went from 6 to 8; the HaveIBeenPwned check that
+  belongs beside it is a paid-plan feature and the API refuses it with a 402,
+  which is why it was off in the first place.
+
   What this does *not* close is the row itself. `files` is written by the
   browser under RLS, so the trigger still sums a number the account chooses;
   moving that write server-side is a larger change than this one and is not

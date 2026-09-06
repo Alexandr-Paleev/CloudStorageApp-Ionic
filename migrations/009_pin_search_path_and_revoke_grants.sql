@@ -64,7 +64,15 @@
 -- `ensure_rls` event trigger, not this project's, and taking grants off managed
 -- objects is how a migration ends up fighting the platform on the next upgrade.
 --
--- Not applied to production yet.
+-- Applied to production on 2026-09-06. Safe to run twice: ALTER FUNCTION ... SET
+-- is idempotent, and a REVOKE of a grant that is already gone is a no-op.
+--
+-- Verified afterwards on production rather than assumed: all three functions
+-- report a pinned path and an ACL with no `anon` or `authenticated`, and a real
+-- sign-up through `/api/demo/session` created its `profiles` row — the trigger
+-- fires as the table's owner, so taking EXECUTE off the callable surface does
+-- not touch it. Supabase's own security advisor went from ten findings to four,
+-- and both `function_search_path_mutable` warnings are gone.
 
 BEGIN;
 

@@ -33,7 +33,13 @@
 -- rewrite. `NOT VALID` is deliberately *not* used for that reason — there is
 -- nothing to grandfather in.
 --
--- Not applied to production yet.
+-- Applied to production on 2026-09-06. Safe to run twice — the DROP ... IF
+-- EXISTS above is there for exactly that.
+--
+-- Verified by trying to break it: an INSERT carrying `javascript:alert(1)` was
+-- refused with 23514 on the live database. All 20 existing rows were `https`,
+-- checked immediately before applying, so the constraint validated without a
+-- rewrite and nothing legitimate was rejected.
 
 BEGIN;
 
