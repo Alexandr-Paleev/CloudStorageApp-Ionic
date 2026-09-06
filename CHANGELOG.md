@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.6.0] — 2026-09-06
+
 ### Added
 
 - **The five client services that decide access, money and the quota.** Four of
@@ -1026,7 +1030,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...HEAD
+[4.6.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...v4.3.0
