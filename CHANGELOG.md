@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.5.0] — 2026-09-06
+
 ### Added
 
 - **A `LICENSE` file, which the badge had been promising since v1.** The README
@@ -52,8 +56,10 @@ reasoning behind the larger decisions lives in
 - **The native shells stop claiming to be version 1.0.** `MARKETING_VERSION` in
   the Xcode project and `versionName` in `android/app/build.gradle` had been left
   at the Capacitor default through four releases, so a store submission would
-  have gone out as version 1.0 of an app this repository calls 4.4.0. Both now
-  read 4.4.0. The build counters beside them are a different number and stay at
+  have gone out as version 1.0 of an app this repository called 4.4.0. Both now
+  track the release and read 4.5.0 — neither is derived from `package.json`, so
+  keeping them in step is a step in cutting a release rather than something the
+  build does. The build counters beside them are a different number and stay at
   1: they increment per upload, not per release, and nothing has been uploaded.
 
 - **A rate limit on the two billing routes.** `create-checkout` and
@@ -886,7 +892,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...HEAD
+[4.5.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.1.0...v4.2.0
