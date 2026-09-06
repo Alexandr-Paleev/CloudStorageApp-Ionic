@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.4.0] — 2026-09-06
+
 ### Added
 
 - **`docs/store-submission.md`** — what an App Store and Play submission would
@@ -110,6 +114,108 @@ reasoning behind the larger decisions lives in
   confirmation is pressed is asserted in `e2e/file-lifecycle.spec.ts` against a
   real browser. What the unit tests claim is the half they can see: that neither
   a delete nor a rename happens on the tap that opens the sheet.
+### Changed
+
+- **ESLint 9 and a flat config.** ESLint 8 went out of support in October 2024
+  and `.eslintrc.cjs` went with it. `eslint.config.mjs` replaces it, and
+  `typescript-eslint` 7 → 8.69, `eslint-plugin-react-hooks` 4.6 → 7.1 come along
+  — the last of those brings the React Compiler rules, which is the reason to
+  take the major rather than a side effect of it.
+
+  **ESLint 10 was the target and is not what shipped.** `eslint-plugin-react`
+  and `eslint-plugin-jsx-a11y` both cap their peer range at `^9`, and neither
+  has a release that says otherwise. Installing over that is a claim to npm that
+  something was tested together when it was not; 9.39.5 is the newest version
+  both plugins actually name, and it is on the supported side of the line. ADR
+  0011 already says majors are taken by hand, with reasons — this is one.
+
+  The migration also nearly widened what gets linted without saying so. A flat
+  config with no `files` key applies to plain `.js` too, so the five presets
+  pulled in the six build scripts and `lighthouserc.js` for the first time: 76
+  errors, every one of them `no-undef` on `process` and `require` in files that
+  are CommonJS on purpose. They are attached through `extends` under a
+  TypeScript-only `files` now, so the scope is exactly what `--ext ts,tsx` gave.
+  Linting those scripts is worth doing; it is not this change.
+
+  What the compiler rules found, once the noise was gone, was four real things:
+
+  - **`useAnalytics`** kept a ref "to maintain stable function references"
+    around `trackPageView`, which is declared at module scope and has one
+    identity for the life of the module. The ref guarded nothing and was
+    reassigned on every render, which is the thing React asks you not to do.
+  - **`Upload`** mirrored the queue into a ref during render. The runner only
+    reads it after an `await`, so the mirror now happens in an effect and the
+    first read comes from state — which is, by definition, the queue the click
+    was made against.
+  - **`useOfflineQueue`** declared `[user?.id]` as its dependency while the body
+    reached through `user`. The compiler inferred the whole session object and
+    refused to keep the memoization: the callback was being rebuilt on changes
+    to fields it never read.
+  - **`DropboxCallback`** set "no authorization code received" as state from
+    inside an effect. Whether the URL has a code is known while rendering, so
+    the page was drawing "Connecting…" once and then immediately redrawing the
+    failure. Only the exchange itself was ever asynchronous.
+
+- **`noUncheckedIndexedAccess`.** `tsconfig.json` already had `strict`,
+  `noUnusedLocals`, `noUnusedParameters` and `noFallthroughCasesInSwitch`. This
+  is the flag that separates turning `strict` on from knowing what `strict` does
+  not catch: `arr[0]` is typed as present when the array may be empty.
+
+  Seventy-four sites, and the fourteen in shipping code were not all
+  ceremony. `lib/rate-limit.ts` read `times[0]` behind a length check the
+  compiler cannot follow; `lib/supabase-key.ts` reached `parts[1]` around one;
+  `multipart.upload.ts` assigned `fresh.url` from a re-sign that can come back
+  empty — where the original expiry error is the more useful thing to raise
+  anyway. `ProviderSelector` is the one that shrank: its `Record<string, …>`
+  annotation had widened the keys to `string`, which is why the five provider
+  names had to be written out twice, once as the map and once as the render
+  order. `satisfies` keeps them literal, and the second list is gone.
+
+- **A CI step that type-checks the tests.** Adding a strictness flag to a tree
+  half of which nothing enforces is theatre. `npm run build` checks what ships —
+  `tsconfig.build.json` excludes `**/*.test.ts` and `**/*.test.tsx` by name, and
+  `tsconfig.api.json` never sees `src/` or `e2e/` at all. Nothing read the unit
+  tests, the Playwright specs or `playwright.config.ts` for types.
+
+  Two errors had been sitting in that gap: a fixture missing a required
+  `userId`, and a `vi.fn` widened past the signature it was being passed to.
+  Both showed as red in an editor and neither could fail a build. `npm run
+  typecheck` now runs `tsconfig.json`, and CI runs it after the build.
+
+- **Vite 8 and Vitest 5.** Three majors on the bundler, one on the test runner,
+  with `@vitejs/plugin-react` 4 → 6, `vite-plugin-pwa` 1.2 → 1.3 and
+  `@types/node` 20 → 22 — those types had been describing a runtime one major
+  behind the Node 22 that CI and everything else actually run.
+
+  Vite 8 builds through Rolldown rather than Rollup, which makes the chunk split
+  in `vite.config.mts` the thing to check first: its own comment records that
+  getting it wrong is a blank page in the browser and in the native shell, and
+  that `npm run dev` cannot show it. The split survived — React, react-dom and
+  the router in one chunk, Sentry's reporter still off the critical path per ADR
+  0005 — and `npm run smoke`, which is the check that would catch it, renders
+  the built bundle with no console errors.
+
+  Measured before and after, which is what ADR 0011 asks for:
+
+  | | Before | After |
+  | --- | ---: | ---: |
+  | First load (gzip) | 432.2 kB | 415.0 kB |
+  | Largest chunk (`ionic`) | 248.7 kB | 244.4 kB |
+  | All assets | 527.0 kB | 508.2 kB |
+
+  Headroom against the first-load budget goes from 12.8 kB to 30.0 kB, which
+  matters more than the saving itself: the next major has room to land in.
+
+  Two things had to be settled to get there. `@vitejs/plugin-react@6` is the
+  only line that supports Vite 8, and it carries an optional peer chain ending
+  at `@babel/core@8`, while `vite-plugin-pwa` pulls `workbox-build`, which pins
+  `@babel/core@7`. The chain's own range allows either, so `overrides` pins
+  `@babel/plugin-transform-runtime` to its 7.x branch — a subtree this project
+  never activates, since it passes no `babel` option. And the root configs are
+  now `vite.config.mts` and `vite-plugin-dev-api.mts`: Vite 8 warns on every
+  start that ESM in a file loaded as CommonJS will stop working, and `.mts` is
+  what `vitest.config.mts` already did.
+
 ## [4.3.0] — 2026-09-05
 
 ### Added
@@ -708,7 +814,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...HEAD
+[4.4.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.0.0...v4.1.0

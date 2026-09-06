@@ -337,6 +337,7 @@ export async function seedFolder(
   });
   if (!response.ok) throw new Error(`could not seed a folder: ${await response.text()}`);
   const [folder] = (await response.json()) as { id: string }[];
+  if (!folder) throw new Error('the folder was created but came back with no row');
   return folder.id;
 }
 

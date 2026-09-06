@@ -129,8 +129,8 @@ describe('share: creating a link', () => {
     await handler(post({ fileId: FILE_ID }), res);
 
     const { url } = res.body as { url: string };
-    const token = url.split('/s/')[1];
-    const row = writes()[0].args?.[0] as Record<string, unknown>;
+    const token = url.split('/s/')[1] ?? '';
+    const row = writes()[0]!.args?.[0] as Record<string, unknown>;
 
     expect(row.token_hash).toBe(hashShareToken(token));
     expect(JSON.stringify(row)).not.toContain(token);
@@ -264,7 +264,7 @@ describe('share: revoking a link', () => {
     await handler(del({ id: 'link-1' }), res);
 
     expect(res.statusCode).toBe(200);
-    const update = writes()[0].args?.[0] as Record<string, unknown>;
+    const update = writes()[0]!.args?.[0] as Record<string, unknown>;
     expect(update.revoked_at).toBeTruthy();
     expect((db.calls as RecordedCall[]).some((c) => c.op === 'delete')).toBe(false);
   });

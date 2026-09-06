@@ -88,7 +88,7 @@ describe('a name queued offline', () => {
     screen.getByText('rename').click();
 
     await waitFor(() => expect(stored).toHaveLength(1));
-    expect((stored[0].op as { name: string }).name).toBe('report .pdf');
+    expect((stored[0]!.op as { name: string }).name).toBe('report .pdf');
   });
 
   it('is recorded against the account that made it', async () => {
@@ -96,6 +96,6 @@ describe('a name queued offline', () => {
     screen.getByText('delete').click();
 
     await waitFor(() => expect(stored).toHaveLength(1));
-    expect(stored[0].userId).toBe('user-1');
+    expect(stored[0]!.userId).toBe('user-1');
   });
 });

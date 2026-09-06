@@ -95,7 +95,7 @@ describe('uploadFile', () => {
       })
     );
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
+    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
     expect(body).toEqual({ fileName: 'photo.png', size: 1024, contentType: 'image/png' });
   });
 
@@ -206,7 +206,7 @@ describe('deleteFile', () => {
 
     await fresh.deleteFile('users/user-1/photo');
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/cloudinary/delete');
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/cloudinary/delete');
   });
 
   it('uses the configured URL when a deployment sets one', async () => {
@@ -222,6 +222,6 @@ describe('deleteFile', () => {
 
     await fresh.deleteFile('users/user-1/photo');
 
-    expect(fetchMock.mock.calls[0][0]).toBe('https://example.invalid/api/cloudinary/delete');
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://example.invalid/api/cloudinary/delete');
   });
 });

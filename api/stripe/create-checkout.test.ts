@@ -140,7 +140,9 @@ describe('create-checkout: the session', () => {
   it('sends the user back to this deployment, not to a fixed host', async () => {
     await handler(request(), mockResponse());
 
-    const [args] = stripe.createSession.mock.calls[0] as [Record<string, string>];
+    const [args] = stripe.createSession.mock.calls[0] as [
+      { success_url: string; cancel_url: string },
+    ];
     expect(args.success_url.startsWith(APP_URL)).toBe(true);
     expect(args.cancel_url.startsWith(APP_URL)).toBe(true);
   });

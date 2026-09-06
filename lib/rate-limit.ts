@@ -161,9 +161,9 @@ export class RateLimiter {
    * "retry after 0 seconds" retries immediately and is refused again.
    */
   retryAfterSeconds(key: string, now: number = Date.now()): number {
-    const times = this.hits.get(key);
-    if (!times || times.length === 0) return 0;
-    return Math.max(1, Math.ceil((times[0] + this.windowMs - now) / 1000));
+    const oldest = this.hits.get(key)?.[0];
+    if (oldest === undefined) return 0;
+    return Math.max(1, Math.ceil((oldest + this.windowMs - now) / 1000));
   }
 
   reset(): void {

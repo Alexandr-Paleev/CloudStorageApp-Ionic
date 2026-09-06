@@ -196,7 +196,7 @@ describe('presign-upload: the signed URL', () => {
     await handler(withAction({ body: { fileName: 'a.pdf', size: 42 } }), res);
 
     expect(res.statusCode).toBe(200);
-    expect(signedCommands[0].input).toMatchObject({ ContentLength: 42 });
+    expect(signedCommands[0]!.input).toMatchObject({ ContentLength: 42 });
   });
 
   it('scopes the key to the caller, whatever name they send', async () => {
@@ -212,7 +212,7 @@ describe('presign-upload: the signed URL', () => {
   it('defaults the content type rather than signing an empty one', async () => {
     const res = mockResponse();
     await handler(withAction({ body: { fileName: 'a.bin', size: 1 } }), res);
-    expect(signedCommands[0].input).toMatchObject({ ContentType: 'application/octet-stream' });
+    expect(signedCommands[0]!.input).toMatchObject({ ContentType: 'application/octet-stream' });
   });
 });
 

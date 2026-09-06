@@ -11,6 +11,7 @@ function show(pending: number, discarded: QueuedMutation[] = []) {
 
 const gaveUp = (op: PendingOp, lastError: string): QueuedMutation => ({
   id: 'q1',
+  userId: 'user-1',
   op,
   createdAt: 0,
   attempts: 3,

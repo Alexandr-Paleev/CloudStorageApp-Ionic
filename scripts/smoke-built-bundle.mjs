@@ -4,7 +4,7 @@
  * render anything at all?
  *
  * Everything else in this repository tests the source. `npm run dev` serves
- * unbundled modules, so `manualChunks` in vite.config.ts is inert there, and
+ * unbundled modules, so `manualChunks` in vite.config.mts is inert there, and
  * the Playwright suite runs against that dev server — which means the chunk
  * split, the one piece of configuration that can turn a working app into a
  * blank page, was never executed by any check.

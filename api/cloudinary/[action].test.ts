@@ -191,8 +191,8 @@ describe('cloudinary delete: result handling', () => {
     await handler(del('users/user-1/doc', 'raw'), res);
 
     expect(destroy).toHaveBeenCalledTimes(2);
-    expect(destroy.mock.calls[0][1]).toMatchObject({ resource_type: 'raw' });
-    expect(destroy.mock.calls[1][1]).toMatchObject({ resource_type: 'image' });
+    expect(destroy.mock.calls[0]![1]).toMatchObject({ resource_type: 'raw' });
+    expect(destroy.mock.calls[1]![1]).toMatchObject({ resource_type: 'image' });
     expect(res.statusCode).toBe(200);
   });
 
@@ -231,7 +231,7 @@ describe('cloudinary sign: authorizing an upload', () => {
 
     await handler(sign(), res);
 
-    const [params, secret] = apiSignRequest.mock.calls[0];
+    const [params, secret] = apiSignRequest.mock.calls[0]!;
     expect(Object.keys(params).sort()).toEqual(['folder', 'tags', 'timestamp']);
     expect(secret).toBe('test-secret');
     expect(res.body).toMatchObject({ timestamp: params.timestamp });

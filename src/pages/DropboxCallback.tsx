@@ -6,18 +6,21 @@ import dropboxAuthService from '../services/dropbox-auth.service';
 const DropboxCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [error, setError] = useState('');
+  const [exchangeError, setExchangeError] = useState('');
   const exchangeStarted = useRef(false);
 
+  /* Whether Dropbox sent us back with a code is in the URL, and the URL is
+     known while rendering. Setting it as state from inside the effect made the
+     page render "Connecting..." once, then immediately re-render with the
+     failure — a cascading render for a value that was never asynchronous.
+     Only the exchange itself is. */
+  const code = searchParams.get('code');
+  const error = code ? exchangeError : 'No authorization code received';
+
   useEffect(() => {
+    if (!code) return;
     // StrictMode runs effects twice in dev — the code may only be exchanged once
     if (exchangeStarted.current) return;
-
-    const code = searchParams.get('code');
-    if (!code) {
-      setError('No authorization code received');
-      return;
-    }
     exchangeStarted.current = true;
 
     dropboxAuthService
@@ -26,9 +29,9 @@ const DropboxCallback: React.FC = () => {
         navigate('/upload', { replace: true });
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to connect Dropbox');
+        setExchangeError(err instanceof Error ? err.message : 'Failed to connect Dropbox');
       });
-  }, [searchParams, navigate]);
+  }, [code, searchParams, navigate]);
 
   return (
     <IonPage>

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
@@ -71,9 +71,16 @@ const Upload: React.FC = () => {
 
   /* The runner walks a local copy of the queue — state updates do not land in
      the middle of a loop — and reads this to pick up files added while it was
-     already working. */
+     already working.
+
+     Mirrored in an effect rather than assigned during render. A ref written
+     while rendering escapes the render that computed it, which is why React
+     forbids it; here the value is only ever read after an `await`, so a commit
+     has always landed by the time the loop looks. */
   const queueRef = useRef<QueueItem[]>([]);
-  queueRef.current = queue;
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
   const { profile } = useProfile();
   const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
 
@@ -115,8 +122,12 @@ const Upload: React.FC = () => {
     setError('');
 
     /* A local copy, because setQueue does not take effect inside this loop.
-       Every mutation goes through here so the screen and the walk agree. */
-    let items = queueRef.current;
+       Every mutation goes through here so the screen and the walk agree.
+
+       Seeded from state rather than from the ref: this line runs before the
+       first `await`, and `queue` is by definition the queue the click was made
+       against. The ref is for what arrives later. */
+    let items = queue;
     const apply = (id: string, patch: Partial<QueueItem>) => {
       items = update(items, id, patch);
       setQueue(items);

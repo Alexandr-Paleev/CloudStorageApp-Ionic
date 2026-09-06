@@ -105,7 +105,7 @@ test.describe('A share link, from both sides', () => {
     const [link] = (await rows.json()) as { id: string }[];
     expect(link, 'the owner should be able to list the link they just created').toBeTruthy();
 
-    const revoked = await api(page, user.accessToken, `/api/share?id=${link.id}`, {
+    const revoked = await api(page, user.accessToken, `/api/share?id=${link!.id}`, {
       method: 'DELETE',
     });
     expect(revoked.status).toBe(200);

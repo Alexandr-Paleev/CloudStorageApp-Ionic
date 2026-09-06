@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import ReactGA from 'react-ga4';
 
 import { env } from '../env';
@@ -91,15 +91,18 @@ function trackEvent(eventName: string, params: Record<string, unknown>): void {
  * Provides type-safe methods for tracking various events
  */
 export function useAnalytics() {
-  // Use refs to maintain stable function references
-  const trackPageViewRef = useRef(trackPageView);
-  trackPageViewRef.current = trackPageView;
-
   /**
    * Track page view
+   *
+   * The ref that used to sit here — assigned on every render to keep a
+   * "stable function reference" — was guarding nothing: `trackPageView` is
+   * declared at module scope and has one identity for the life of the module.
+   * Writing a ref during render is the thing React asks you not to do, and it
+   * bought a level of indirection over a constant. The other seven trackers in
+   * this hook call `trackEvent` directly; this one now matches them.
    */
   const handleTrackPageView = useCallback((path: string, title?: string) => {
-    trackPageViewRef.current(path, title);
+    trackPageView(path, title);
   }, []);
 
   /**

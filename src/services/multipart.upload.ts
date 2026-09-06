@@ -161,7 +161,10 @@ export function createMultipartUploader(deps: MultipartDeps) {
                   // Cheaper than failing the upload and asking the user to
                   // start a file they have already sent most of.
                   const [fresh] = await signBatch(current, [next.partNumber]);
-                  next.url = fresh.url;
+                  /* If the re-sign came back empty there is no fresher URL to
+                     try, and the original expiry error below is the more useful
+                     thing to raise. */
+                  if (fresh) next.url = fresh.url;
                 }
                 throw error;
               }

@@ -14,20 +14,25 @@ interface ProviderSelectorProps {
   onSelect: (provider: string | undefined) => void;
 }
 
-const PROVIDER_INFO: Record<string, { label: string; icon: string }> = {
+/* `satisfies` rather than a `Record<string, …>` annotation: the annotation
+   widened the key to `string`, which made every lookup below a lookup that
+   might miss — and made the list of five names have to be written out twice,
+   once here and once as the render order. Keys stay literal, so indexing is
+   checked at compile time and the order comes from this object. */
+const PROVIDER_INFO = {
   cloudinary: { label: 'Cloudinary', icon: imagesOutline },
   r2: { label: 'Cloudflare R2', icon: serverOutline },
   supabase_storage: { label: 'Supabase', icon: cloudOutline },
   googledrive: { label: 'Google Drive', icon: logoGoogle },
   dropbox: { label: 'Dropbox', icon: logoDropbox },
-};
+} satisfies Record<string, { label: string; icon: string }>;
 
 const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   selectedProvider,
   allowedProviders,
   onSelect,
 }) => {
-  const allProviders = ['cloudinary', 'r2', 'supabase_storage', 'googledrive', 'dropbox'];
+  const allProviders = Object.keys(PROVIDER_INFO) as Array<keyof typeof PROVIDER_INFO>;
 
   return (
     <div style={{ marginTop: '12px' }}>

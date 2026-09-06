@@ -30,7 +30,7 @@ const validateFileName = (name: string): boolean => {
     'LPT8',
     'LPT9',
   ];
-  const upperName = name.toUpperCase().split('.')[0];
+  const upperName = name.toUpperCase().split('.')[0] ?? '';
   if (reservedNames.includes(upperName)) {
     return false;
   }

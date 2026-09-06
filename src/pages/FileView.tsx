@@ -259,7 +259,7 @@ const FileView: React.FC = () => {
   const isPDF =
     file?.type === 'application/pdf' ||
     file?.name?.toLowerCase().endsWith('.pdf') ||
-    downloadUrl?.toLowerCase().split('?')[0].endsWith('.pdf');
+    downloadUrl?.toLowerCase().split('?')[0]?.endsWith('.pdf');
 
   if (isLoading) {
     return (
