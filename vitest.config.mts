@@ -65,6 +65,10 @@ export default defineConfig({
             VITE_SUPABASE_URL: 'https://project.supabase.co',
             VITE_SUPABASE_ANON_KEY: 'test-anon-key',
             VITE_CLOUDINARY_CLOUD_NAME: 'test-cloud',
+            /* Same reason: r2.service reads the bucket name at module load and
+               answers isConfigured() from it, so without this every test of
+               that service asserts against "Cloudflare R2 is not configured". */
+            VITE_R2_BUCKET_NAME: 'test-bucket',
           },
         },
       },

@@ -10,6 +10,69 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **The five client services that decide access, money and the quota.** Four of
+  them were at zero and the fifth at 4.8% — the whole of `src/services` that a
+  reviewer would ask about, and the reason the client coverage badge is red
+  while the server one is not. Fifty-six tests later they read 92% to 100%, and
+  `src/` goes from 46.2% to 52.8%.
+
+  Behaviour, and specifically the behaviour where being wrong costs something:
+
+  - **`billing.service`** — that an unknown profile falls back *down*. A read
+    that fails, or a row that has not arrived yet, must never be taken for more
+    room or more providers than the free tier; the difference between those two
+    directions is a degraded experience versus giving the paid one away. Also
+    that a 409 stays a `SubscriptionExistsError` all the way to the interface,
+    because flattened into a generic failure it reads as "checkout is broken"
+    and the honest answer — you already pay for this — is what stops someone
+    buying a second subscription.
+  - **`auth.service`** — where Google is asked to come back to, on each
+    platform. This is the one that was actually broken in production for both
+    shells: a custom scheme and the system browser on a device, a page and an
+    in-place redirect on the web. Asserted against the real
+    `NATIVE_AUTH_CALLBACK`, plus the property behind it — that it is a scheme
+    and not a URL, which is the shape of the mistake that broke it.
+  - **`share.service`** — that listing a file's links never asks for the token
+    hash, and that a link id is encoded before it goes into a query string. An
+    id carrying `&` truncates the parameter, and the DELETE then lands on a
+    different link, or on none, reporting success either way.
+  - **`account.service`** — the order. Signing out before the delete would throw
+    away the only proof of who is asking; a failed delete that signs out anyway
+    would log someone out of an account that still exists and still holds their
+    files. Both directions are now held down.
+  - **`r2.service`** — which path an upload takes either side of the multipart
+    threshold, and that a 413 arrives at the interface as a 413 with the
+    server's own sentence. A full quota is the one refusal a person can act on;
+    flattened into "upload failed" it becomes a bug report.
+
+  Two of these tests were wrong before they were right, and both because the
+  test lied rather than the code: a file helper that capped its bytes at 1 KiB
+  made the "large file" small, and an abort fired after a fake PUT had already
+  finished proved nothing. Worth saying because a green test that exercises the
+  wrong branch is the failure mode this whole exercise exists to avoid.
+
+  `vitest.config.mts` now supplies `VITE_R2_BUCKET_NAME` alongside the Cloudinary
+  cloud name, for the reason the comment there already gives: the service reads
+  it at module load to answer `isConfigured()`.
+
+  **What this does not yet cover**, so the claim stays honest: money and the
+  quota are now closed end to end, and so is the app's own access — sign-in,
+  share links, account deletion. Connecting a *third-party* provider is not:
+  `googledrive-auth.service` is at 11% and `dropbox-auth.service` at 14%.
+
+### Fixed
+
+- **Two documents still naming version 4.4.0** after 4.5.0 shipped —
+  `docs/store-submission.md` and `CLAUDE.md`. The store document no longer names
+  a version at all, since the point it was making is about drift rather than
+  about a number, and it now says plainly that bumping the native versions is a
+  step in cutting a release. (The Release badge was never wrong: it resolves to
+  v4.5.0, and GitHub was serving a cached copy through its image proxy.)
+
+## [4.5.0] — 2026-09-06
+
 ### Fixed
 
 - **The multipart upload path did not enforce the storage quota.** v4.0.0 moved
@@ -46,10 +109,6 @@ reasoning behind the larger decisions lives in
   moving that write server-side is a larger change than this one and is not
   disguised as part of it. What is closed is the half that costs money: bytes
   actually sitting in the bucket, past a limit, with nothing to notice them.
-
-## [4.5.0] — 2026-09-06
-
-### Fixed
 
 - **A stored cross-site scripting hole in share links.** `files.download_url` is
   written by the browser under a policy that lets an account write anything into
