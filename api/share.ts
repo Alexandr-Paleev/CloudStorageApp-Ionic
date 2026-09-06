@@ -19,6 +19,7 @@ import {
   tooManyRequests,
 } from '../lib/rate-limit';
 import { applyCors } from '../lib/cors';
+import { isSafeHttpUrl } from '../lib/safe-url';
 
 /**
  * Public share links.
@@ -83,6 +84,16 @@ async function downloadUrlFor(file: FileRow): Promise<string> {
       .createSignedUrl(file.storage_path, SIGNED_URL_TTL);
     if (error || !data) throw new Error(`Failed to sign download URL: ${error?.message}`);
     return data.signedUrl;
+  }
+
+  /* The only value on this path the owner controls directly. RLS lets an
+     account write anything into its own row, `FileMetadataSchema` stopped
+     checking the shape years ago, and there is no constraint on the column —
+     so a `javascript:` URL written here and then shared is script running on
+     this origin in the recipient's session. Refused rather than sanitised:
+     there is no legitimate stored value this rejects. */
+  if (!isSafeHttpUrl(file.download_url)) {
+    throw new Error('The stored location for this file is not a usable URL');
   }
 
   return file.download_url;

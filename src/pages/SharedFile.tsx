@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isSafeHttpUrl } from '../../lib/safe-url';
 import { Link, useParams } from 'react-router-dom';
 import {
   IonContent,
@@ -99,15 +100,25 @@ const SharedFilePage: React.FC = () => {
                 </p>
               </IonText>
 
-              <IonButton
-                expand="block"
-                href={file.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <IonIcon icon={cloudDownloadOutline} slot="start" aria-hidden="true" />
-                Download
-              </IonButton>
+              {/* The server refuses to hand out anything but an http(s) URL, and
+                  this asks again before it becomes an href — the last place the
+                  value is still inert, and the one that would still hold if the
+                  route ever gained a second way to answer. */}
+              {isSafeHttpUrl(file.downloadUrl) ? (
+                <IonButton
+                  expand="block"
+                  href={file.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <IonIcon icon={cloudDownloadOutline} slot="start" aria-hidden="true" />
+                  Download
+                </IonButton>
+              ) : (
+                <IonText color="danger">
+                  <p>This file cannot be downloaded — its stored location is not a usable link.</p>
+                </IonText>
+              )}
 
               <p className="shared-file__note">
                 Shared with you through <Link to="/login">Cloud Storage</Link>. This link expires,

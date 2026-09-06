@@ -14,6 +14,34 @@ Nothing yet.
 
 ## [4.5.0] — 2026-09-06
 
+### Fixed
+
+- **A stored cross-site scripting hole in share links.** `files.download_url` is
+  written by the browser under a policy that lets an account write anything into
+  its own row; `FileMetadataSchema` had dropped its `.url()` check with a comment
+  saying it rejected long signed URLs; and there was no constraint on the column.
+  `/api/share` then returned that value **verbatim** for every provider that
+  stores a delivery URL rather than a private object — Cloudinary, Google Drive
+  and Dropbox — and `SharedFile.tsx` made it the `href` of the Download button.
+
+  So a `javascript:` URL saved against one's own file and shared through
+  `/s/<token>` was script running on this origin, in the recipient's session.
+  The Content-Security-Policy does not stop that: `script-src` carries
+  `'unsafe-inline'`, and that directive is what governs `javascript:` URLs.
+  Ten of the twenty rows in production are Cloudinary, so the path was live.
+
+  Fixed in three places, because two of them are code and code paths gain
+  entrances: `lib/safe-url.ts` allows `http:` and `https:` and nothing else;
+  `api/share.ts` refuses to hand out anything that fails it; `SharedFile.tsx`
+  asks again before rendering. `migrations/010` adds the CHECK constraint that
+  PostgREST cannot be talked past — all twenty existing rows are `https`, so it
+  validates without a rewrite. **Not applied to production yet.**
+
+  A scheme allowlist rather than a denylist for `javascript:`: a denylist has to
+  be right about every scheme a browser will navigate, including the ones with
+  whitespace and control characters in the middle that `new URL()` normalises
+  away. `lib/safe-url.test.ts` covers exactly those.
+
 ### Added
 
 - **A `LICENSE` file, which the badge had been promising since v1.** The README
@@ -82,13 +110,25 @@ Nothing yet.
   reads production dependencies is unaffected. Recorded here so the next person
   to run `npm audit` does not go looking for a fix that does not exist.
 
-- **`migrations/009` pins the `search_path` on `handle_new_user`.** It was the
-  only one of the schema's four SECURITY DEFINER functions without one. Not
-  exploitable here — the single table it touches is fully qualified, and no role
-  holds CREATE on `public` to shadow anything with — but the second of those is a
-  property of the current grants rather than of the function, and the sort of
-  thing a later migration changes without anyone connecting the two. **Not
-  applied to production.**
+- **`migrations/009` pins two `search_path`s and takes back three grants.**
+  `handle_new_user` had no pinned path — not exploitable here, since the one
+  table it touches is fully qualified and no role holds CREATE on `public`, but
+  the second of those is a property of the current grants rather than of the
+  function. Running Supabase's own linter afterwards found a second function in
+  the same state, `handle_updated_at`, which the first pass had missed because
+  it is not SECURITY DEFINER.
+
+  The same linter reported what no amount of reading the migrations would have:
+  `handle_new_user`, `handle_updated_at` and `enforce_storage_quota` all carry
+  `anon=X` and `authenticated=X` — the default a function inherits when nobody
+  writes a REVOKE. Probed against production: PostgREST answers 404 for the
+  first two (a function returning `trigger` has no callable signature) and
+  Postgres itself refuses the third. Nothing is exploitable. What makes it worth
+  a migration is `recount_storage_used`, which is granted to `postgres` and
+  `service_role` only and answers 401 — that is the posture all of them should
+  have had, and three of them differ from it by accident rather than by
+  decision. Proved on the CI project, including that sign-up still creates a
+  profile row afterwards. **Not applied to production.**
 
 ## [4.4.0] — 2026-09-06
 
