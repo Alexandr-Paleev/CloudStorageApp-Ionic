@@ -148,7 +148,7 @@ const Dashboard: React.FC = () => {
     enabled: !!user?.id && !!folderId,
   });
 
-  const parentId = folderPath.length > 1 ? (folderPath[folderPath.length - 2].id ?? null) : null;
+  const parentId = folderPath.length > 1 ? (folderPath[folderPath.length - 2]?.id ?? null) : null;
 
   const openFolder = (id: string | null) => navigate(id ? `/dashboard/${id}` : '/dashboard');
 

@@ -185,7 +185,7 @@ describe('Upload', () => {
     fireEvent.click(uploadButton());
 
     await waitFor(() => expect(trackFileUpload).toHaveBeenCalled());
-    expect(trackFileUpload.mock.calls[0][0]).toMatchObject({ storage_provider: 'cloudinary' });
+    expect(trackFileUpload.mock.calls[0]![0]).toMatchObject({ storage_provider: 'cloudinary' });
   });
 
   it('hands the profile limits down to the service rather than deciding itself', async () => {
@@ -200,7 +200,7 @@ describe('Upload', () => {
     fireEvent.click(uploadButton());
 
     await waitFor(() => expect(uploadFile).toHaveBeenCalled());
-    expect(uploadFile.mock.calls[0][5]).toMatchObject({
+    expect(uploadFile.mock.calls[0]![5]).toMatchObject({
       allowedProviders: ['r2', 'dropbox'],
       storageLimit: 5 * 1024 ** 3,
     });

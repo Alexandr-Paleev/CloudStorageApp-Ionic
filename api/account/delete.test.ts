@@ -50,7 +50,7 @@ describe('account deletion', () => {
 
     expect(res.statusCode).toBe(200);
     expect(eraseAccount).toHaveBeenCalledTimes(1);
-    expect(eraseAccount.mock.calls[0][0]).toBe('user-1');
+    expect(eraseAccount.mock.calls[0]![0]).toBe('user-1');
   });
 
   it('reports the providers that could not be reached, and still says deleted', async () => {

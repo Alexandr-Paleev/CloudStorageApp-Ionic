@@ -85,7 +85,7 @@ describe('coalesce', () => {
 
     const result = coalesce(ops);
     expect(result).toHaveLength(1);
-    expect((result[0].op as { name: string }).name).toBe('third');
+    expect((result[0]!.op as { name: string }).name).toBe('third');
   });
 
   it('drops a rename that a deletion made pointless', () => {
@@ -96,7 +96,7 @@ describe('coalesce', () => {
 
     const result = coalesce(ops);
     expect(result).toHaveLength(1);
-    expect(result[0].op.kind).toBe('deleteFile');
+    expect(result[0]!.op.kind).toBe('deleteFile');
   });
 
   it('ignores a rename queued after a deletion', () => {

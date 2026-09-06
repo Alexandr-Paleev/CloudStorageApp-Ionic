@@ -72,8 +72,12 @@ export function coalesce(queue: QueuedMutation[]): QueuedMutation[] {
   for (const entry of queue) {
     const target = targetOf(entry.op);
     const previous = result.findIndex((other) => targetOf(other.op) === target);
+    /* `findIndex` answers -1 for "not queued yet", and `result[-1]` is
+       undefined — so one check covers both that and proving the index is in
+       range, which is what the compiler wants to see. */
+    const previousEntry = result[previous];
 
-    if (previous === -1) {
+    if (!previousEntry) {
       result.push(entry);
       continue;
     }
@@ -87,7 +91,7 @@ export function coalesce(queue: QueuedMutation[]): QueuedMutation[] {
       continue;
     }
 
-    const earlier = result[previous].op;
+    const earlier = previousEntry.op;
     if (earlier.kind === 'deleteFile' || earlier.kind === 'deleteFolder') {
       // Renaming something already queued for deletion: keep the deletion.
       continue;

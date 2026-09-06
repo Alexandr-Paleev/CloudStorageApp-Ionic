@@ -21,10 +21,13 @@
  */
 export function readKeyRole(key: string): string | null {
   const parts = key.split('.');
-  if (parts.length !== 3) return null;
+  /* A JWT is header.payload.signature. Anything else is not one, and the
+     payload has to be reached through the length check rather than around it. */
+  const payload = parts.length === 3 ? parts[1] : undefined;
+  if (payload === undefined) return null;
 
   try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
     const role = JSON.parse(Buffer.from(padded, 'base64').toString('utf8')).role;
     return typeof role === 'string' ? role : null;

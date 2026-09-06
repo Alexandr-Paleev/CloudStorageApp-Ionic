@@ -18,7 +18,7 @@ import { applyCors } from '../../lib/cors';
  * They share a file because Vercel turns every file under api/ into its own
  * function and the Hobby plan allows twelve — which this repository already
  * has. A dynamic segment costs nothing and keeps signing uploads from needing
- * a thirteenth. See resolveHandler() in vite-plugin-dev-api.ts for the dev
+ * a thirteenth. See resolveHandler() in vite-plugin-dev-api.mts for the dev
  * server's side of the same routing.
  */
 

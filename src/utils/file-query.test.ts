@@ -49,8 +49,8 @@ describe('scopedToFolder', () => {
 describe('the orderings offered', () => {
   it('starts on the one the list used before any of this existed', () => {
     expect({ field: DEFAULT_SORT, direction: DEFAULT_DIRECTION }).toEqual({
-      field: SORT_OPTIONS[0].field,
-      direction: SORT_OPTIONS[0].direction,
+      field: SORT_OPTIONS[0]!.field,
+      direction: SORT_OPTIONS[0]!.direction,
     });
   });
 

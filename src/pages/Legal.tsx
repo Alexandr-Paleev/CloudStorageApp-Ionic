@@ -87,9 +87,14 @@ function renderMarkdown(markdown: string) {
     }
 
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
-    if (heading) {
-      const Tag = `h${heading[1].length}` as 'h1' | 'h2' | 'h3' | 'h4';
-      blocks.push(<Tag key={key}>{renderInline(heading[2], key)}</Tag>);
+    const hashes = heading?.[1];
+    const headingText = heading?.[2];
+    /* Both groups are checked rather than the match as a whole: a heading whose
+       text is empty is still a heading, so `headingText` is compared against
+       undefined and not tested for truthiness. */
+    if (hashes !== undefined && headingText !== undefined) {
+      const Tag = `h${hashes.length}` as 'h1' | 'h2' | 'h3' | 'h4';
+      blocks.push(<Tag key={key}>{renderInline(headingText, key)}</Tag>);
       return;
     }
 

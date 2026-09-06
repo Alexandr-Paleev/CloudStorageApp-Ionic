@@ -204,7 +204,7 @@ describe('multipart-complete', () => {
     );
 
     expect(res.statusCode).toBe(200);
-    const command = send.mock.calls[0][0] as {
+    const command = send.mock.calls[0]![0] as {
       input: { MultipartUpload: { Parts: { PartNumber: number; ETag: string }[] } };
     };
     expect(command.input.MultipartUpload.Parts).toEqual([

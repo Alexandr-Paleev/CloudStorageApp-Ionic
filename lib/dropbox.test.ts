@@ -56,7 +56,7 @@ describe('the token endpoint', () => {
   }
 
   function sentBody(): URLSearchParams {
-    return fetchMock.mock.calls[0][1].body as URLSearchParams;
+    return fetchMock.mock.calls[0]![1].body as URLSearchParams;
   }
 
   it('exchanges an authorization code together with its PKCE verifier', async () => {

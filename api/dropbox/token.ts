@@ -31,13 +31,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error) throw new Error(`Failed to read Dropbox connection: ${error.message}`);
 
     const rows = (data || []) as { refresh_token: string }[];
-    if (rows.length === 0) {
+    const connection = rows[0];
+    if (!connection) {
       return res.status(404).json({ message: 'Dropbox is not connected' });
     }
 
     let tokens;
     try {
-      tokens = await refreshAccessToken(rows[0].refresh_token);
+      tokens = await refreshAccessToken(connection.refresh_token);
     } catch (refreshError) {
       // The user revoked access on Dropbox's side, or the token was rotated.
       // Drop the dead row so the app offers to reconnect instead of retrying.

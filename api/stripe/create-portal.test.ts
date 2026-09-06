@@ -70,7 +70,7 @@ describe('create-portal', () => {
 
   it('sends the user back to this deployment', async () => {
     await handler(post(), mockResponse());
-    const [args] = createPortalSession.mock.calls[0] as [Record<string, string>];
+    const [args] = createPortalSession.mock.calls[0] as [{ return_url: string }];
     expect(args.return_url.startsWith(APP_URL)).toBe(true);
   });
 

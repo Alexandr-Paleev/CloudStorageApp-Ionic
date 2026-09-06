@@ -74,6 +74,18 @@ jobs:
       # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
       - run: npm run build
 
+      # The build checks what ships. This checks what does not: the unit tests,
+      # the Playwright specs and playwright.config.ts, none of which any earlier
+      # step reads for types — tsconfig.build.json excludes them by name.
+      #
+      # Two type errors had been sitting in that gap: a fixture missing a
+      # required field, and a `vi.fn` widened past the signature it was passed
+      # to. Both compiled under the editor's red squiggle and neither could fail
+      # a build. Adding noUncheckedIndexedAccess without this step would have
+      # left the strictest half of the tree the least enforced.
+      - name: Type-check the tests
+        run: npm run typecheck
+
       # A byte count rather than a score, so it cannot be flaky: the check fails
       # when what the browser fetches before first paint grows past its budget.
       # scripts/check-bundle-size.js holds the numbers and why each one is what
@@ -83,7 +95,7 @@ jobs:
 
       # The one check that runs the built bundle rather than the source.
       # `npm run dev` serves unbundled modules, so manualChunks in
-      # vite.config.ts is inert there and the Playwright suite — which runs
+      # vite.config.mts is inert there and the Playwright suite — which runs
       # against that dev server — cannot see it. A chunk split that puts
       # react-dom and React in different chunks paints nothing, and every
       # other step here stays green while it does.

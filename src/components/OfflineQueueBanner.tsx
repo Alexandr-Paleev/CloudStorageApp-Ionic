@@ -37,6 +37,8 @@ const OfflineQueueBanner: React.FC<OfflineQueueBannerProps> = ({
      through or the last three attempts had failed — which meant a change the
      user watched apply on screen could vanish without a word. */
   if (pending === 0) {
+    const onlyOne = discarded.length === 1 ? discarded[0] : undefined;
+
     return (
       <div
         className="offline-queue-banner offline-queue-banner--failed"
@@ -44,8 +46,8 @@ const OfflineQueueBanner: React.FC<OfflineQueueBannerProps> = ({
       >
         <IonIcon icon={alertCircleOutline} aria-hidden="true" />
         <IonLabel>
-          {discarded.length === 1
-            ? `${WHAT[discarded[0].op.kind]} did not go through: ${discarded[0].lastError ?? 'the server refused it'}`
+          {onlyOne
+            ? `${WHAT[onlyOne.op.kind]} did not go through: ${onlyOne.lastError ?? 'the server refused it'}`
             : `${discarded.length} changes did not go through and were not kept.`}
         </IonLabel>
       </div>

@@ -77,8 +77,8 @@ describe('nextPending', () => {
 
   it('skips what is already going, done or failed', () => {
     let items = queued(file('a.pdf'), file('b.pdf'), file('c.pdf'));
-    items = update(items, items[0].id, { status: 'done' });
-    items = update(items, items[1].id, { status: 'failed' });
+    items = update(items, items[0]!.id, { status: 'done' });
+    items = update(items, items[1]!.id, { status: 'failed' });
 
     expect(nextPending(items)?.file.name).toBe('c.pdf');
   });
@@ -87,7 +87,7 @@ describe('nextPending', () => {
     // Pausing is a decision; the queue must not walk past it and start the
     // next file as if nothing happened.
     let items = queued(file('a.pdf'));
-    items = update(items, items[0].id, { status: 'paused' });
+    items = update(items, items[0]!.id, { status: 'paused' });
 
     expect(nextPending(items)).toBeUndefined();
   });
@@ -98,14 +98,14 @@ describe('overallProgress', () => {
     // Counting files would jump to 50% when the thumbnail lands and then sit
     // still through the video behind it.
     let items = queued(file('small.pdf', 100), file('large.pdf', 900));
-    items = update(items, items[0].id, { status: 'done' });
+    items = update(items, items[0]!.id, { status: 'done' });
 
     expect(overallProgress(items)).toBe(10);
   });
 
   it('counts a file in flight by how far it has got', () => {
     let items = queued(file('a.pdf', 1000));
-    items = update(items, items[0].id, { status: 'uploading', progress: 40 });
+    items = update(items, items[0]!.id, { status: 'uploading', progress: 40 });
 
     expect(overallProgress(items)).toBe(40);
   });
@@ -116,7 +116,7 @@ describe('overallProgress', () => {
 
   it('never exceeds a hundred', () => {
     let items = queued(file('a.pdf', 1000));
-    items = update(items, items[0].id, { status: 'done', progress: 140 });
+    items = update(items, items[0]!.id, { status: 'done', progress: 140 });
 
     expect(overallProgress(items)).toBe(100);
   });
@@ -127,7 +127,7 @@ describe('summarise', () => {
 
   it('is not finished while anything is still pending', () => {
     let items = three();
-    items = update(items, items[0].id, { status: 'done' });
+    items = update(items, items[0]!.id, { status: 'done' });
 
     expect(summarise(items).finished).toBe(false);
   });
@@ -135,7 +135,7 @@ describe('summarise', () => {
   it('is finished when everything has either landed or failed', () => {
     let items = three();
     items = items.map((i) => ({ ...i, status: 'done' as const }));
-    items = update(items, items[2].id, { status: 'failed' });
+    items = update(items, items[2]!.id, { status: 'failed' });
 
     const summary = summarise(items);
     expect(summary).toMatchObject({ done: 2, failed: 1, finished: true });
@@ -144,7 +144,7 @@ describe('summarise', () => {
   it('is not finished while one is paused', () => {
     let items = three();
     items = items.map((i) => ({ ...i, status: 'done' as const }));
-    items = update(items, items[0].id, { status: 'paused' });
+    items = update(items, items[0]!.id, { status: 'paused' });
 
     expect(summarise(items).finished).toBe(false);
   });
@@ -169,6 +169,6 @@ describe('summaryText', () => {
 describe('remove', () => {
   it('takes one file out and leaves the rest in order', () => {
     const items: QueueItem[] = queued(file('a.pdf'), file('b.pdf'), file('c.pdf'));
-    expect(remove(items, items[1].id).map((i) => i.file.name)).toEqual(['a.pdf', 'c.pdf']);
+    expect(remove(items, items[1]!.id).map((i) => i.file.name)).toEqual(['a.pdf', 'c.pdf']);
   });
 });

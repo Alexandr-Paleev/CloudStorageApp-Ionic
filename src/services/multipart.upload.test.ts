@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMultipartUploader, UploadPausedError } from './multipart.upload';
 import type { PendingUpload, UploadStore } from './upload-store';
+
+/** The signature the uploader actually wants, so the mock can be cast to it once. */
+type PutPart = Parameters<typeof createMultipartUploader>[0]['putPart'];
 import { planParts } from '../../lib/multipart';
 import { HttpError } from '../utils/http.utils';
 
@@ -61,7 +64,11 @@ function setup(overrides: { putPart?: ReturnType<typeof vi.fn> } = {}) {
     overrides.putPart ?? vi.fn(async (url: string) => `"etag-${url.split('/').pop()}"`);
 
   return {
-    uploader: createMultipartUploader({ api, putPart, store }),
+    /* `vi.fn` types itself as the union of every callable shape it could be,
+       which is not the one signature `createMultipartUploader` asks for. The
+       cast sits here, at the boundary, rather than on `putPart` itself — the
+       assertions below still need to see a mock. */
+    uploader: createMultipartUploader({ api, putPart: putPart as unknown as PutPart, store }),
     api,
     putPart,
     records,
@@ -183,7 +190,7 @@ describe('a whole upload', () => {
 
     const signCalls = api.mock.calls.filter(([action]) => action === 'multipart-sign');
     expect(signCalls).toHaveLength(1);
-    expect((signCalls[0][1] as { partNumbers: number[] }).partNumbers).toEqual([1, 2, 3]);
+    expect((signCalls[0]![1] as { partNumbers: number[] }).partNumbers).toEqual([1, 2, 3]);
   });
 });
 
@@ -266,7 +273,7 @@ describe('when a part does not go through', () => {
 
     const signCalls = api.mock.calls.filter(([action]) => action === 'multipart-sign');
     expect(signCalls).toHaveLength(2);
-    expect((signCalls[1][1] as { partNumbers: number[] }).partNumbers).toEqual([1]);
+    expect((signCalls[1]![1] as { partNumbers: number[] }).partNumbers).toEqual([1]);
   });
 
   it('gives up after enough failures rather than looping', async () => {
@@ -293,6 +300,7 @@ describe('pausing', () => {
     ).rejects.toBeInstanceOf(UploadPausedError);
 
     const [record] = [...records.values()];
+    if (!record) throw new Error('the paused upload left no record behind');
     expect(record.completed.length).toBeGreaterThan(0);
     expect(record.completed.length).toBeLessThan(record.partCount);
   });
@@ -322,6 +330,7 @@ describe('pausing', () => {
     ).rejects.toBeInstanceOf(UploadPausedError);
 
     const [paused] = [...first.records.values()];
+    if (!paused) throw new Error('the paused upload left no record behind');
     const second = setup();
     await second.uploader.run(paused);
 

@@ -77,10 +77,18 @@ function useOfflineQueueState() {
     [queryClient]
   );
 
+  /* Pulled out of `user` once, here, rather than read as `user?.id` inside the
+     callback below. The dependency array already said `[user?.id]`, but the
+     body reached through `user` — so the compiler inferred the whole object as
+     the dependency and refused to keep the memoization, which is a real
+     difference: the callback would have been rebuilt on any change to the
+     session object, not just to the id it uses. */
+  const userId = user?.id;
+
   /** Runs one queued change for real. */
   const perform = useCallback(
     async (op: PendingOp) => {
-      if (!user?.id) throw new NotSignedIn();
+      if (!userId) throw new NotSignedIn();
 
       /* Imported here rather than at the top of the file: this provider sits
          in App.tsx, and a static import would pull the whole storage layer —
@@ -91,17 +99,17 @@ function useOfflineQueueState() {
 
       switch (op.kind) {
         case 'renameFile':
-          return storageService.renameFile(op.fileId, user.id, op.name);
+          return storageService.renameFile(op.fileId, userId, op.name);
         case 'deleteFile':
-          return storageService.deleteFile(op.fileId, user.id);
+          return storageService.deleteFile(op.fileId, userId);
         case 'renameFolder':
-          await storageService.renameFolder(op.folderId, user.id, op.name);
+          await storageService.renameFolder(op.folderId, userId, op.name);
           return;
         case 'deleteFolder':
-          return storageService.deleteFolder(op.folderId, user.id);
+          return storageService.deleteFolder(op.folderId, userId);
       }
     },
-    [user?.id]
+    [userId]
   );
 
   /* One flush at a time. The browser fires `online` more than once on a flaky

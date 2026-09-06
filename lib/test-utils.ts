@@ -89,7 +89,10 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     if (!queue || queue.length === 0) return { data: [], error: null };
     // Repeat the last answer once the queue runs dry: paged reads call the same
     // table twice and the second page is expected to come back short.
-    return queue.length === 1 ? queue[0] : (queue.shift() as TableAnswer);
+    const next = queue.length === 1 ? queue[0] : queue.shift();
+    // The guard above proved the queue is not empty; the compiler cannot see
+    // that through an index, and an empty answer is the right fallback anyway.
+    return next ?? { data: [], error: null };
   }
 
   function builder(table: string) {

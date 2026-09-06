@@ -90,7 +90,7 @@ describe('uploadFile', () => {
 
     await storageService.uploadFile('user-1', file('photo.png', 'image/png', 4096));
 
-    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0]!;
     expect(metadata.size).toBe(512);
   });
 
@@ -99,7 +99,7 @@ describe('uploadFile', () => {
 
     await storageService.uploadFile('user-1', file('report.pdf', 'application/pdf', 2048));
 
-    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0]!;
     expect(metadata.size).toBe(2048);
   });
 
@@ -111,7 +111,7 @@ describe('uploadFile', () => {
 
     await storageService.uploadFile('user-1', file('../../etc/passwd'));
 
-    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0];
+    const [metadata] = vi.mocked(supabaseService.saveFileMetadata).mock.calls[0]!;
     expect(metadata.name).toBe('.._.._etc_passwd');
   });
 
@@ -429,7 +429,7 @@ describe('renameFolder', () => {
 
     await storageService.renameFolder('f1', 'user-1', '  Invoices  ');
 
-    const [, , name] = vi.mocked(supabaseService.renameFolder).mock.calls[0];
+    const [, , name] = vi.mocked(supabaseService.renameFolder).mock.calls[0]!;
     expect(name).toBe('Invoices');
   });
 });

@@ -12,11 +12,13 @@ test.describe('Uploading several files', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
   const stamp = Date.now();
+  /* `as const` makes this a three-element tuple rather than an array of unknown
+     length, so indexing it below is checked rather than merely hoped for. */
   const names = [
     `e2e-multi-a-${stamp}.txt`,
     `e2e-multi-b-${stamp}.txt`,
     `e2e-multi-c-${stamp}.txt`,
-  ];
+  ] as const;
 
   test('queues a dropped file and two picked ones, then sends them in order', async ({ page }) => {
     await page.goto('/upload');

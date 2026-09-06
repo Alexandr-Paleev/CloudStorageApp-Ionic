@@ -13,7 +13,7 @@ function queue(...entries: [string, QueueStatus, number?][]): QueueItem[] {
     entries.map(([name]) => file(name))
   );
   entries.forEach(([, status, progress], index) => {
-    items = update(items, items[index].id, { status, progress: progress ?? 0 });
+    items = update(items, items[index]!.id, { status, progress: progress ?? 0 });
   });
   return items;
 }
@@ -48,7 +48,7 @@ describe('UploadQueue', () => {
 
   it('says why a file failed, rather than only that it did', () => {
     let items = queue(['a.pdf', 'failed']);
-    items = update(items, items[0].id, { error: 'Storage limit exceeded' });
+    items = update(items, items[0]!.id, { error: 'Storage limit exceeded' });
     show(items);
 
     expect(screen.getByText(/Storage limit exceeded/)).toBeInTheDocument();

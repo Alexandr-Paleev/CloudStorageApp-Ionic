@@ -193,7 +193,7 @@ describe('Dashboard', () => {
       show('/dashboard/folder-9');
 
       await waitFor(() => expect(getItems).toHaveBeenCalled());
-      expect(getItems.mock.calls[0][1]).toMatchObject({ folderId: 'folder-9' });
+      expect(getItems.mock.calls[0]![1]).toMatchObject({ folderId: 'folder-9' });
     });
 
     /* Fifteen at a time is what makes the filters a query rather than a filter
@@ -202,7 +202,7 @@ describe('Dashboard', () => {
       show();
 
       await waitFor(() => expect(getItems).toHaveBeenCalled());
-      expect(getItems.mock.calls[0][1]).toMatchObject({ page: 0, pageSize: 15 });
+      expect(getItems.mock.calls[0]![1]).toMatchObject({ page: 0, pageSize: 15 });
     });
   });
 });
