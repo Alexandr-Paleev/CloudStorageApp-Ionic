@@ -3,8 +3,13 @@ import Stripe from 'stripe';
 import { authenticateUser, AuthError, supabase } from '../../lib/auth';
 import { getAppUrl } from '../../lib/app-url';
 import { applyCors } from '../../lib/cors';
+import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../lib/rate-limit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+/* Each call here can create a Stripe customer, which is a row in an account
+   this project does not control. */
+const byUser = new RateLimiter(BILLING_LIMIT);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   /* Before anything else: a preflight from the native shell carries no
@@ -17,6 +22,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const userId = await authenticateUser(req);
+
+    /* Keyed on the user rather than the address: the route is authenticated, so
+       there is a better key than an IP, and a shared office should not share a
+       billing allowance. */
+    if (!byUser.allow(userId)) {
+      return tooManyRequests(
+        res,
+        byUser.retryAfterSeconds(userId),
+        'Too many billing requests. Try again in a minute.'
+      );
+    }
     const appUrl = getAppUrl(req);
 
     // Get or create Stripe customer

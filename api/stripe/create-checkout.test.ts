@@ -44,9 +44,18 @@ function request() {
   return mockRequest({ headers: { authorization: 'Bearer t', origin: APP_URL } });
 }
 
+/* One caller per test. The billing limiter allows six a minute and keys on the
+   user, so a file that signs every test in as the same person starts handing
+   out 429s partway down — a failure that moves as tests are added rather than
+   pointing at what broke. */
+let signedIn = 'user-0';
+let callers = 0;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  authenticateUser.mockResolvedValue('user-1');
+  callers += 1;
+  signedIn = `user-${callers}`;
+  authenticateUser.mockResolvedValue(signedIn);
   withProfile(KNOWN_CUSTOMER);
   stripe.listSubscriptions.mockResolvedValue({ data: [] });
   stripe.createSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' });
@@ -54,6 +63,23 @@ beforeEach(() => {
 });
 
 describe('create-checkout: access', () => {
+  /* Each call past the first can create a Stripe customer, in an account this
+     project does not control. Six a minute is generous for a person changing
+     their mind; a loop is not a person. */
+  it('refuses a seventh checkout in a minute from one user', async () => {
+    for (let i = 0; i < 6; i += 1) {
+      const ok = mockResponse();
+      await handler(request(), ok);
+      expect(ok.statusCode).toBe(200);
+    }
+
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(stripe.createSession).toHaveBeenCalledTimes(6);
+  });
+
   it('refuses anything but POST', async () => {
     const res = mockResponse();
     await handler(mockRequest({ method: 'GET' }), res);
@@ -130,7 +156,7 @@ describe('create-checkout: the session', () => {
     await handler(request(), mockResponse());
 
     expect(stripe.createCustomer).toHaveBeenCalledWith(
-      expect.objectContaining({ metadata: { supabase_user_id: 'user-1' } })
+      expect.objectContaining({ metadata: { supabase_user_id: signedIn } })
     );
     expect(stripe.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_new' })
@@ -150,7 +176,7 @@ describe('create-checkout: the session', () => {
   it('carries the user id into the session metadata', async () => {
     await handler(request(), mockResponse());
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ metadata: { supabase_user_id: 'user-1' } })
+      expect.objectContaining({ metadata: { supabase_user_id: signedIn } })
     );
   });
 });

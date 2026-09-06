@@ -10,7 +10,69 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Tests for the one route with no undo.** `api/account/delete.ts` was 52.5% of
+  its statements and two of its six functions — the least covered of anything
+  that decides access, money or data, and the only handler that destroys a
+  person's account on request.
+
+  What had been tested was the handler; `eraseAccount` was mocked, so everything
+  the handler *builds* was not. That is the half where a bug is silent: the R2
+  objects are listed from the bucket rather than derived from the `files` rows,
+  precisely so an upload that half-failed leaves nothing behind — which also
+  means nothing in the system would notice if the walk stopped after one page
+  and reported success. Now covered: the continuation token is followed to the
+  end, deletes are split into requests of at most 1000 keys, the prefix is the
+  account being erased, and Cloudinary is asked for both `image` and `raw`,
+  which are separate namespaces there. Also which providers get erased at all —
+  an unconfigured one is left out on purpose, and a configured one left out
+  would be bytes surviving a deletion with `failures` empty, because nothing was
+  tried. 97.5%, six functions of six.
+
+  One of those tests exists because writing the others found the reason for it.
+  The limiter allows five attempts an hour and keys on the client IP, which is
+  `'unknown'` for any request with no `x-forwarded-for` — so every test in the
+  file shared one bucket and the sixth `DELETE` would have started answering 429
+  whatever it was testing. Each test now comes from its own address, the same
+  reasoning as one account per test in the e2e suite.
+
+### Changed
+
+- **The native shells stop claiming to be version 1.0.** `MARKETING_VERSION` in
+  the Xcode project and `versionName` in `android/app/build.gradle` had been left
+  at the Capacitor default through four releases, so a store submission would
+  have gone out as version 1.0 of an app this repository calls 4.4.0. Both now
+  read 4.4.0. The build counters beside them are a different number and stay at
+  1: they increment per upload, not per release, and nothing has been uploaded.
+
+- **A rate limit on the two billing routes.** `create-checkout` and
+  `create-portal` were the only authenticated routes with none. Neither is
+  destructive, which is presumably why they were skipped, but each call is a
+  round trip to Stripe and the first checkout a user reaches creates a customer
+  record — in an account this project does not control. `BILLING_LIMIT` is six a
+  minute, keyed on the user rather than the address, since the route is
+  authenticated and a shared office should not share an allowance.
+
+  The existing tests for both routes signed every case in as `user-1`, so adding
+  the limit made three of them fail — the same shared-key trap as above, found
+  twice in one afternoon. Both files now mint a caller per test.
+
+- **`@vercel/node` 10 → 12.** This does *not* clear the three high-severity
+  advisories that reach it through `undici` and `path-to-regexp`: every version
+  from 2.1.1 onward is in range, and npm's suggested fix is a downgrade to
+  3.0.1. The package is a devDependency carried for `VercelRequest` and
+  `VercelResponse` alone, `npm run audit:prod` stays clean, and the CI gate that
+  reads production dependencies is unaffected. Recorded here so the next person
+  to run `npm audit` does not go looking for a fix that does not exist.
+
+- **`migrations/009` pins the `search_path` on `handle_new_user`.** It was the
+  only one of the schema's four SECURITY DEFINER functions without one. Not
+  exploitable here — the single table it touches is fully qualified, and no role
+  holds CREATE on `public` to shadow anything with — but the second of those is a
+  property of the current grants rather than of the function, and the sort of
+  thing a later migration changes without anyone connecting the two. **Not
+  applied to production.**
 
 ## [4.4.0] — 2026-09-06
 

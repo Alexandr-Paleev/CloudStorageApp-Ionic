@@ -104,6 +104,20 @@ export const CLOUDINARY_SIGN_LIMIT = 60;
  */
 export const CLOUDINARY_DELETE_LIMIT = 90;
 
+/**
+ * Checkout sessions and portal links, per user, per minute.
+ *
+ * Both routes are authenticated and neither is destructive, which is why they
+ * had no limit at all — but each one is a call out to Stripe, and the checkout
+ * route creates a customer record the first time a user reaches it. A loop
+ * spends someone else's rate allowance and leaves rows behind in an account
+ * this project does not control.
+ *
+ * Six is generous for a person: opening the upgrade page twice, changing their
+ * mind, and coming back is three.
+ */
+export const BILLING_LIMIT = 6;
+
 /** Both Cloudinary actions, per address, counted before the token check —
  *  the same guard, and for the same reason, as PRESIGN_IP_LIMIT. */
 export const CLOUDINARY_IP_LIMIT = 120;
