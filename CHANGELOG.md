@@ -12,6 +12,16 @@ reasoning behind the larger decisions lives in
 
 ### Added
 
+- **A `LICENSE` file, which the badge had been promising since v1.** The README
+  carries an MIT badge, `package.json` says `"license": "MIT"`, and the licence
+  section links to `LICENSE` — a file that did not exist, so the link was dead
+  and GitHub's own sidebar reported no licence at all.
+
+  That is not cosmetic. Without the file the default applies, which is all
+  rights reserved: the repository was describing itself as "Open-source" in its
+  GitHub description while granting nobody the right to use any of it. The text
+  is the standard MIT one, matching what three other places already claimed.
+
 - **Tests for the one route with no undo.** `api/account/delete.ts` was 52.5% of
   its statements and two of its six functions — the least covered of anything
   that decides access, money or data, and the only handler that destroys a
