@@ -10,7 +10,34 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The multipart upload path did not enforce the storage quota.** v4.0.0 moved
+  the quota into the database precisely because the client had been the only
+  thing guarding it. The resumable path added in the same release did not
+  inherit the fix, and this is that story a second time on the road built after
+  it.
+
+  `presign-upload` puts `ContentLength` into the signed headers, so R2 refuses a
+  body that is not the size the quota was checked against — its own comment says
+  so. `multipart-create` checks the quota against the `size` in its body and
+  then binds nothing: `UploadPartCommand` is signed without a `ContentLength`, a
+  part may be any size, and `multipart-complete` assembled whatever arrived and
+  answered 200. A create declaring one byte followed by a thousand parts is
+  storage that is paid for and counted by nobody.
+
+  `multipart-complete` now weighs the assembled object with `HeadObject`,
+  re-checks the quota against that number, and deletes the object and answers
+  413 when it does not fit — an object over the limit is billable and nothing
+  comes back for it, since the browser is about to be told the upload failed.
+  The response carries the measured `size` so the row records what was stored
+  rather than what was promised.
+
+  What this does *not* close is the row itself. `files` is written by the
+  browser under RLS, so the trigger still sums a number the account chooses;
+  moving that write server-side is a larger change than this one and is not
+  disguised as part of it. What is closed is the half that costs money: bytes
+  actually sitting in the bucket, past a limit, with nothing to notice them.
 
 ## [4.5.0] — 2026-09-06
 
