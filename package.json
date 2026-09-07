@@ -69,7 +69,7 @@
     "react-ga4": "^2.1.0",
     "react-router-dom": "^6.26.0",
     "stripe": "^22.6.1",
-    "zod": "^4.3.4"
+    "zod": "^4.5.4"
   },
   "overrides": {
     "@babel/plugin-transform-runtime": "^7.29.0"
