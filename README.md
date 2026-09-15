@@ -7,6 +7,11 @@
 [![Coverage — server](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAlexandr-Paleev%2FCloudStorageApp-Ionic%2Fbadges%2Fcoverage-server.json)](#what-the-tests-cover-and-what-they-deliberately-do-not)
 [![Coverage — client](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAlexandr-Paleev%2FCloudStorageApp-Ionic%2Fbadges%2Fcoverage-client.json)](#what-the-tests-cover-and-what-they-deliberately-do-not)
 
+<p align="center">
+  <img src="docs/screenshots/three-platforms.png" alt="The same app running in three places at once: the web build in a browser at the production URL, a Pixel 7 Android emulator showing the sign-up card, and an iPhone 17 simulator showing the sign-in card" width="820"><br>
+  <sub>One <code>npm run build</code>, three shells — the browser, a Pixel 7 emulator and an iPhone 17 simulator</sub>
+</p>
+
 A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Supabase, with Stripe billing and five storage backends.
 
 🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[Releases](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)** | 📓 **[Changelog](CHANGELOG.md)**
