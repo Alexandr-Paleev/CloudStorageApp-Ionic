@@ -28,6 +28,11 @@ reasoning behind the larger decisions lives in
   allowance, or neither, in which case the route answers `501` and the mode
   says so.
 
+  The indexer reads only what the caller owns: a `files` row carries a path and
+  a URL the browser wrote, and this route holds the service-role key, so both
+  are checked against the prefixes the upload routes create before anything is
+  signed or fetched.
+
 - **A weekly ping that keeps the database awake.** A free Supabase project
   pauses after a week without traffic, and the live demo, the e2e suite and
   every screenshot in this repository point at it. `keepalive.yml` reads one

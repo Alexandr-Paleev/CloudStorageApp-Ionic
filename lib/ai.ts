@@ -54,6 +54,81 @@ export const SEARCH_RESULTS = 15;
  */
 export const SEARCH_MIN_SIMILARITY = 0.25;
 
+/**
+ * Whether the path on a row really belongs to the caller.
+ *
+ * `files` rows are written by the browser under a policy that says only which
+ * *rows* an account may write, never what may go in them — `lib/safe-url.ts`
+ * says the same thing about `download_url` one column over. So a caller can
+ * put another account's object path into their own row and ask this service
+ * to read it: the indexer holds the service-role key, and neither Storage's
+ * policies nor R2's bucket care what `auth.uid()` was.
+ *
+ * The prefixes are the ones the upload routes create and the R2 route already
+ * checks (`ownsKey`, api/r2/[action].ts): Cloudinary signs into
+ * `users/<id>/`, R2 writes under `users/<id>/`, and Supabase Storage uses
+ * `<id>/` as the first path segment — the same segment its own policies match
+ * on. Verified against production before it was written: all 20 rows there
+ * follow it.
+ *
+ * The trailing slash is load-bearing, exactly as it is in `ownsKey`: without
+ * it `users/<id>` would authorise `users/<id>0/`.
+ */
+export function ownsStoredPath(
+  file: { storage_type: string; storage_path: string },
+  userId: string
+): boolean {
+  switch (file.storage_type) {
+    case 'cloudinary':
+    case 'r2':
+      return file.storage_path.startsWith(`users/${userId}/`);
+    case 'supabase_storage':
+      return file.storage_path.startsWith(`${userId}/`);
+    default:
+      // Google Drive and Dropbox never reach here — planFor() skips them —
+      // and an unknown provider is not something to guess about.
+      return false;
+  }
+}
+
+/**
+ * Whether a stored Cloudinary delivery URL is one of ours, for this user.
+ *
+ * Cloudinary is the one provider whose stored URL is used as-is, because it is
+ * a permanent delivery link rather than a signature that expired months ago.
+ * That makes the column an instruction to fetch, and the column is written by
+ * the browser — so without this the route would fetch any `http(s)` address a
+ * caller cared to store and hand the answer back as a description.
+ *
+ * Fails closed on anything unexpected, including a custom delivery domain: a
+ * file that stops being indexable is a visible, fixable annoyance, and a
+ * server that fetches arbitrary URLs is not.
+ */
+export function cloudinaryUrlIsOwned(url: string, userId: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  return (
+    parsed.protocol === 'https:' &&
+    parsed.hostname === 'res.cloudinary.com' &&
+    parsed.pathname.includes(`/users/${userId}/`)
+  );
+}
+
+/**
+ * The ceiling on an image sent to a model as bytes rather than as a link.
+ *
+ * Lower than MAX_DESCRIBE_BYTES on purpose. The Workers AI image-to-text
+ * schema takes an array of byte values, so a megabyte of picture becomes a
+ * megabyte of comma-separated numbers in a JSON body — the function runs out
+ * of memory long before the model runs out of patience.
+ */
+export const MAX_VISION_BYTES = 3 * 1024 * 1024;
+
 /** Bytes the indexer will pull into memory to describe one file. */
 export const MAX_DESCRIBE_BYTES = 8 * 1024 * 1024;
 
@@ -160,11 +235,14 @@ export function normalizeTags(raw: unknown): string[] {
  * A vector as Postgres reads it.
  *
  * pgvector's input format is `[0.1,0.2]` — square brackets, no spaces — which
- * is what JSON.stringify of an array of numbers produces exactly. Passing the
- * array itself would leave the conversion to PostgREST, which has its own
- * opinion about what a JSON array means and turns it into `{0.1,0.2}` in some
- * positions; that is a Postgres array, not a vector, and the error it raises
- * names neither. One spelling, both directions, no ambiguity.
+ * is what JSON.stringify of an array of numbers produces exactly.
+ *
+ * Measured against production rather than assumed, because the guess written
+ * here first was wrong: PostgREST accepts a raw JSON array for a `vector`
+ * parameter too, and both spellings return the same row. The literal stays
+ * anyway — it is the format the type itself documents, it is the same string
+ * on the way in and on the way out, and it does not depend on PostgREST
+ * continuing to be clever about a type it knows nothing about.
  */
 export function toVectorLiteral(vector: number[]): string {
   return JSON.stringify(vector);

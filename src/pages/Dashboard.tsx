@@ -164,19 +164,37 @@ const Dashboard: React.FC = () => {
     enabled: !!user?.id && smartSearching,
   });
 
-  const [indexing, setIndexing] = useState(false);
+  const [indexing, setIndexing] = useState<{ done: number; total: number } | null>(null);
 
   /* Indexing is a deliberate act, not something an upload triggers on its
      own: every file costs a request at a model provider, and this deployment
      hands an account to any visitor. */
   const indexMissing = async () => {
-    setIndexing(true);
+    const ids = unindexed ?? [];
+    setIndexing({ done: 0, total: ids.length });
     try {
-      await aiService.indexMany(unindexed ?? []);
+      /* Counted rather than awaited in silence: describing twenty files is
+         minutes of a spinner, and a run where every one of them failed — no
+         key on this deployment, say — used to end exactly like a run where
+         every one succeeded. */
+      const { indexed, skipped, failed } = await aiService.indexMany(ids, (done, total) =>
+        setIndexing({ done, total })
+      );
+
+      if (failed > 0) {
+        setErrorToast(
+          `Indexed ${indexed} of ${ids.length}. ${failed} failed — smart search will not find those yet.`
+        );
+      } else if (indexed === 0 && skipped > 0) {
+        setErrorToast(
+          `Nothing to index: ${skipped} file${skipped === 1 ? '' : 's'} cannot be read.`
+        );
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['unindexed', user?.id] });
       await queryClient.invalidateQueries({ queryKey: ['smart-search'] });
     } finally {
-      setIndexing(false);
+      setIndexing(null);
     }
   };
 
@@ -467,8 +485,8 @@ const Dashboard: React.FC = () => {
               <IonText color="medium">
                 {unindexed!.length} file{unindexed!.length === 1 ? '' : 's'} not indexed yet
               </IonText>
-              <IonButton size="small" fill="outline" disabled={indexing} onClick={indexMissing}>
-                {indexing ? <IonSpinner name="crescent" aria-label="Indexing" /> : 'Index them'}
+              <IonButton size="small" fill="outline" disabled={!!indexing} onClick={indexMissing}>
+                {indexing ? `Indexing ${indexing.done}/${indexing.total}` : 'Index them'}
               </IonButton>
             </div>
           )}

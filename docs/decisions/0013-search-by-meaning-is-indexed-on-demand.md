@@ -58,6 +58,15 @@ forward a token.
 - `file_embeddings` is written by the service-role key alone; the browser has
   `SELECT` and no other grant, which is [0002](0002-billing-is-server-write-only.md)
   applied to a table nobody has been tempted by yet.
+- The indexer verifies the path on a row before reading it, and does not obey
+  the stored Cloudinary URL without checking it. `files` rows are written by
+  the browser under a policy that says which *rows* an account may write and
+  nothing about what goes in them, and this service holds the service-role key
+  — so a row pointing at another account's object, or at an address on the
+  internal network, would otherwise have been read and described back to
+  whoever asked. The prefixes it checks are the ones the upload routes create,
+  and they match every row in production.
+
 - Quality is not measured yet, and until it is, "the free model is good
   enough" is a claim rather than a finding. Every row records the model that
   wrote it and the model that embedded it, which is what makes the eval

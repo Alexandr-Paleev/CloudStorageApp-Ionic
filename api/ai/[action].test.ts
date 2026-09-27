@@ -67,7 +67,7 @@ const FILE = {
   size: 2048,
   storage_type: 'cloudinary',
   storage_path: 'users/user-1/photo',
-  download_url: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+  download_url: 'https://res.cloudinary.com/demo/image/upload/v1/users/user-1/photo.jpg',
 };
 
 function withFile(overrides: Partial<typeof FILE> = {}, embeddings: TableAnswer = { data: [] }) {
@@ -246,6 +246,32 @@ describe('index', () => {
     const [, source] = describeFile.mock.calls[0] as [string, { kind: string; text: string }];
     expect(source.kind).toBe('text');
     expect(source.text).toHaveLength(TEXT_SAMPLE_BYTES);
+  });
+
+  it('refuses a row pointing at another account\u2019s object', async () => {
+    /* RLS decides which rows an account may write, not what may go in them —
+       so a caller can put somebody else's path in their own row. The indexer
+       holds the service-role key, which consults neither Storage's policies
+       nor the bucket, so this check is the only one there is. */
+    withFile({ storage_type: 'supabase_storage', storage_path: 'user-2/private.pdf' });
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(createSignedUrl).not.toHaveBeenCalled();
+    expect(describeFile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Cloudinary URL that is not ours', async () => {
+    // Same column, the other half of the problem: download_url is obeyed, and
+    // it is written by the browser. Without this the route fetches whatever it
+    // is pointed at and hands back a description of the answer.
+    withFile({ download_url: 'http://169.254.169.254/latest/meta-data/' });
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(describeFile).not.toHaveBeenCalled();
   });
 
   it('says why a file was skipped instead of failing', async () => {

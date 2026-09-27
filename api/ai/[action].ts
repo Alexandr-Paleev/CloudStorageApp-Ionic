@@ -8,12 +8,15 @@ import {
   MAX_DESCRIBE_BYTES,
   ProviderNotConfigured,
   TEXT_SAMPLE_BYTES,
+  cloudinaryUrlIsOwned,
   embeddingInput,
+  ownsStoredPath,
   planFor,
   toVectorLiteral,
   type IndexPlan,
   type IndexableFile,
 } from '../../lib/ai';
+import { fetchBytes } from '../../lib/fetch-bytes';
 import { activeBackend } from '../../lib/ai-provider';
 import type { DescribeSource } from '../../lib/describe';
 import {
@@ -45,6 +48,9 @@ import { applyCors } from '../../lib/cors';
  * database. See migrations/011_add_file_embeddings.sql.
  */
 
+/** A row pointing somewhere it should not. Answered with 403, not 500. */
+class AccessError extends Error {}
+
 const byAddress = new RateLimiter(AI_IP_LIMIT);
 const byIndexingUser = new RateLimiter(AI_INDEX_LIMIT);
 const byEmbeddingUser = new RateLimiter(AI_EMBED_LIMIT);
@@ -61,14 +67,16 @@ interface FileRow extends IndexableFile {
 }
 
 /**
- * A URL this function — or Anthropic — can actually read the bytes through.
+ * A URL the bytes can actually be read through — and only the caller's own.
  *
  * `download_url` on the row is only a URL in the sense that it was one when it
  * was written: for the two private backends it is a signed link that has long
  * since expired. Cloudinary is the exception and the common case, where the
- * stored value is a permanent delivery URL.
+ * stored value is a permanent delivery URL — and therefore the one value here
+ * that the browser both writes and this function obeys, which is why it is
+ * checked rather than used.
  */
-async function readableUrl(file: FileRow): Promise<string> {
+async function readableUrl(file: FileRow, userId: string): Promise<string> {
   if (file.storage_type === 'r2') {
     return getSignedUrl(
       getS3Client(),
@@ -87,27 +95,18 @@ async function readableUrl(file: FileRow): Promise<string> {
     return data.signedUrl;
   }
 
+  if (!cloudinaryUrlIsOwned(file.download_url, userId)) {
+    throw new AccessError('that file does not point at your own Cloudinary folder');
+  }
   return file.download_url;
 }
 
-/** Pulls the bytes, refusing anything larger than the indexer will look at. */
-async function fetchBytes(url: string): Promise<Buffer> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-  if (!response.ok) throw new Error(`Could not read the file: ${response.status}`);
-
-  /* Checked before reading and again after. A Content-Length is a claim, and
-     the size on the row was written by the browser — neither is a measurement
-     of what is arriving down this socket. */
-  const claimed = Number(response.headers.get('content-length') ?? 0);
-  if (claimed > MAX_DESCRIBE_BYTES) throw new Error('file is too large to describe');
-
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.byteLength > MAX_DESCRIBE_BYTES) throw new Error('file is too large to describe');
-  return bytes;
-}
-
-async function sourceFor(file: FileRow, plan: IndexPlan & { kind: 'image' | 'pdf' | 'text' }) {
-  const url = await readableUrl(file);
+async function sourceFor(
+  file: FileRow,
+  plan: IndexPlan & { kind: 'image' | 'pdf' | 'text' },
+  userId: string
+) {
+  const url = await readableUrl(file, userId);
 
   if (plan.kind === 'image') {
     // By link rather than by value: the bytes are already behind a URL that
@@ -116,7 +115,7 @@ async function sourceFor(file: FileRow, plan: IndexPlan & { kind: 'image' | 'pdf
     return { kind: 'image', url, mediaType: file.type } satisfies DescribeSource;
   }
 
-  const bytes = await fetchBytes(url);
+  const bytes = await fetchBytes(url, MAX_DESCRIBE_BYTES);
 
   if (plan.kind === 'pdf') {
     return { kind: 'pdf', data: bytes.toString('base64') } satisfies DescribeSource;
@@ -175,6 +174,17 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
     return;
   }
 
+  /* After the skip, before anything is signed or fetched: ownership only
+     matters for the providers whose bytes this service reads, and a file in
+     someone's own Drive deserves the honest "not indexed, here is why" rather
+     than a refusal. The row said this path is the caller's, and the row is
+     written by the caller — the service-role key below consults neither RLS,
+     nor Storage's policies, nor the bucket. */
+  if (!ownsStoredPath(file, userId)) {
+    res.status(403).json({ message: 'That file is not stored where your files are' });
+    return;
+  }
+
   /* Resolved here rather than at module scope: which backend is active is a
      property of the environment, and a module read once at cold start would
      survive a variable being added in the dashboard. */
@@ -191,7 +201,7 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
     return;
   }
 
-  const description = await backend.describe(file.name, await sourceFor(file, plan));
+  const description = await backend.describe(file.name, await sourceFor(file, plan, userId));
   const vector = await backend.embed(
     embeddingInput(file, description.summary, description.tags),
     'document'
@@ -322,6 +332,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     await embedQuery(req, res);
   } catch (error) {
     console.error('[ai]', error);
+
+    if (error instanceof AccessError) {
+      res.status(403).json({ message: `Access denied: ${error.message}` });
+      return;
+    }
 
     if (error instanceof ProviderNotConfigured) {
       // 501: the client cannot see the server's variables, so it keeps

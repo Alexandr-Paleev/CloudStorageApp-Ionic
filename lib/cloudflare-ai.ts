@@ -1,4 +1,11 @@
-import { EMBEDDING_DIMENSIONS, ProviderNotConfigured, clampSummary, normalizeTags } from './ai';
+import {
+  EMBEDDING_DIMENSIONS,
+  MAX_VISION_BYTES,
+  ProviderNotConfigured,
+  clampSummary,
+  normalizeTags,
+} from './ai';
+import { fetchBytes } from './fetch-bytes';
 import type { Description, DescribeSource } from './describe';
 
 /**
@@ -168,11 +175,12 @@ export async function describeFile(name: string, source: DescribeSource): Promis
     /* The image travels as bytes, not as a link: this model takes the pixels,
        and the URL a signed link points at is not reachable from Cloudflare's
        side of the request anyway. */
-    const response = await fetch(source.url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!response.ok) throw new Error(`Could not read the image: ${response.status}`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    const bytes = await fetchBytes(source.url, MAX_VISION_BYTES, TIMEOUT_MS);
 
     const result = await run(CF_VISION_MODEL, {
+      /* An array of byte values is what this model's schema takes, and it is
+         why the ceiling above is three megabytes rather than eight: every byte
+         becomes up to four characters of JSON on the way out. */
       image: Array.from(bytes),
       prompt: `${PROMPT}\n\nThe file is named "${name}".`,
       max_tokens: 256,

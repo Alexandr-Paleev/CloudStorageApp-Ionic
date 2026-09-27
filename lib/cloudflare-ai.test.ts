@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EMBEDDING_DIMENSIONS } from './ai';
-import { embed, parseCaption } from './cloudflare-ai';
+import { EMBEDDING_DIMENSIONS, MAX_VISION_BYTES } from './ai';
+import { describeFile, embed, parseCaption } from './cloudflare-ai';
 
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.01);
 
@@ -64,5 +64,30 @@ describe('embed', () => {
     // answer to anything that only checks the status code.
     answers({ success: false, errors: [{ message: 'daily limit reached' }] });
     await expect(embed('x')).rejects.toThrow(/daily limit reached/);
+  });
+});
+
+describe('describeFile, on an image', () => {
+  it('refuses a picture too big to send as an array of numbers', async () => {
+    /* This model's schema takes the bytes as JSON numbers, so a large image
+       costs several times its own size in memory. The size on the `files` row
+       is written by the browser, so it cannot be the thing that stops it. */
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => String(MAX_VISION_BYTES * 2) },
+        arrayBuffer: async () => new ArrayBuffer(8),
+      })
+    );
+
+    await expect(
+      describeFile('huge.png', {
+        kind: 'image',
+        url: 'https://cdn.test/huge.png',
+        mediaType: 'image/png',
+      })
+    ).rejects.toThrow(/too large/);
   });
 });
