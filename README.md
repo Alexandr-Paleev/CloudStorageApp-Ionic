@@ -122,6 +122,14 @@ render — and the banner says the deletion has not reached the server yet:
   another, with progress per file and a failure that stops that file rather than the queue
 - ✅ Search by name, six orderings and a filter by type. All three change the
   query, not the fifteen rows already on screen
+- ✅ **Search by meaning**, for the files whose name is `IMG_4821.jpg`. A model
+  writes one sentence about a file when you ask it to, the sentence becomes a
+  vector, and Postgres ranks by distance with pgvector — inside your own rows,
+  under RLS, from the browser. Indexing is a button rather than something an
+  upload triggers, because every description is a paid request. Which models
+  run depends on which keys the deployment has; with none, the mode says so
+  instead of failing
+  ([ADR 0013](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md))
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
 - ✅ File renaming and deletion — removed from the provider, not just from the list

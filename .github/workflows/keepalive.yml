@@ -33,16 +33,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # The anon key, not the service role: this should look like the traffic
-      # the app itself sends, and reading one column of one row needs no
-      # privilege. RLS answers an unauthenticated caller with an empty array,
-      # which is a successful query — the point is that a query happened.
+      # The service-role key, not the anon one — and that is a consequence of
+      # migration 012 rather than a preference. After it, `anon` holds no
+      # privilege on any table in `public`, so the request this job used to
+      # make now answers `42501 permission denied for table files` with a 401,
+      # and `curl --fail` painted the workflow red every third day. The key is
+      # already in this repository's secrets for the e2e suite; the query is
+      # one column of one row and the answer is thrown away.
       - name: Select one row through PostgREST
         env:
-          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
             echo "No Supabase credentials configured — nothing to keep awake."
             exit 0
           fi
@@ -52,8 +55,8 @@ jobs:
           # green for a month while the project it guards is asleep.
           status=$(curl -sS --fail --show-error -o /tmp/ping.json -w '%{http_code}' \
             --max-time 30 \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
             "$SUPABASE_URL/rest/v1/files?select=id&limit=1")
 
           echo "PostgREST answered $status with $(wc -c < /tmp/ping.json) bytes"
