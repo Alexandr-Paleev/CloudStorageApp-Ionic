@@ -8,6 +8,7 @@ const BASE: FileFiltersValue = {
   sort: DEFAULT_SORT,
   direction: DEFAULT_DIRECTION,
   group: 'all',
+  mode: 'name',
 };
 
 function show(value: Partial<FileFiltersValue> = {}, resultCount?: number) {
@@ -48,6 +49,7 @@ describe('FileFilters', () => {
       group: 'images',
       sort: 'size',
       direction: 'asc',
+      mode: 'name',
     });
   });
 
@@ -88,5 +90,38 @@ describe('FileFilters', () => {
   it('does not claim a count it was not given', () => {
     show({ search: 'invoice' });
     expect(screen.getByText('Searching every folder')).toBeInTheDocument();
+  });
+
+  it('offers the two ways of reading a search term, once there is one', () => {
+    show();
+    // Nothing to choose between before a term is typed, and the moment it is
+    // typed is also when the choice explains itself.
+    expect(screen.queryByText('By meaning')).not.toBeInTheDocument();
+
+    show({ search: 'invoice' });
+    expect(screen.getByText('By name')).toBeInTheDocument();
+    expect(screen.getByText('By meaning')).toBeInTheDocument();
+  });
+
+  it('switches the mode without disturbing the term', () => {
+    const { onChange } = show({ search: 'invoice' });
+    ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'smart', search: 'invoice' })
+    );
+  });
+
+  it('says what an empty smart result means', () => {
+    // An empty list here is not an empty account: a file nobody indexed is
+    // invisible to this mode, and saying so is the difference between a
+    // feature that looks broken and one that looks honest.
+    show({ search: 'hotel', mode: 'smart' }, 0);
+    expect(screen.getByText(/files are indexed after upload/)).toBeInTheDocument();
+  });
+
+  it('says that a smart search crosses folders too', () => {
+    show({ search: 'hotel', mode: 'smart' }, 3);
+    expect(screen.getByText(/Closest in meaning, every folder — 3/)).toBeInTheDocument();
   });
 });

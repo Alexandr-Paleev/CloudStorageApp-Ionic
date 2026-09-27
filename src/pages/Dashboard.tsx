@@ -48,6 +48,7 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { applyPending } from '../services/mutation-queue';
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import storageService, { type Folder } from '../services/storage.service';
+import aiService from '../services/ai.service';
 import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
@@ -83,9 +84,14 @@ const Dashboard: React.FC = () => {
     sort: DEFAULT_SORT,
     direction: DEFAULT_DIRECTION,
     group: 'all',
+    mode: 'name',
   });
 
   const PAGE_SIZE = 15;
+
+  const searching = filters.search.trim().length > 0;
+  /** A search by meaning, and something to search for. Both, or neither. */
+  const smartSearching = filters.mode === 'smart' && searching;
 
   const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
     /* The filters belong in the key: they are part of the question being
@@ -106,18 +112,73 @@ const Dashboard: React.FC = () => {
       return allPages.length;
     },
     initialPageParam: 0,
-    enabled: !!user?.id,
+    // Not merely ignored while searching by meaning — not asked for. The two
+    // lists answer different questions, and the ordinary one costs a query.
+    enabled: !!user?.id && !smartSearching,
+  });
+
+  /**
+   * The same question asked of the index instead of the file names.
+   *
+   * One page and no scrolling: `match_files` returns the nearest handful, and
+   * "more results" past the twentieth nearest neighbour is not a page of a
+   * list, it is noise with a worse score.
+   */
+  const {
+    data: smartFiles,
+    isLoading: smartLoading,
+    error: smartError,
+  } = useQuery({
+    queryKey: ['smart-search', user?.id, filters.search.trim()],
+    queryFn: () => aiService.smartSearch(filters.search),
+    enabled: !!user?.id && smartSearching,
+    /* Typing "invoice" again a moment later is the same question, and the
+       answer costs an embedding on a paid API. */
+    staleTime: 60_000,
+    retry: false,
   });
 
   /* The server's answer, plus whatever this device has queued and not yet
-     sent. The cache stays a truthful snapshot; the queue is applied on top. */
+     sent. The cache stays a truthful snapshot; the queue is applied on top —
+     including over search results, where a file deleted offline would
+     otherwise come back from the database as a perfectly good match. */
   const items = applyPending(
-    {
-      files: data?.pages.flatMap((page) => page.files) || [],
-      folders: data?.pages[0]?.folders || [],
-    },
+    smartSearching
+      ? { files: smartFiles ?? [], folders: [] }
+      : {
+          files: data?.pages.flatMap((page) => page.files) || [],
+          folders: data?.pages[0]?.folders || [],
+        },
     offlineQueue.ops
   );
+
+  const listLoading = smartSearching ? smartLoading : isLoading;
+  const listError = smartSearching ? smartError : error;
+
+  /* Only asked while a smart search is on screen: it is the one moment the
+     answer matters, and the answer is two reads the dashboard need not make
+     on every visit. */
+  const { data: unindexed } = useQuery({
+    queryKey: ['unindexed', user?.id],
+    queryFn: () => aiService.unindexedFileIds(user!.id),
+    enabled: !!user?.id && smartSearching,
+  });
+
+  const [indexing, setIndexing] = useState(false);
+
+  /* Indexing is a deliberate act, not something an upload triggers on its
+     own: every file costs a request at a model provider, and this deployment
+     hands an account to any visitor. */
+  const indexMissing = async () => {
+    setIndexing(true);
+    try {
+      await aiService.indexMany(unindexed ?? []);
+      await queryClient.invalidateQueries({ queryKey: ['unindexed', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['smart-search'] });
+    } finally {
+      setIndexing(false);
+    }
+  };
 
   const { data: storageSize } = useQuery({
     queryKey: ['storageSize', user?.id],
@@ -401,6 +462,17 @@ const Dashboard: React.FC = () => {
 
           <FileFilters value={filters} onChange={setFilters} resultCount={items.files.length} />
 
+          {smartSearching && (unindexed?.length ?? 0) > 0 && (
+            <div className="smart-index-row">
+              <IonText color="medium">
+                {unindexed!.length} file{unindexed!.length === 1 ? '' : 's'} not indexed yet
+              </IonText>
+              <IonButton size="small" fill="outline" disabled={indexing} onClick={indexMissing}>
+                {indexing ? <IonSpinner name="crescent" aria-label="Indexing" /> : 'Index them'}
+              </IonButton>
+            </div>
+          )}
+
           {items?.folders && items.folders.length > 0 && (
             <div className="folders-section">
               <IonText color="dark" className="section-title">
@@ -457,15 +529,30 @@ const Dashboard: React.FC = () => {
               Files
             </IonText>
 
-            {isLoading && (
+            {listLoading && (
               <div className="files-loading">
                 <IonSpinner color="primary" aria-label="Loading files" />
               </div>
             )}
 
-            {error && <div className="files-error">Error loading items.</div>}
+            {listError && (
+              <div className="files-error">
+                {/* The message itself for a smart search. It fails for reasons
+                    the person can act on — this deployment has no key for the
+                    provider, this database has no migration 011 — and "Error
+                    loading items" hides every one of them behind the same
+                    sentence. */}
+                {smartSearching && listError instanceof Error
+                  ? listError.message
+                  : 'Error loading items.'}
+              </div>
+            )}
 
-            {!isLoading &&
+            {!listLoading &&
+              /* Not while searching: an empty result is not an empty account,
+                 and the note under the searchbar has already said which of
+                 the two this is. */
+              !searching &&
               items?.files.length === 0 &&
               (!items.folders || items.folders.length === 0) && (
                 <div className="files-empty">
@@ -524,6 +611,13 @@ const Dashboard: React.FC = () => {
                     <p className="file-meta-details">
                       {formatFileSize(file.size)} • {formatDateTime(file.created_at)}
                     </p>
+                    {'summary' in file && typeof file.summary === 'string' && (
+                      /* Why this one came back. A ranked list with no reason
+                         attached is indistinguishable from a wrong one — and
+                         the sentence under the name is also what the search
+                         actually matched against. */
+                      <p className="file-meta-summary">{file.summary}</p>
+                    )}
                   </IonLabel>
 
                   {/* Stretched over the row rather than wrapped around it, so

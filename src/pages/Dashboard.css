@@ -400,3 +400,14 @@ body.dark .section-title {
   position: relative;
   z-index: 1;
 }
+
+/* The one place the index makes itself visible: a count and a way to fix it,
+   shown only while a search by meaning is on screen. */
+.smart-index-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  margin: 4px 0 12px;
+}

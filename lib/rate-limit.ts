@@ -123,6 +123,31 @@ export const BILLING_LIMIT = 6;
 export const CLOUDINARY_IP_LIMIT = 120;
 
 /**
+ * Files described per user per minute.
+ *
+ * The first limit in this file that guards a bill rather than a resource:
+ * every call is a request to Claude and one to Voyage, and both are paid per
+ * token. What bounds the total is not this number but the storage quota — a
+ * file has to exist before it can be indexed, and indexing it twice overwrites
+ * one row. This bounds the rate at which someone can spend that ceiling, and
+ * thirty a minute still lets a folder of photographs finish while the person
+ * is watching.
+ */
+export const AI_INDEX_LIMIT = 30;
+
+/**
+ * Search queries embedded per user per minute.
+ *
+ * Higher, because this is typing: the searchbar debounces at 300ms and a
+ * sentence typed slowly is several queries. Cheaper too — embedding a line of
+ * text costs a fraction of describing a photograph.
+ */
+export const AI_EMBED_LIMIT = 60;
+
+/** Both AI actions, per address, before the token check — as PRESIGN_IP_LIMIT. */
+export const AI_IP_LIMIT = 120;
+
+/**
  * Every limiter built in this process.
  *
  * Only so that tests can put the module back to a known state: limiters are

@@ -355,6 +355,9 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID_PRO_MONTHLY`, `STRIPE_WEBHOOK_SECRET`
    - `DROPBOX_APP_KEY` (only if Dropbox is enabled)
+   - `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` (only for semantic search — without
+     them `/api/ai/*` answers `501` and the smart search stays off, while
+     everything else works unchanged)
 4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 

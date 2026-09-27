@@ -19,7 +19,20 @@ function requireServiceRoleKey(): string {
 
 const supabase = createClient(requireEnv('SUPABASE_URL'), requireServiceRoleKey());
 
-export async function authenticateUser(req: VercelRequest): Promise<string> {
+/** Who the caller is, as the token check already knows it. */
+export interface AuthenticatedUser {
+  id: string;
+  email?: string;
+}
+
+/**
+ * The caller, with the parts of them a route might need.
+ *
+ * `getUser` returns the whole record, and most routes want only the id — but
+ * the email is what tells a demo account from a real one, and asking for it
+ * separately would be a second round trip for something already in hand.
+ */
+export async function authenticate(req: VercelRequest): Promise<AuthenticatedUser> {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) throw new AuthError('Missing authorization token');
 
@@ -28,7 +41,11 @@ export async function authenticateUser(req: VercelRequest): Promise<string> {
     error,
   } = await supabase.auth.getUser(token);
   if (error || !user) throw new AuthError('Invalid or expired token');
-  return user.id;
+  return { id: user.id, email: user.email };
+}
+
+export async function authenticateUser(req: VercelRequest): Promise<string> {
+  return (await authenticate(req)).id;
 }
 
 export { supabase };
