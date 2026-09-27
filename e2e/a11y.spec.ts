@@ -92,6 +92,23 @@ test.describe('Accessibility', () => {
     expect(summarise(violations)).toBe('');
   });
 
+  test('the account page, with the destructive section open', async ({ page }) => {
+    /* Both states, because they are different pages as far as axe is
+       concerned: closed, the section is one button; open, it is a heading, a
+       labelled field and two more buttons. */
+    await page.goto('/account');
+    await expect(page.getByRole('button', { name: 'Delete account' })).toBeVisible();
+
+    const closed = await scan(page);
+    expect(summarise(closed.violations)).toBe('');
+
+    await page.getByRole('button', { name: 'Delete account' }).click();
+    await expect(page.locator('ion-input#delete-confirm')).toBeVisible();
+
+    const open = await scan(page);
+    expect(summarise(open.violations)).toBe('');
+  });
+
   test('the plans page, which is where money is asked for', async ({ page }) => {
     await page.goto('/pricing');
     await expect(page.locator('ion-title')).toBeVisible();
