@@ -28,6 +28,10 @@ test.describe('Deleting an account', () => {
     await page.getByTestId('account-link').click();
     await expect(page.getByText(user.email)).toBeVisible();
 
+    /* The destructive section is closed until it is asked for, so that the
+       page does not open on a red button. */
+    await page.getByRole('button', { name: 'Delete account' }).click();
+
     /* The native input, not the ion-input host — the same lesson as the login
        spec: Ionic 9 sets props as properties, and the host is not the field. */
     await page.locator('ion-input#delete-confirm input').fill('DELETE');

@@ -10,7 +10,13 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The account page opens on the account, not on a red button.** It was one
+  box — "delete account" — so the first thing an account's own settings said
+  to its owner was that they could destroy it. It now leads with the plan, the
+  storage in use and a way to manage billing; deleting is a section that opens
+  when asked, and still needs the word typed out.
 
 ## [4.6.0] — 2026-09-06
 

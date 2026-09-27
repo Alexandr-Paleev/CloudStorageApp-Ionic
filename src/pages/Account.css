@@ -3,6 +3,13 @@
   margin: 0 auto;
 }
 
+.account-card {
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
 .account-heading {
   font-size: 13px;
   font-weight: 600;
@@ -12,16 +19,103 @@
   margin: 0 0 8px;
 }
 
+.account-heading-danger {
+  color: var(--ion-color-danger);
+}
+
 .account-email {
   font-size: 16px;
-  margin: 0 0 32px;
+  margin: 0 0 12px;
   word-break: break-all;
 }
 
+.account-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* A plan is a fact about the account, not a call to action — a chip, not a
+   button, so nothing on this page competes with the one thing that is. */
+.account-tier {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.account-tier-free {
+  background: var(--ion-color-light);
+  color: var(--ion-color-medium-shade);
+}
+
+.account-tier-pro {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.account-since {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+}
+
+.account-storage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.account-storage-percent {
+  color: var(--ion-color-medium);
+}
+
+.account-storage-row + ion-progress-bar {
+  border-radius: 999px;
+  height: 6px;
+  margin-bottom: 16px;
+}
+
+.account-note {
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+/* Not a red box any more. The section is a quiet row until someone opens it,
+   and only then does it look like what it is. */
 .account-danger {
+  margin-top: 8px;
+}
+
+.account-danger:has(.account-heading-danger) {
   border: 1px solid var(--ion-color-danger);
   border-radius: 12px;
   padding: 16px;
+}
+
+.account-danger-toggle {
+  background: none;
+  border: none;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.account-danger-toggle:hover {
+  color: var(--ion-color-danger);
+}
+
+.account-danger-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .account-label {
