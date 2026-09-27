@@ -39,8 +39,20 @@ export function cloudflareAccountId(): string | undefined {
   const explicit = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (explicit) return explicit;
 
+  /* Anchored at both ends, and CodeQL was right to ask for it: without the
+     `$` this also matched `https://<id>.r2.cloudflarestorage.com.example.com`
+     and handed that host's first label over as an account id. The value comes
+     from this deployment's own environment rather than from a request, so the
+     fix is hardening rather than a closed hole — but a pattern that matches a
+     lookalike domain is wrong whoever supplies the string.
+
+     The middle group is Cloudflare's jurisdiction label (`eu`, `fedramp`),
+     which an endpoint may or may not carry, and the id itself is 32 hex
+     characters rather than "some hex". */
   const endpoint = process.env.R2_ENDPOINT;
-  const match = endpoint?.match(/^https:\/\/([0-9a-f]+)\.r2\.cloudflarestorage\.com/i);
+  const match = endpoint?.match(
+    /^https:\/\/([0-9a-f]{32})(?:\.[a-z]+)?\.r2\.cloudflarestorage\.com\/?$/i
+  );
   return match?.[1];
 }
 

@@ -32,9 +32,26 @@ describe('activeBackend', () => {
 
   it('takes the account id off the R2 endpoint rather than asking for it twice', () => {
     process.env.CLOUDFLARE_AI_TOKEN = 'cf-test';
-    process.env.R2_ENDPOINT = 'https://deadbeef1234.r2.cloudflarestorage.com';
+    process.env.R2_ENDPOINT = `https://${'a1b2c3d4'.repeat(4)}.r2.cloudflarestorage.com`;
 
     expect(activeBackend().embeddingModel).toBe(CF_EMBEDDING_MODEL);
+  });
+
+  it('accepts the jurisdiction label an endpoint may carry', () => {
+    process.env.CLOUDFLARE_AI_TOKEN = 'cf-test';
+    process.env.R2_ENDPOINT = `https://${'a1b2c3d4'.repeat(4)}.eu.r2.cloudflarestorage.com/`;
+
+    expect(activeBackend().embeddingModel).toBe(CF_EMBEDDING_MODEL);
+  });
+
+  it('refuses a domain that merely starts like an R2 endpoint', () => {
+    /* Without the anchor at the end this matched, and the first label of
+       somebody else's domain became the account every model call was billed
+       to. CodeQL flagged exactly this on PR #108. */
+    process.env.CLOUDFLARE_AI_TOKEN = 'cf-test';
+    process.env.R2_ENDPOINT = `https://${'a1b2c3d4'.repeat(4)}.r2.cloudflarestorage.com.example.com`;
+
+    expect(() => activeBackend()).toThrow(ProviderNotConfigured);
   });
 
   it('says what is missing when nothing is configured', () => {
