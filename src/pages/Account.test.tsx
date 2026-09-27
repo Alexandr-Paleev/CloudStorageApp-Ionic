@@ -4,21 +4,27 @@ import { Route, Routes } from 'react-router-dom';
 import Account from './Account';
 import { renderWithProviders } from '../test/utils';
 
-const { deleteAccount, createPortalSession, getUserStorageSize, profileMock, envMock } = vi.hoisted(
-  () => ({
-    deleteAccount: vi.fn(),
-    createPortalSession: vi.fn(),
-    getUserStorageSize: vi.fn(),
-    profileMock: {
-      current: {
-        tier: 'free',
-        storage_limit: 500 * 1024 * 1024,
-        created_at: '2026-01-10T00:00:00.000Z',
-      } as Record<string, unknown> | null,
-    },
-    envMock: { VITE_BILLING_ENABLED: true },
-  })
-);
+const {
+  deleteAccount,
+  createPortalSession,
+  getUserStorageSize,
+  profileMock,
+  envMock,
+  isNativePlatform,
+} = vi.hoisted(() => ({
+  deleteAccount: vi.fn(),
+  createPortalSession: vi.fn(),
+  getUserStorageSize: vi.fn(),
+  profileMock: {
+    current: {
+      tier: 'free',
+      storage_limit: 500 * 1024 * 1024,
+      created_at: '2026-01-10T00:00:00.000Z',
+    } as Record<string, unknown> | null,
+  },
+  envMock: { VITE_BILLING_ENABLED: true },
+  isNativePlatform: vi.fn(() => false),
+}));
 
 vi.mock('../services/account.service', () => ({
   default: { deleteAccount: (...args: unknown[]) => deleteAccount(...args) },
@@ -37,6 +43,12 @@ vi.mock('../hooks/useProfile', () => ({
 }));
 
 vi.mock('../env', () => ({ env: envMock }));
+
+/* The real billingIsOffered() runs on top of both of these — mocking the
+   predicate itself would test the mock rather than the rule it encodes. */
+vi.mock('@capacitor/core', () => ({
+  Capacitor: { isNativePlatform: () => isNativePlatform() },
+}));
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', email: 'someone@example.com' } }),
@@ -80,6 +92,7 @@ beforeEach(() => {
     created_at: '2026-01-10T00:00:00.000Z',
   };
   envMock.VITE_BILLING_ENABLED = true;
+  isNativePlatform.mockReturnValue(false);
 });
 
 describe('Account', () => {
@@ -130,6 +143,40 @@ describe('Account', () => {
     expect(screen.queryByText('Manage billing')).not.toBeInTheDocument();
   });
 
+  it('offers nothing to buy inside the native shell', async () => {
+    /* App Store 3.1.1 forbids a button that steers towards a purchase made
+       anywhere but In-App Purchase, and /pricing bounces back to the dashboard
+       there — so a visible "See Pro" was both a rejection risk and a button
+       that did nothing. See ADR 0012. */
+    isNativePlatform.mockReturnValue(true);
+    show();
+
+    expect(screen.queryByText('See Pro')).not.toBeInTheDocument();
+
+    profileMock.current = { tier: 'pro', storage_limit: 5 * 1024 * 1024 * 1024 };
+    show();
+    expect(screen.queryByText('Manage billing')).not.toBeInTheDocument();
+  });
+
+  it('says so beside the button when the portal will not open', async () => {
+    profileMock.current = { tier: 'pro', storage_limit: 5 * 1024 * 1024 * 1024 };
+    createPortalSession.mockRejectedValue(new Error('Stripe is not configured'));
+    show();
+
+    fireEvent.click(screen.getByText('Manage billing'));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Stripe is not configured')
+    );
+  });
+
+  it('explains a full bar even when nothing is over the limit', async () => {
+    getUserStorageSize.mockResolvedValue(500 * 1024 * 1024);
+    show();
+
+    await waitFor(() => expect(screen.getByText(/Storage is full/)).toBeInTheDocument());
+  });
+
   /* The page used to open on a red box with a red button in it — the first
      thing an account's own settings said to its owner was "you can destroy
      this". */
@@ -137,6 +184,11 @@ describe('Account', () => {
     show();
     expect(document.querySelector('ion-input')).toBeNull();
     expect(deleteButton()).toBeNull();
+
+    expect(screen.getByRole('button', { name: 'Delete account' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
 
     openDangerZone();
     expect(document.querySelector('ion-input')).not.toBeNull();

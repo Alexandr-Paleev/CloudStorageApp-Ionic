@@ -91,7 +91,9 @@
   margin-top: 8px;
 }
 
-.account-danger:has(.account-heading-danger) {
+/* The class, not `:has()`: the component already knows whether the section is
+   open, and re-deriving it from the DOM is a second source of truth. */
+.account-danger-open {
   border: 1px solid var(--ion-color-danger);
   border-radius: 12px;
   padding: 16px;

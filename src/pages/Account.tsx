@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -22,7 +22,7 @@ import billingService from '../services/billing.service';
 import storageService from '../services/storage.service';
 import { TIER_CONFIG } from '../types/billing.types';
 import { formatFileSize, formatDate } from '../utils/format.utils';
-import { env } from '../env';
+import { billingIsOffered } from '../utils/billing.utils';
 import './Account.css';
 
 /** Typed exactly, because a destructive action reached by a single tap is one
@@ -37,6 +37,10 @@ const Account: React.FC = () => {
   const [confirmation, setConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  /* Kept apart from the deletion error rather than shared. One message for two
+     buttons meant a failed portal printed itself inside the delete section, at
+     the other end of the page from the thing that caused it. */
+  const [billingError, setBillingError] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
   /* The page used to open on a red box with a red button in it. Nothing else
      was on the screen, so the first thing this account's own settings said to
@@ -44,6 +48,17 @@ const Account: React.FC = () => {
      acts — open the section, type the word — and it now sits below what the
      page is actually for. */
   const [dangerOpen, setDangerOpen] = useState(false);
+  const confirmRef = useRef<HTMLIonInputElement>(null);
+
+  /* The button that opened the section is the button that disappears with it,
+     which leaves a keyboard user's focus on <body>. It goes to the field they
+     came here to fill. */
+  useEffect(() => {
+    /* `setFocus?.()` and not `setFocus()`: outside a browser the custom
+       element never upgrades, so the ref points at a bare stub with none of
+       Ionic's methods on it. */
+    if (dangerOpen) void confirmRef.current?.setFocus?.();
+  }, [dangerOpen]);
 
   const tier = profile?.tier ?? 'free';
   const limit = profile?.storage_limit ?? TIER_CONFIG.free.storage_limit;
@@ -77,12 +92,12 @@ const Account: React.FC = () => {
 
   const handleManageBilling = async () => {
     setPortalLoading(true);
-    setError('');
+    setBillingError('');
     try {
       window.location.href = await billingService.createPortalSession();
     } catch (err) {
       setPortalLoading(false);
-      setError(err instanceof Error ? err.message : 'Failed to open the billing portal');
+      setBillingError(err instanceof Error ? err.message : 'Failed to open the billing portal');
     }
   };
 
@@ -127,16 +142,25 @@ const Account: React.FC = () => {
               aria-label="Storage used"
             />
 
-            {usedBytes > limit && (
+            {usedBytes >= limit && (
+              /* The same condition that turns the bar red, so a red bar is
+                 never left without a sentence explaining it. */
               <IonText color="danger">
                 <p className="account-note">
-                  {formatFileSize(usedBytes - limit)} over the limit — uploads are blocked until you
-                  free up space.
+                  {usedBytes > limit
+                    ? `${formatFileSize(usedBytes - limit)} over the limit — uploads are blocked until you free up space.`
+                    : 'Storage is full — uploads are blocked until you free up space.'}
                 </p>
               </IonText>
             )}
 
-            {env.VITE_BILLING_ENABLED &&
+            {/* The predicate every other billing surface asks, rather than the
+                env flag underneath it: in the native shell it is false whatever
+                the flag says, because App Store 3.1.1 does not allow a button
+                that steers towards a purchase made anywhere but In-App
+                Purchase. Without this the shell showed "See Pro" and /pricing
+                sent the tap straight back to the dashboard. See ADR 0012. */}
+            {billingIsOffered() &&
               (tier === 'pro' ? (
                 <IonButton
                   expand="block"
@@ -155,13 +179,26 @@ const Account: React.FC = () => {
                   See Pro
                 </IonButton>
               ))}
+
+            {billingError && (
+              <IonText color="danger">
+                <p className="account-note" role="alert">
+                  {billingError}
+                </p>
+              </IonText>
+            )}
           </section>
 
-          <section className="account-danger">
+          <section
+            id="account-danger"
+            className={dangerOpen ? 'account-danger account-danger-open' : 'account-danger'}
+          >
             {!dangerOpen ? (
               <button
                 type="button"
                 className="account-danger-toggle"
+                aria-expanded={false}
+                aria-controls="account-danger"
                 onClick={() => setDangerOpen(true)}
               >
                 Delete account
@@ -181,6 +218,7 @@ const Account: React.FC = () => {
                   Type <strong>{CONFIRM_WORD}</strong> to confirm
                 </label>
                 <IonInput
+                  ref={confirmRef}
                   id="delete-confirm"
                   className="account-confirm"
                   value={confirmation}
