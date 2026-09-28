@@ -43,6 +43,22 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Whether this deployment may offer search by meaning.
+   *
+   * Off by default, and for the same reason as VITE_BILLING_ENABLED above: a
+   * clone with no model keys would otherwise show a mode that answers 501,
+   * and an error carrying the names of environment variables reads as a
+   * half-finished project rather than as a feature nobody switched on. The
+   * server decides for itself too — `/api/ai/*` answers 501 whatever this
+   * says — so a flag left on by mistake is untidy rather than dangerous.
+   */
+  VITE_SMART_SEARCH_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
    * Set where Stripe runs on test keys. Real cards are declined there, so the
    * plans page has to say so — otherwise the page reads as a live storefront
    * taking money it will never charge.

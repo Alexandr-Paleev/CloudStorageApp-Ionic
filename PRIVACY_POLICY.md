@@ -43,10 +43,25 @@ Your data is stored securely using:
 - **Google Drive** (optional, with your explicit consent)
 - **Cloudflare R2** (optional file storage)
 
+### Semantic search, and what it sends where
+
+If this deployment has semantic search switched on, asking to index a file
+sends **that file's contents** — the image itself, or the first few kilobytes
+of a text file — to the model provider the deployment is configured for
+(Anthropic, or Cloudflare Workers AI). The provider returns one sentence
+describing the file; that sentence and a numeric representation of it are
+stored next to your file's row and are readable only by you.
+
+Indexing never happens on its own. It runs when you press the button that
+offers it, on the files you own, and files kept in your own Google Drive or
+Dropbox are never sent anywhere. Nothing is sent when the feature is switched
+off, which is the default.
+
 ## Data Sharing
 
 We **DO NOT** sell your personal information. We may share data with:
 - **Service providers** (Supabase, Cloudinary, Sentry) - only as necessary to provide the Service
+- **Model providers** (Anthropic, or Cloudflare Workers AI) - only the contents of a file you have asked to index, and only while semantic search is enabled on this deployment
 - **Law enforcement** - if required by law
 - **Business transfers** - in case of merger or acquisition
 

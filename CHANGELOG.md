@@ -10,6 +10,43 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **Search by meaning.** The searchbar gains a second mode: "By meaning" finds
+  a file by what is in it rather than by what it is called, which is the only
+  way to find the two thirds of this account's files that carry the name a
+  camera gave them. A model writes one sentence about each file, that sentence
+  becomes a vector, and Postgres ranks by distance with pgvector — inside the
+  user's own rows, under RLS, from the browser
+  ([ADR 0013](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md),
+  migration `011`).
+
+  Indexing is a button, not something an upload triggers: every description is
+  a paid request, and this deployment hands an account to any visitor. Demo
+  accounts are refused outright. Which models run is decided by which keys the
+  deployment has — Claude and Voyage, or Cloudflare Workers AI on its free
+  allowance, or neither, in which case the route answers `501` and the mode
+  says so.
+
+  The indexer reads only what the caller owns: a `files` row carries a path and
+  a URL the browser wrote, and this route holds the service-role key, so both
+  are checked against the prefixes the upload routes create before anything is
+  signed or fetched.
+
+- **A weekly ping that keeps the database awake.** A free Supabase project
+  pauses after a week without traffic, and the live demo, the e2e suite and
+  every screenshot in this repository point at it. `keepalive.yml` reads one
+  row every third day.
+
+### Fixed
+
+- **Every table in `public` was handed `TRUNCATE`, `TRIGGER` and `REFERENCES`
+  to `anon` and `authenticated`**, and `profiles` also `INSERT` and `DELETE` —
+  the Supabase default that 009 found on functions, one level up. None of it
+  was reachable through PostgREST, and row-level security does not apply to
+  `TRUNCATE` at all, which is what makes the grant worth taking back rather
+  than arguing about (migration `012`).
+
 ### Changed
 
 - **The account page opens on the account, not on a red button.** It was one

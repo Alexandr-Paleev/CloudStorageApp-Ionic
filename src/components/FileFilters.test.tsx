@@ -1,22 +1,36 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FileFilters, { type FileFiltersValue } from './FileFilters';
+
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
+
+const { envMock } = vi.hoisted(() => ({ envMock: { VITE_SMART_SEARCH_ENABLED: true } }));
+vi.mock('../env', () => ({ env: envMock }));
 
 const BASE: FileFiltersValue = {
   search: '',
   sort: DEFAULT_SORT,
   direction: DEFAULT_DIRECTION,
   group: 'all',
+  mode: 'name',
 };
 
-function show(value: Partial<FileFiltersValue> = {}, resultCount?: number) {
+function show(value: Partial<FileFiltersValue> = {}, resultCount?: number, searchFailed = false) {
   const onChange = vi.fn();
   render(
-    <FileFilters value={{ ...BASE, ...value }} onChange={onChange} resultCount={resultCount} />
+    <FileFilters
+      value={{ ...BASE, ...value }}
+      onChange={onChange}
+      resultCount={resultCount}
+      searchFailed={searchFailed}
+    />
   );
   return { onChange };
 }
+
+beforeEach(() => {
+  envMock.VITE_SMART_SEARCH_ENABLED = true;
+});
 
 /** Ionic controls report through their own events, not through the DOM ones. */
 const ionEvent = (element: Element, name: string, value: unknown) =>
@@ -48,6 +62,7 @@ describe('FileFilters', () => {
       group: 'images',
       sort: 'size',
       direction: 'asc',
+      mode: 'name',
     });
   });
 
@@ -88,5 +103,57 @@ describe('FileFilters', () => {
   it('does not claim a count it was not given', () => {
     show({ search: 'invoice' });
     expect(screen.getByText('Searching every folder')).toBeInTheDocument();
+  });
+
+  it('offers the two ways of reading a search term, once there is one', () => {
+    show();
+    // Nothing to choose between before a term is typed, and the moment it is
+    // typed is also when the choice explains itself.
+    expect(screen.queryByText('By meaning')).not.toBeInTheDocument();
+
+    show({ search: 'invoice' });
+    expect(screen.getByText('By name')).toBeInTheDocument();
+    expect(screen.getByText('By meaning')).toBeInTheDocument();
+  });
+
+  it('switches the mode without disturbing the term', () => {
+    const { onChange } = show({ search: 'invoice' });
+    ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'smart', search: 'invoice' })
+    );
+  });
+
+  it('says what an empty smart result means', () => {
+    // An empty list here is not an empty account: a file nobody indexed is
+    // invisible to this mode, and saying so is the difference between a
+    // feature that looks broken and one that looks honest.
+    show({ search: 'hotel', mode: 'smart' }, 0);
+    expect(screen.getByText(/files are indexed after upload/)).toBeInTheDocument();
+  });
+
+  it('says that a smart search crosses folders too', () => {
+    show({ search: 'hotel', mode: 'smart' }, 3);
+    expect(screen.getByText(/Closest in meaning, every folder — 3/)).toBeInTheDocument();
+  });
+
+  it('hides the mode switch where no model provider is configured', () => {
+    // A fresh clone has no keys, so the route would answer 501 and the only
+    // honest thing on screen would be an error. The search it always had
+    // stays; the switch that cannot work is not offered.
+    envMock.VITE_SMART_SEARCH_ENABLED = false;
+    show({ search: 'invoice' });
+
+    expect(screen.queryByText('By meaning')).not.toBeInTheDocument();
+    expect(screen.getByTestId('file-search')).toBeInTheDocument();
+  });
+
+  it('says nothing about the result when the search itself failed', () => {
+    // "Nothing matches" about a search that never ran is a small lie, and it
+    // is the one the user reads first.
+    show({ search: 'hotel', mode: 'smart' }, 0, true);
+
+    expect(screen.queryByText(/Nothing indexed matches/)).not.toBeInTheDocument();
   });
 });

@@ -93,8 +93,8 @@ export async function eraseAccount(userId: string, deps: EraseDeps): Promise<Era
   }
 
   /* Rows before the user, for the reason at the top of this file. shared_links
-     cascades from files, and profiles and dropbox_connections cascade from the
-     user, so those three are not named here. */
+     and file_embeddings cascade from files, and profiles and dropbox_connections
+     cascade from the user, so those four are not named here. */
   const { error: filesError } = await supabase.from('files').delete().eq('user_id', userId);
   if (filesError) throw new Error(`Failed to delete files: ${filesError.message}`);
 

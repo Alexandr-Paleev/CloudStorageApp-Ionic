@@ -1,0 +1,62 @@
+name: Keep the database awake
+
+# A free Supabase project pauses after about a week without activity, and
+# coming back is a button in a dashboard that nobody is looking at. The cost of
+# that is not the downtime itself — it is that the live demo in the README, the
+# e2e suite and every screenshot in this repository all point at a database
+# that answers with a DNS failure until someone notices.
+#
+# ci.yml already touches the database, but only on push and pull_request, and
+# a quiet week is exactly the week this is needed. So: a query on a timer.
+#
+# Two things this deliberately is not. It is not a health check — nothing here
+# alerts, and a red run means the ping failed, not that the site is down. And
+# it is not a way to dodge the free plan: one small read every three days is
+# what the plan's own inactivity rule asks for.
+
+on:
+  # Every third day, so two pings land inside the seven-day window before it
+  # closes. The minute is arbitrary and off the hour on purpose — scheduled
+  # jobs at :00 queue behind everyone else's.
+  schedule:
+    - cron: '23 7 */3 * *'
+  # For the day the project is restored by hand and should be poked at once.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Query the database
+    runs-on: ubuntu-latest
+
+    steps:
+      # The service-role key, not the anon one — and that is a consequence of
+      # migration 012 rather than a preference. After it, `anon` holds no
+      # privilege on any table in `public`, so the request this job used to
+      # make now answers `42501 permission denied for table files` with a 401,
+      # and `curl --fail` painted the workflow red every third day. The key is
+      # already in this repository's secrets for the e2e suite; the query is
+      # one column of one row and the answer is thrown away.
+      - name: Select one row through PostgREST
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "No Supabase credentials configured — nothing to keep awake."
+            exit 0
+          fi
+
+          # --fail turns a 4xx/5xx into a non-zero exit. Without it curl prints
+          # the error body and reports success, which is how a workflow stays
+          # green for a month while the project it guards is asleep.
+          status=$(curl -sS --fail --show-error -o /tmp/ping.json -w '%{http_code}' \
+            --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/files?select=id&limit=1")
+
+          echo "PostgREST answered $status with $(wc -c < /tmp/ping.json) bytes"

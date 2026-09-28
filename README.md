@@ -122,6 +122,14 @@ render — and the banner says the deletion has not reached the server yet:
   another, with progress per file and a failure that stops that file rather than the queue
 - ✅ Search by name, six orderings and a filter by type. All three change the
   query, not the fifteen rows already on screen
+- ✅ **Search by meaning**, for the files whose name is `IMG_4821.jpg`. A model
+  writes one sentence about a file when you ask it to, the sentence becomes a
+  vector, and Postgres ranks by distance with pgvector — inside your own rows,
+  under RLS, from the browser. Indexing is a button rather than something an
+  upload triggers, because every description is a paid request. Which models
+  run depends on which keys the deployment has, and a deployment with none —
+  every fresh clone — does not show the mode at all
+  ([ADR 0013](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md))
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
 - ✅ File renaming and deletion — removed from the provider, not just from the list
@@ -355,6 +363,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID_PRO_MONTHLY`, `STRIPE_WEBHOOK_SECRET`
    - `DROPBOX_APP_KEY` (only if Dropbox is enabled)
+   - `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY`, or `CLOUDFLARE_AI_TOKEN` for the
+     free path (only for semantic search). Pair them with
+     `VITE_SMART_SEARCH_ENABLED=true`, which is what puts the mode on screen:
+     without it the dashboard offers the search it always had, and `/api/ai/*`
+     answers `501` to anything that asks anyway
 4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 
