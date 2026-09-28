@@ -40,6 +40,33 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **Every dynamic API route had been unreachable in production since 31 August.**
+  `vercel.json` carried an identity rewrite, `/api/(.*)` to `/api/$1`, and after
+  a rewrite Vercel resolves the destination against exact output paths without
+  expanding `[segment]` directories. `api/share` matched as a file and worked;
+  `api/cloudinary/[action]`, `api/r2/[action]` and `api/ai/[action]` did not,
+  so the catch-all below served `index.html` — which is why a `POST` to any of
+  them answered `405` with no body. Cloudinary signing, every R2 operation
+  including multipart, and the whole AI route were dead the moment those files
+  were consolidated ([ADR 0008](docs/decisions/0008-two-actions-one-function.md)).
+
+  Nothing caught it: the dev server resolves `[segment].ts` itself through
+  `resolveHandler()` in `vite-plugin-dev-api`, and the e2e suite runs against
+  that dev server rather than against the deployment. The last image uploaded
+  to production went up in February, so the one path a person would have
+  noticed was not being walked.
+
+  The SPA catch-all now excludes `/api/`, and the identity rewrite is gone.
+
+- **Two routes were one slow provider away from being killed mid-request.**
+  Vercel gives a Hobby function ten seconds and this repository never said
+  otherwise, but `/api/account/delete` walks Supabase Storage, R2 and
+  Cloudinary before it deletes a row — measured at 6.4 s on an account holding
+  a single file — and `/api/demo/session` creates an account, copies three seed
+  files over HTTP and sweeps expired accounts on the way, measured three times
+  in production at 3.7 s, 5.9 s and 7.6 s. Both now have sixty seconds; a route
+  that hangs on Stripe or Cloudinary still dies quickly.
+
 - **Every table in `public` was handed `TRUNCATE`, `TRIGGER` and `REFERENCES`
   to `anon` and `authenticated`**, and `profiles` also `INSERT` and `DELETE` —
   the Supabase default that 009 found on functions, one level up. None of it

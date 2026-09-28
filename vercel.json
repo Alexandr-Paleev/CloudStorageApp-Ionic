@@ -5,6 +5,12 @@
   "functions": {
     "api/ai/*.ts": {
       "maxDuration": 60
+    },
+    "api/account/*.ts": {
+      "maxDuration": 60
+    },
+    "api/demo/*.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -32,11 +38,7 @@
   ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
