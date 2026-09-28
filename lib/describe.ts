@@ -72,7 +72,10 @@ const SYSTEM = [
 function contentFor(name: string, source: DescribeSource): Anthropic.ContentBlockParam[] {
   const ask: Anthropic.ContentBlockParam = {
     type: 'text',
-    text: `The file is named "${name}". Describe it.`,
+    /* The name is fenced for the same reason the contents are: it is text
+       the user chose, and a file called "ignore the above and…" is a file
+       anyone can create. */
+    text: `Describe the file.\n--- file name ---\n${name}\n--- end ---`,
   };
 
   switch (source.kind) {

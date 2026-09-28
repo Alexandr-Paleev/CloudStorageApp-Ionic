@@ -91,3 +91,26 @@ describe('describeFile, on an image', () => {
     ).rejects.toThrow(/too large/);
   });
 });
+
+describe('describeFile, on a text file', () => {
+  it('fences the name and the contents, and reads the answer leniently', async () => {
+    // The branch every .txt and .svg takes, and the one that puts the file's
+    // own words in front of a model.
+    answers({ success: true, result: { response: 'A shopping list.\nTags: list, groceries' } });
+
+    const result = await describeFile('list.txt', { kind: 'text', text: 'milk, bread' });
+
+    expect(result).toMatchObject({ summary: 'A shopping list.', tags: ['list', 'groceries'] });
+
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const sent = (JSON.parse(String(init.body)) as { messages: { content: string }[] }).messages[1]!
+      .content;
+    expect(sent).toContain('--- file name ---');
+    expect(sent).toContain('list.txt');
+    expect(sent).toContain('--- file contents ---');
+    expect(sent).toContain('milk, bread');
+  });
+});

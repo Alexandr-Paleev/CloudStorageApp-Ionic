@@ -182,7 +182,7 @@ export async function describeFile(name: string, source: DescribeSource): Promis
          why the ceiling above is three megabytes rather than eight: every byte
          becomes up to four characters of JSON on the way out. */
       image: Array.from(bytes),
-      prompt: `${PROMPT}\n\nThe file is named "${name}".`,
+      prompt: `${PROMPT}\n--- file name ---\n${name}\n--- end ---`,
       max_tokens: 256,
     });
 
@@ -200,7 +200,9 @@ export async function describeFile(name: string, source: DescribeSource): Promis
       },
       {
         role: 'user',
-        content: `${PROMPT}\n\nThe file is named "${name}".\n--- file contents ---\n${source.text}\n--- end ---`,
+        content:
+          `${PROMPT}\n--- file name ---\n${name}\n--- end ---\n` +
+          `--- file contents ---\n${source.text}\n--- end ---`,
       },
     ],
     max_tokens: 256,

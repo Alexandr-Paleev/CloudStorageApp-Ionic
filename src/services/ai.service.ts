@@ -52,21 +52,6 @@ const aiService = {
   },
 
   /**
-   * Indexing as it happens after an upload: out of the way, and never fatal.
-   *
-   * The file is already stored and listed by the time this runs. If the
-   * description fails — no key on this deployment, a model having a bad
-   * minute, a rate limit — the upload still succeeded, and the only
-   * consequence is that a smart search will not find this one until it is
-   * indexed again. Reported, not raised.
-   */
-  indexInBackground(fileId: string): void {
-    void this.indexFile(fileId).catch((error) => {
-      Sentry.captureException(error, { tags: { context: 'ai.indexInBackground' } });
-    });
-  },
-
-  /**
    * Files this account has that the index does not.
    *
    * Two reads and a subtraction in the browser rather than a view or an RPC:
