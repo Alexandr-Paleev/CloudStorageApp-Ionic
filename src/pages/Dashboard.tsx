@@ -53,6 +53,8 @@ import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
 import { billingIsOffered } from '../utils/billing.utils';
+import { smartSearchIsOffered } from '../utils/smart-search.utils';
+import { HttpError } from '../utils/http.utils';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -90,8 +92,9 @@ const Dashboard: React.FC = () => {
   const PAGE_SIZE = 15;
 
   const searching = filters.search.trim().length > 0;
-  /** A search by meaning, and something to search for. Both, or neither. */
-  const smartSearching = filters.mode === 'smart' && searching;
+  /** A search by meaning, offered by this deployment, with something to
+   *  search for. All three, or the ordinary list. */
+  const smartSearching = smartSearchIsOffered() && filters.mode === 'smart' && searching;
 
   const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
     /* The filters belong in the key: they are part of the question being
@@ -478,7 +481,15 @@ const Dashboard: React.FC = () => {
             <FolderBreadcrumbs path={folderPath} onNavigate={openFolder} />
           )}
 
-          <FileFilters value={filters} onChange={setFilters} resultCount={items.files.length} />
+          <FileFilters
+            value={filters}
+            onChange={setFilters}
+            resultCount={items.files.length}
+            /* An empty list after a failed search is not an empty result, and
+               saying "nothing matches" about a search that never ran is the
+               kind of small lie that makes the rest look unreliable. */
+            searchFailed={!!listError}
+          />
 
           {smartSearching && (unindexed?.length ?? 0) > 0 && (
             <div className="smart-index-row">
@@ -560,9 +571,14 @@ const Dashboard: React.FC = () => {
                     provider, this database has no migration 011 — and "Error
                     loading items" hides every one of them behind the same
                     sentence. */}
-                {smartSearching && listError instanceof Error
-                  ? listError.message
-                  : 'Error loading items.'}
+                {smartSearching && listError instanceof HttpError && listError.status === 501
+                  ? /* The server's own words name environment variables. That
+                       sentence is for whoever deploys this, not for whoever is
+                       looking at it — it stays in the console and in Sentry. */
+                    'Smart search is not set up on this deployment.'
+                  : smartSearching && listError instanceof Error
+                    ? listError.message
+                    : 'Error loading items.'}
               </div>
             )}
 

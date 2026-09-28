@@ -127,8 +127,8 @@ render — and the banner says the deletion has not reached the server yet:
   vector, and Postgres ranks by distance with pgvector — inside your own rows,
   under RLS, from the browser. Indexing is a button rather than something an
   upload triggers, because every description is a paid request. Which models
-  run depends on which keys the deployment has; with none, the mode says so
-  instead of failing
+  run depends on which keys the deployment has, and a deployment with none —
+  every fresh clone — does not show the mode at all
   ([ADR 0013](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md))
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
@@ -363,9 +363,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID_PRO_MONTHLY`, `STRIPE_WEBHOOK_SECRET`
    - `DROPBOX_APP_KEY` (only if Dropbox is enabled)
-   - `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` (only for semantic search — without
-     them `/api/ai/*` answers `501` and the smart search stays off, while
-     everything else works unchanged)
+   - `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY`, or `CLOUDFLARE_AI_TOKEN` for the
+     free path (only for semantic search). Pair them with
+     `VITE_SMART_SEARCH_ENABLED=true`, which is what puts the mode on screen:
+     without it the dashboard offers the search it always had, and `/api/ai/*`
+     answers `501` to anything that asks anyway
 4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 

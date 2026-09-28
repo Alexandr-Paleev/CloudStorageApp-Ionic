@@ -23,6 +23,14 @@ who opens the demo therefore costs nothing, and the same is true of the demo
 accounts `/api/demo/session` creates — `/api/ai/index` refuses them by email
 prefix and says so in the response.
 
+**A deployment without keys does not show the feature.**
+`VITE_SMART_SEARCH_ENABLED` decides whether the mode appears at all, the same
+way `billingIsOffered()` decides whether a buy button does. The route refuses
+on its own regardless — but its refusal names environment variables, which is
+a sentence for whoever deploys this and not for whoever is looking at it. A
+switch that cannot work reads as a broken app, and every fresh clone of this
+repository is such a deployment.
+
 **The models are chosen by which keys exist.** Claude and Voyage when
 `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY` are set; Cloudflare Workers AI, which
 has a free daily allowance, when only `CLOUDFLARE_AI_TOKEN` is; and a 501 with

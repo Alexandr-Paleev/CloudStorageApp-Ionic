@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FileFilters, { type FileFiltersValue } from './FileFilters';
+
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
+
+const { envMock } = vi.hoisted(() => ({ envMock: { VITE_SMART_SEARCH_ENABLED: true } }));
+vi.mock('../env', () => ({ env: envMock }));
 
 const BASE: FileFiltersValue = {
   search: '',
@@ -11,13 +15,22 @@ const BASE: FileFiltersValue = {
   mode: 'name',
 };
 
-function show(value: Partial<FileFiltersValue> = {}, resultCount?: number) {
+function show(value: Partial<FileFiltersValue> = {}, resultCount?: number, searchFailed = false) {
   const onChange = vi.fn();
   render(
-    <FileFilters value={{ ...BASE, ...value }} onChange={onChange} resultCount={resultCount} />
+    <FileFilters
+      value={{ ...BASE, ...value }}
+      onChange={onChange}
+      resultCount={resultCount}
+      searchFailed={searchFailed}
+    />
   );
   return { onChange };
 }
+
+beforeEach(() => {
+  envMock.VITE_SMART_SEARCH_ENABLED = true;
+});
 
 /** Ionic controls report through their own events, not through the DOM ones. */
 const ionEvent = (element: Element, name: string, value: unknown) =>
@@ -123,5 +136,24 @@ describe('FileFilters', () => {
   it('says that a smart search crosses folders too', () => {
     show({ search: 'hotel', mode: 'smart' }, 3);
     expect(screen.getByText(/Closest in meaning, every folder — 3/)).toBeInTheDocument();
+  });
+
+  it('hides the mode switch where no model provider is configured', () => {
+    // A fresh clone has no keys, so the route would answer 501 and the only
+    // honest thing on screen would be an error. The search it always had
+    // stays; the switch that cannot work is not offered.
+    envMock.VITE_SMART_SEARCH_ENABLED = false;
+    show({ search: 'invoice' });
+
+    expect(screen.queryByText('By meaning')).not.toBeInTheDocument();
+    expect(screen.getByTestId('file-search')).toBeInTheDocument();
+  });
+
+  it('says nothing about the result when the search itself failed', () => {
+    // "Nothing matches" about a search that never ran is a small lie, and it
+    // is the one the user reads first.
+    show({ search: 'hotel', mode: 'smart' }, 0, true);
+
+    expect(screen.queryByText(/Nothing indexed matches/)).not.toBeInTheDocument();
   });
 });
