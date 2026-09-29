@@ -62,7 +62,8 @@ export const SEARCH_MIN_SIMILARITY = 0.25;
  * says the same thing about `download_url` one column over. So a caller can
  * put another account's object path into their own row and ask this service
  * to read it: the indexer holds the service-role key, and neither Storage's
- * policies nor R2's bucket care what `auth.uid()` was.
+ * policies nor R2's bucket care what `auth.uid()` was. `/api/share` asks the
+ * same question, for the same reason, before it signs a path for a link.
  *
  * The prefixes are the ones the upload routes create and the R2 route already
  * checks (`ownsKey`, api/r2/[action].ts): Cloudinary signs into

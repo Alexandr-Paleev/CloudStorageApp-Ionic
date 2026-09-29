@@ -262,7 +262,11 @@ describe('share: opening a link', () => {
 
   it('signs a URL for private Supabase Storage objects', async () => {
     setup({
-      files: { data: [{ ...FILE_ROW, storage_type: 'supabase_storage' }] },
+      files: {
+        data: [
+          { ...FILE_ROW, storage_type: 'supabase_storage', storage_path: 'user-1/report.pdf' },
+        ],
+      },
       shared_links: { data: [liveLink()] },
     });
     const res = mockResponse();
@@ -270,6 +274,31 @@ describe('share: opening a link', () => {
 
     expect((res.body as { downloadUrl: string }).downloadUrl).toBe('https://supa.example/signed');
   });
+
+  /* `storage_path` is the browser's writing too, and for these two providers
+     this route signs it with its own credentials, which do not care whose
+     object it names. A recipient has already read the path in the signed URL
+     they were handed — so a row of their own pointing at it would have turned
+     a revoked or expired link into a fresh one, for as long as the file lived. */
+  it.each([
+    ['r2', 'users/user-2/their-report.pdf'],
+    ['supabase_storage', 'user-2/their-report.pdf'],
+  ])(
+    "refuses to sign a %s path outside the row owner's own storage",
+    async (storage_type, storage_path) => {
+      setup({
+        files: { data: [{ ...FILE_ROW, storage_type, storage_path }] },
+        shared_links: { data: [liveLink()] },
+      });
+      const res = mockResponse();
+      await handler(get({ token: TOKEN }), res);
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body).not.toHaveProperty('downloadUrl');
+      expect(signedUrl).not.toHaveBeenCalled();
+      expect(db.storage.createSignedUrl).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('share: revoking a link', () => {
