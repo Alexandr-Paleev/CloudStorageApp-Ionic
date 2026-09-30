@@ -41,8 +41,13 @@
 -- grandfather in. If the pre-flight below does find a row, look at it before
 -- reaching for NOT VALID — it is either a bug or the thing this is for.
 --
--- **Not applied to production yet.** Run the pre-flight first; it must return
--- no rows. Safe to run twice: the DROP ... IF EXISTS comes first.
+-- Applied to production on 2026-09-30, after the pre-flight below came back
+-- empty (16 rows then: 10 Cloudinary, 6 Supabase Storage). Verified by trying
+-- to break it, with the probe at the foot of this file: a row naming somebody
+-- else's object was refused with 23514 and a row under the owner's own prefix
+-- went in, both rolled back. The Playwright suite then ran against the live
+-- database with the constraint in place — 36 of 36 in the chromium project.
+-- Safe to run twice: the DROP ... IF EXISTS comes first.
 --
 -- Pre-flight — expects no rows:
 --
