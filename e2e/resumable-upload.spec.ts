@@ -45,12 +45,14 @@ interface StubCalls {
  *
  * The key is fixed rather than random: a resumed upload has to address the same
  * object, and asserting on a constant is how a regression that re-creates the
- * upload becomes visible.
+ * upload becomes visible. It sits under the signed-in user's own folder, as the
+ * real route puts it: migrations/013 refuses a `files` row whose R2 path names
+ * any other folder, and the `users/e2e/` this used to invent was exactly that.
  */
-async function stubR2(page: Page, options: StubOptions = {}): Promise<StubCalls> {
+async function stubR2(page: Page, userId: string, options: StubOptions = {}): Promise<StubCalls> {
   const calls: StubCalls = { parts: [], completed: [], aborted: 0, signed: [] };
   const failed = new Set<number>();
-  const key = 'users/e2e/1700000000_large.bin';
+  const key = `users/${userId}/1700000000_large.bin`;
 
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -129,8 +131,8 @@ test.describe('A large file, in parts', () => {
   test.describe.configure({ timeout: 90_000 });
   const arrival = { timeout: 45_000 };
 
-  test('goes up in parts and is recorded once', async ({ page }) => {
-    const calls = await stubR2(page);
+  test('goes up in parts and is recorded once', async ({ page, user }) => {
+    const calls = await stubR2(page, user.id);
     const name = `e2e-large-${Date.now()}.bin`;
 
     await page.goto('/upload');
@@ -155,10 +157,10 @@ test.describe('A large file, in parts', () => {
     ]);
   });
 
-  test('survives a pause and a reload, and finishes what is left', async ({ page }) => {
+  test('survives a pause and a reload, and finishes what is left', async ({ page, user }) => {
     // Part 1 lands at once; the other two are still in flight when Pause is
     // pressed, which is what leaves a record worth resuming.
-    const calls = await stubR2(page, { delays: { 2: 5000, 3: 5000 } });
+    const calls = await stubR2(page, user.id, { delays: { 2: 5000, 3: 5000 } });
     const name = `e2e-paused-${Date.now()}.bin`;
 
     await page.goto('/upload');
@@ -182,7 +184,7 @@ test.describe('A large file, in parts', () => {
 
     await test.step('resuming sends only what is missing', async () => {
       // The stubs went with the page; the second session gets its own, fast.
-      const resumed = await stubR2(page);
+      const resumed = await stubR2(page, user.id);
       await page.locator('ion-button', { hasText: 'Resume' }).click();
 
       await expect(page).toHaveURL(/\/dashboard$/, arrival);
@@ -203,8 +205,8 @@ test.describe('A large file, in parts', () => {
     expect(calls.completed).toHaveLength(0);
   });
 
-  test('discarding releases the parts and clears the record', async ({ page }) => {
-    const calls = await stubR2(page, { delays: { 2: 5000, 3: 5000 } });
+  test('discarding releases the parts and clears the record', async ({ page, user }) => {
+    const calls = await stubR2(page, user.id, { delays: { 2: 5000, 3: 5000 } });
 
     await page.goto('/upload');
     await chooseLargeFile(page, `e2e-discard-${Date.now()}.bin`);
@@ -222,8 +224,8 @@ test.describe('A large file, in parts', () => {
     expect(calls.aborted).toBe(1);
   });
 
-  test('retries a part the network refused', async ({ page }) => {
-    const calls = await stubR2(page, { failOnce: [2] });
+  test('retries a part the network refused', async ({ page, user }) => {
+    const calls = await stubR2(page, user.id, { failOnce: [2] });
     const name = `e2e-retry-${Date.now()}.bin`;
 
     await page.goto('/upload');

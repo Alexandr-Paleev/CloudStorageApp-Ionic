@@ -47,6 +47,10 @@
 -- else's object was refused with 23514 and a row under the owner's own prefix
 -- went in, both rolled back. The Playwright suite then ran against the live
 -- database with the constraint in place — 36 of 36 in the chromium project.
+-- The R2 project, left out of that run, failed in CI afterwards, and rightly:
+-- `e2e/resumable-upload.spec.ts` stubbed R2 with a key under `users/e2e/`,
+-- outside the test user's folder, and this constraint refused its row. The
+-- stub now uses the signed-in user's own folder.
 -- Safe to run twice: the DROP ... IF EXISTS comes first.
 --
 -- Pre-flight — expects no rows:
@@ -97,4 +101,5 @@ COMMIT;
 --
 -- And the part a constraint cannot answer: that uploads still land. The e2e
 -- suite seeds rows under the owner's prefix (`e2e/fixtures.ts`,
--- `e2e/quota.spec.ts`) and uploads through every provider the deployment has.
+-- `e2e/quota.spec.ts`, and the R2 stub in `e2e/resumable-upload.spec.ts`) and
+-- uploads through every provider the deployment has.
