@@ -20,6 +20,7 @@ import {
 } from '../lib/rate-limit';
 import { applyCors } from '../lib/cors';
 import { isSafeHttpUrl } from '../lib/safe-url';
+import { ownsStoredPath } from '../lib/ai';
 
 /**
  * Public share links.
@@ -64,6 +65,7 @@ interface FileRow {
   storage_path: string;
   storage_type: string;
   download_url: string;
+  user_id: string;
 }
 
 /**
@@ -73,6 +75,20 @@ interface FileRow {
  * providers already store a delivery URL that works on its own.
  */
 async function downloadUrlFor(file: FileRow): Promise<string> {
+  /* The path is the owner's writing as much as `download_url` below is: RLS
+     decides whose row this is, never what it says. For these two providers it
+     is signed with this function's own credentials — the service-role key and
+     the R2 keys — and neither cares whose object the path names. So an account
+     could point a row of its own at another account's object and share that.
+     Nor is the path a secret to lean on: every recipient has read it in the
+     signed URL they were handed, and with it a revoked or expired link could be
+     replaced by a fresh one on a row of their own. The owner is the row's
+     user_id — RLS will not let an account write a row under anyone else's. */
+  const signed = file.storage_type === 'r2' || file.storage_type === 'supabase_storage';
+  if (signed && !ownsStoredPath(file, file.user_id)) {
+    throw new Error('The stored location for this file does not belong to its owner');
+  }
+
   if (file.storage_type === 'r2') {
     const command = new GetObjectCommand({ Bucket: getR2BucketName(), Key: file.storage_path });
     return getSignedUrl(getS3Client(), command, { expiresIn: SIGNED_URL_TTL });
@@ -183,7 +199,7 @@ async function openLink(req: VercelRequest, res: VercelResponse) {
 
   const { data: files, error: fileError } = await supabase
     .from('files')
-    .select('id, name, size, type, storage_path, storage_type, download_url')
+    .select('id, name, size, type, storage_path, storage_type, download_url, user_id')
     .eq('id', link.file_id)
     .limit(1);
 

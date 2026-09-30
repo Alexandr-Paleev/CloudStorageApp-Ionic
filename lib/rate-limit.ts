@@ -98,9 +98,8 @@ export const CLOUDINARY_SIGN_LIMIT = 60;
  * Higher than signing, because clearing out a folder is a normal afternoon and
  * bulk selection is a feature away. Not unlimited, though, which is where this
  * differs from revoking a share link: each deletion is a call to Cloudinary's
- * own API, which has a limit of its own, and ownsAsset() can fall back to
- * reading every Cloudinary row the caller owns. A loop here spends someone
- * else's allowance as well as ours.
+ * own API, which has a limit of its own. A loop here spends someone else's
+ * allowance as well as ours.
  */
 export const CLOUDINARY_DELETE_LIMIT = 90;
 

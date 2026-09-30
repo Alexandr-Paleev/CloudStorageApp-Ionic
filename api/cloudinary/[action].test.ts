@@ -132,28 +132,25 @@ describe('cloudinary delete: ownership', () => {
     expect(destroy).toHaveBeenCalledWith('users/user-1/photo', { resource_type: 'image' });
   });
 
-  it('accepts an asset owned via the files table, outside the folder convention', async () => {
-    // Cloudinary accounts with dynamic folders store the folder separately, so
-    // the public_id does not start with users/<id>/.
+  it('is not talked into it by a row the caller wrote themselves', async () => {
+    // The hole this closes: `files` rows are written by the browser, so a caller
+    // could store another account's public_id — it is in every delivery URL,
+    // shared links included — in a row of their own, and a fallback that read
+    // the rows took that as proof of ownership. The route reads no rows now;
+    // this one is here on purpose, so the test fails if such a fallback returns.
+    withFiles([{ storage_path: 'users/user-2/their-photo.jpg' }]);
+    const res = mockResponse();
+    await handler(del('users/user-2/their-photo'), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it("refuses an id outside the folder convention, whatever the caller's rows say", async () => {
+    // Dynamic-folder public_ids carry no users/<id>/ prefix, and used to be
+    // matched against the rows instead. A visible 403 on such an account is the
+    // price of nobody being able to delete what they do not own.
     withFiles([{ storage_path: 'legacy-asset-42' }]);
-    const res = mockResponse();
-    await handler(del('legacy-asset-42'), res);
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it('matches a stored path that still carries its extension', async () => {
-    // CloudinaryProvider strips the extension before calling this endpoint.
-    withFiles([{ storage_path: 'legacy/photo.jpg' }]);
-    const res = mockResponse();
-    await handler(del('legacy/photo'), res);
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it('does not accept an asset that belongs to no row of the caller', async () => {
-    // The fallback must not degrade into "any id goes" when the table is empty.
-    withFiles([]);
     const res = mockResponse();
     await handler(del('legacy-asset-42'), res);
 

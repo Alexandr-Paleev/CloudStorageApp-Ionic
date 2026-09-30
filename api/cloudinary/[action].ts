@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
+import { authenticateUser, AuthError } from '../../lib/auth';
 import { readQuota, quotaRejection } from '../../lib/quota';
 import {
   CLOUDINARY_DELETE_LIMIT,
@@ -134,31 +134,31 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
   });
 }
 
-function stripExtension(path: string): string {
-  return path.replace(/\.[^/.]+$/, '');
-}
-
 /**
- * CloudinaryProvider strips the extension from image public_ids before calling
- * this endpoint, so a stored path of users/<id>/photo.jpg arrives here as
- * users/<id>/photo — both forms have to be accepted.
+ * Whether the asset sits in the caller's own folder — and the folder alone
+ * decides.
+ *
+ * `signUpload` puts every upload under `users/<id>/`, and on this account the
+ * folder becomes part of the public_id: the unsigned uploads before it sent the
+ * same `folder` parameter, and all ten of their rows carry the prefix (checked
+ * against production on 2026-09-29). CloudinaryProvider strips the extension
+ * from image public_ids before calling this endpoint, which a prefix does not
+ * notice.
+ *
+ * There used to be a second way in, for accounts on dynamic folders: a
+ * public_id that matched one of the caller's `files` rows. Those rows are
+ * written by the browser — RLS decides whose row it is, never what it says —
+ * so a caller could store another account's public_id in a row of their own
+ * and delete that account's asset with it. Nor is a public_id a secret: one is
+ * in every delivery URL, shared links included. An account on dynamic folders
+ * now gets a 403 it can see, rather than everyone getting a way to delete what
+ * they do not own.
+ *
+ * The trailing slash is load-bearing: without it `users/user-1` would
+ * authorise `users/user-12/`.
  */
-async function ownsAsset(userId: string, publicId: string): Promise<boolean> {
-  // Fast path: uploads go into a per-user folder (see cloudinary.service.ts)
-  if (publicId.startsWith(`users/${userId}/`)) return true;
-
-  // Fallback for Cloudinary accounts using dynamic folders, where the folder is
-  // stored separately and is not part of the public_id.
-  const { data } = await supabase
-    .from('files')
-    .select('storage_path')
-    .eq('user_id', userId)
-    .eq('storage_type', 'cloudinary');
-
-  const rows = (data || []) as { storage_path: string }[];
-  return rows.some(
-    (row) => row.storage_path === publicId || stripExtension(row.storage_path) === publicId
-  );
+function ownsAsset(userId: string, publicId: string): boolean {
+  return publicId.startsWith(`users/${userId}/`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -223,7 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    if (!(await ownsAsset(userId, publicId))) {
+    if (!ownsAsset(userId, publicId)) {
       res.status(403).json({ message: 'Access denied' });
       return;
     }

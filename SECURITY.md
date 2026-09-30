@@ -61,6 +61,8 @@ Fixed, documented, and kept in the open rather than quietly patched:
 | Cloudinary uploads accepted through an unsigned preset                  | [ADR 0008](docs/decisions/0008-two-actions-one-function.md)                   |
 | R2 credentials inlined into the public bundle by Vite                   | [ADR 0001](docs/decisions/0001-presigned-uploads-not-a-proxy.md)              |
 | High-severity `undici` advisories that the dependency policy hid        | [ADR 0006](docs/decisions/0006-dependabot-skips-majors.md), and the second README postmortem |
+| A share link could sign another account's object, named in a row of the caller's own | [CHANGELOG](CHANGELOG.md), migration `013`                                   |
+| Any account could delete another's Cloudinary asset, through a fallback that read the caller's own rows | [CHANGELOG](CHANGELOG.md), migration `013`                                   |
 
 ## What runs on every pull request
 

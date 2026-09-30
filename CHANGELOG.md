@@ -10,7 +10,33 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **A share link could sign another account's file.** `/api/share` signs
+  `storage_path` for R2 and Supabase Storage with the R2 keys and the
+  service-role key, and it checked only that the row belonged to the caller —
+  never what the row said. `files` is written by the browser, so an account
+  could point a row of its own at another account's object and share it. The
+  owner who revoked a link was not safe either: every recipient reads the full
+  path in the signed URL they are handed, so a revoked or expired link could be
+  replaced by a fresh one on a row of the recipient's own — a demo account is
+  enough. The route now refuses to sign a path outside the row owner's prefix,
+  with the same `ownsStoredPath` the indexer has used since 4.7.0.
+
+- **Any account could delete another account's Cloudinary asset.**
+  `/api/cloudinary/delete` accepted a `public_id` outside the caller's
+  `users/<id>/` folder whenever one of the caller's own `files` rows named it —
+  a fallback for accounts on dynamic folders. Those rows are the caller's own
+  writing, and a `public_id` is in every delivery URL, shared links included.
+  The folder alone decides now, and an account on dynamic folders gets a 403 it
+  can see.
+
+  Both are the class 4.5.0 closed for `download_url`, one column over, in code
+  written before 4.7.0 gave the check a name. `migrations/013` puts the check
+  on the table itself — `storage_path` must sit under the row owner's prefix
+  for R2, Cloudinary and Supabase Storage — so the next route to read that
+  column cannot forget it. Every production row passes it. **Not yet applied to
+  production.**
 
 ## [4.7.0] — 2026-09-28
 
