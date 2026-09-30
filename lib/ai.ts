@@ -74,6 +74,9 @@ export const SEARCH_MIN_SIMILARITY = 0.25;
  *
  * The trailing slash is load-bearing, exactly as it is in `ownsKey`: without
  * it `users/<id>` would authorise `users/<id>0/`.
+ *
+ * Mirrors `files_storage_path_is_owners` in migrations/013 — a change to one
+ * prefix is a change to both.
  */
 export function ownsStoredPath(
   file: { storage_type: string; storage_path: string },
@@ -86,8 +89,9 @@ export function ownsStoredPath(
     case 'supabase_storage':
       return file.storage_path.startsWith(`${userId}/`);
     default:
-      // Google Drive and Dropbox never reach here — planFor() skips them —
-      // and an unknown provider is not something to guess about.
+      // Google Drive and Dropbox never reach here — planFor() skips them, and
+      // /api/share only asks about the two providers it signs for — and an
+      // unknown provider is not something to guess about.
       return false;
   }
 }

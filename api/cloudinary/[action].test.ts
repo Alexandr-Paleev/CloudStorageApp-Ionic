@@ -136,7 +136,8 @@ describe('cloudinary delete: ownership', () => {
     // The hole this closes: `files` rows are written by the browser, so a caller
     // could store another account's public_id — it is in every delivery URL,
     // shared links included — in a row of their own, and a fallback that read
-    // the rows took that as proof of ownership.
+    // the rows took that as proof of ownership. The route reads no rows now;
+    // this one is here on purpose, so the test fails if such a fallback returns.
     withFiles([{ storage_path: 'users/user-2/their-photo.jpg' }]);
     const res = mockResponse();
     await handler(del('users/user-2/their-photo'), res);

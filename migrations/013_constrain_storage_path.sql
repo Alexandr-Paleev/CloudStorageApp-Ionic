@@ -29,7 +29,8 @@
 -- The prefixes are the ones the upload routes create: `users/<id>/` for R2 and
 -- Cloudinary, `<id>/` for Supabase Storage. Google Drive and Dropbox are left
 -- alone on purpose: their path is an id in the user's own account, reached
--- with the user's own OAuth grant and never with this app's credentials.
+-- with the user's own OAuth grant and never with this app's credentials. The
+-- rule is `ownsStoredPath` in lib/ai.ts; a change to one is a change to both.
 --
 -- `starts_with` rather than LIKE, which reads `_` as a wildcard. A UUID has
 -- no `_` in it, but the function says what is meant.
@@ -47,10 +48,11 @@
 --
 --   SELECT storage_type, count(*)
 --   FROM public.files
---   WHERE NOT CASE storage_type
---     WHEN 'r2'               THEN starts_with(storage_path, 'users/' || user_id::text || '/')
---     WHEN 'cloudinary'       THEN starts_with(storage_path, 'users/' || user_id::text || '/')
---     WHEN 'supabase_storage' THEN starts_with(storage_path, user_id::text || '/')
+--   WHERE NOT CASE
+--     WHEN storage_type IN ('r2', 'cloudinary')
+--       THEN starts_with(storage_path, 'users/' || user_id::text || '/')
+--     WHEN storage_type = 'supabase_storage'
+--       THEN starts_with(storage_path, user_id::text || '/')
 --     ELSE true
 --   END
 --   GROUP BY storage_type;
@@ -63,10 +65,11 @@ ALTER TABLE public.files
 ALTER TABLE public.files
   ADD CONSTRAINT files_storage_path_is_owners
   CHECK (
-    CASE storage_type
-      WHEN 'r2'               THEN starts_with(storage_path, 'users/' || user_id::text || '/')
-      WHEN 'cloudinary'       THEN starts_with(storage_path, 'users/' || user_id::text || '/')
-      WHEN 'supabase_storage' THEN starts_with(storage_path, user_id::text || '/')
+    CASE
+      WHEN storage_type IN ('r2', 'cloudinary')
+        THEN starts_with(storage_path, 'users/' || user_id::text || '/')
+      WHEN storage_type = 'supabase_storage'
+        THEN starts_with(storage_path, user_id::text || '/')
       ELSE true
     END
   );
