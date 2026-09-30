@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.7.1] — 2026-09-30
+
 ### Fixed
 
 - **A share link could sign another account's file.** `/api/share` signs
@@ -35,8 +39,22 @@ reasoning behind the larger decisions lives in
   written before 4.7.0 gave the check a name. `migrations/013` puts the check
   on the table itself — `storage_path` must sit under the row owner's prefix
   for R2, Cloudinary and Supabase Storage — so the next route to read that
-  column cannot forget it. Every production row passes it. **Not yet applied to
-  production.**
+  column cannot forget it. **Applied to production** on 2026-09-30: the
+  pre-flight found no row it would reject, a probe naming someone else's object
+  was refused, and the chromium project of the end-to-end suite ran against the
+  live database with the constraint in place. The R2 project, which that run
+  left out, then caught a fixture the constraint was right to refuse:
+  `resumable-upload.spec.ts` stubs R2 and had been inventing a key under
+  `users/e2e/`, outside the test user's own folder. The stub now uses the
+  signed-in user's folder, as the real route does.
+
+### Security
+
+- `brace-expansion` 5.0.9 → 5.0.12, in the lockfile only. Three
+  denial-of-service advisories — GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7 and
+  GHSA-6j4f-fj2g-mc7p — reached production dependencies through `@ionic/react`
+  → `@stencil/react-output-target` → `ts-morph` → `minimatch`, and the audit
+  step failed the build on them, as it is there to do.
 
 ## [4.7.0] — 2026-09-28
 
@@ -1134,6 +1152,7 @@ folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
 [unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...HEAD
+[4.7.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.0...v4.7.1
 [4.7.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...v4.7.0
 [4.6.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...v4.6.0
 [4.5.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.4.0...v4.5.0

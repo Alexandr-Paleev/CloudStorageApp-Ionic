@@ -41,8 +41,17 @@
 -- grandfather in. If the pre-flight below does find a row, look at it before
 -- reaching for NOT VALID — it is either a bug or the thing this is for.
 --
--- **Not applied to production yet.** Run the pre-flight first; it must return
--- no rows. Safe to run twice: the DROP ... IF EXISTS comes first.
+-- Applied to production on 2026-09-30, after the pre-flight below came back
+-- empty (16 rows then: 10 Cloudinary, 6 Supabase Storage). Verified by trying
+-- to break it, with the probe at the foot of this file: a row naming somebody
+-- else's object was refused with 23514 and a row under the owner's own prefix
+-- went in, both rolled back. The Playwright suite then ran against the live
+-- database with the constraint in place — 36 of 36 in the chromium project.
+-- The R2 project, left out of that run, failed in CI afterwards, and rightly:
+-- `e2e/resumable-upload.spec.ts` stubbed R2 with a key under `users/e2e/`,
+-- outside the test user's folder, and this constraint refused its row. The
+-- stub now uses the signed-in user's own folder.
+-- Safe to run twice: the DROP ... IF EXISTS comes first.
 --
 -- Pre-flight — expects no rows:
 --
@@ -92,4 +101,5 @@ COMMIT;
 --
 -- And the part a constraint cannot answer: that uploads still land. The e2e
 -- suite seeds rows under the owner's prefix (`e2e/fixtures.ts`,
--- `e2e/quota.spec.ts`) and uploads through every provider the deployment has.
+-- `e2e/quota.spec.ts`, and the R2 stub in `e2e/resumable-upload.spec.ts`) and
+-- uploads through every provider the deployment has.
