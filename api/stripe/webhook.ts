@@ -51,6 +51,54 @@ async function downgradeToFree(customerId: string) {
   if (!data?.length) throw new Error(`No profile found for customer ${customerId}`);
 }
 
+async function markPastDue(customerId: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ subscription_status: 'past_due' })
+    .eq('stripe_customer_id', customerId);
+
+  if (error) throw new Error(`Failed to update status: ${error.message}`);
+}
+
+/**
+ * Brings one customer's profile in line with what Stripe holds now.
+ *
+ * Every event below is read as "something changed for this customer", never as
+ * a description of what to write. Stripe does not deliver events in the order
+ * they happened, and retries a failed delivery for up to three days, so the
+ * subscription inside an event is a snapshot of some earlier moment. Read
+ * literally, a late `customer.subscription.updated` saying "active" put an
+ * account back on Pro for good after the cancellation that followed it; the
+ * late end of an old subscription took Pro from someone already paying for a
+ * new one; a late payment failure marked past_due an account a retry had
+ * already paid for. Asking Stripe each time makes order and duplicates
+ * irrelevant: whichever event is handled last writes the state as it is.
+ *
+ * The rules are the ones the handlers applied to the snapshot, applied to the
+ * current state instead: an active subscription is Pro; past_due is recorded
+ * and the tier left alone; a cancelled one, with nothing live beside it, is
+ * Free; anything else — an `incomplete` checkout still being paid, say —
+ * changes nothing.
+ */
+async function syncCustomer(customerId: string) {
+  // Newest first, as Stripe lists them; `all` so that cancelled ones count.
+  const { data } = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 10,
+  });
+
+  const active = data.find((subscription) => subscription.status === 'active');
+
+  if (active) {
+    await upgradeToPro(customerId, active.id, getPeriodEnd(active));
+  } else if (data.some((subscription) => subscription.status === 'past_due')) {
+    await markPastDue(customerId);
+  } else if (data.some((subscription) => subscription.status === 'canceled')) {
+    await downgradeToFree(customerId);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -68,50 +116,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Each case only works out which customer to ask about — see syncCustomer
+    // for why the event's own copy of the subscription is not used.
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.subscription && session.customer) {
-          const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-          await upgradeToPro(
-            session.customer as string,
-            subscription.id,
-            getPeriodEnd(subscription)
-          );
+          await syncCustomer(session.customer as string);
         }
         break;
       }
 
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
-
-        if (subscription.status === 'active') {
-          await upgradeToPro(customerId, subscription.id, getPeriodEnd(subscription));
-        } else if (subscription.status === 'past_due') {
-          const { error } = await supabase
-            .from('profiles')
-            .update({ subscription_status: 'past_due' })
-            .eq('stripe_customer_id', customerId);
-          if (error) throw new Error(`Failed to update status: ${error.message}`);
-        }
-        break;
-      }
-
+      case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        await downgradeToFree(subscription.customer as string);
+        await syncCustomer(subscription.customer as string);
         break;
       }
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.customer) {
-          const { error } = await supabase
-            .from('profiles')
-            .update({ subscription_status: 'past_due' })
-            .eq('stripe_customer_id', invoice.customer as string);
-          if (error) throw new Error(`Failed to update payment status: ${error.message}`);
+          await syncCustomer(invoice.customer as string);
         }
         break;
       }
