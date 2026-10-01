@@ -45,6 +45,16 @@ reasoning behind the larger decisions lives in
   an `incomplete` checkout changes nothing. Order and duplicates stop
   mattering.
 
+- **Expired demo accounts left their images behind.** The demo route sweeps
+  accounts older than a day before it opens a new one, and the sweep removed
+  the first 200 Supabase Storage objects, the rows and the user — nothing else.
+  Images go to Cloudinary by default, so everything a visitor uploaded stayed
+  there, paid for and named by no row. The sweep now runs the same
+  `eraseAccount` as `DELETE /api/account`: every configured provider by prefix
+  and paged, then the rows, then the user. One account that will not go no
+  longer stops the rest. The R2 and Cloudinary erasers moved from the deletion
+  route to `lib/erase-providers.ts` so both routes share them.
+
 ## [4.7.1] — 2026-09-30
 
 ### Fixed
