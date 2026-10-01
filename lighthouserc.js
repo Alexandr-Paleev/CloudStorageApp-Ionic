@@ -17,8 +17,11 @@ module.exports = {
     collect: {
       staticDistDir: './dist',
       /* index.html plus the two static legal pages — the whole set this build
-         emits as HTML. Every route past the login wall is the same shell. */
-      numberOfRuns: 1,
+         emits as HTML. Every route past the login wall is the same shell.
+         Three runs of each, so the performance floor below is judged on a
+         median rather than on whichever single run a shared runner was slow
+         for. */
+      numberOfRuns: 3,
 
       /* Desktop, deliberately. Mobile emulation throttles the CPU fourfold and
          the resulting score swings by twenty points between runs on a shared
@@ -38,8 +41,13 @@ module.exports = {
         /* 97 on the shell locally, 100 on the legal pages. The floor is set low
            enough that a slow runner cannot fail the build on its own, and high
            enough that putting a blocking script back on the critical path
-           will. */
-        'categories:performance': ['error', { minScore: 0.8 }],
+           will. With one run the first half did not hold: on 2026-10-01 a push
+           scored the shell 0.75 while the pull-request run of the same commit,
+           which changed nothing but an e2e spec, passed. The median of three
+           needs two slow runs to fail, and a real regression slows all three.
+           Median rather than the optimistic default, which would pass on the
+           single best run. */
+        'categories:performance': ['error', { minScore: 0.8, aggregationMethod: 'median' }],
       },
     },
     upload: { target: 'filesystem', outputDir: './.lighthouseci' },
