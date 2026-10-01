@@ -15,7 +15,7 @@ const { db, stripe } = vi.hoisted(() => ({
   },
   stripe: {
     constructEvent: vi.fn(),
-    retrieveSubscription: vi.fn(),
+    listSubscriptions: vi.fn(),
   },
 }));
 
@@ -32,7 +32,7 @@ vi.mock('@supabase/supabase-js', () => ({
 vi.mock('stripe', () => ({
   default: class {
     webhooks = { constructEvent: stripe.constructEvent };
-    subscriptions = { retrieve: stripe.retrieveSubscription };
+    subscriptions = { list: stripe.listSubscriptions };
   },
 }));
 
@@ -51,6 +51,12 @@ function subscription(overrides: Record<string, unknown> = {}) {
     items: { data: [{ current_period_end: PERIOD_END }] },
     ...overrides,
   };
+}
+
+/** What Stripe holds for the customer now, newest first. The handler asks for
+ *  this on every event, whatever the event itself says. */
+function stripeHolds(...subscriptions: unknown[]) {
+  stripe.listSubscriptions.mockResolvedValue({ data: subscriptions });
 }
 
 function withProfiles(answer: TableAnswer = { data: [{ id: 'profile-1' }] }) {
@@ -78,7 +84,7 @@ function deliver(type: string, object: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   withProfiles();
-  stripe.retrieveSubscription.mockResolvedValue(subscription());
+  stripeHolds(subscription());
   deliver('unknown.event', {});
 });
 
@@ -128,6 +134,14 @@ describe('webhook: checkout completed', () => {
     });
   });
 
+  it("asks Stripe about the session's customer, cancelled subscriptions included", async () => {
+    await handler(post(), mockResponse());
+
+    expect(stripe.listSubscriptions).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: CUSTOMER, status: 'all' })
+    );
+  });
+
   it('grants the Pro provider list, Dropbox included', async () => {
     await handler(post(), mockResponse());
     expect(lastUpdate()?.allowed_providers).toContain('dropbox');
@@ -144,7 +158,7 @@ describe('webhook: checkout completed', () => {
   });
 
   it('fails loudly when the subscription carries no period end', async () => {
-    stripe.retrieveSubscription.mockResolvedValue(subscription({ items: { data: [{}] } }));
+    stripeHolds(subscription({ items: { data: [{}] } }));
     const res = mockResponse();
     await handler(post(), res);
 
@@ -157,6 +171,7 @@ describe('webhook: checkout completed', () => {
     await handler(post(), res);
 
     expect(res.statusCode).toBe(200);
+    expect(stripe.listSubscriptions).not.toHaveBeenCalled();
     expect(db.calls).toHaveLength(0);
   });
 
@@ -179,13 +194,14 @@ describe('webhook: checkout completed', () => {
 });
 
 describe('webhook: subscription updated', () => {
-  it('upgrades on an active subscription', async () => {
+  it('upgrades when Stripe holds an active subscription', async () => {
     deliver('customer.subscription.updated', subscription());
     await handler(post(), mockResponse());
     expect(lastUpdate()).toMatchObject({ tier: 'pro' });
   });
 
   it('marks a past_due subscription without touching the tier', async () => {
+    stripeHolds(subscription({ status: 'past_due' }));
     deliver('customer.subscription.updated', subscription({ status: 'past_due' }));
     const res = mockResponse();
     await handler(post(), res);
@@ -194,7 +210,8 @@ describe('webhook: subscription updated', () => {
     expect(lastUpdate()).toEqual({ subscription_status: 'past_due' });
   });
 
-  it('leaves other statuses alone', async () => {
+  it('leaves a checkout that is still being paid alone', async () => {
+    stripeHolds(subscription({ status: 'incomplete' }));
     deliver('customer.subscription.updated', subscription({ status: 'incomplete' }));
     const res = mockResponse();
     await handler(post(), res);
@@ -202,10 +219,24 @@ describe('webhook: subscription updated', () => {
     expect(res.statusCode).toBe(200);
     expect(db.calls).toHaveLength(0);
   });
+
+  it('does not let a late "active" snapshot undo the cancellation that followed it', async () => {
+    // Stripe does not deliver in order and retries for days. Read literally,
+    // this event put a cancelled account back on Pro, and nothing that came
+    // after would ever take it away again.
+    stripeHolds(subscription({ status: 'canceled' }));
+    deliver('customer.subscription.updated', subscription({ status: 'active' }));
+    await handler(post(), mockResponse());
+
+    expect(lastUpdate()).toMatchObject({ tier: 'free', subscription_status: 'canceled' });
+  });
 });
 
 describe('webhook: subscription cancelled', () => {
-  beforeEach(() => deliver('customer.subscription.deleted', subscription()));
+  beforeEach(() => {
+    stripeHolds(subscription({ status: 'canceled' }));
+    deliver('customer.subscription.deleted', subscription({ status: 'canceled' }));
+  });
 
   it('drops the account back to Free', async () => {
     const res = mockResponse();
@@ -225,10 +256,25 @@ describe('webhook: subscription cancelled', () => {
     await handler(post(), mockResponse());
     expect(lastUpdate()?.allowed_providers).not.toContain('dropbox');
   });
+
+  it('does not take Pro from a newer subscription when an old one ends late', async () => {
+    // Cancel, then subscribe again: if the old subscription's end is delivered
+    // after the new one began, reading the event alone downgraded an account
+    // that was paying.
+    stripeHolds(
+      subscription({ id: 'sub_new', status: 'active' }),
+      subscription({ id: 'sub_old', status: 'canceled' })
+    );
+    deliver('customer.subscription.deleted', subscription({ id: 'sub_old', status: 'canceled' }));
+    await handler(post(), mockResponse());
+
+    expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_subscription_id: 'sub_new' });
+  });
 });
 
 describe('webhook: payment failed', () => {
   it('marks the subscription past_due', async () => {
+    stripeHolds(subscription({ status: 'past_due' }));
     deliver('invoice.payment_failed', { customer: CUSTOMER });
     const res = mockResponse();
     await handler(post(), res);
@@ -237,12 +283,33 @@ describe('webhook: payment failed', () => {
     expect(lastUpdate()).toEqual({ subscription_status: 'past_due' });
   });
 
+  it('does not mark past_due an account that a later retry already paid for', async () => {
+    deliver('invoice.payment_failed', { customer: CUSTOMER });
+    await handler(post(), mockResponse());
+
+    expect(lastUpdate()).toMatchObject({ tier: 'pro', subscription_status: 'active' });
+  });
+
   it('ignores an invoice with no customer', async () => {
     deliver('invoice.payment_failed', {});
     const res = mockResponse();
     await handler(post(), res);
 
     expect(res.statusCode).toBe(200);
+    expect(stripe.listSubscriptions).not.toHaveBeenCalled();
+    expect(db.calls).toHaveLength(0);
+  });
+});
+
+describe('webhook: when Stripe cannot be asked', () => {
+  it('answers 500, so Stripe delivers the event again', async () => {
+    // Writing nothing and saying 200 would lose the change for good.
+    stripe.listSubscriptions.mockRejectedValue(new Error('api.stripe.com unreachable'));
+    deliver('customer.subscription.updated', subscription());
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(500);
     expect(db.calls).toHaveLength(0);
   });
 });
@@ -256,6 +323,7 @@ describe('webhook: unhandled events', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ received: true });
+    expect(stripe.listSubscriptions).not.toHaveBeenCalled();
     expect(db.calls).toHaveLength(0);
   });
 });

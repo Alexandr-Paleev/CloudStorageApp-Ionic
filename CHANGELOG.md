@@ -32,6 +32,19 @@ reasoning behind the larger decisions lives in
   request that merely claimed an Origin to point the seeding fetch at a host
   of its choosing.
 
+- **The Stripe webhook believed the event instead of Stripe.** Each handler
+  wrote what the subscription inside the event said, but Stripe does not
+  deliver events in order and retries a failed delivery for up to three days.
+  A late `customer.subscription.updated` saying "active" could put a cancelled
+  account back on Pro for good; the late end of an old subscription could take
+  Pro from someone already paying for a new one; a late `invoice.payment_failed`
+  could mark past_due an account a retry had already paid for. Every event now
+  only names the customer, and the webhook asks Stripe for that customer's
+  subscriptions and writes what it holds now, by the same rules as before:
+  active is Pro, past_due is recorded, cancelled with nothing live is Free, and
+  an `incomplete` checkout changes nothing. Order and duplicates stop
+  mattering.
+
 ## [4.7.1] — 2026-09-30
 
 ### Fixed
