@@ -73,9 +73,12 @@ test.describe('Uploading several files', () => {
     });
 
     await test.step('a file can be taken out before the run starts', async () => {
-      // Scoped to the ion-button: the aria-label lands on it and on the native
-      // button it renders, which is two matches for one control.
-      await page.locator(`ion-button[aria-label="Remove ${names[2]}"]`).click();
+      // By role, not by the ion-button's own aria-label. Ionic moves that label
+      // from the host onto the native button it renders as it hydrates, so a
+      // selector on the host raced hydration: it lost on a fast machine every
+      // time, and in CI now and then. The host's role is generic, so this is
+      // still one match for one control.
+      await page.getByRole('button', { name: `Remove ${names[2]}`, exact: true }).click();
       await expect(page.locator('.upload-queue-item')).toHaveCount(2);
     });
 
