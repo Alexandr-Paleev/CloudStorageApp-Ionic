@@ -18,6 +18,16 @@ describe('applyCors', () => {
   });
 
   it('lets the Android shell read it too', () => {
+    // androidScheme is 'https' in capacitor.config.ts. This test used to send
+    // http://localhost — the same wrong guess the allowlist made, so the two
+    // agreed with each other and not with the device.
+    const res = mockResponse();
+    applyCors(mockRequest({ headers: { origin: 'https://localhost' } }), res);
+
+    expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBe('https://localhost');
+  });
+
+  it('still answers a shell built with the older http scheme', () => {
     const res = mockResponse();
     applyCors(mockRequest({ headers: { origin: 'http://localhost' } }), res);
 

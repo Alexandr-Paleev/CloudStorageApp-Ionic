@@ -44,6 +44,8 @@ const VALID = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // getAppUrl takes an Origin only when it is this deployment's own address.
+  process.env.VERCEL_PROJECT_PRODUCTION_URL = 'app.example';
   authenticateUser.mockResolvedValue('user-1');
   setup();
   exchangeCode.mockResolvedValue({

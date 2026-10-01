@@ -10,7 +10,27 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The Android shell could reach none of `/api`.** `capacitor.config.ts` sets
+  `androidScheme: 'https'`, so the WebView's origin is `https://localhost` —
+  and the CORS allowlist, its test and ADR 0010 all said `http://localhost`.
+  Every call through the API failed its preflight: the demo, Cloudinary
+  signing, R2, share links, search and account deletion. Sign-in and the file
+  list go straight to Supabase, which is why the shell looked alive. Found in a
+  review rather than on a device, and confirmed against production with a
+  preflight from each origin.
+
+- **A share link made in a native shell pointed at the phone.** `getAppUrl`
+  built the URLs this API hands back on the request's `Origin`, which in a
+  shell is `capacitor://localhost` — so the link opened nothing anywhere else,
+  and a demo started in a shell seeded no files, because it fetched its assets
+  from there too. `Origin` is now taken only when it is one of this
+  deployment's own addresses — the production domain, the deployment URL and
+  the branch URL, as Vercel provides them — or a dev server on this machine.
+  Anything else gets the production URL. That also shuts the demo route to a
+  request that merely claimed an Origin to point the seeding fetch at a host
+  of its choosing.
 
 ## [4.7.1] — 2026-09-30
 

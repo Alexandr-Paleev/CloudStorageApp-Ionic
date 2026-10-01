@@ -6,9 +6,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * On the web the page and the functions share a deployment, so a call to
  * `/api/share` is same-origin and CORS never enters into it. The native shells
  * are the exception the app now has to account for: a Capacitor WebView serves
- * the page from `capacitor://localhost` on iOS and `http://localhost` on
+ * the page from `capacitor://localhost` on iOS and `https://localhost` on
  * Android, so every call to the API is cross-origin, and a browser that is not
  * told otherwise refuses to hand the answer back to the page.
+ *
+ * Android's scheme is `server.androidScheme` in capacitor.config.ts, `https`
+ * since the first commit. This list said `http://localhost` until 2026-09-30,
+ * and every `/api` call from that shell failed its preflight while sign-in and
+ * the file list, which go straight to Supabase, looked fine. `http://localhost`
+ * stays for a shell built with the older scheme.
  *
  * An allowlist rather than `*`. These routes read an `Authorization` header,
  * mint Stripe Checkout sessions and presign uploads; `*` would invite any page
@@ -17,7 +23,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * `ionic://localhost` is there for older shells only — Capacitor has used
  * `capacitor://` on iOS since 3.0, and this costs nothing to keep correct.
  */
-const ALLOWED_ORIGINS = new Set(['capacitor://localhost', 'ionic://localhost', 'http://localhost']);
+const ALLOWED_ORIGINS = new Set([
+  'capacitor://localhost',
+  'https://localhost',
+  'ionic://localhost',
+  'http://localhost',
+]);
 
 /**
  * Answers the CORS half of a request, and says whether that was all of it.

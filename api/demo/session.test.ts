@@ -86,6 +86,8 @@ beforeEach(() => {
   process.env.DEMO_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://supa.example';
   process.env.VITE_SUPABASE_ANON_KEY = 'anon-key';
+  // getAppUrl takes an Origin only when it is this deployment's own address.
+  process.env.VERCEL_PROJECT_PRODUCTION_URL = 'app.example';
 
   admin.createUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
   admin.listUsers.mockResolvedValue({ data: { users: [] }, error: null });
@@ -148,6 +150,23 @@ describe('POST /api/demo/session', () => {
     const file = table.calls.find((c) => c.table === 'files')?.args?.[0] as { size: number };
     expect(file.size).toBe(3);
   });
+
+  it.each(['capacitor://localhost', 'https://elsewhere.example'])(
+    'seeds from this deployment, not from the Origin %s',
+    async (origin) => {
+      // A shell sends its own origin, and a plain request can claim any. The
+      // assets used to be fetched from whichever it was.
+      await handler(post({ origin }), mockResponse());
+
+      const seeded = vi
+        .mocked(fetch)
+        .mock.calls.map(([input]) => String(input))
+        .filter((url) => url.includes('/demo/'));
+
+      expect(seeded.length).toBeGreaterThan(0);
+      expect(seeded.every((url) => url.startsWith(`${APP_URL}/demo/`))).toBe(true);
+    }
+  );
 
   it('still hands over a session when a seed asset is missing', async () => {
     vi.stubGlobal(
