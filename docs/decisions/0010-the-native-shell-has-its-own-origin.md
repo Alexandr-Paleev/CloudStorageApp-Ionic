@@ -36,9 +36,10 @@ prefixes `VITE_API_ORIGIN` when `Capacitor.isNativePlatform()` is true. One
 the app talks to another origin.
 
 **The API answers the two shell origins by name.** `applyCors` sets the
-`Access-Control-*` headers for `capacitor://localhost` and `http://localhost`
+`Access-Control-*` headers for `capacitor://localhost` and `https://localhost`
 and answers the preflight itself, before the code that expects an
-`Authorization` header ever sees a request that carries none.
+`Authorization` header ever sees a request that carries none. (Written first as
+`http://localhost` — see the update below.)
 
 **OAuth leaves through the system browser and comes back through a custom
 scheme.** `com.cloudstorage.app://auth/callback` is registered in `Info.plist`,
@@ -75,3 +76,27 @@ listener that turns the callback into a session.
   runs the implicit flow today; a native app should move to PKCE, and this
   keeps working across that change rather than failing at the one moment
   nobody is watching.
+
+## Update — 2026-09-30
+
+**Android was never `http://localhost`.** `capacitor.config.ts` has set
+`androidScheme: 'https'` since the first commit, and Capacitor builds the
+WebView's origin from that scheme, so the Android shell is `https://localhost`.
+The allowlist named the wrong one, and so did its test, which agreed with the
+allowlist rather than with a device. Every `/api` call from Android failed its
+preflight — the demo, Cloudinary signing, R2, share links, search, account
+deletion — while sign-in and the file list, which go straight to Supabase,
+looked alive. It was found in a code review, not on a device, and confirmed
+against production with a preflight from each origin. `https://localhost` is on
+the list now; `http://localhost` stays for a shell built with the older scheme.
+
+**A shell's origin is not the app's address.** `getAppUrl` built the URLs this
+API hands back — share links, Stripe's return addresses, the host the demo
+fetches its seed assets from — on the request's `Origin`, which in a shell is
+`capacitor://localhost`. A share link made on a phone pointed at the phone, and
+a demo started in a shell seeded nothing. It now takes `Origin` only when it is
+one of this deployment's own addresses — the production domain, the deployment
+URL and the branch URL, all three as Vercel provides them — or a dev server on
+this machine. Anything else gets the production URL. That closes a quieter
+problem too: a request that merely claimed an Origin could point the demo's
+seeding fetch at any host.

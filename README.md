@@ -679,9 +679,13 @@ reasoning.
   where the page and the functions share a deployment; a 404 in the shell.
   `apiUrl()` prefixes `VITE_API_ORIGIN` when — and only when — the app is
   running natively, so the web build still calls its own deployment.
-- **The API had to be told who is calling.** `capacitor://localhost` and
-  `http://localhost` are answered by name, never `*`: these routes read bearer
-  tokens and open Stripe sessions.
+- **The API had to be told who is calling.** `capacitor://localhost` (iOS) and
+  `https://localhost` (Android) are answered by name, never `*`: these routes
+  read bearer tokens and open Stripe sessions. The list said `http://localhost`
+  for Android until 2026-09-30, and every `/api` call from that shell failed.
+- **A shell's origin is not the app's address.** Share links and the demo's
+  seed assets are built on the deployment's own URL, never on the caller's
+  `Origin` — a link made on a phone used to point at the phone.
 - **Sign in with Google could not come back to a page.** It leaves through the
   system browser and returns through `com.cloudstorage.app://auth/callback`.
 

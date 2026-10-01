@@ -79,6 +79,8 @@ beforeEach(() => {
   // The limiters are module-scope singletons: without this, the eleventh test
   // in this file would be the one that finds the create limit spent.
   resetRateLimits();
+  // getAppUrl takes an Origin only when it is this deployment's own address.
+  process.env.VERCEL_PROJECT_PRODUCTION_URL = 'app.example';
   authenticateUser.mockResolvedValue('user-1');
   signedUrl.mockResolvedValue('https://r2.example/signed');
   db.storage.createSignedUrl.mockResolvedValue({
@@ -122,6 +124,23 @@ describe('share: creating a link', () => {
     expect(res.statusCode).toBe(201);
     const { url } = res.body as { url: string };
     expect(url.startsWith(`${APP_URL}/s/`)).toBe(true);
+  });
+
+  it('points a link made in a native shell at the deployment, not at the phone', async () => {
+    // The shell's Origin is capacitor://localhost, and a link built on it
+    // opens nothing on anyone else's device.
+    const res = mockResponse();
+    await handler(
+      mockRequest({
+        method: 'POST',
+        body: { fileId: FILE_ID },
+        headers: { authorization: 'Bearer t', origin: 'capacitor://localhost' },
+      }),
+      res
+    );
+
+    expect(res.statusCode).toBe(201);
+    expect((res.body as { url: string }).url.startsWith(`${APP_URL}/s/`)).toBe(true);
   });
 
   it('stores only the hash, never the token itself', async () => {
