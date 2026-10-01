@@ -4,7 +4,10 @@ import { DEMO_RATE_LIMIT, DEMO_TTL_MS } from '../../lib/demo';
 
 const APP_URL = 'https://app.example';
 
-const { admin, storage, table } = vi.hoisted(() => ({
+const { admin, storage, table, providers } = vi.hoisted(() => ({
+  /* What configuredProviders() hands the sweep. Empty by default, which is a
+     deployment with neither R2 nor Cloudinary configured. */
+  providers: { current: {} as Record<string, unknown> },
   admin: {
     createUser: vi.fn(),
     listUsers: vi.fn(),
@@ -46,6 +49,10 @@ vi.mock('../../lib/auth', () => ({
   },
 }));
 
+vi.mock('../../lib/erase-providers', () => ({
+  configuredProviders: () => providers.current,
+}));
+
 import handler from './session';
 
 /** Each test uses its own address: the limiter lives in module scope and the
@@ -82,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   table.calls = [];
   table.folderId = 'folder-1';
+  providers.current = {};
 
   process.env.DEMO_ENABLED = 'true';
   process.env.SUPABASE_URL = 'https://supa.example';
@@ -229,6 +237,56 @@ describe('POST /api/demo/session', () => {
     expect(storage.remove).toHaveBeenCalledWith(['stale/1_a.png']);
     const deletions = table.calls.filter((c) => c.op === 'delete').map((c) => c.table);
     expect(deletions).toEqual(['files', 'folders']);
+  });
+
+  it('erases an expired account from R2 and Cloudinary too, not only Supabase Storage', async () => {
+    // Images go to Cloudinary by default. The sweep used to stop at Supabase
+    // Storage, so every image a visitor uploaded outlived the account.
+    const eraseR2 = vi.fn().mockResolvedValue(undefined);
+    const eraseCloudinary = vi.fn().mockResolvedValue(undefined);
+    providers.current = { eraseR2, eraseCloudinary };
+    admin.listUsers.mockResolvedValue({
+      data: {
+        users: [
+          {
+            id: 'stale',
+            email: 'demo-1@example.com',
+            created_at: new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString(),
+          },
+        ],
+      },
+      error: null,
+    });
+
+    await handler(post(), mockResponse());
+
+    expect(eraseR2).toHaveBeenCalledWith('stale');
+    expect(eraseCloudinary).toHaveBeenCalledWith('stale');
+    expect(admin.deleteUser).toHaveBeenCalledWith('stale');
+  });
+
+  it('keeps sweeping when one expired account will not go', async () => {
+    const old = new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString();
+    admin.listUsers.mockResolvedValue({
+      data: {
+        users: [
+          { id: 'stuck', email: 'demo-1@example.com', created_at: old },
+          { id: 'stale', email: 'demo-2@example.com', created_at: old },
+        ],
+      },
+      error: null,
+    });
+    admin.deleteUser
+      .mockResolvedValueOnce({ data: null, error: { message: 'user not found' } })
+      .mockResolvedValueOnce({ data: null, error: null });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(admin.deleteUser).toHaveBeenCalledWith('stuck');
+    expect(admin.deleteUser).toHaveBeenCalledWith('stale');
+    expect(res.statusCode).toBe(201);
   });
 
   it('serves the visitor even when the sweep fails', async () => {

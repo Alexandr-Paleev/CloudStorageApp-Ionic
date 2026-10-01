@@ -14,6 +14,8 @@ import {
 } from '../../lib/demo';
 import { RateLimiter, clientIp, tooManyRequests } from '../../lib/rate-limit';
 import { applyCors } from '../../lib/cors';
+import { eraseAccount } from '../../lib/account-erase';
+import { configuredProviders } from '../../lib/erase-providers';
 
 /**
  * POST /api/demo/session — hands an anonymous visitor a signed-in account.
@@ -54,18 +56,23 @@ async function sweepExpired(): Promise<void> {
   if (error || !data) return;
 
   const expired = (data.users as AdminUser[]).filter((u) => isExpiredDemoUser(u));
+  const providers = configuredProviders();
 
   for (const user of expired.slice(0, DEMO_SWEEP_LIMIT)) {
-    // Order matters: files.user_id and folders.user_id are plain UUID columns
-    // with no foreign key to auth.users, so deleting the account first would
-    // strand every row it owns. Same sequence as e2e/fixtures.ts.
-    const { data: objects } = await supabase.storage.from(BUCKET).list(user.id, { limit: 200 });
-    if (objects && objects.length > 0) {
-      await supabase.storage.from(BUCKET).remove(objects.map((o) => `${user.id}/${o.name}`));
+    /* The same erase an account deletion runs: every provider by prefix, then
+       the rows, then the user. This used to remove the first 200 Supabase
+       Storage objects and the rows, and nothing else. Images go to Cloudinary
+       by default, so everything a demo visitor uploaded stayed there, paid for
+       and counted by nobody, once the row that named it was gone. One account
+       that will not go must not stop the next. */
+    try {
+      const { failures } = await eraseAccount(user.id, { supabase, ...providers });
+      if (failures.length > 0) {
+        console.error(`[demo/session] sweep left ${failures.join(', ')} behind for ${user.id}`);
+      }
+    } catch (error) {
+      console.error(`[demo/session] sweep could not erase ${user.id}:`, error);
     }
-    await supabase.from('files').delete().eq('user_id', user.id);
-    await supabase.from('folders').delete().eq('user_id', user.id);
-    await supabase.auth.admin.deleteUser(user.id);
   }
 }
 
