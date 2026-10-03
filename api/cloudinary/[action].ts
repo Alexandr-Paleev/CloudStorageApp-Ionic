@@ -10,6 +10,7 @@ import {
   tooManyRequests,
 } from '../../lib/rate-limit';
 import { applyCors } from '../../lib/cors';
+import { ownerPrefix, ownsStoredPath } from '../../lib/stored-path';
 
 /**
  * Two actions, one serverless function: /api/cloudinary/sign and
@@ -118,7 +119,8 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
   // this prefix before destroying anything.
   const timestamp = Math.round(Date.now() / 1000);
   const params = {
-    folder: `users/${userId}`,
+    // The owner's prefix as Cloudinary wants a folder: without the slash.
+    folder: ownerPrefix('cloudinary', userId).replace(/\/$/, ''),
     tags: `user_${userId}`,
     timestamp,
   };
@@ -154,11 +156,10 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
  * now gets a 403 it can see, rather than everyone getting a way to delete what
  * they do not own.
  *
- * The trailing slash is load-bearing: without it `users/user-1` would
- * authorise `users/user-12/`.
+ * The prefix, and why its trailing slash matters, is `lib/stored-path.ts`.
  */
 function ownsAsset(userId: string, publicId: string): boolean {
-  return publicId.startsWith(`users/${userId}/`);
+  return ownsStoredPath({ storage_type: 'cloudinary', storage_path: publicId }, userId);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -213,9 +214,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    const cloudinary = (await import('cloudinary')).v2;
-    configureCloudinary(cloudinary);
-
     const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
 
     if (!publicId) {
@@ -236,6 +234,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       res.status(400).json({ message: `Unsupported resourceType "${resourceType}"` });
       return;
     }
+
+    // Only now, with every refusal behind it: loading and configuring the SDK
+    // is the expensive part of this branch, and a 400 or 403 needs neither.
+    const cloudinary = (await import('cloudinary')).v2;
+    configureCloudinary(cloudinary);
 
     const options = { resource_type: resourceType || 'image' };
 

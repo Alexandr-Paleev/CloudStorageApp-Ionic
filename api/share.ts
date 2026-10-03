@@ -20,7 +20,7 @@ import {
 } from '../lib/rate-limit';
 import { applyCors } from '../lib/cors';
 import { isSafeHttpUrl } from '../lib/safe-url';
-import { ownsStoredPath } from '../lib/ai';
+import { ownsStoredPath } from '../lib/stored-path';
 
 /**
  * Public share links.

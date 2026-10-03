@@ -12,6 +12,8 @@
  * is the part worth testing without a network.
  */
 
+import { ownerPrefix } from './stored-path';
+
 /**
  * What writes the sentence.
  *
@@ -55,48 +57,6 @@ export const SEARCH_RESULTS = 15;
 export const SEARCH_MIN_SIMILARITY = 0.25;
 
 /**
- * Whether the path on a row really belongs to the caller.
- *
- * `files` rows are written by the browser under a policy that says only which
- * *rows* an account may write, never what may go in them — `lib/safe-url.ts`
- * says the same thing about `download_url` one column over. So a caller can
- * put another account's object path into their own row and ask this service
- * to read it: the indexer holds the service-role key, and neither Storage's
- * policies nor R2's bucket care what `auth.uid()` was. `/api/share` asks the
- * same question, for the same reason, before it signs a path for a link.
- *
- * The prefixes are the ones the upload routes create and the R2 route already
- * checks (`ownsKey`, api/r2/[action].ts): Cloudinary signs into
- * `users/<id>/`, R2 writes under `users/<id>/`, and Supabase Storage uses
- * `<id>/` as the first path segment — the same segment its own policies match
- * on. Verified against production before it was written: all 20 rows there
- * follow it.
- *
- * The trailing slash is load-bearing, exactly as it is in `ownsKey`: without
- * it `users/<id>` would authorise `users/<id>0/`.
- *
- * Mirrors `files_storage_path_is_owners` in migrations/013 — a change to one
- * prefix is a change to both.
- */
-export function ownsStoredPath(
-  file: { storage_type: string; storage_path: string },
-  userId: string
-): boolean {
-  switch (file.storage_type) {
-    case 'cloudinary':
-    case 'r2':
-      return file.storage_path.startsWith(`users/${userId}/`);
-    case 'supabase_storage':
-      return file.storage_path.startsWith(`${userId}/`);
-    default:
-      // Google Drive and Dropbox never reach here — planFor() skips them, and
-      // /api/share only asks about the two providers it signs for — and an
-      // unknown provider is not something to guess about.
-      return false;
-  }
-}
-
-/**
  * Whether a stored Cloudinary delivery URL is one of ours, for this user.
  *
  * Cloudinary is the one provider whose stored URL is used as-is, because it is
@@ -120,7 +80,7 @@ export function cloudinaryUrlIsOwned(url: string, userId: string): boolean {
   return (
     parsed.protocol === 'https:' &&
     parsed.hostname === 'res.cloudinary.com' &&
-    parsed.pathname.includes(`/users/${userId}/`)
+    parsed.pathname.includes(`/${ownerPrefix('cloudinary', userId)}`)
   );
 }
 

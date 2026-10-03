@@ -11,6 +11,8 @@
  * be tested; api/demo/session.ts holds the orchestration.
  */
 
+import { ownerPrefix } from './stored-path';
+
 /** Demo accounts are recognised by this prefix, and deleted by it. */
 export const DEMO_EMAIL_PREFIX = 'demo-';
 
@@ -100,7 +102,7 @@ export function isExpiredDemoUser(
  * invisible to its owner.
  */
 export function demoStoragePath(userId: string, name: string, timestamp: number): string {
-  return `${userId}/${timestamp}_${name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  return `${ownerPrefix('supabase_storage', userId)}${timestamp}_${name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 }
 
 /* The limiter these two constants feed, and the address it counts against, now

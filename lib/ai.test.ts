@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_SUMMARY_CHARS,
   cloudinaryUrlIsOwned,
-  ownsStoredPath,
   MAX_TAGS,
   MAX_TAG_CHARS,
   clampSummary,
@@ -153,42 +152,6 @@ describe('embeddingInput', () => {
 
   it('leaves out the tag line when there are no tags', () => {
     expect(embeddingInput({ name: 'a.txt' }, 'A note.', [])).toBe('a.txt\nA note.');
-  });
-});
-
-describe('ownsStoredPath', () => {
-  const uid = '11111111-1111-1111-1111-111111111111';
-
-  it.each([
-    ['cloudinary', `users/${uid}/holiday`],
-    ['r2', `users/${uid}/holiday.png`],
-    ['supabase_storage', `${uid}/1700000000_holiday.png`],
-  ])('accepts the path %s actually writes', (storage_type, storage_path) => {
-    expect(ownsStoredPath({ storage_type, storage_path }, uid)).toBe(true);
-  });
-
-  it.each([
-    ['cloudinary', 'users/22222222-2222-2222-2222-222222222222/secret'],
-    ['r2', 'users/22222222-2222-2222-2222-222222222222/secret.pdf'],
-    ['supabase_storage', '22222222-2222-2222-2222-222222222222/secret.pdf'],
-  ])('refuses another account’s %s path', (storage_type, storage_path) => {
-    // The row is written by the browser, and the indexer holds the
-    // service-role key — nothing downstream would have stopped this.
-    expect(ownsStoredPath({ storage_type, storage_path }, uid)).toBe(false);
-  });
-
-  it('keeps the trailing slash load-bearing', () => {
-    // Without it `users/<id>` would authorise `users/<id>0/`, which is the
-    // same trap ownsKey() documents in the R2 route.
-    expect(ownsStoredPath({ storage_type: 'r2', storage_path: `users/${uid}0/x` }, uid)).toBe(
-      false
-    );
-  });
-
-  it('refuses a provider it does not know', () => {
-    expect(ownsStoredPath({ storage_type: 'googledrive', storage_path: 'whatever' }, uid)).toBe(
-      false
-    );
   });
 });
 

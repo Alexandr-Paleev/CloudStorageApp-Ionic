@@ -24,6 +24,7 @@ import {
   tooManyRequests,
 } from '../../lib/rate-limit';
 import { applyCors } from '../../lib/cors';
+import { ownerPrefix, ownsStoredPath } from '../../lib/stored-path';
 
 /**
  * Everything R2, behind one serverless function.
@@ -58,11 +59,16 @@ const byPartSigningUser = new RateLimiter(R2_PART_SIGN_LIMIT);
 /**
  * Every object this app writes lives under the uploader's own prefix, and this
  * is the only thing standing between a caller and someone else's file. The
- * trailing slash is load-bearing: without it `users/user-1` would authorise
- * `users/user-10/`.
+ * prefix, and why its trailing slash matters, is `lib/stored-path.ts`.
  */
 function ownsKey(userId: string, key: string): boolean {
-  return key.startsWith(`users/${userId}/`);
+  return ownsStoredPath({ storage_type: 'r2', storage_path: key }, userId);
+}
+
+/** A new object's key: the uploader's own prefix, then a timestamp and a name
+ *  that cannot step outside it. */
+function newKey(userId: string, fileName: string): string {
+  return `${ownerPrefix('r2', userId)}${Date.now()}_${sanitizeFileName(fileName)}`;
 }
 
 function bad(res: VercelResponse, message: string) {
@@ -95,7 +101,7 @@ async function presignUpload(req: VercelRequest, res: VercelResponse, userId: st
   const rejection = quotaRejection(await readQuota(userId), size);
   if (rejection) return res.status(413).json({ message: rejection });
 
-  const key = `users/${userId}/${Date.now()}_${sanitizeFileName(fileName)}`;
+  const key = newKey(userId, fileName);
 
   const command = new PutObjectCommand({
     Bucket: getR2BucketName(),
@@ -166,7 +172,7 @@ async function multipartCreate(req: VercelRequest, res: VercelResponse, userId: 
   const rejection = quotaRejection(await readQuota(userId), size);
   if (rejection) return res.status(413).json({ message: rejection });
 
-  const key = `users/${userId}/${Date.now()}_${sanitizeFileName(fileName)}`;
+  const key = newKey(userId, fileName);
 
   const created = await getS3Client().send(
     new CreateMultipartUploadCommand({
