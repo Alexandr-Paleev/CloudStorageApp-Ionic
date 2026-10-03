@@ -1,9 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { authenticate, AuthError, supabase } from '../../lib/auth';
 import { isDemoEmail } from '../../lib/demo';
-import { getR2BucketName, getS3Client } from '../../lib/r2';
 import {
   MAX_DESCRIBE_BYTES,
   ProviderNotConfigured,
@@ -17,6 +14,7 @@ import {
 } from '../../lib/ai';
 import { fetchBytes } from '../../lib/fetch-bytes';
 import { ownsStoredPath } from '../../lib/stored-path';
+import { signOwnedPath } from '../../lib/sign-owned-path';
 import { activeBackend } from '../../lib/ai-provider';
 import type { DescribeSource } from '../../lib/describe';
 import {
@@ -55,8 +53,6 @@ const byAddress = new RateLimiter(AI_IP_LIMIT);
 const byIndexingUser = new RateLimiter(AI_INDEX_LIMIT);
 const byEmbeddingUser = new RateLimiter(AI_EMBED_LIMIT);
 
-const BUCKET = 'files';
-
 /** Long enough to fetch a file, short enough that nothing else can use it. */
 const READ_URL_TTL = 300;
 
@@ -77,23 +73,8 @@ interface FileRow extends IndexableFile {
  * checked rather than used.
  */
 async function readableUrl(file: FileRow, userId: string): Promise<string> {
-  if (file.storage_type === 'r2') {
-    return getSignedUrl(
-      getS3Client(),
-      new GetObjectCommand({ Bucket: getR2BucketName(), Key: file.storage_path }),
-      { expiresIn: READ_URL_TTL }
-    );
-  }
-
-  if (file.storage_type === 'supabase_storage') {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(file.storage_path, READ_URL_TTL);
-    if (error || !data?.signedUrl) {
-      throw new Error(`Could not sign a read URL: ${error?.message ?? 'no URL returned'}`);
-    }
-    return data.signedUrl;
-  }
+  const signed = await signOwnedPath(file, userId, READ_URL_TTL);
+  if (signed) return signed;
 
   if (!cloudinaryUrlIsOwned(file.download_url, userId)) {
     throw new AccessError('that file does not point at your own Cloudinary folder');

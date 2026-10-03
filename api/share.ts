@@ -1,9 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { authenticateUser, AuthError, supabase } from '../lib/auth';
 import { getAppUrl } from '../lib/app-url';
-import { getS3Client, getR2BucketName } from '../lib/r2';
 import {
   generateShareToken,
   hashShareToken,
@@ -20,7 +17,7 @@ import {
 } from '../lib/rate-limit';
 import { applyCors } from '../lib/cors';
 import { isSafeHttpUrl } from '../lib/safe-url';
-import { ownsStoredPath } from '../lib/stored-path';
+import { signOwnedPath } from '../lib/sign-owned-path';
 
 /**
  * Public share links.
@@ -37,7 +34,6 @@ import { ownsStoredPath } from '../lib/stored-path';
  */
 
 const SIGNED_URL_TTL = 3600;
-const BUCKET = 'files';
 
 /**
  * Two limits, because the route has two kinds of caller.
@@ -75,32 +71,12 @@ interface FileRow {
  * providers already store a delivery URL that works on its own.
  */
 async function downloadUrlFor(file: FileRow): Promise<string> {
-  /* The path is the owner's writing as much as `download_url` below is: RLS
-     decides whose row this is, never what it says. For these two providers it
-     is signed with this function's own credentials — the service-role key and
-     the R2 keys — and neither cares whose object the path names. So an account
-     could point a row of its own at another account's object and share that.
-     Nor is the path a secret to lean on: every recipient has read it in the
-     signed URL they were handed, and with it a revoked or expired link could be
-     replaced by a fresh one on a row of their own. The owner is the row's
-     user_id — RLS will not let an account write a row under anyone else's. */
-  const signed = file.storage_type === 'r2' || file.storage_type === 'supabase_storage';
-  if (signed && !ownsStoredPath(file, file.user_id)) {
-    throw new Error('The stored location for this file does not belong to its owner');
-  }
-
-  if (file.storage_type === 'r2') {
-    const command = new GetObjectCommand({ Bucket: getR2BucketName(), Key: file.storage_path });
-    return getSignedUrl(getS3Client(), command, { expiresIn: SIGNED_URL_TTL });
-  }
-
-  if (file.storage_type === 'supabase_storage') {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(file.storage_path, SIGNED_URL_TTL);
-    if (error || !data) throw new Error(`Failed to sign download URL: ${error?.message}`);
-    return data.signedUrl;
-  }
+  /* Signed only if the path is the owner's — the row's user_id, since RLS will
+     not let an account write a row under anyone else's. Every recipient has read
+     the path in the signed URL they were handed, so without that check a revoked
+     or expired link could be replaced by a fresh one on a row of their own. */
+  const signed = await signOwnedPath(file, file.user_id, SIGNED_URL_TTL);
+  if (signed) return signed;
 
   /* The only value on this path the owner controls directly. RLS lets an
      account write anything into its own row, `FileMetadataSchema` stopped
