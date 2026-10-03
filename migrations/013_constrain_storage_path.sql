@@ -30,7 +30,8 @@
 -- Cloudinary, `<id>/` for Supabase Storage. Google Drive and Dropbox are left
 -- alone on purpose: their path is an id in the user's own account, reached
 -- with the user's own OAuth grant and never with this app's credentials. The
--- rule is `ownsStoredPath` in lib/ai.ts; a change to one is a change to both.
+-- rule is `ownsStoredPath` in lib/stored-path.ts; a change to one is a change to
+-- both.
 --
 -- `starts_with` rather than LIKE, which reads `_` as a wildcard. A UUID has
 -- no `_` in it, but the function says what is meant.

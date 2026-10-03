@@ -10,13 +10,13 @@ import {
   TEXT_SAMPLE_BYTES,
   cloudinaryUrlIsOwned,
   embeddingInput,
-  ownsStoredPath,
   planFor,
   toVectorLiteral,
   type IndexPlan,
   type IndexableFile,
 } from '../../lib/ai';
 import { fetchBytes } from '../../lib/fetch-bytes';
+import { ownsStoredPath } from '../../lib/stored-path';
 import { activeBackend } from '../../lib/ai-provider';
 import type { DescribeSource } from '../../lib/describe';
 import {

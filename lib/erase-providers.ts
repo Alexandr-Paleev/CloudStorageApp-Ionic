@@ -2,6 +2,7 @@ import { DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { v2 as cloudinary } from 'cloudinary';
 import type { EraseDeps } from './account-erase';
 import { getS3Client, getR2BucketName } from './r2';
+import { ownerPrefix } from './stored-path';
 
 /**
  * The storage providers `eraseAccount` can be handed, as this deployment has
@@ -26,7 +27,7 @@ const S3_DELETE_BATCH = 1000;
 async function eraseR2(userId: string): Promise<void> {
   const client = getS3Client();
   const Bucket = getR2BucketName();
-  const Prefix = `users/${userId}/`;
+  const Prefix = ownerPrefix('r2', userId);
   let ContinuationToken: string | undefined;
 
   do {
@@ -59,7 +60,9 @@ async function eraseR2(userId: string): Promise<void> {
  */
 async function eraseCloudinary(userId: string): Promise<void> {
   for (const resource_type of ['image', 'raw'] as const) {
-    await cloudinary.api.delete_resources_by_prefix(`users/${userId}/`, { resource_type });
+    await cloudinary.api.delete_resources_by_prefix(ownerPrefix('cloudinary', userId), {
+      resource_type,
+    });
   }
 }
 
