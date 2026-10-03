@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.7.2] — 2026-10-03
+
 ### Fixed
 
 - **The Android shell could reach none of `/api`.** `capacitor.config.ts` sets
@@ -1195,6 +1199,7 @@ folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
 [unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...HEAD
+[4.7.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.1...v4.7.2
 [4.7.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.0...v4.7.1
 [4.7.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...v4.7.0
 [4.6.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.5.0...v4.6.0
