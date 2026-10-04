@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.7.3] — 2026-10-04
+
 ### Fixed
 
 - **No PDF opened in its preview.** The file page shows a PDF in a frame
@@ -25,6 +29,8 @@ reasoning behind the larger decisions lives in
   those too. The helper they use matched a wildcard host to one label, unlike
   Chrome, which matches any depth. It now matches any depth too, so R2's
   `<bucket>.<account>` host counts as allowed, as it is in the browser.
+  Confirmed on production after deploy: a fresh demo account's welcome PDF
+  opens in the preview.
 
 ## [4.7.2] — 2026-10-03
 
@@ -1213,6 +1219,7 @@ folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
 [unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...HEAD
+[4.7.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.2...v4.7.3
 [4.7.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.1...v4.7.2
 [4.7.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.0...v4.7.1
 [4.7.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...v4.7.0
