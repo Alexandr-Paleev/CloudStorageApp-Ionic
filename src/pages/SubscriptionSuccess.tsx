@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { IonContent, IonPage, IonText, IonIcon } from '@ionic/react';
 import { checkmarkCircleOutline } from 'ionicons/icons';
 import { useQueryClient } from '@tanstack/react-query';

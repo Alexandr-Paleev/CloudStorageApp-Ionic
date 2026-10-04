@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import Upload from './Upload';
 import { renderWithProviders } from '../test/utils';
 
@@ -46,8 +46,8 @@ vi.mock('../hooks/useAnalytics', () => ({
   useAnalytics: () => ({ trackFileUpload, trackEvent: vi.fn(), trackError: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   return { ...actual, useNavigate: () => navigate, useParams: () => ({}) };
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   IonContent,

@@ -10,6 +10,22 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Changed
+
+- **React Router 6 → 7.** In 7, `react-router-dom` and `react-router` are a
+  single package, `react-router`. The only change in the app is the import
+  path, in 15 source files and 8 test files. 7 makes two v6 options the
+  default: navigations wrapped in `startTransition`, and relative paths inside
+  splat routes. Neither touches this app, which uses `BrowserRouter`, has no
+  relative paths and no data APIs. The upgrade closes the only two advisories
+  in production dependencies, neither of which this app could reach:
+  - GHSA-wrjc-x8rr-h8h6, an open redirect through `<Link>` and `useNavigate`.
+    Every navigation target here starts with a literal path.
+  - GHSA-337j-9hxr-rhxg, in SSR hydration. Nothing here is server-rendered.
+
+  The first load grows by 5.6 kB, to 428.9 kB of a 445 kB budget, and the
+  unit-test log loses its 18 "Future Flag Warning" lines.
+
 ### Security
 
 - **A stored path can no longer climb out of its owner's folder.** 013 checks
