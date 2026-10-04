@@ -40,9 +40,10 @@ describe('allows', () => {
     expect(allows(policy, 'script-src', 'https://*.hotjar.com')).toBe(true);
   });
 
-  it('expands a wildcard host to one label, as a browser does', () => {
+  it('expands a wildcard host to a subdomain at any depth, as a browser does', () => {
     expect(allows(policy, 'script-src', 'https://static.hotjar.com')).toBe(true);
-    expect(allows(policy, 'script-src', 'https://a.b.hotjar.com')).toBe(false);
+    expect(allows(policy, 'script-src', 'https://a.b.hotjar.com')).toBe(true);
+    expect(allows(policy, 'script-src', 'https://hotjar.com')).toBe(false);
     expect(allows(policy, 'script-src', 'https://nothotjar.com')).toBe(false);
   });
 
@@ -76,6 +77,18 @@ describe('the shipped policy', () => {
   it('allows the Stripe pages billing redirects to be framed', () => {
     expect(allows(directives, 'frame-src', 'https://checkout.stripe.com')).toBe(true);
     expect(allows(directives, 'frame-src', 'https://billing.stripe.com')).toBe(true);
+  });
+
+  /* src/pages/FileView.tsx shows a PDF in an <iframe> pointed at the file's own
+     URL. From 4.0.0 to 4.7.2 this directive named only Stripe and Google, and
+     Chrome answered every preview with "This content is blocked" — the demo's
+     welcome.pdf included. */
+  it.each([
+    ['https://fhcpgsenptnwimwimjka.supabase.co', 'Supabase Storage'],
+    ['https://mybucket.0123456789abcdef.r2.cloudflarestorage.com', 'an R2 presigned URL'],
+    ['https://res.cloudinary.com', 'Cloudinary'],
+  ])('allows a PDF preview to be framed from %s (%s)', (origin) => {
+    expect(allows(directives, 'frame-src', origin)).toBe(true);
   });
 
   it('refuses a script origin nobody asked for', () => {
