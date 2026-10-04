@@ -27,6 +27,15 @@
 -- Checked against production on 2026-10-04 before writing it: every hosted row
 -- passes, 37 of 37 (27 Supabase Storage, 10 Cloudinary, none in R2). As with
 -- 013, `NOT VALID` is not used, because there is nothing to grandfather in.
+--
+-- Applied to production on 2026-10-04, after the pre-flight below came back
+-- empty (37 hosted rows). The constraint went in validated. It was then probed
+-- with the statement at the foot of this file, inside transactions that were
+-- rolled back. A path under the owner's own prefix that climbs out with `..`
+-- was refused with 23514 by this constraint. A plain path under the same
+-- prefix went in. No probe row was left behind. The Playwright suite then ran
+-- against production with the constraint in place, 39 of 39, and in CI, which
+-- uses the same database, 43 of 43.
 -- Safe to run twice: the DROP ... IF EXISTS comes first.
 --
 -- Pre-flight — expects no rows:
