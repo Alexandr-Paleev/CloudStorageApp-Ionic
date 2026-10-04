@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isSafeHttpUrl } from '../../lib/safe-url';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import {
   IonContent,
   IonPage,

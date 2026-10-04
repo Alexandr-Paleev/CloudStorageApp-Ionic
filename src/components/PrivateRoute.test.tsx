@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router';
 import type { User } from '@supabase/supabase-js';
 import PrivateRoute from './PrivateRoute';
 import { useAuth } from '../contexts/AuthContext';

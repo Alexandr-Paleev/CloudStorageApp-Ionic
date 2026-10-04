@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { IonContent, IonPage, IonSpinner, IonText } from '@ionic/react';
 import dropboxAuthService from '../services/dropbox-auth.service';
 

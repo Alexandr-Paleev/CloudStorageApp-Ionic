@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { IonApp, IonSpinner, setupIonicReact } from '@ionic/react';
 
 import { AuthProvider } from './contexts/AuthContext';

@@ -1,6 +1,6 @@
 import { IonButton, IonIcon, IonText } from '@ionic/react';
 import { rocketOutline } from 'ionicons/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { billingIsOffered } from '../utils/billing.utils';
 import { storageMeter } from '../utils/quota.utils';
 

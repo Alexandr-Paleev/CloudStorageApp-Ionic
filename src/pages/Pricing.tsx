@@ -13,7 +13,7 @@ import {
 } from '@ionic/react';
 import { checkmarkCircle, lockClosed, informationCircle } from 'ionicons/icons';
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router';
 import { env } from '../env';
 import { billingIsOffered } from '../utils/billing.utils';
 import { useProfile } from '../hooks/useProfile';
