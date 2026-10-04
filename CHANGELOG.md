@@ -26,6 +26,30 @@ reasoning behind the larger decisions lives in
   The first load grows by 5.6 kB, to 428.9 kB of a 445 kB budget, and the
   unit-test log loses its 18 "Future Flag Warning" lines.
 
+### Fixed
+
+- **A folder name could vanish between typing it and pressing Create.** The
+  dashboard gave the New Folder and Rename dialogs a new `inputs` array on
+  every render, and Ionic's alert rebuilds its fields, along with what was
+  typed in them, whenever that array changes. A render while a dialog was open,
+  such as a query settling, emptied the field the button reads, while the text
+  stayed on screen. New Folder then closed and created nothing, and Rename
+  saved the old name. Reproduced in Chrome against Ionic 9.0.5. Both arrays now
+  keep their identity, and New Folder stays open on an empty or blank name
+  instead of closing on nothing. This was the flaky `e2e/folders.spec.ts` test,
+  which failed once in twelve CI runs.
+
+- **Files kept in Google Drive or Dropbox showed a broken preview, and a Drive
+  share link opened nothing.** What those providers store is the address of
+  their own viewer, not of the file. The file page drew it as an image, which
+  came out broken, or framed it, which the provider and this app's policy
+  both refuse. Such a file now says where it is kept and opens there.
+  Google Drive's viewer also asks anyone but the owner to request access, so
+  a share link from here would have looked like a share and opened nothing:
+  the page no longer offers one, and `/api/share` answers 422 to a request for
+  one. Dropbox stores a public link, so sharing a Dropbox file still works.
+  Production holds no Drive or Dropbox files yet.
+
 ### Security
 
 - **A stored path can no longer climb out of its owner's folder.** 013 checks

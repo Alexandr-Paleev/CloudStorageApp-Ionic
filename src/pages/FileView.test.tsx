@@ -113,6 +113,47 @@ describe('FileView', () => {
     expect(getFileMetadata).toHaveBeenCalledWith('file-1', 'user-1');
   });
 
+  /* Drive and Dropbox store the provider's own viewer, not the file: as an
+     <img> it is a broken image and as a frame it is refused. */
+  describe('a file kept in Google Drive or Dropbox', () => {
+    const drive = {
+      ...FILE,
+      storage_type: 'googledrive',
+      download_url: 'https://drive.google.com/file/d/abc/view',
+    };
+
+    it('opens where it lives instead of a preview that cannot load', async () => {
+      getFileMetadata.mockResolvedValue(drive);
+      show();
+      expect(await screen.findByText('Kept in Google Drive')).toBeInTheDocument();
+      expect(document.querySelector('iframe, img.preview-image')).toBeNull();
+
+      const open = ionButtonByText('Open in Google Drive');
+      expect(open).toBeTruthy();
+      const opened = vi.spyOn(window, 'open').mockReturnValue(null);
+      fireEvent.click(open);
+      expect(opened).toHaveBeenCalledWith(drive.download_url, '_blank');
+      opened.mockRestore();
+    });
+
+    it('offers no share link for a Drive file, and says where to share it', async () => {
+      getFileMetadata.mockResolvedValue(drive);
+      show();
+      await screen.findByText('Kept in Google Drive');
+
+      expect(ionButtonByText('Copy Link')).toBeUndefined();
+      expect(ionButtonByText('Share')).toBeUndefined();
+      expect(screen.getByText(/Share it from Google Drive/)).toBeInTheDocument();
+    });
+
+    it('still offers a share link for a Dropbox file', async () => {
+      getFileMetadata.mockResolvedValue({ ...FILE, storage_type: 'dropbox' });
+      show();
+      expect(await screen.findByText('Kept in Dropbox')).toBeInTheDocument();
+      expect(ionButtonByText('Copy Link')).toBeTruthy();
+    });
+  });
+
   describe('sharing', () => {
     /* Never download_url: that is either permanent and unrevocable or dead in
        an hour, depending on which provider the file happens to be on. */

@@ -27,15 +27,16 @@ test.describe('Folders', () => {
     await page.goto('/dashboard');
     await page.locator('ion-button', { hasText: 'New Folder' }).click();
 
-    // Typed, not filled. fill() sets the DOM value — toHaveValue below passes
-    // either way — but the value never reaches the alert's own state, so the
-    // Create handler reads an empty name and quietly creates nothing.
-    //
-    // Retried, because typing alone was not enough either: the alert animates
-    // in, and keystrokes sent before it settles are dropped on the floor. That
-    // showed up only under parallel load, as an empty input after a full round
-    // of pressSequentially — so the retry re-types rather than waiting longer
+    // Typed, and retried: the alert animates in, and keystrokes sent before it
+    // settles can be dropped, so the retry re-types rather than waiting longer
     // on a value that is never going to arrive.
+    //
+    // The typing was not what made this test flaky. The dashboard handed the
+    // alert a new `inputs` array on every render. Ionic rebuilt its fields from
+    // each new array, so any render after typing lost the name while the text
+    // stayed on screen. toHaveValue passed, Create read an empty value, and no
+    // POST was sent. Under parallel load a query settling was enough to cause
+    // it. NEW_FOLDER_INPUTS in src/pages/Dashboard.tsx keeps the array stable.
     /* Scoped by its header: the dashboard renders several alerts, and each one
        with an input keeps that input in the DOM whether it is showing or not. */
     const name = page.getByLabel('New Folder').getByPlaceholder('Folder name');
