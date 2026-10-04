@@ -114,7 +114,7 @@ async function createLink(req: VercelRequest, res: VercelResponse) {
   // mints a credential that bypasses authentication entirely.
   const { data: files, error: fileError } = await supabase
     .from('files')
-    .select('id')
+    .select('id, storage_type')
     .eq('id', fileId)
     .eq('user_id', userId)
     .limit(1);
@@ -122,6 +122,18 @@ async function createLink(req: VercelRequest, res: VercelResponse) {
   if (fileError) throw new Error(`Failed to read file: ${fileError.message}`);
   if (!files || files.length === 0) {
     return res.status(404).json({ message: 'File not found' });
+  }
+
+  /* What a Drive file stores is Drive's own viewer, reached with the owner's
+     grant. Anyone else who opens it is asked to request access, so a link
+     minted here would look like a share and open nothing. The file page does
+     not offer one, and this route does not make one for a caller who asks
+     anyway. 422: the request is well-formed, and this file cannot be shared
+     this way. */
+  if ((files[0] as { storage_type?: string }).storage_type === 'googledrive') {
+    return res
+      .status(422)
+      .json({ message: 'A file in Google Drive is shared from Google Drive itself' });
   }
 
   const token = generateShareToken();

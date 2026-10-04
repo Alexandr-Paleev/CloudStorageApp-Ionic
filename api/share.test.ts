@@ -117,6 +117,38 @@ describe('share: creating a link', () => {
     expect(writes()).toHaveLength(0);
   });
 
+  it('refuses a file in Google Drive, whose stored address only its owner can open', async () => {
+    setup({
+      files: {
+        data: [
+          {
+            ...FILE_ROW,
+            storage_type: 'googledrive',
+            download_url: 'https://drive.google.com/file/d/abc/view',
+          },
+        ],
+      },
+      shared_links: { data: [] },
+    });
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(422);
+    expect((res.body as { message: string }).message).toMatch(/Google Drive/);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('still shares a Dropbox file, which stores a link anyone can open', async () => {
+    setup({
+      files: { data: [{ ...FILE_ROW, storage_type: 'dropbox' }] },
+      shared_links: { data: [] },
+    });
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(201);
+  });
+
   it('returns a URL on this deployment', async () => {
     const res = mockResponse();
     await handler(post({ fileId: FILE_ID }), res);

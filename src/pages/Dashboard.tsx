@@ -24,6 +24,7 @@ import {
   IonRow,
   IonCol,
   IonText,
+  type AlertInput,
 } from '@ionic/react';
 import {
   add,
@@ -55,11 +56,25 @@ import UpgradeBanner from '../components/UpgradeBanner';
 import { billingIsOffered } from '../utils/billing.utils';
 import { smartSearchIsOffered } from '../utils/smart-search.utils';
 import { HttpError } from '../utils/http.utils';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import { storageMeter } from '../utils/quota.utils';
 import './Dashboard.css';
+
+/**
+ * One array for the life of the module, never a literal in the JSX.
+ *
+ * Ionic's alert rebuilds its fields whenever `inputs` is a different array,
+ * and what has been typed lives in those fields. A literal is a new array on
+ * every render, so any render while the dialog was open, such as a query
+ * settling, wiped the typing. The text stayed on screen, the button read an
+ * empty value, and New Folder quietly created nothing. Reproduced in Chrome
+ * with Ionic 9.0.5. The same holds for Rename, below, whose array is memoised.
+ */
+const NEW_FOLDER_INPUTS: AlertInput[] = [
+  { name: 'folderName', type: 'text', placeholder: 'Folder name' },
+];
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -80,6 +95,11 @@ const Dashboard: React.FC = () => {
   const [folderMenu, setFolderMenu] = useState<Folder | null>(null);
   const [folderAction, setFolderAction] = useState<'rename' | 'delete' | null>(null);
   const [renaming, setRenaming] = useState<Folder | null>(null);
+  // A new array only when another name is being edited; see NEW_FOLDER_INPUTS.
+  const renameInputs = useMemo<AlertInput[]>(
+    () => [{ name: 'name', type: 'text', value: renaming?.name, placeholder: 'Folder name' }],
+    [renaming?.name]
+  );
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null);
   const [filters, setFilters] = useState<FileFiltersValue>({
     search: '',
@@ -722,9 +742,7 @@ const Dashboard: React.FC = () => {
           isOpen={!!renaming}
           onDidDismiss={() => setRenaming(null)}
           header="Rename folder"
-          inputs={[
-            { name: 'name', type: 'text', value: renaming?.name, placeholder: 'Folder name' },
-          ]}
+          inputs={renameInputs}
           buttons={[
             { text: 'Cancel', role: 'cancel' },
             {
@@ -792,13 +810,7 @@ const Dashboard: React.FC = () => {
           isOpen={showFolderAlert}
           onDidDismiss={() => setShowFolderAlert(false)}
           header={'New Folder'}
-          inputs={[
-            {
-              name: 'folderName',
-              type: 'text',
-              placeholder: 'Folder name',
-            },
-          ]}
+          inputs={NEW_FOLDER_INPUTS}
           buttons={[
             {
               text: 'Cancel',
@@ -807,10 +819,12 @@ const Dashboard: React.FC = () => {
             },
             {
               text: 'Create',
-              handler: (data) => {
-                if (data.folderName) {
-                  createFolderMutation.mutate(data.folderName);
-                }
+              handler: (data: { folderName?: string }) => {
+                const name = data.folderName?.trim();
+                // Kept open rather than closed on nothing: an empty name is a
+                // slip to correct, and a dialog that vanishes reads as success.
+                if (!name) return false;
+                createFolderMutation.mutate(name);
               },
             },
           ]}

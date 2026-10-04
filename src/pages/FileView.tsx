@@ -33,6 +33,7 @@ import {
   paperPlaneOutline,
   documentTextOutline,
   cloudDownloadOutline,
+  openOutline,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
@@ -44,6 +45,18 @@ import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import { offerSystemShare, warnFeedback } from '../native/shell';
 import './FileView.css';
+
+/**
+ * Providers whose files are opened where they live instead of previewed here.
+ *
+ * Google Drive and Dropbox store the address of the provider's own viewer, not
+ * of the file. As an <img> it is a broken image, and as a frame it is refused
+ * by the provider and by this app's Content-Security-Policy alike.
+ */
+const OPENED_IN_PLACE: Record<string, string> = {
+  googledrive: 'Google Drive',
+  dropbox: 'Dropbox',
+};
 
 const FileView: React.FC = () => {
   const { fileId } = useParams<{ fileId: string }>();
@@ -256,6 +269,11 @@ const FileView: React.FC = () => {
 
   const isImage = file?.type?.startsWith('image/') ?? false;
   const downloadUrl = getDownloadUrl();
+  const openedIn = file ? OPENED_IN_PLACE[file.storage_type] : undefined;
+  /* Drive stores its own viewer, which asks anyone but the owner to request
+     access, so a link made here would look like a share and open nothing. The
+     share route refuses one too. Dropbox stores a public link, which works. */
+  const sharedByLink = file?.storage_type !== 'googledrive';
   const isPDF =
     file?.type === 'application/pdf' ||
     file?.name?.toLowerCase().endsWith('.pdf') ||
@@ -326,7 +344,17 @@ const FileView: React.FC = () => {
       <IonContent fullscreen>
         <div className="file-view-container">
           <div className="bg-gradient-mesh preview-area">
-            {isImage && downloadUrl ? (
+            {openedIn ? (
+              <div className="preview-placeholder">
+                <div className="preview-icon-box">
+                  <IonIcon icon={openOutline} className="preview-icon" aria-hidden="true" />
+                </div>
+                <IonText color="dark">
+                  <h2 className="preview-title">Kept in {openedIn}</h2>
+                  <p className="preview-type">It opens in {openedIn} itself.</p>
+                </IonText>
+              </div>
+            ) : isImage && downloadUrl ? (
               <img
                 src={downloadUrl}
                 alt={file.name}
@@ -376,35 +404,43 @@ const FileView: React.FC = () => {
                 className="premium-button download-button"
                 onClick={handleDownload}
               >
-                <IonIcon icon={cloudDownloadOutline} slot="start" aria-hidden="true" />
-                Download Original
+                <IonIcon
+                  icon={openedIn ? openOutline : cloudDownloadOutline}
+                  slot="start"
+                  aria-hidden="true"
+                />
+                {openedIn ? `Open in ${openedIn}` : 'Download Original'}
               </IonButton>
 
               <IonGrid className="action-grid">
                 <IonRow>
-                  <IonCol size="6">
-                    <IonButton
-                      expand="block"
-                      fill="outline"
-                      onClick={() => setShowShareSheet(true)}
-                      className="action-button"
-                    >
-                      <IonIcon icon={shareSocialOutline} aria-hidden="true" />
-                      <span className="action-button-label">Share</span>
-                    </IonButton>
-                  </IonCol>
-                  <IonCol size="6">
-                    <IonButton
-                      expand="block"
-                      fill="outline"
-                      onClick={handleCopyLink}
-                      disabled={sharePending}
-                      className="action-button"
-                    >
-                      <IonIcon icon={linkOutline} aria-hidden="true" />
-                      <span className="action-button-label">Copy Link</span>
-                    </IonButton>
-                  </IonCol>
+                  {sharedByLink && (
+                    <>
+                      <IonCol size="6">
+                        <IonButton
+                          expand="block"
+                          fill="outline"
+                          onClick={() => setShowShareSheet(true)}
+                          className="action-button"
+                        >
+                          <IonIcon icon={shareSocialOutline} aria-hidden="true" />
+                          <span className="action-button-label">Share</span>
+                        </IonButton>
+                      </IonCol>
+                      <IonCol size="6">
+                        <IonButton
+                          expand="block"
+                          fill="outline"
+                          onClick={handleCopyLink}
+                          disabled={sharePending}
+                          className="action-button"
+                        >
+                          <IonIcon icon={linkOutline} aria-hidden="true" />
+                          <span className="action-button-label">Copy Link</span>
+                        </IonButton>
+                      </IonCol>
+                    </>
+                  )}
                   <IonCol size="6">
                     <IonButton
                       expand="block"
@@ -441,10 +477,9 @@ const FileView: React.FC = () => {
               {shareLink && (
                 <IonText color="medium">
                   {/* Says what revoking actually does. For files on providers
-                      that serve permanent public URLs (Cloudinary, Dropbox,
-                      Google Drive) the direct file address keeps working once
-                      someone has opened it — promising a clean revoke here
-                      would be a lie. */}
+                      that serve permanent public URLs (Cloudinary, Dropbox)
+                      the direct file address keeps working once someone has
+                      opened it — promising a clean revoke here would be a lie. */}
                   <p className="share-note">
                     Anyone with this link can download the file until{' '}
                     {formatDateTime(shareLink.expiresAt)}. Revoking stops the link from opening — it
@@ -453,7 +488,16 @@ const FileView: React.FC = () => {
                 </IonText>
               )}
 
-              {fileId && <ShareLinks fileId={fileId} />}
+              {!sharedByLink && (
+                <IonText color="medium">
+                  <p className="share-note">
+                    Share it from Google Drive. A link from here would ask the person you send it to
+                    for access to your Drive.
+                  </p>
+                </IonText>
+              )}
+
+              {fileId && sharedByLink && <ShareLinks fileId={fileId} />}
             </div>
           </div>
         </div>
