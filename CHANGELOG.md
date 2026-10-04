@@ -10,7 +10,20 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **A stored path can no longer climb out of its owner's folder.** 013 checks
+  that `files.storage_path` starts with the owner's prefix, but a prefix is
+  only the front of a string, and the routes that act on the path turn it into
+  a URL. A browser resolves `..`, reads `\` as `/`, decodes `%2e` and drops
+  tabs and newlines before it fetches, so `users/<id>/../<other>/x` passed the
+  check and could name another account's object once it became a URL. Whether
+  any signer or storage would actually have served it was never established.
+  It no longer has to be: `ownsStoredPath` refuses `.` and `..` segments,
+  backslashes, `%`, `?`, `#` and control characters, and so do the R2,
+  Cloudinary, share and indexer routes, which all ask it. No path the app
+  creates contains any of them. Migration `014` adds the same rule as a
+  constraint. All 37 hosted rows in production passed it before it was written.
 
 ## [4.7.3] — 2026-10-04
 
