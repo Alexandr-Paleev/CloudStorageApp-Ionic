@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.7.4] — 2026-10-04
+
 ### Changed
 
 - **React Router 6 → 7.** In 7, `react-router-dom` and `react-router` are a
@@ -1271,7 +1275,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.6.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...HEAD
+[4.7.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.3...v4.7.4
 [4.7.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.2...v4.7.3
 [4.7.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.1...v4.7.2
 [4.7.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.0...v4.7.1
