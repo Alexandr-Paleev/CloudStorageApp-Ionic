@@ -4,8 +4,10 @@ name: CI
 # pull request to be opened was previously not verified at all.
 on:
   push:
-  # Opening the PR would otherwise re-run what the push already covered. Forks
-  # still need this trigger — their pushes cannot run against this repository.
+  # For forks, whose pushes cannot run against this repository. Opening a pull
+  # request from a branch of this repository fires it too, for a commit its push
+  # has already checked. Both jobs skip that case (`if:` below) rather than run
+  # the same commit twice, which is what doubled every check on every PR.
   pull_request:
     types: [opened, reopened]
 
@@ -21,6 +23,8 @@ jobs:
   check:
     name: Lint, types, unit tests
     runs-on: ubuntu-latest
+    # Runs on every push, and on a pull request only when it comes from a fork.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
 
     # Only for the badges step below, and only it uses the write. Declared here
     # because a job with no `permissions:` block gets whatever the repository
@@ -188,6 +192,8 @@ jobs:
   e2e:
     name: Playwright
     runs-on: ubuntu-latest
+    # The same rule as `check`: a fork's pull request, or a push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - uses: actions/checkout@v7
 
@@ -209,13 +215,15 @@ jobs:
       # demo.spec.ts additionally needs DEMO_ENABLED, and deletes the account it
       # opens rather than leaving it for the endpoint's 24-hour sweep.
       #
-      # The four secrets point at `cloudstorage-ci`, a second Supabase project
-      # that exists only for this job. They pointed at production until
-      # 2026-09-05, which meant every push minted real users in the database the
-      # app serves, and a suite that died before its afterAll left them there.
-      # The schema is the same one: migrations/ applied in order, verified
-      # column-for-column, index-for-index and policy-for-policy against
-      # production.
+      # The four secrets point at production. From 2026-09-05 to 2026-09-27
+      # they pointed at `cloudstorage-ci`, a second project kept for this job.
+      # On the free plan it paused itself, its host stopped resolving, and this
+      # job failed with getaddrinfo ENOTFOUND for eleven days before anyone
+      # looked. A second database is also a second copy of a schema migrated
+      # by hand, and it drifts by default: 011 and 012 had reached production
+      # only. So the suite runs against the database the app serves. Every
+      # test gets its own throwaway account, and e2e/fixtures.ts checks that
+      # each one is removed rather than assuming it.
       - name: Write .env
         run: |
           cat > .env <<'EOF'
