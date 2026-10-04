@@ -24,7 +24,9 @@ export function parseCsp(policy: string): CspDirectives {
 
 /**
  * Whether `origin` is permitted by a directive, honouring the single wildcard
- * form CSP allows in a host source (`https://*.hotjar.com`).
+ * form CSP allows in a host source (`https://*.hotjar.com`). The wildcard
+ * stands for a subdomain at any depth, as it does in Chrome: R2's presigned
+ * URLs put the bucket in front of the account (`<bucket>.<account>.r2…`).
  *
  * Falls back to default-src the way a browser does, so a policy that omits a
  * fetch directive is judged by what it actually does rather than by what it
@@ -39,7 +41,7 @@ export function allows(directives: CspDirectives, directive: string, origin: str
     if (!source.includes('*')) return false;
 
     const pattern = new RegExp(
-      `^${source.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^.]+')}$`
+      `^${source.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]+')}$`
     );
     return pattern.test(origin);
   });

@@ -10,7 +10,21 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **No PDF opened in its preview.** The file page shows a PDF in a frame
+  pointed at the file's own URL, and the Content-Security-Policy added in 4.0.0
+  allowed frames only from Stripe and Google sign-in. From 4.0.0 on, Chrome
+  answered every preview with "This content is blocked", the demo's
+  `welcome.pdf` included. `frame-src` now also names the three storages a PDF can
+  be served from: this project's Supabase Storage, R2 and Cloudinary. Download
+  was never affected, because it opens a new tab, which the policy does not
+  govern. Nothing caught the regression: e2e runs on the dev server, which does
+  not send the headers in `vercel.json`, and the policy's tests listed the
+  origins of scripts, fonts and Stripe but none that serve files. They now list
+  those too. The helper they use matched a wildcard host to one label, unlike
+  Chrome, which matches any depth. It now matches any depth too, so R2's
+  `<bucket>.<account>` host counts as allowed, as it is in the browser.
 
 ## [4.7.2] — 2026-10-03
 
