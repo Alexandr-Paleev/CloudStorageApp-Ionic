@@ -7,8 +7,9 @@
  * erase. It was written out separately in each of them; a layout change now
  * has one place to happen, plus the constraint below.
  *
- * Mirrors `files_storage_path_is_owners` in migrations/013 — a change to one
- * prefix is a change to both.
+ * Mirrors `files_storage_path_is_owners` in migrations/013 and
+ * `files_storage_path_is_plain` in migrations/014 — a change to the rule here
+ * is a change to those too.
  */
 
 /** The providers whose bytes this app pays for and lays out itself. Google
@@ -37,6 +38,26 @@ export function ownerPrefix(provider: HostedProvider, userId: string): string {
 }
 
 /**
+ * Whether a URL parser could read the path as naming another object.
+ *
+ * Every route that acts on a stored path turns it into a URL, and a browser
+ * resolves `..` segments, reads `\` as `/`, decodes `%2e` to `.` and drops tabs
+ * and newlines before it does that — so `users/<id>/../<other>/x` passes a
+ * prefix check and can name `<other>`'s object by the time it is fetched.
+ * Whether a given signer and storage would let that through is not something
+ * to depend on. No path this app creates contains any of it: the upload routes
+ * put a timestamp in front of a sanitised name, and Cloudinary picks its own
+ * public ids. `?` and `#` go with them, because a URL ends its path at either.
+ */
+function rewritable(path: string): boolean {
+  for (const char of path) {
+    const code = char.charCodeAt(0);
+    if (code < 0x20 || code === 0x7f || '\\%?#'.includes(char)) return true;
+  }
+  return path.split('/').some((segment) => segment === '.' || segment === '..');
+}
+
+/**
  * Whether the path on a row really belongs to the given account.
  *
  * `files` rows are written by the browser under a policy that says only which
@@ -57,6 +78,7 @@ export function ownsStoredPath(
 ): boolean {
   return (
     isHosted(file.storage_type) &&
-    file.storage_path.startsWith(ownerPrefix(file.storage_type, userId))
+    file.storage_path.startsWith(ownerPrefix(file.storage_type, userId)) &&
+    !rewritable(file.storage_path)
   );
 }
