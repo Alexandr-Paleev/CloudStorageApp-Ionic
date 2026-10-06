@@ -55,6 +55,9 @@ export default defineConfig({
          * tokens. Only the path is looked at, because a dot in a query string
          * says nothing about what the address is.
          *
+         * Declining a navigation here hands it to the next route in line, so
+         * the image cache below is written not to take one.
+         *
          * `npm run dev` cannot show any of this. The worker the dev server
          * generates falls back for `/` alone, so
          * scripts/smoke-built-bundle.mjs asks the built one in a real
@@ -91,7 +94,22 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
+            /**
+             * An image asked for as an image, never a navigation to one. The
+             * router tries its routes in order, so a navigation the fallback
+             * has declined arrives here next, and this cache would keep
+             * whatever the server said for thirty days. For an address that
+             * does not exist, that is the app shell.
+             *
+             * The rest is what /\.(?:png|…)$/ did as a plain RegExp: this
+             * origin only, matched against the whole address. Workbox writes
+             * the function into the worker as text, so it can use nothing but
+             * its own arguments.
+             */
+            urlPattern: ({ request, sameOrigin, url }) =>
+              sameOrigin &&
+              request.mode !== 'navigate' &&
+              /\.(?:png|jpg|jpeg|svg|gif|webp)$/.test(url.href),
             handler: 'CacheFirst',
             options: {
               cacheName: 'images-cache',

@@ -24,13 +24,16 @@ reasoning behind the larger decisions lives in
   would have met it. `navigateFallbackDenylist` now keeps the worker out of
   `/api/`, the line `vercel.json` draws for its rewrite, and out of any path
   that ends in a file extension: Vercel serves a file that exists before it
-  consults the rewrite. No route of the app ends that way.
+  consults the rewrite. No route of the app ends that way. The worker's image
+  cache stops taking navigations as well: it is next in line after the
+  fallback, and would have answered for the image paths the fallback now lets
+  go, keeping whatever the server said for thirty days.
 
   The dev server could not show this, because the worker it generates falls
   back for `/` alone. `npm run smoke` now asks the built worker in a real
-  browser: it must answer a navigation to `/dashboard`, and leave one under
-  `/api/` and one to a file to the network. Against the build as it was, it
-  answered all three.
+  browser: it must answer a navigation to `/dashboard`, and leave three others
+  to the network, one under `/api/`, one to a text file and one to an image.
+  Against the build as it was, it answered all four.
 
 ### Changed
 

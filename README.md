@@ -922,12 +922,16 @@ Supabase project. Rendering a page in jsdom proves the markup exists; it does
 not prove an upload works.
 
 **One check runs the built bundle rather than the source.** `npm run smoke`
-opens `dist/` in a real browser and asks whether the page rendered anything at
-all. It exists because nothing else could: `npm run dev` serves unbundled
-modules, so `manualChunks` in `vite.config.ts` never executes there, and the
-Playwright suite runs against that dev server. A split that put React and
-react-dom in different chunks painted a blank page while lint, 621 unit tests,
-the whole e2e suite and the bundle budgets stayed green.
+opens `dist/` in a real browser and asks two questions: whether the page
+rendered anything at all, and whether the service worker keeps to the app. It
+exists because nothing else could: `npm run dev` serves unbundled modules, so
+`manualChunks` in `vite.config.mts` never executes there, and the Playwright
+suite runs against that dev server. A split that put React and react-dom in
+different chunks painted a blank page while lint, 621 unit tests, the whole
+e2e suite and the bundle budgets stayed green. The service worker is out of
+sight the same way. The dev server generates one of its own, which falls back
+to the app shell for `/` alone, while the built one answered every navigation
+in its scope, `/api/` and file paths included.
 
 **Accessibility is asserted on the rendered DOM**, at WCAG 2.1 A and AA, by
 `@axe-core/playwright` — on the login page, the dashboard with folders and

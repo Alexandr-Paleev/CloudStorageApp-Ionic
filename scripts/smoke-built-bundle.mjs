@@ -35,19 +35,28 @@ const target = url ?? `http://localhost:${PORT}/`;
 /** Anything under this and the page is a white screen, whatever the status code. */
 const MIN_RENDERED_CHARS = 50;
 
-/** How long a page that has just loaded gets to install and activate its service worker. */
-const WORKER_ACTIVATION_MS = 15_000;
+/**
+ * How long a page that has just loaded gets to install and activate its
+ * service worker. Against dist/ on this machine that takes milliseconds. A
+ * real deployment has the whole precache to fetch first: about two seconds
+ * against production as a rule, and once more than fifteen. A generous limit
+ * costs nothing when the worker does arrive, because the wait ends when it
+ * does.
+ */
+const WORKER_ACTIVATION_MS = 60_000;
 
 /** A route of the app. The worker must answer it, or its silence elsewhere proves nothing. */
 const THE_APP = '/dashboard';
 
 /**
- * Navigations the worker must leave to the network. Neither address has to
- * exist: the question is who answers, not what the answer is. The file is
- * made up on purpose. The real one outside the precache is a PDF, and a
- * headless browser downloads a PDF instead of navigating to it.
+ * Navigations the worker must leave to the network. None of these addresses
+ * has to exist: the question is who answers, not what the answer is. Both
+ * files are made up on purpose. The real one outside the precache is a PDF,
+ * and a headless browser downloads a PDF instead of navigating to it. The
+ * image is here because the worker has a cache for images, which comes after
+ * the fallback and must not pick up a navigation the fallback has let go.
  */
-const NOT_THE_APP = ['/api/smoke', '/smoke.txt'];
+const NOT_THE_APP = ['/api/smoke', '/smoke.txt', '/smoke.png'];
 
 let preview;
 if (!url) {
@@ -167,8 +176,9 @@ if (!worker.answered.includes(THE_APP)) {
 const overreach = NOT_THE_APP.filter((path) => worker.answered.includes(path));
 if (overreach.length > 0) {
   console.error(
-    `\nThe service worker answered a navigation to ${overreach.join(' and ')} with the app shell.\n` +
-      'navigateFallbackDenylist in vite.config.mts is what keeps it out.'
+    `\nThe service worker answered a navigation to ${overreach.join(', ')}. That is not the app.\n` +
+      'In vite.config.mts, navigateFallbackDenylist keeps the fallback out of such addresses,\n' +
+      'and the image cache must not take navigations.'
   );
   process.exit(1);
 }
