@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.7.5] — 2026-10-06
+
 ### Fixed
 
 - **The service worker answered for addresses that are not the app.** Workbox
@@ -47,7 +51,10 @@ reasoning behind the larger decisions lives in
   production holds 41 rows. On a scratch Postgres 14 with 400 000 files,
   counting them went from 150 ms to 15 ms for an account that owns half of
   them, and stayed at 0.2 ms for one that owns 100. Production runs Postgres
-  17.6, and its planner treats the call the same way.
+  17.6, and its planner treats the call the same way. **Applied to
+  production** on 2026-10-06. Afterwards an account still saw only its own
+  rows, a row made out to someone else was still refused, and the end-to-end
+  suite passed against the live database, 43 of 43.
 
 ## [4.7.4] — 2026-10-04
 
@@ -1312,7 +1319,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...HEAD
+[4.7.5]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...v4.7.5
 [4.7.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.3...v4.7.4
 [4.7.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.2...v4.7.3
 [4.7.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.1...v4.7.2

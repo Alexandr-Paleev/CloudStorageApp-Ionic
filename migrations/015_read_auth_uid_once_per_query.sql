@@ -47,6 +47,19 @@
 -- roles of each policy stay as they are because they are not written out
 -- again here, and what is not written out again cannot be copied wrongly.
 --
+-- Applied to production on 2026-10-06, after the pre-flight below showed the
+-- five policies with the old spelling and no WITH CHECK. Afterwards it showed
+-- the new spelling, and the name, command and roles of every policy as they
+-- had been, the three on `storage.objects` included. The plan from the verify
+-- step carried an InitPlan and no `current_setting` in its filter. The
+-- policies were then probed as a signed-in account, inside transactions that
+-- were rolled back. An account saw its own rows in all five tables and no file
+-- of anyone else's, and a caller with no session saw nothing. A file and a
+-- folder made out to someone else were refused with 42501, and so was handing
+-- a folder over to someone else. A row of the account's own went in. No probe
+-- row was left behind. The Playwright suite then ran against that database
+-- with the policies in place, 43 of 43.
+--
 -- Safe to run twice: ALTER POLICY sets the expression, and setting it to what
 -- it already is changes nothing. On a database that lacks one of the five, the
 -- statement naming it fails and the transaction takes the others back with it.
