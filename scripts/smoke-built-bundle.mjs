@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Opens the built bundle in a real browser and asks two questions: did it
- * render anything at all, and does its service worker keep out of /api/?
+ * render anything at all, and does its service worker keep to the app?
  *
  * Everything else in this repository tests the source. `npm run dev` serves
  * unbundled modules, so `manualChunks` in vite.config.mts is inert there, and
@@ -18,9 +18,9 @@
  * registers exists only in the build. The dev server generates its own, which
  * falls back to the app shell for `/` and for nothing else, while the built
  * one answers every navigation in its scope with the cached index.html unless
- * it is told otherwise. It had not been told about /api/: a browser sent to an
- * address there was shown the app's "not found" page instead of what the
- * function said.
+ * it is told otherwise. It had not been told about /api/, or about files it
+ * does not precache: a browser sent to either was shown the app's "not found"
+ * page instead of what the server would have said.
  *
  * Usage: node scripts/smoke-built-bundle.mjs [url]
  * Serves dist/ itself unless a URL is given.
@@ -37,6 +37,17 @@ const MIN_RENDERED_CHARS = 50;
 
 /** How long a page that has just loaded gets to install and activate its service worker. */
 const WORKER_ACTIVATION_MS = 15_000;
+
+/** A route of the app. The worker must answer it, or its silence elsewhere proves nothing. */
+const THE_APP = '/dashboard';
+
+/**
+ * Navigations the worker must leave to the network. Neither address has to
+ * exist: the question is who answers, not what the answer is. The file is
+ * made up on purpose. The real one outside the precache is a PDF, and a
+ * headless browser downloads a PDF instead of navigating to it.
+ */
+const NOT_THE_APP = ['/api/smoke', '/smoke.txt'];
 
 let preview;
 if (!url) {
@@ -64,57 +75,72 @@ const context = await browser.newContext();
 const page = await context.newPage();
 
 const errors = [];
-page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
-page.on('pageerror', (error) => errors.push(error.message));
+const onConsole = (message) => message.type() === 'error' && errors.push(message.text());
+const onPageError = (error) => errors.push(error.message);
+page.on('console', onConsole);
+page.on('pageerror', onPageError);
+
+/**
+ * Asks the service worker this page registered which navigations it answers
+ * itself, or says why it could not be asked.
+ */
+async function askWorker() {
+  const state = await page.evaluate((ms) => {
+    if (!('serviceWorker' in navigator)) return 'unsupported';
+    return Promise.race([
+      navigator.serviceWorker.ready.then(() => 'active'),
+      new Promise((resolve) => setTimeout(() => resolve('inactive'), ms)),
+    ]);
+  }, WORKER_ACTIVATION_MS);
+
+  if (state === 'unsupported') {
+    return { problem: 'This origin has no service workers: they need https or localhost.' };
+  }
+  if (state === 'inactive') {
+    return {
+      problem: `No service worker became active within ${WORKER_ACTIVATION_MS / 1000} seconds.`,
+    };
+  }
+
+  // In a second tab, so the first one is left as it rendered.
+  const probe = await context.newPage();
+  const answered = [];
+  for (const path of [THE_APP, ...NOT_THE_APP]) {
+    const response = await probe.goto(new URL(path, target).href, { waitUntil: 'commit' });
+    if (response?.fromServiceWorker()) answered.push(path);
+  }
+  return { answered };
+}
 
 let rendered = '';
-/** Which navigations the service worker answered itself. Stays undefined if none became active. */
 let worker;
 try {
   await page.goto(target, { waitUntil: 'networkidle', timeout: 30_000 });
   rendered = ((await page.textContent('body')) ?? '').trim();
 
-  const active = await page.evaluate(
-    (ms) =>
-      'serviceWorker' in navigator &&
-      Promise.race([
-        navigator.serviceWorker.ready.then(() => true),
-        new Promise((resolve) => setTimeout(() => resolve(false), ms)),
-      ]),
-    WORKER_ACTIVATION_MS
-  );
+  // The first question is answered. What this tab logs from here on, while
+  // the worker is being asked, is not part of it.
+  page.off('console', onConsole);
+  page.off('pageerror', onPageError);
 
-  if (active) {
-    // In a second tab, so that whatever the app logs while it is being
-    // navigated away from does not count against the first question.
-    const probe = await context.newPage();
-    const answeredByWorker = async (path) => {
-      const response = await probe.goto(new URL(path, target).href, { waitUntil: 'commit' });
-      return response?.fromServiceWorker() ?? false;
-    };
-    worker = {
-      // The control: without it, a worker that answers nothing at all would
-      // pass the /api/ check below.
-      app: await answeredByWorker('/dashboard'),
-      api: await answeredByWorker('/api/smoke'),
-    };
-  }
+  worker = await askWorker().catch((error) => ({
+    problem: `The service worker could not be asked: ${error.message.split('\n')[0]}`,
+  }));
 } finally {
   await browser.close();
   preview?.kill();
 }
 
 const tooEmpty = rendered.length < MIN_RENDERED_CHARS;
-const answers = (yes) => (yes ? 'answered by the worker' : 'left to the network');
+const whoAnswered = (path) =>
+  `${path} ${worker.answered.includes(path) ? 'answered by the worker' : 'left to the network'}`;
 
 console.log(`Smoke test of the built bundle — ${target}`);
 console.log(`  rendered: ${rendered.length} characters`);
 console.log(`  console errors: ${errors.length}`);
 for (const error of errors.slice(0, 5)) console.log(`    ${error}`);
 console.log(
-  worker
-    ? `  service worker: /dashboard ${answers(worker.app)}, /api/ ${answers(worker.api)}`
-    : '  service worker: none became active'
+  `  service worker: ${worker.problem ?? [THE_APP, ...NOT_THE_APP].map(whoAnswered).join(', ')}`
 );
 
 if (tooEmpty || errors.length > 0) {
@@ -126,21 +152,25 @@ if (tooEmpty || errors.length > 0) {
   process.exit(1);
 }
 
-if (!worker?.app) {
+if (worker.problem) {
+  console.error(`\n${worker.problem}`);
+  process.exit(1);
+}
+
+if (!worker.answered.includes(THE_APP)) {
   console.error(
-    worker
-      ? '\nThe service worker did not answer a navigation to /dashboard, so its silence on /api/ proves nothing.'
-      : `\nNo service worker became active within ${WORKER_ACTIVATION_MS / 1000} seconds.`
+    `\nThe service worker did not answer a navigation to ${THE_APP}, so its silence elsewhere proves nothing.`
   );
   process.exit(1);
 }
 
-if (worker.api) {
+const overreach = NOT_THE_APP.filter((path) => worker.answered.includes(path));
+if (overreach.length > 0) {
   console.error(
-    '\nThe service worker answered a navigation to /api/ with the app shell.\n' +
+    `\nThe service worker answered a navigation to ${overreach.join(' and ')} with the app shell.\n` +
       'navigateFallbackDenylist in vite.config.mts is what keeps it out.'
   );
   process.exit(1);
 }
 
-console.log('\nThe built bundle renders, and its service worker leaves /api/ alone.');
+console.log('\nThe built bundle renders, and its service worker keeps to the app.');

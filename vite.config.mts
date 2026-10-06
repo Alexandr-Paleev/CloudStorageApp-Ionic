@@ -42,16 +42,25 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         /**
          * Workbox answers every navigation inside the worker's scope with the
-         * cached index.html, and nothing tells it that /api/ is not the app:
-         * a browser sent to an address there was shown the app's "not found"
-         * page instead of what the function said. This is the line
-         * vercel.json already draws for its own rewrite.
+         * cached index.html, and nothing tells it where the app ends. A
+         * browser sent past that edge was shown the app's "not found" page
+         * instead of what the server would have said.
          *
-         * `npm run dev` cannot show it. The worker the dev server generates
-         * falls back for `/` alone, so scripts/smoke-built-bundle.mjs asks
-         * the built one in a real browser.
+         * Two kinds of address are not the app. /api/ is the functions, the
+         * line vercel.json draws for its own rewrite. A path that ends in a
+         * file extension is a file: Vercel serves a file that exists before
+         * it consults the rewrite at all, and the worker precaches only some
+         * of them — public/demo/welcome.pdf is one it does not. No route of
+         * the app ends that way: the ids in them are UUIDs and base64url
+         * tokens. Only the path is looked at, because a dot in a query string
+         * says nothing about what the address is.
+         *
+         * `npm run dev` cannot show any of this. The worker the dev server
+         * generates falls back for `/` alone, so
+         * scripts/smoke-built-bundle.mjs asks the built one in a real
+         * browser.
          */
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^[^?]*\.[a-z0-9]+(\?|$)/i],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

@@ -10,13 +10,13 @@
 --   shared_links     Users can view their own shared links   created_by = auth.uid()
 --   file_embeddings  Users can view own file embeddings      auth.uid() = user_id
 --
--- Written like that, the call is part of the row filter. Where Postgres can
--- reach the rows through an index on the column, the call is the index
--- condition and is made once. Where it reads the table itself, it makes the
--- call again for every row it reads. And `auth.uid()` is not a stored value:
--- it reads the request's settings and, on the path PostgREST uses today,
--- parses the JWT claims out of one of them as JSON. Its answer cannot change
--- in the middle of a statement, so every call after the first buys nothing.
+-- Written like that, the call is part of the row filter. On a plain index scan
+-- over the column it is the index condition, and is made once. On a sequential
+-- scan or a bitmap scan it stays a filter, and Postgres makes the call again
+-- for every row it reads. And `auth.uid()` is not a stored value: it reads the
+-- request's settings and, on the path PostgREST uses today, parses the JWT
+-- claims out of one of them as JSON. Its answer cannot change in the middle of
+-- a statement, so every call after the first buys nothing.
 --
 -- `(select auth.uid())` is the same value, computed once. Postgres plans a
 -- scalar subquery that does not depend on the row as an InitPlan: it runs
@@ -25,23 +25,27 @@
 -- this wrapper.
 --
 -- **Nothing is slow today, and this fixes nothing.** Checked against
--- production on 2026-10-06: the five tables hold 41, 10, 14, 7 and 0 rows, and
--- the plan for a read of `files` is an index scan on `idx_files_user_id`,
--- which already makes the call once. What goes away is a cost that arrives
--- with size. Measured on a scratch Postgres 14 carrying these five policies
--- as production has them, over 400 000 files: counting them took 150 ms for
--- an account that owns half of them, and 15 ms after this file. For an account
--- that owns 100 of them it took 0.2 ms both times.
+-- production, which runs Postgres 17.6, on 2026-10-06: the five tables hold
+-- 41, 10, 14, 7 and 0 rows, so whichever way Postgres reads them the call is
+-- made a few dozen times at most. What goes away is a cost that arrives with
+-- size. Measured on a scratch Postgres 14 carrying these five policies as
+-- production has them, over 400 000 files: counting them took 150 ms for an
+-- account that owns half of them, which Postgres read with a bitmap scan, and
+-- 15 ms after this file. For an account that owns 100 of them, read with an
+-- index scan, it took 0.2 ms both times. Production's own planner agrees
+-- about the three shapes: asked with EXPLAIN alone, it shows the call as the
+-- index condition of an index scan, and as a filter on a bitmap scan and on a
+-- sequential one.
 --
 -- Who may read or write which row does not change. The same checks were run
--- on that database before and after: an account sees its own rows in all five
--- tables and nobody else's, a row made out to someone else is refused on
--- insert and on update, and a caller with no session sees and writes nothing.
--- They passed both times.
+-- on that scratch database before and after: an account sees its own rows in
+-- all five tables and nobody else's, a row made out to someone else is refused
+-- on insert and on update, and a caller with no session sees and writes
+-- nothing. They passed both times.
 --
--- ALTER POLICY rather than DROP and CREATE. The policy keeps its name, its
--- command and its roles, and there is no moment at which the table has row
--- level security on and no policy, which would refuse everyone.
+-- ALTER POLICY rather than DROP and CREATE: the name, the command and the
+-- roles of each policy stay as they are because they are not written out
+-- again here, and what is not written out again cannot be copied wrongly.
 --
 -- Safe to run twice: ALTER POLICY sets the expression, and setting it to what
 -- it already is changes nothing. On a database that lacks one of the five, the
@@ -58,12 +62,18 @@
 -- request. The only listing, in account erasure, runs with the service-role
 -- key, which bypasses them.
 --
--- Pre-flight — expects the five rows above, none of them containing `SELECT`:
+-- Pre-flight. It lists every policy in `public`; in production those are the
+-- five above. Before the first run each USING reads `auth.uid()`, and after it
+-- `( SELECT auth.uid() AS uid)`. The last column is WITH CHECK, which none of
+-- the five has. This file rewrites USING alone, so a policy that shows the
+-- call in that column needs an ALTER POLICY ... WITH CHECK of its own:
 --
---   SELECT c.relname, p.polname, pg_get_expr(p.polqual, p.polrelid)
+--   SELECT c.relname, p.polname,
+--          pg_get_expr(p.polqual, p.polrelid) AS using_expr,
+--          pg_get_expr(p.polwithcheck, p.polrelid) AS check_expr
 --   FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
 --   WHERE c.relnamespace = 'public'::regnamespace
---   ORDER BY 1;
+--   ORDER BY 1, 2;
 
 BEGIN;
 
@@ -84,9 +94,9 @@ ALTER POLICY "Users can view own file embeddings" ON public.file_embeddings
 
 COMMIT;
 
--- Verify with the pre-flight query: each expression now reads
--- `( SELECT auth.uid() AS uid)` where it read `auth.uid()`. Then ask the
--- planner as a signed-in caller, inside a transaction that is rolled back:
+-- Verify with the pre-flight query: USING now reads
+-- `( SELECT auth.uid() AS uid)` in all five. Then ask the planner as a
+-- signed-in caller, inside a transaction that is rolled back:
 --
 --   BEGIN;
 --   SELECT set_config('request.jwt.claims',

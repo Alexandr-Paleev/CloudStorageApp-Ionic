@@ -12,34 +12,39 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
-- **The service worker answered for `/api/` as well as for the app.** Workbox
+- **The service worker answered for addresses that are not the app.** Workbox
   answers every navigation inside the worker's scope with the cached app
-  shell, and nothing had told it that `/api/` is not the app. A browser sent
-  to an address there, with the worker installed, was shown the app's "not
-  found" page instead of what the function said. Nothing in the app sends a
-  browser there: every call to a function is a `fetch`, which the fallback
-  does not touch. Only an address typed by hand would have met it.
-  `navigateFallbackDenylist` now keeps the worker out of `/api/`, the same
-  line `vercel.json` draws for its rewrite.
+  shell, and nothing had told it where the app ends. With the worker
+  installed, a browser sent to an address under `/api/`, or to a file the
+  worker does not precache, was shown the app's "not found" page instead of
+  what the server would have said. Nothing in the app sends a browser to
+  either. Every call to a function is a `fetch`, which the fallback does not
+  touch, and the one file in `public/` outside the precache,
+  `demo/welcome.pdf`, is read by a function. Only an address typed by hand
+  would have met it. `navigateFallbackDenylist` now keeps the worker out of
+  `/api/`, the line `vercel.json` draws for its rewrite, and out of any path
+  that ends in a file extension: Vercel serves a file that exists before it
+  consults the rewrite. No route of the app ends that way.
 
   The dev server could not show this, because the worker it generates falls
   back for `/` alone. `npm run smoke` now asks the built worker in a real
-  browser: it must answer a navigation to `/dashboard` and leave one to
-  `/api/` to the network. Against the build as it was, it answered both.
+  browser: it must answer a navigation to `/dashboard`, and leave one under
+  `/api/` and one to a file to the network. Against the build as it was, it
+  answered all three.
 
 ### Changed
 
 - **Five row-level security policies read the caller's id once per query, not
   once per row.** The policies on `files`, `folders`, `profiles`,
   `shared_links` and `file_embeddings` compared a column with `auth.uid()`.
-  Where Postgres reads a table itself rather than through an index, it makes
-  that call again for every row. Migration `015` wraps it as
-  `(select auth.uid())`, which Postgres computes once, before the scan. Who
-  may read or write which row is unchanged, and nothing gets faster today:
-  the largest of the five tables in production holds 41 rows and is read
-  through an index. On a scratch database with 400 000 files, counting them
-  went from 150 ms to 15 ms for an account that owns half of them, and stayed
-  at 0.2 ms for one that owns 100.
+  On a sequential scan or a bitmap scan Postgres makes that call again for
+  every row it reads. Migration `015` wraps it as `(select auth.uid())`, which
+  Postgres computes once, before the scan. Who may read or write which row is
+  unchanged, and nothing gets faster today: the largest of the five tables in
+  production holds 41 rows. On a scratch Postgres 14 with 400 000 files,
+  counting them went from 150 ms to 15 ms for an account that owns half of
+  them, and stayed at 0.2 ms for one that owns 100. Production runs Postgres
+  17.6, and its planner treats the call the same way.
 
 ## [4.7.4] — 2026-10-04
 
