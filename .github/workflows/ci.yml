@@ -103,6 +103,10 @@ jobs:
       # against that dev server — cannot see it. A chunk split that puts
       # react-dom and React in different chunks paints nothing, and every
       # other step here stays green while it does.
+      #
+      # The same goes for the service worker: the built one exists only in
+      # dist/, so this step is also where it is asked whether it keeps to the
+      # app and leaves /api/ and files to the network.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
