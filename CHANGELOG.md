@@ -10,7 +10,36 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The service worker answered for `/api/` as well as for the app.** Workbox
+  answers every navigation inside the worker's scope with the cached app
+  shell, and nothing had told it that `/api/` is not the app. A browser sent
+  to an address there, with the worker installed, was shown the app's "not
+  found" page instead of what the function said. Nothing in the app sends a
+  browser there: every call to a function is a `fetch`, which the fallback
+  does not touch. Only an address typed by hand would have met it.
+  `navigateFallbackDenylist` now keeps the worker out of `/api/`, the same
+  line `vercel.json` draws for its rewrite.
+
+  The dev server could not show this, because the worker it generates falls
+  back for `/` alone. `npm run smoke` now asks the built worker in a real
+  browser: it must answer a navigation to `/dashboard` and leave one to
+  `/api/` to the network. Against the build as it was, it answered both.
+
+### Changed
+
+- **Five row-level security policies read the caller's id once per query, not
+  once per row.** The policies on `files`, `folders`, `profiles`,
+  `shared_links` and `file_embeddings` compared a column with `auth.uid()`.
+  Where Postgres reads a table itself rather than through an index, it makes
+  that call again for every row. Migration `015` wraps it as
+  `(select auth.uid())`, which Postgres computes once, before the scan. Who
+  may read or write which row is unchanged, and nothing gets faster today:
+  the largest of the five tables in production holds 41 rows and is read
+  through an index. On a scratch database with 400 000 files, counting them
+  went from 150 ms to 15 ms for an account that owns half of them, and stayed
+  at 0.2 ms for one that owns 100.
 
 ## [4.7.4] — 2026-10-04
 

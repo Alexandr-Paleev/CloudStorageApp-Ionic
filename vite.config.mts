@@ -40,6 +40,18 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        /**
+         * Workbox answers every navigation inside the worker's scope with the
+         * cached index.html, and nothing tells it that /api/ is not the app:
+         * a browser sent to an address there was shown the app's "not found"
+         * page instead of what the function said. This is the line
+         * vercel.json already draws for its own rewrite.
+         *
+         * `npm run dev` cannot show it. The worker the dev server generates
+         * falls back for `/` alone, so scripts/smoke-built-bundle.mjs asks
+         * the built one in a real browser.
+         */
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
