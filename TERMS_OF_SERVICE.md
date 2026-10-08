@@ -186,8 +186,8 @@ These Terms, along with the Privacy Policy, constitute the entire agreement.
 
 For questions or concerns:
 - **Email**: aleksandr.paleev@example.com
-- **GitHub Issues**: [Report Issue](https://github.com/yourusername/CloudStorageApp-Ionic/issues)
-- **Support**: [GitHub Discussions](https://github.com/yourusername/CloudStorageApp-Ionic/discussions)
+- **GitHub Issues**: [Report Issue](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
+- **Support**: [GitHub Discussions](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/discussions)
 
 ---
 

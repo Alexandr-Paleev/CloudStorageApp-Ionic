@@ -122,7 +122,7 @@ We use the following third-party services:
 
 If you have questions about this Privacy Policy:
 - **Email**: aleksandr.paleev@example.com
-- **GitHub**: [Open an Issue](https://github.com/yourusername/CloudStorageApp-Ionic/issues)
+- **GitHub**: [Open an Issue](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
 
 ## Compliance
 
