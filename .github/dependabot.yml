@@ -22,6 +22,10 @@ updates:
         patterns: ['vitest', '@vitest/*', '@playwright/*', 'playwright']
       types:
         patterns: ['@types/*']
+      # Nx wants its own packages on one version, and there will be more of
+      # them than `nx` once the workspace has a second project.
+      nx:
+        patterns: ['nx', '@nx/*']
     ignore:
       # Majors are migrations, not updates: they need a changelog read and a
       # decision, which is exactly what an automated PR cannot supply. The

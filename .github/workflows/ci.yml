@@ -34,7 +34,12 @@ jobs:
       contents: write
 
     steps:
+      # The whole history rather than the last commit: the step after the
+      # install compares this push with main, and a shallow clone has no main
+      # to compare with.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -42,6 +47,17 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Not every push changes the app. scripts/ci-affected.mjs asks Nx, which
+      # leaves the files in .nxignore — documentation — out of the project, and
+      # sets AFFECTED for the steps below. A push that touches nothing else
+      # skips them and the job still ends green. The required checks need
+      # that: a workflow that never started would leave them waiting.
+      #
+      # A push to main runs everything regardless, and a failure in this step
+      # fails the job rather than skipping the rest of it.
+      - name: What does this change touch?
+        run: node scripts/ci-affected.mjs
 
       # The dependency policy ignores majors — see .github/dependabot.yml, where
       # the reasoning still holds. What it did not account for is that a security
@@ -61,14 +77,17 @@ jobs:
       # unreachable registry is retried and then reported as not-checked. It
       # also prints the moderate and low counts the old command swallowed.
       - name: Audit production dependencies
+        if: env.AFFECTED == 'true'
         run: npm run --silent audit:prod
 
       - run: npm run lint
+        if: env.AFFECTED == 'true'
 
       # src/env.ts validates import.meta.env with Zod on startup, so the build
       # needs the two required variables present. Real values come from repo
       # secrets when they are set; the placeholders only have to satisfy Zod.
       - name: Write .env
+        if: env.AFFECTED == 'true'
         run: |
           cat > .env <<'EOF'
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -77,6 +96,7 @@ jobs:
 
       # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
       - run: npm run build
+        if: env.AFFECTED == 'true'
 
       # The build checks what ships. This checks what does not: the unit tests,
       # the Playwright specs and playwright.config.ts, none of which any earlier
@@ -88,6 +108,7 @@ jobs:
       # a build. Adding noUncheckedIndexedAccess without this step would have
       # left the strictest half of the tree the least enforced.
       - name: Type-check the tests
+        if: env.AFFECTED == 'true'
         run: npm run typecheck
 
       # A byte count rather than a score, so it cannot be flaky: the check fails
@@ -95,6 +116,7 @@ jobs:
       # scripts/check-bundle-size.js holds the numbers and why each one is what
       # it is, and prints the table onto the run page either way.
       - name: Bundle size
+        if: env.AFFECTED == 'true'
         run: npm run --silent size | tee -a "$GITHUB_STEP_SUMMARY"
 
       # The one check that runs the built bundle rather than the source.
@@ -108,12 +130,15 @@ jobs:
       # dist/, so this step is also where it is asked whether it keeps to the
       # app and leaves /api/ and files to the network.
       - name: Install Chromium
+        if: env.AFFECTED == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Smoke-test the built bundle
+        if: env.AFFECTED == 'true'
         run: npm run --silent smoke
 
       - run: npm run test:coverage
+        if: env.AFFECTED == 'true'
 
       # Puts the numbers on the run page, so a pull request shows what its
       # tests actually reach without anyone opening an artifact.
@@ -122,7 +147,7 @@ jobs:
       # covered by different suites in different runtimes, and a single
       # blended percentage would hide which of the two moved.
       - name: Coverage summary
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
         run: |
           if [ ! -f coverage/coverage-summary.json ]; then
             echo "No coverage report produced." >> "$GITHUB_STEP_SUMMARY"
@@ -183,10 +208,11 @@ jobs:
       # Lighthouse and its Chrome tooling, some 40 MB installed, for a check
       # that runs here and occasionally on a laptop.
       - name: Lighthouse
+        if: env.AFFECTED == 'true'
         run: npm run --silent lighthouse
 
       - name: Upload Lighthouse reports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: lighthouse-report
@@ -199,7 +225,10 @@ jobs:
     # The same rule as `check`: a fork's pull request, or a push.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
+      # The whole history, for the same comparison with main as in `check`.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -208,7 +237,14 @@ jobs:
 
       - run: npm ci
 
+      # The same question as in `check`, and here the answer saves the most: a
+      # push that does not change the app opens no accounts in the live
+      # database.
+      - name: What does this change touch?
+        run: node scripts/ci-affected.mjs
+
       - name: Install Chromium
+        if: env.AFFECTED == 'true'
         run: npx playwright install --with-deps chromium
 
       # auth, routing and legal specs are pure UI and pass on placeholders.
@@ -229,6 +265,7 @@ jobs:
       # test gets its own throwaway account, and e2e/fixtures.ts checks that
       # each one is removed rather than assuming it.
       - name: Write .env
+        if: env.AFFECTED == 'true'
         run: |
           cat > .env <<'EOF'
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -241,9 +278,10 @@ jobs:
           EOF
 
       - run: npm run test:e2e
+        if: env.AFFECTED == 'true'
 
       - name: Upload report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

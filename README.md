@@ -442,6 +442,7 @@ The app will be available at: `http://localhost:8100`
 - **State Management**: TanStack Query + React Context API
 - **Routing**: React Router DOM
 - **Build**: Vite + Capacitor
+- **Workspace**: Nx, with one project so far: it caches tasks and tells CI what a push touches
 - **Backend API**: Vercel Functions
 - **Testing**: Vitest (node and jsdom projects) + Playwright (e2e), run in GitHub Actions
 - **Analytics**: Google Analytics 4 (GA4) + Hotjar
@@ -799,6 +800,8 @@ cloud-storage-app/
 ├── e2e/                           # Playwright specs
 ├── capacitor.config.ts            # Capacitor config
 ├── vite.config.ts                 # Vite config (incl. vendor chunk splitting)
+├── nx.json                        # Nx: which tasks are cached, and on what
+├── .nxignore                      # What is not the app: documentation
 └── package.json
 ```
 
@@ -873,16 +876,29 @@ npm run lighthouse
 
 # Regenerate the demo seed files and the link-preview image
 npm run generate:demo-assets
+
+# The same checks through Nx, which repeats only what has changed since it last ran them
+npx nx run-many -t lint typecheck test
 ```
 
 GitHub Actions runs lint, both type-check passes, an audit of production
 dependencies, a bundle-size budget, Lighthouse, unit and e2e tests on every
-pull request. The e2e suite runs against two dev servers: one as deployed, and
+pull request that changes the app. The e2e suite runs against two dev servers: one as deployed, and
 one with `VITE_R2_BUCKET_NAME` set, where the resumable-upload spec answers
 every `/api/r2/*` call itself, and in three Playwright projects: Desktop
 Chrome, the same browser pointed at the R2 server, and Pixel 7 for the specs
 whose subject is the phone. `main` is protected:
 those checks are required, and changes land through pull requests only.
+
+The repository is an Nx workspace with one project, the app at its root;
+[decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md) says
+where that is going. Nx does two things here today. It caches `build`, `lint`,
+both type-checks and the unit tests, and its cache key includes a fingerprint
+of the env files, which git ignores and Vite inlines into the bundle. And CI
+asks it what a push touches. Documentation is listed in `.nxignore`, so a push
+that changes nothing else skips every step, the required checks still end
+green, and no account is opened in the live database for a paragraph of prose.
+A push to `main` runs everything regardless.
 
 ### What the tests cover, and what they deliberately do not
 

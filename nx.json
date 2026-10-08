@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
+  "neverConnectToCloud": true,
+  "analytics": false,
+  "useDaemonProcess": false,
+  "namedInputs": {
+    "envFiles": [{ "runtime": "node scripts/env-fingerprint.mjs" }],
+    "default": ["{projectRoot}/**/*", "envFiles"]
+  },
+  "targetDefaults": {
+    "build": {
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "lint": { "cache": true, "inputs": ["default", "^default"] },
+    "typecheck": { "cache": true, "inputs": ["default", "^default"] },
+    "typecheck:api": { "cache": true, "inputs": ["default", "^default"] },
+    "test": { "cache": true, "inputs": ["default", "^default"] },
+    "test:coverage": {
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/coverage"]
+    },
+    "size": { "dependsOn": ["build"] },
+    "smoke": { "dependsOn": ["build"] },
+    "lighthouse": { "dependsOn": ["build"] }
+  }
+}

@@ -10,6 +10,27 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Changed
+
+- **The repository is an Nx workspace, and CI asks it what a push touches.**
+  This is step 2 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md):
+  Nx on the repository as it stands, with one project, the app, and no file
+  moved. Until now every push ran everything. The pull request that added
+  that decision changed two markdown files, and for them CI built the app,
+  ran Lighthouse and put the end-to-end suite through the live database: 43
+  tests, 30 accounts opened and removed. Documentation is now listed in
+  `.nxignore`, so Nx counts no project as affected by it, and a push that
+  touches nothing else skips every step while the required checks still end
+  green. A push to `main` runs everything regardless, and a failure to ask
+  fails the job instead of skipping it.
+
+  Nx also caches `build`, `lint`, both type-checks and the unit tests. The
+  cache key includes a fingerprint of the env files, which git ignores and Nx
+  would therefore not count: Vite inlines them into the bundle, so a build
+  made before an edit to `.env` must not be handed back after it. Vercel
+  still builds with `npm run build`, and what it deploys is unchanged.
+
 ### Fixed
 
 - **The static copy of the privacy policy had fallen behind the one the app
