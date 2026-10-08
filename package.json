@@ -100,6 +100,7 @@
     "husky": "^9.0.11",
     "jsdom": "^29.1.1",
     "lint-staged": "^15.2.0",
+    "nx": "^23.3.0",
     "prettier": "^3.3.3",
     "sharp": "^0.35.5",
     "typescript": "5.9.3",
@@ -108,6 +109,21 @@
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^5.0.0",
     "workbox-window": "^7.4.0"
+  },
+  "nx": {
+    "includedScripts": [
+      "build",
+      "lint",
+      "typecheck",
+      "typecheck:api",
+      "test",
+      "test:coverage",
+      "test:e2e",
+      "size",
+      "smoke",
+      "lighthouse",
+      "audit:prod"
+    ]
   },
   "lint-staged": {
     "*.{ts,tsx}": [

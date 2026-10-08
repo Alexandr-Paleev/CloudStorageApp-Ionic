@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · nothing built yet
+Accepted · 2026-10-08 · step 2 of 6 built
 
 ## Context
 
@@ -165,3 +165,24 @@ the app's end-to-end suite against the live database.
   of its own.
 - **Not here either: a React Native app.** `libs/core` would make one a third
   shell over the same code.
+
+## Update — 2026-10-08, step 2
+
+Nx is on the repository: one project, the app at the root, with its targets
+taken from the scripts in `package.json`. Three things were decided on the way
+that the record above does not say.
+
+- **Documentation is outside every project.** `.nxignore` lists it, so Nx
+  counts nothing as affected by a change to it. That is what lets CI skip a
+  push that touches only documentation, this record included. The two legal
+  documents are not on that list, because the app imports them.
+- **CI asks Nx whether to run, and runs what it ran before.** The steps are
+  still the npm scripts. With one project there is nothing yet for Nx to
+  choose between, only whether to start at all. A push to `main` is not
+  asked, and a question that fails turns the job red rather than skipping it.
+- **The cache key carries a fingerprint of the env files.** Nx does not count
+  a file that git ignores, `.env` is one, and Vite inlines it into the
+  bundle. Without the fingerprint a build made before an edit to `.env` would
+  be handed back after it.
+
+The version taken is Nx 23.3.0, with its daemon and Nx Cloud both off.
