@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Proposed · 2026-10-06 · nothing built yet
+Accepted · 2026-10-08 · nothing built yet
 
 ## Context
 
@@ -24,9 +24,10 @@ browser fixes all three.
   an account, so `/terms` and `/privacy` are public routes of the app,
   rendered from the markdown at the repository root. There are also two
   static copies in `public/`. Nothing in the repository links to them but
-  each other, nothing keeps them in step, and they are out of it already:
-  the policy the app renders says where a file's contents go when it is
-  indexed, and the static copy does not.
+  each other, and nothing kept them in step. On 2026-10-08 the privacy
+  policy the app rendered said where a file's contents go when it is
+  indexed and the static copy did not, and the static terms were six
+  sections shorter than the ones the app rendered.
 
 The other half of the context is the code the two sides share. `lib/` holds
 what the browser and the functions both need, next to what only the functions
