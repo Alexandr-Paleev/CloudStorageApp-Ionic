@@ -9,7 +9,10 @@ that cost something: a decision with no downside listed is usually a decision
 nobody examined.
 
 Nothing here is a plan. These describe what the code does now and why, and they
-are amended rather than rewritten when a decision is reversed.
+are amended rather than rewritten when a decision is reversed. The one
+exception says so under its title: 0014 was written before the work it
+decides, because it decides where that work goes, and it is amended as each
+piece ships.
 
 | #                                                | Decision                                                        | Shipped  |
 | ------------------------------------------------ | --------------------------------------------------------------- | -------- |
@@ -25,4 +28,5 @@ are amended rather than rewritten when a decision is reversed.
 | [0010](0010-the-native-shell-has-its-own-origin.md) | The native shell has its own origin, and the API says so | v4.1.0     |
 | [0011](0011-majors-are-taken-by-hand.md)         | Majors are taken by hand, in one deliberate piece               | v4.1.0     |
 | [0012](0012-the-native-build-sells-nothing.md)   | The native build sells nothing                                   | v4.3.0     |
-| [0013](0013-search-by-meaning-is-indexed-on-demand.md) | Search by meaning is indexed on demand, by a swappable model | unreleased |
+| [0013](0013-search-by-meaning-is-indexed-on-demand.md) | Search by meaning is indexed on demand, by a swappable model | v4.7.0     |
+| [0014](0014-the-public-pages-are-a-second-app.md) | The public pages are a second app on its own origin, in one Nx workspace | not built |
