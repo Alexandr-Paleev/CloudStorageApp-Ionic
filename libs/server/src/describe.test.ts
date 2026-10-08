@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MAX_SUMMARY_CHARS, MAX_TAGS, ProviderNotConfigured, SUMMARY_MODEL } from './ai';
+import {
+  MAX_SUMMARY_CHARS,
+  MAX_TAGS,
+  ProviderNotConfigured,
+  SUMMARY_MODEL,
+} from '../../core/src/ai';
 
 const { parse } = vi.hoisted(() => ({ parse: vi.fn() }));
 

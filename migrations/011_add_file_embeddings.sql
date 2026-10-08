@@ -55,7 +55,7 @@ SET LOCAL search_path = public, extensions;
 --
 -- One row per file, keyed by the file: a file has exactly one description, and
 -- re-indexing overwrites rather than accumulates. ON DELETE CASCADE is what
--- keeps this table honest — `lib/account-erase.ts` and the demo sweep in
+-- keeps this table honest — `libs/server/src/account-erase.ts` and the demo sweep in
 -- `api/demo/session.ts` both delete `files` rows and rely on the cascades for
 -- everything hanging off them, as `shared_links` already does.
 --

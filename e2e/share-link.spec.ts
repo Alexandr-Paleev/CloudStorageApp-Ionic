@@ -27,7 +27,7 @@ import {
 /**
  * Minting a link from inside the page rather than through page.request.
  *
- * /api/share builds the returned URL from the Origin header (lib/app-url.ts),
+ * /api/share builds the returned URL from the Origin header (libs/server/src/app-url.ts),
  * and browsers send Origin on every POST while Playwright's APIRequestContext
  * does not — through page.request this route answers 500, which is a property
  * of the test harness and not of the app. Running the same fetch the app runs,

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../../lib/auth';
-import { getAppUrl } from '../../lib/app-url';
+import { supabase } from '../../libs/server/src/auth';
+import { getAppUrl } from '../../libs/server/src/app-url';
 import {
   DEMO_FOLDER_NAME,
   DEMO_RATE_LIMIT,
@@ -11,11 +11,11 @@ import {
   demoPassword,
   demoStoragePath,
   isExpiredDemoUser,
-} from '../../lib/demo';
-import { RateLimiter, clientIp, tooManyRequests } from '../../lib/rate-limit';
-import { applyCors } from '../../lib/cors';
-import { eraseAccount } from '../../lib/account-erase';
-import { configuredProviders } from '../../lib/erase-providers';
+} from '../../libs/server/src/demo';
+import { RateLimiter, clientIp, tooManyRequests } from '../../libs/server/src/rate-limit';
+import { applyCors } from '../../libs/server/src/cors';
+import { eraseAccount } from '../../libs/server/src/account-erase';
+import { configuredProviders } from '../../libs/server/src/erase-providers';
 
 /**
  * POST /api/demo/session — hands an anonymous visitor a signed-in account.

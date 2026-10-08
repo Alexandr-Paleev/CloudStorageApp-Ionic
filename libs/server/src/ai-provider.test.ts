@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProviderNotConfigured } from './ai';
+import { ProviderNotConfigured } from '../../core/src/ai';
 import { activeBackend } from './ai-provider';
 import { CF_EMBEDDING_MODEL } from './cloudflare-ai';
 

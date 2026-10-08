@@ -1,7 +1,7 @@
 /**
  * The numbers and the plain functions behind semantic search.
  *
- * Everything here is decided in one place for the same reason `lib/tiers.ts`
+ * Everything here is decided in one place for the same reason `libs/core/src/tiers.ts`
  * exists: these values are spelled out in three others — the CHECK
  * constraints in `migrations/011_add_file_embeddings.sql`, the API function
  * that writes the rows, and the eval that scores the result — and a copy that
@@ -136,7 +136,7 @@ export function planFor(file: IndexableFile): IndexPlan {
     // Google Drive and Dropbox files live in the user's own cloud, reached
     // with their OAuth grant while they are connected. This app holds no
     // standing authority to read them later, which is the same reason
-    // lib/account-erase.ts cannot delete them.
+    // libs/server/src/account-erase.ts cannot delete them.
     return { kind: 'skip', reason: `${file.storage_type} files stay in the user's own cloud` };
   }
 

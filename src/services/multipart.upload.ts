@@ -1,4 +1,9 @@
-import { MAX_PARTS_PER_BATCH, partRange, planParts, type PartPlan } from '../../lib/multipart';
+import {
+  MAX_PARTS_PER_BATCH,
+  partRange,
+  planParts,
+  type PartPlan,
+} from '../../libs/core/src/multipart';
 import { HttpError } from '../utils/http.utils';
 import { withRetry } from '../utils/retry.utils';
 import type { CompletedPart, PendingUpload, UploadStore } from './upload-store';

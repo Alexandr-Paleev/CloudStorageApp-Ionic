@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
-import { applyCors } from '../../lib/cors';
-import { RateLimiter, clientIp, tooManyRequests } from '../../lib/rate-limit';
-import { eraseAccount } from '../../lib/account-erase';
-import { configuredProviders } from '../../lib/erase-providers';
+import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { applyCors } from '../../libs/server/src/cors';
+import { RateLimiter, clientIp, tooManyRequests } from '../../libs/server/src/rate-limit';
+import { eraseAccount } from '../../libs/server/src/account-erase';
+import { configuredProviders } from '../../libs/server/src/erase-providers';
 
 /**
  * DELETE /api/account — erases the caller's account and everything under it.

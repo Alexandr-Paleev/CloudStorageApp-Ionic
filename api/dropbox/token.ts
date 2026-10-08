@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
-import { refreshAccessToken } from '../../lib/dropbox';
-import { applyCors } from '../../lib/cors';
+import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { refreshAccessToken } from '../../libs/server/src/dropbox';
+import { applyCors } from '../../libs/server/src/cors';
 
 /**
  * Hands the caller a fresh access token for their own Dropbox connection.

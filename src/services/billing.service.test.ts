@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import billingService, { SubscriptionExistsError } from './billing.service';
-import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../lib/tiers';
+import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../libs/core/src/tiers';
 import type { UserProfile } from '../types/billing.types';
 
 const getSession = vi.fn();

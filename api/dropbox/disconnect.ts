@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
-import { applyCors } from '../../lib/cors';
+import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { applyCors } from '../../libs/server/src/cors';
 
 /** Forgets the stored refresh token. Disconnecting has to happen server-side
  *  now that the browser no longer holds one. */

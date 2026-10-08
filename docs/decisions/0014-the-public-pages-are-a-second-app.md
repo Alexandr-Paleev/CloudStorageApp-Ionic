@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 2 of 6 built
+Accepted · 2026-10-08 · step 2 of 6 built, and the first half of step 3
 
 ## Context
 
@@ -186,3 +186,28 @@ that the record above does not say.
   be handed back after it.
 
 The version taken is Nx 23.3.0, with its daemon and Nx Cloud both off.
+
+## Update — 2026-10-08, step 3, first half
+
+Step 3 goes in as two changes. This is the move: `lib/` is gone, and its 53
+files are in `libs/core/src` and `libs/server/src`. The rule is the second
+change, so that the diff which renames every shared file is not also the one
+that changes what lint accepts.
+
+- **The line is drawn by use.** `libs/core` holds what both sides import
+  today: the four modules the app imports and the one that one of them
+  needs. The other 22 are in `libs/server`. Some of those use nothing a
+  browser lacks, `format` and `demo` among them, and they stay where they are
+  until a second side asks for them. A small `libs/core` is the point:
+  everything in it is one import away from the bundle. The next thing to
+  join it is the price, which step 4 takes out of the app.
+- **Imports are still relative.** They are longer and say nothing new. What
+  the record above leaves open, whether Vercel's builder resolves a library
+  by name, belongs to the second change and is not asked here. Each of the
+  twelve functions traces to the same shared modules it did before the move,
+  and the app builds to the same bytes.
+- **Pointers moved, history did not.** The three links from older records
+  into `lib/` lead to the new paths, and so do the comments that name a
+  shared file, the ones in the migrations included. The changelog keeps the
+  paths that were true when each entry was written, and so does the text of
+  this record above.

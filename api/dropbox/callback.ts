@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
-import { getAppUrl } from '../../lib/app-url';
-import { assertSameOrigin, exchangeCode } from '../../lib/dropbox';
-import { applyCors } from '../../lib/cors';
+import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { getAppUrl } from '../../libs/server/src/app-url';
+import { assertSameOrigin, exchangeCode } from '../../libs/server/src/dropbox';
+import { applyCors } from '../../libs/server/src/cors';
 
 /**
  * Exchanges the OAuth code for tokens and keeps the refresh token here.

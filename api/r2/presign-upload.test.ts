@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
-import { TIER_LIMITS } from '../../lib/tiers';
-import { PRESIGN_IP_LIMIT, PRESIGN_LIMIT, resetRateLimits } from '../../lib/rate-limit';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
+import { TIER_LIMITS } from '../../libs/core/src/tiers';
+import { PRESIGN_IP_LIMIT, PRESIGN_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
@@ -17,13 +22,13 @@ const { FakeAuthError, authenticateUser, db, signedCommands } = vi.hoisted(() =>
   signedCommands: [] as { input: Record<string, unknown> }[],
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },
 }));
 
-vi.mock('../../lib/r2', () => ({
+vi.mock('../../libs/server/src/r2', () => ({
   getS3Client: () => ({}),
   getR2BucketName: () => 'test-bucket',
 }));

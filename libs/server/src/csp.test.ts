@@ -7,7 +7,7 @@ interface VercelConfig {
 }
 
 const config = JSON.parse(
-  readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
+  readFileSync(new URL('../../../vercel.json', import.meta.url), 'utf8')
 ) as VercelConfig;
 
 function headerValue(name: string): string {

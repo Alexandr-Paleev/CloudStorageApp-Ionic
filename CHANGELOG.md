@@ -30,6 +30,22 @@ reasoning behind the larger decisions lives in
   would therefore not count: Vite inlines them into the bundle, so a build
   made before an edit to `.env` must not be handed back after it. Vercel
   still builds with `npm run build`, and what it deploys is unchanged.
+- **`lib/` is now `libs/core` and `libs/server`.** This is the first half of
+  step 3 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md).
+  `lib/` held what the app and the functions both use next to what only the
+  functions may touch, and nothing in the layout said which was which. The
+  five modules the app reaches are in `libs/core`: the four it imports
+  (`tiers`, `multipart`, `safe-url`, `ai`) and the one `ai` needs
+  (`stored-path`). The other 22, the service-role client among them, are in
+  `libs/server` with the test helper. Tests moved with their modules.
+
+  Nothing but the paths changed. Imports are still relative. Built from
+  `main` and from this change with the same environment, `dist/` holds the
+  same 60 files, byte for byte, and each of the twelve functions traces to
+  the same shared modules it did. The split is still a convention: the lint
+  rule that makes importing `libs/server` from the app an error is the second
+  half of the step.
 
 ### Fixed
 

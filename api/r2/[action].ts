@@ -10,11 +10,11 @@ import {
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { authenticateUser, AuthError } from '../../lib/auth';
-import { getS3Client, getR2BucketName } from '../../lib/r2';
-import { sanitizeFileName } from '../../lib/filename';
-import { readQuota, quotaRejection } from '../../lib/quota';
-import { MAX_PARTS, MAX_PARTS_PER_BATCH } from '../../lib/multipart';
+import { authenticateUser, AuthError } from '../../libs/server/src/auth';
+import { getS3Client, getR2BucketName } from '../../libs/server/src/r2';
+import { sanitizeFileName } from '../../libs/server/src/filename';
+import { readQuota, quotaRejection } from '../../libs/server/src/quota';
+import { MAX_PARTS, MAX_PARTS_PER_BATCH } from '../../libs/core/src/multipart';
 import {
   PRESIGN_IP_LIMIT,
   PRESIGN_LIMIT,
@@ -22,9 +22,9 @@ import {
   RateLimiter,
   clientIp,
   tooManyRequests,
-} from '../../lib/rate-limit';
-import { applyCors } from '../../lib/cors';
-import { ownerPrefix, ownsStoredPath } from '../../lib/stored-path';
+} from '../../libs/server/src/rate-limit';
+import { applyCors } from '../../libs/server/src/cors';
+import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
 
 /**
  * Everything R2, behind one serverless function.
@@ -59,7 +59,7 @@ const byPartSigningUser = new RateLimiter(R2_PART_SIGN_LIMIT);
 /**
  * Every object this app writes lives under the uploader's own prefix, and this
  * is the only thing standing between a caller and someone else's file. The
- * prefix, and why its trailing slash matters, is `lib/stored-path.ts`.
+ * prefix, and why its trailing slash matters, is `libs/core/src/stored-path.ts`.
  */
 function ownsKey(userId: string, key: string): boolean {
   return ownsStoredPath({ storage_type: 'r2', storage_path: key }, userId);

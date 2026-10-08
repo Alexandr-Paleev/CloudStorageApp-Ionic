@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
-import { AI_INDEX_LIMIT, resetRateLimits } from '../../lib/rate-limit';
-import { EMBEDDING_MODEL, ProviderNotConfigured, TEXT_SAMPLE_BYTES } from '../../lib/ai';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
+import { AI_INDEX_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit';
+import { EMBEDDING_MODEL, ProviderNotConfigured, TEXT_SAMPLE_BYTES } from '../../libs/core/src/ai';
 
 const {
   FakeAuthError,
@@ -28,7 +33,7 @@ const {
   presign: vi.fn(),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticate: (...args: unknown[]) => authenticate(...args),
   supabase: {
@@ -41,13 +46,13 @@ vi.mock('../../lib/auth', () => ({
 
 // The backend is the seam between this route and whichever pair of models the
 // deployment is configured for; the route's job is to pick one and use it.
-vi.mock('../../lib/ai-provider', () => ({
+vi.mock('../../libs/server/src/ai-provider', () => ({
   activeBackend: () => activeBackend(),
 }));
 
 // The S3 client wants credentials at construction, and none of this test is
 // about signing — only about which URL reaches the model.
-vi.mock('../../lib/r2', () => ({
+vi.mock('../../libs/server/src/r2', () => ({
   getS3Client: () => ({}),
   getR2BucketName: () => 'test-bucket',
 }));

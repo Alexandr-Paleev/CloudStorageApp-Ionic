@@ -28,7 +28,7 @@ Two changes, and the second is the one that survives a mistake in the first:
    owner copied.
 
 Tokens are 32 random bytes, base64url — long enough that guessing is not an
-attack worth modelling ([`lib/share.ts`](../../lib/share.ts)).
+attack worth modelling ([`libs/server/src/share.ts`](../../libs/server/src/share.ts)).
 
 ## Consequences
 

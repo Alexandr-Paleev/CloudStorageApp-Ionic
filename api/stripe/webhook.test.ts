@@ -5,8 +5,8 @@ import {
   mockSupabase,
   type RecordedCall,
   type TableAnswer,
-} from '../../lib/test-utils';
-import { TIER_LIMITS } from '../../lib/tiers';
+} from '../../libs/server/src/test-utils';
+import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
 const { db, stripe } = vi.hoisted(() => ({
   db: {
@@ -19,7 +19,7 @@ const { db, stripe } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: class extends Error {},
   authenticateUser: vi.fn(),
   supabase: { from: (table: string) => db.client!.from(table) },

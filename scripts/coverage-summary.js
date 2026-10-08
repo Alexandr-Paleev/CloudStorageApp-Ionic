@@ -36,7 +36,7 @@ function colourFor(pct) {
 const METRICS = ['statements', 'branches', 'functions', 'lines'];
 
 const GROUPS = [
-  ['Server — api/ and lib/', 'server', (file) => file.startsWith('api/') || file.startsWith('lib/')],
+  ['Server — api/ and libs/', 'server', (file) => file.startsWith('api/') || file.startsWith('libs/')],
   ['Client — src/', 'client', (file) => file.startsWith('src/')],
 ];
 

@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 /**
  * Minimal stand-ins for the Vercel request/response pair.
  *
- * They live in lib/ rather than next to the specs because Vercel turns every
+ * They live in libs/server rather than next to the specs because Vercel turns every
  * .ts file under api/ into its own serverless function, and the Hobby plan
  * allows twelve.
  */

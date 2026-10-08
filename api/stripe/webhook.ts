@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { getPeriodEnd } from '../../lib/stripe';
-import { TIER_LIMITS } from '../../lib/tiers';
+import { getPeriodEnd } from '../../libs/server/src/stripe';
+import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

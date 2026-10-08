@@ -1,4 +1,4 @@
-import { TIER_LIMITS } from '../../lib/tiers';
+import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
 export type SubscriptionTier = 'free' | 'pro';
 

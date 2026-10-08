@@ -4,7 +4,7 @@ import {
   ProviderNotConfigured,
   clampSummary,
   normalizeTags,
-} from './ai';
+} from '../../core/src/ai';
 import { fetchBytes } from './fetch-bytes';
 import type { Description, DescribeSource } from './describe';
 

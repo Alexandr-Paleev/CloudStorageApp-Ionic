@@ -1,6 +1,6 @@
 # 0007 — Rate limits live in module scope, not in a shared counter
 
-Accepted · shipped in v4.0.0 · [`lib/rate-limit.ts`](../../lib/rate-limit.ts)
+Accepted · shipped in v4.0.0 · [`libs/server/src/rate-limit.ts`](../../libs/server/src/rate-limit.ts)
 
 ## Context
 
@@ -37,5 +37,5 @@ window is one minute.
 - Revoking a share link is deliberately outside the per-account limit. It is the
   owner's brake on a leaked link; refusing it protects nothing and keeps the
   link alive for exactly as long as the refusal lasts.
-- Moving to a shared counter later changes `lib/rate-limit.ts` and nothing else:
+- Moving to a shared counter later changes `libs/server/src/rate-limit.ts` and nothing else:
   the routes only ask "may this caller proceed".

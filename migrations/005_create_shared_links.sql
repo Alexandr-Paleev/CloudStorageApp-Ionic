@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.shared_links (
     -- it needs its own ALTER migration that both paths run.
     created_by UUID NOT NULL,
     -- Never the token itself: only its SHA-256. See 004 for why, and
-    -- lib/share.ts for where the hashing happens.
+    -- libs/server/src/share.ts for where the hashing happens.
     token_hash TEXT NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE,
     revoked_at TIMESTAMP WITH TIME ZONE,

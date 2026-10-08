@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type RecordedCall } from '../lib/test-utils';
-import { hashShareToken } from '../lib/share';
-import { SHARE_CREATE_LIMIT, SHARE_IP_LIMIT, resetRateLimits } from '../lib/rate-limit';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type RecordedCall,
+} from '../libs/server/src/test-utils';
+import { hashShareToken } from '../libs/server/src/share';
+import { SHARE_CREATE_LIMIT, SHARE_IP_LIMIT, resetRateLimits } from '../libs/server/src/rate-limit';
 
 const APP_URL = 'https://app.example';
 const TOKEN = 'test-token-value';
@@ -18,7 +23,7 @@ const { FakeAuthError, authenticateUser, db, signedUrl } = vi.hoisted(() => ({
   signedUrl: vi.fn(),
 }));
 
-vi.mock('../lib/auth', () => ({
+vi.mock('../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: {
@@ -27,7 +32,7 @@ vi.mock('../lib/auth', () => ({
   },
 }));
 
-vi.mock('../lib/r2', () => ({
+vi.mock('../libs/server/src/r2', () => ({
   getS3Client: () => ({}),
   getR2BucketName: () => 'bucket',
 }));

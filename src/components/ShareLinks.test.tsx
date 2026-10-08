@@ -40,7 +40,7 @@ describe('ShareLinks', () => {
   });
 
   it('separates a link that still works from one that no longer does', async () => {
-    // stateOf() deliberately re-implements shareUnusableReason() from lib/share
+    // stateOf() deliberately re-implements shareUnusableReason() from libs/server/src/share
     // rather than importing it — that module pulls node:crypto in. Which means
     // the two can drift, and only a test on this side would notice.
     vi.mocked(shareService.listLinks).mockResolvedValue(links);

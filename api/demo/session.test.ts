@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mockRequest, mockResponse } from '../../lib/test-utils';
-import { DEMO_RATE_LIMIT, DEMO_TTL_MS } from '../../lib/demo';
+import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
+import { DEMO_RATE_LIMIT, DEMO_TTL_MS } from '../../libs/server/src/demo';
 
 const APP_URL = 'https://app.example';
 
@@ -25,7 +25,7 @@ const { admin, storage, table, providers } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   supabase: {
     auth: { admin },
     storage: { from: () => storage },
@@ -49,7 +49,7 @@ vi.mock('../../lib/auth', () => ({
   },
 }));
 
-vi.mock('../../lib/erase-providers', () => ({
+vi.mock('../../libs/server/src/erase-providers', () => ({
   configuredProviders: () => providers.current,
 }));
 

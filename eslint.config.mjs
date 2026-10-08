@@ -100,11 +100,11 @@ export default tseslint.config(
   },
 
   {
-    /* Everything that runs under node: the Vercel handlers, the code `lib/`
+    /* Everything that runs under node: the Vercel handlers, the code `libs/`
        shares with them, the Playwright specs, and the config files at the root. */
     files: [
       'api/**/*.ts',
-      'lib/**/*.ts',
+      'libs/**/*.ts',
       'e2e/**/*.ts',
       '*.mts',
     ],

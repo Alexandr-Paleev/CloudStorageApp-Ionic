@@ -8,7 +8,7 @@ import './ShareLinks.css';
 type LinkState = 'active' | 'revoked' | 'expired';
 
 /**
- * Mirrors shareUnusableReason() in lib/share.ts rather than importing it: that
+ * Mirrors shareUnusableReason() in libs/server/src/share.ts rather than importing it: that
  * module pulls in node:crypto for token generation, which has no place in the
  * browser bundle.
  */

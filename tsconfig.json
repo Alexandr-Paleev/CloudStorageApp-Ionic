@@ -30,7 +30,7 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "lib", "e2e", "playwright.config.ts"],
+  "include": ["src", "libs", "e2e", "playwright.config.ts"],
   "exclude": ["api", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

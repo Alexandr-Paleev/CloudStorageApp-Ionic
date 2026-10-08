@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
 
 const APP_URL = 'https://app.example';
 
@@ -14,7 +19,7 @@ const { FakeAuthError, authenticateUser, db, stripe } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },

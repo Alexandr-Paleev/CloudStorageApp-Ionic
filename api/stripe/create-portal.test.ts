@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase } from '../../lib/test-utils';
+import { mockRequest, mockResponse, mockSupabase } from '../../libs/server/src/test-utils';
 
 const APP_URL = 'https://app.example';
 
@@ -10,7 +10,7 @@ const { FakeAuthError, authenticateUser, db, createPortalSession } = vi.hoisted(
   createPortalSession: vi.fn(),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },
