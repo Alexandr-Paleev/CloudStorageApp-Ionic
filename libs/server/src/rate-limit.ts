@@ -3,7 +3,7 @@ import type { VercelResponse } from '@vercel/node';
 /**
  * The ceiling on how often a caller may reach a route.
  *
- * This started life inside lib/demo.ts, guarding the one endpoint that created
+ * This started life inside libs/server/src/demo.ts, guarding the one endpoint that created
  * accounts, with a note saying every other /api route needed the same thing.
  * They did: POST /api/share mints a credential that bypasses authentication
  * entirely, and presign-upload signs a write into the bucket. Neither had

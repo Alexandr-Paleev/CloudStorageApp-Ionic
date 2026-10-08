@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from './ai';
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from '../../core/src/ai';
 import { embed } from './embeddings';
 
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => i / EMBEDDING_DIMENSIONS);

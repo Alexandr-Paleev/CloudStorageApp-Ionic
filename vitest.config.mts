@@ -18,7 +18,7 @@ export default defineConfig({
         test: {
           name: 'server',
           environment: 'node',
-          include: ['api/**/*.test.ts', 'lib/**/*.test.ts'],
+          include: ['api/**/*.test.ts', 'libs/**/*.test.ts'],
           /* e2e/ belongs to Playwright — vitest must not pick those specs up */
           exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
         },
@@ -76,12 +76,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'json-summary'],
-      include: ['api/**/*.ts', 'lib/**/*.ts', 'src/**/*.ts', 'src/**/*.tsx'],
+      include: ['api/**/*.ts', 'libs/**/*.ts', 'src/**/*.ts', 'src/**/*.tsx'],
       exclude: [
         '**/*.test.ts',
         '**/*.test.tsx',
         '**/*.d.ts',
-        'lib/test-utils.ts',
+        'libs/server/src/test-utils.ts',
         'src/test/**',
         /* iCloud leaves "name 2.ts" copies in the working tree. They are
            gitignored and absent from CI, so counting them here would make the

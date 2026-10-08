@@ -24,12 +24,12 @@ import {
 } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
 import storageService, { FileMetadata, PendingUpload } from '../services/storage.service';
-import { DEFAULT_STORAGE_LIMIT } from '../../lib/tiers';
+import { DEFAULT_STORAGE_LIMIT } from '../../libs/core/src/tiers';
 import googleDriveAuthService from '../services/googledrive-auth.service';
 import { useProfile } from '../hooks/useProfile';
 import ProviderSelector from '../components/ProviderSelector';
 import ResumableUploads from '../components/ResumableUploads';
-import { shouldUseMultipart } from '../../lib/multipart';
+import { shouldUseMultipart } from '../../libs/core/src/multipart';
 import UploadQueue from '../components/UploadQueue';
 import {
   absorb,

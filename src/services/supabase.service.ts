@@ -92,7 +92,7 @@ const supabaseService = {
     if (error) {
       Sentry.captureException(error, { tags: { context: 'supabase.getTotalStorageUsed' } });
 
-      // Deploy order: this column arrives with migrations/007. lib/quota.ts
+      // Deploy order: this column arrives with migrations/007. libs/server/src/quota.ts
       // says the same thing on the server side; without it the symptom is a
       // meter stuck at 0 B and every upload failing, which points nowhere.
       if (/bytes_used/.test(error.message ?? '')) {

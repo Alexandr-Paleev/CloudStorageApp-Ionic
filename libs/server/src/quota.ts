@@ -1,6 +1,6 @@
 import { supabase } from './auth';
 import { formatBytes } from './format';
-import { DEFAULT_STORAGE_LIMIT } from './tiers';
+import { DEFAULT_STORAGE_LIMIT } from '../../core/src/tiers';
 
 export type Quota = {
   /** Bytes the plan allows. */

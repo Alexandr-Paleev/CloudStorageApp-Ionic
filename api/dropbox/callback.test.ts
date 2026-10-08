@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type RecordedCall } from '../../lib/test-utils';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type RecordedCall,
+} from '../../libs/server/src/test-utils';
 
 const APP_URL = 'https://app.example';
 
@@ -13,15 +18,15 @@ const { FakeAuthError, authenticateUser, db, exchangeCode } = vi.hoisted(() => (
   exchangeCode: vi.fn(),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },
 }));
 
-vi.mock('../../lib/dropbox', async (importOriginal) => {
+vi.mock('../../libs/server/src/dropbox', async (importOriginal) => {
   // assertSameOrigin is the thing under test here — keep the real one.
-  const actual = await importOriginal<typeof import('../../lib/dropbox')>();
+  const actual = await importOriginal<typeof import('../../libs/server/src/dropbox')>();
   return { ...actual, exchangeCode: (...args: unknown[]) => exchangeCode(...args) };
 });
 

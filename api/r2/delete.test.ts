@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse } from '../../lib/test-utils';
+import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
 
 const { FakeAuthError, authenticateUser, send } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -7,13 +7,13 @@ const { FakeAuthError, authenticateUser, send } = vi.hoisted(() => ({
   send: vi.fn(),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: {},
 }));
 
-vi.mock('../../lib/r2', () => ({
+vi.mock('../../libs/server/src/r2', () => ({
   getS3Client: () => ({ send }),
   getR2BucketName: () => 'bucket',
 }));

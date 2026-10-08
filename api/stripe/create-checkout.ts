@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { authenticateUser, AuthError, supabase } from '../../lib/auth';
-import { getAppUrl } from '../../lib/app-url';
-import { applyCors } from '../../lib/cors';
-import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../lib/rate-limit';
+import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { getAppUrl } from '../../libs/server/src/app-url';
+import { applyCors } from '../../libs/server/src/cors';
+import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../libs/server/src/rate-limit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 

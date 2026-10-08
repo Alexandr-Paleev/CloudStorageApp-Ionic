@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticate, AuthError, supabase } from '../../lib/auth';
-import { isDemoEmail } from '../../lib/demo';
+import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
+import { isDemoEmail } from '../../libs/server/src/demo';
 import {
   MAX_DESCRIBE_BYTES,
   ProviderNotConfigured,
@@ -11,12 +11,12 @@ import {
   toVectorLiteral,
   type IndexPlan,
   type IndexableFile,
-} from '../../lib/ai';
-import { fetchBytes } from '../../lib/fetch-bytes';
-import { ownsStoredPath } from '../../lib/stored-path';
-import { signOwnedPath } from '../../lib/sign-owned-path';
-import { activeBackend } from '../../lib/ai-provider';
-import type { DescribeSource } from '../../lib/describe';
+} from '../../libs/core/src/ai';
+import { fetchBytes } from '../../libs/server/src/fetch-bytes';
+import { ownsStoredPath } from '../../libs/core/src/stored-path';
+import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
+import { activeBackend } from '../../libs/server/src/ai-provider';
+import type { DescribeSource } from '../../libs/server/src/describe';
 import {
   AI_EMBED_LIMIT,
   AI_INDEX_LIMIT,
@@ -24,8 +24,8 @@ import {
   RateLimiter,
   clientIp,
   tooManyRequests,
-} from '../../lib/rate-limit';
-import { applyCors } from '../../lib/cors';
+} from '../../libs/server/src/rate-limit';
+import { applyCors } from '../../libs/server/src/cors';
 
 /**
  * The two halves of semantic search that need a secret:
@@ -203,7 +203,7 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
   );
 
   if (writeError) {
-    // Deploy order, as in lib/quota.ts: the table arrives with migrations/011,
+    // Deploy order, as in libs/server/src/quota.ts: the table arrives with migrations/011,
     // and "relation does not exist" points at nothing on its own.
     if (/file_embeddings/.test(writeError.message)) {
       throw new Error(

@@ -17,8 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true
   },
-  /* lib/ holds the server-side helpers. They live outside api/ because Vercel
-     turns every file under api/ into its own Serverless Function, and the
-     Hobby plan allows at most 12 per deployment. */
-  "include": ["api", "lib", "vitest.config.mts"]
+  /* libs/ holds what the handlers share: libs/server, and libs/core, which the
+     app uses as well. Neither lives under api/, because Vercel turns every
+     file there into its own Serverless Function, and the Hobby plan allows at
+     most 12 per deployment. */
+  "include": ["api", "libs", "vitest.config.mts"]
 }

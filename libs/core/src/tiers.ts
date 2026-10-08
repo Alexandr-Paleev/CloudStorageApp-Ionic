@@ -7,7 +7,7 @@
  * around. A copy that drifts here does not throw: it either sells storage the
  * server refuses to accept, or hands out space nobody paid for.
  *
- * `lib/` is compiled into both tsconfigs, so there is no longer any reason for
+ * `libs/` is compiled into both tsconfigs, so there is no longer any reason for
  * the copies to exist.
  *
  * Changing `storage_limit` also means updating the DEFAULT on `profiles`

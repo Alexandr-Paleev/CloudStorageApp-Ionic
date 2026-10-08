@@ -1,7 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { apiUrl } from '../utils/api.utils';
 import { httpErrorFrom } from '../utils/http.utils';
-import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '../../lib/ai';
+import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '../../libs/core/src/ai';
 import type { FileMetadata } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
 
@@ -132,7 +132,7 @@ const aiService = {
     });
 
     if (error) {
-      /* Deploy order, as in lib/quota.ts: the function arrives with
+      /* Deploy order, as in libs/server/src/quota.ts: the function arrives with
          migrations/011, and PostgREST's own words for its absence name
          neither the function nor the file that creates it. */
       if (/match_files/.test(error.message) || error.code === 'PGRST202') {

@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
-import { TIER_LIMITS } from '../../lib/tiers';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
+import { TIER_LIMITS } from '../../libs/core/src/tiers';
 import {
   CLOUDINARY_DELETE_LIMIT,
   CLOUDINARY_IP_LIMIT,
   CLOUDINARY_SIGN_LIMIT,
   resetRateLimits,
-} from '../../lib/rate-limit';
+} from '../../libs/server/src/rate-limit';
 
 const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -17,7 +22,7 @@ const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest } =
   apiSignRequest: vi.fn((_params: Record<string, unknown>, _secret: string) => 'the-signature'),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },

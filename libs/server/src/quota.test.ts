@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockSupabase, type TableAnswer } from './test-utils';
-import { TIER_LIMITS, DEFAULT_STORAGE_LIMIT } from './tiers';
+import { TIER_LIMITS, DEFAULT_STORAGE_LIMIT } from '../../core/src/tiers';
 
 const { db } = vi.hoisted(() => ({
   db: { client: null as { from: (table: string) => unknown } | null },

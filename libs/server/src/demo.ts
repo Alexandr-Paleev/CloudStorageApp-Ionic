@@ -11,7 +11,7 @@
  * be tested; api/demo/session.ts holds the orchestration.
  */
 
-import { ownerPrefix } from './stored-path';
+import { ownerPrefix } from '../../core/src/stored-path';
 
 /** Demo accounts are recognised by this prefix, and deleted by it. */
 export const DEMO_EMAIL_PREFIX = 'demo-';
@@ -106,6 +106,6 @@ export function demoStoragePath(userId: string, name: string, timestamp: number)
 }
 
 /* The limiter these two constants feed, and the address it counts against, now
-   live in lib/rate-limit.ts: /api/share and /api/r2/presign-upload needed the
+   live in libs/server/src/rate-limit.ts: /api/share and /api/r2/presign-upload needed the
    same thing, and the copy that guarded this endpoint was the only one there
    was. */

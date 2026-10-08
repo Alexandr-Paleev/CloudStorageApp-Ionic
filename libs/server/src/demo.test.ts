@@ -89,7 +89,7 @@ describe('DEMO_SEED', () => {
   it('names assets that exist under public/demo', async () => {
     const { existsSync } = await import('node:fs');
     for (const item of DEMO_SEED) {
-      expect(existsSync(new URL(`../public/demo/${item.asset}`, import.meta.url))).toBe(true);
+      expect(existsSync(new URL(`../../../public/demo/${item.asset}`, import.meta.url))).toBe(true);
     }
   });
 });

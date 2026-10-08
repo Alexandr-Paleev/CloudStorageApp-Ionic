@@ -1,6 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { UserProfile } from '../types/billing.types';
-import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../lib/tiers';
+import { DEFAULT_STORAGE_LIMIT, TIER_LIMITS } from '../../libs/core/src/tiers';
 import { apiUrl } from '../utils/api.utils';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {

@@ -2,7 +2,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { supabase } from './auth';
 import { getS3Client, getR2BucketName } from './r2';
-import { ownsStoredPath } from './stored-path';
+import { ownsStoredPath } from '../../core/src/stored-path';
 
 /** The Supabase Storage bucket every upload goes to. */
 const BUCKET = 'files';

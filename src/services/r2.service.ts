@@ -1,6 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { HttpError, httpErrorFrom } from '../utils/http.utils';
-import { shouldUseMultipart } from '../../lib/multipart';
+import { shouldUseMultipart } from '../../libs/core/src/multipart';
 import { createMultipartUploader, type PartUploadOptions } from './multipart.upload';
 import { uploadStore, type PendingUpload } from './upload-store';
 import { apiUrl } from '../utils/api.utils';

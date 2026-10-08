@@ -61,7 +61,7 @@ function rewritable(path: string): boolean {
  * Whether the path on a row really belongs to the given account.
  *
  * `files` rows are written by the browser under a policy that says only which
- * *rows* an account may write, never what may go in them — `lib/safe-url.ts`
+ * *rows* an account may write, never what may go in them — `libs/core/src/safe-url.ts`
  * says the same thing about `download_url` one column over. So a caller can
  * put another account's object path into their own row and ask a route that
  * holds the service-role key to read it: the indexer, or `/api/share` before it

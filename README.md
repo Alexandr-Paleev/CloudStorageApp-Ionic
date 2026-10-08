@@ -549,7 +549,7 @@ The interesting parts:
   account and the Sentry ingest host all differ per deployment, and `vercel.json`
   is checked in, so a hardcoded list would break every fork.
 
-`lib/csp.test.ts` parses the header out of `vercel.json` and asserts that every
+`libs/server/src/csp.test.ts` parses the header out of `vercel.json` and asserts that every
 origin the app injects a script from is allowed. The policy is a string inside a
 JSON file — nothing else in the toolchain can see it, and a mistake there shows
 up only in production, in whichever browser the visitor happened to bring.
@@ -795,7 +795,9 @@ cloud-storage-app/
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here
 │   └── stripe/                    # Checkout, Customer Portal, webhook
-├── lib/                           # Shared by api/ and tests (auth, stripe, format)
+├── libs/
+│   ├── core/                      # What the app and the functions both use (tiers, upload parts, URL rules)
+│   └── server/                    # What only the functions may use (auth, signing, Stripe, erasure)
 ├── migrations/                    # The whole schema, in order, each re-runnable
 ├── e2e/                           # Playwright specs
 ├── capacitor.config.ts            # Capacitor config
@@ -903,7 +905,7 @@ A push to `main` runs everything regardless.
 ### What the tests cover, and what they deliberately do not
 
 Two Vitest projects, because the two halves of this app run in different
-places: `server` executes the Vercel handlers and the `lib/` helpers under
+places: `server` executes the Vercel handlers and the `libs/` helpers under
 node, `client` renders the React layer under jsdom. CI prints their coverage
 as two tables — a single blended percentage would hide which half a pull
 request moved.
@@ -928,7 +930,7 @@ money and quota** has a test:
 - The storage meter — cancelling Pro drops the limit back to 500 MB without
   deleting anything, so the bar stops at full while the number keeps counting.
 - Share-link state — `stateOf()` in the browser deliberately re-implements
-  `shareUnusableReason()` from `lib/share.ts` rather than pull `node:crypto`
+  `shareUnusableReason()` from `libs/server/src/share.ts` rather than pull `node:crypto`
   into the bundle. Two implementations can drift; each side is tested.
 
 Pages are left to Playwright rather than jsdom: `e2e/` opens a throwaway
@@ -981,7 +983,7 @@ The migration had been run. The row was there — a direct query against the
 database returned it, `stripe_customer_id` and all.
 
 **The cause.** Every serverless function builds its Supabase client in
-`lib/auth.ts` from `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The project
+`libs/server/src/auth.ts` from `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The project
 URL was correct. The key was not: decoding the JWT payload showed
 `"role": "anon"`. An anon key had been stored under the service-role name, in
 all three Vercel environments, 221 days earlier.

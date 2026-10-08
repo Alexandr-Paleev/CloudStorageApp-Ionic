@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError } from '../../lib/auth';
-import { readQuota, quotaRejection } from '../../lib/quota';
+import { authenticateUser, AuthError } from '../../libs/server/src/auth';
+import { readQuota, quotaRejection } from '../../libs/server/src/quota';
 import {
   CLOUDINARY_DELETE_LIMIT,
   CLOUDINARY_IP_LIMIT,
@@ -8,9 +8,9 @@ import {
   RateLimiter,
   clientIp,
   tooManyRequests,
-} from '../../lib/rate-limit';
-import { applyCors } from '../../lib/cors';
-import { ownerPrefix, ownsStoredPath } from '../../lib/stored-path';
+} from '../../libs/server/src/rate-limit';
+import { applyCors } from '../../libs/server/src/cors';
+import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
 
 /**
  * Two actions, one serverless function: /api/cloudinary/sign and
@@ -156,7 +156,7 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
  * now gets a 403 it can see, rather than everyone getting a way to delete what
  * they do not own.
  *
- * The prefix, and why its trailing slash matters, is `lib/stored-path.ts`.
+ * The prefix, and why its trailing slash matters, is `libs/core/src/stored-path.ts`.
  */
 function ownsAsset(userId: string, publicId: string): boolean {
   return ownsStoredPath({ storage_type: 'cloudinary', storage_path: publicId }, userId);

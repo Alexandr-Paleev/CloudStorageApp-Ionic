@@ -1,23 +1,23 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, AuthError, supabase } from '../lib/auth';
-import { getAppUrl } from '../lib/app-url';
+import { authenticateUser, AuthError, supabase } from '../libs/server/src/auth';
+import { getAppUrl } from '../libs/server/src/app-url';
 import {
   generateShareToken,
   hashShareToken,
   resolveExpiry,
   shareUnusableReason,
   shareUrl,
-} from '../lib/share';
+} from '../libs/server/src/share';
 import {
   RateLimiter,
   SHARE_CREATE_LIMIT,
   SHARE_IP_LIMIT,
   clientIp,
   tooManyRequests,
-} from '../lib/rate-limit';
-import { applyCors } from '../lib/cors';
-import { isSafeHttpUrl } from '../lib/safe-url';
-import { signOwnedPath } from '../lib/sign-owned-path';
+} from '../libs/server/src/rate-limit';
+import { applyCors } from '../libs/server/src/cors';
+import { isSafeHttpUrl } from '../libs/core/src/safe-url';
+import { signOwnedPath } from '../libs/server/src/sign-owned-path';
 
 /**
  * Public share links.

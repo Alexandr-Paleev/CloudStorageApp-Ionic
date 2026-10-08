@@ -1,4 +1,4 @@
-import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from './ai';
+import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from '../../core/src/ai';
 
 /**
  * Text in, one vector out.

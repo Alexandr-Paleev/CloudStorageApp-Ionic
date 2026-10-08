@@ -8,7 +8,7 @@ import {
   SUMMARY_MODEL,
   clampSummary,
   normalizeTags,
-} from './ai';
+} from '../../core/src/ai';
 
 /**
  * One sentence about a file, and a handful of words.

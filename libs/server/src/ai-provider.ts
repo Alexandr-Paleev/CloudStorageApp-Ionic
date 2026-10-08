@@ -1,4 +1,4 @@
-import { EMBEDDING_MODEL, ProviderNotConfigured } from './ai';
+import { EMBEDDING_MODEL, ProviderNotConfigured } from '../../core/src/ai';
 import {
   describeFile as describeWithClaude,
   type Description,

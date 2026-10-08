@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type RecordedCall } from '../../lib/test-utils';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type RecordedCall,
+} from '../../libs/server/src/test-utils';
 
 const { FakeAuthError, authenticateUser, db } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -10,7 +15,7 @@ const { FakeAuthError, authenticateUser, db } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },

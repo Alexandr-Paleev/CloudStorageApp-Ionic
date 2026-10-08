@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EMBEDDING_DIMENSIONS, MAX_VISION_BYTES } from './ai';
+import { EMBEDDING_DIMENSIONS, MAX_VISION_BYTES } from '../../core/src/ai';
 import { describeFile, embed, parseCaption } from './cloudflare-ai';
 
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.01);

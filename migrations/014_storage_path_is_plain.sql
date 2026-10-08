@@ -12,12 +12,12 @@
 -- makes the question moot instead.
 --
 -- No path this app creates contains any of it. The upload routes put a
--- timestamp in front of a name that has been sanitised (`lib/filename.ts`,
--- `src/services/supabase-storage.service.ts`, `lib/demo.ts`), and Cloudinary
+-- timestamp in front of a name that has been sanitised (`libs/server/src/filename.ts`,
+-- `src/services/supabase-storage.service.ts`, `libs/server/src/demo.ts`), and Cloudinary
 -- picks its own public ids inside the folder. `?` and `#` are refused with the
 -- rest, because a URL ends its path at either one.
 --
--- The rule is `ownsStoredPath` in lib/stored-path.ts. A change to one is a
+-- The rule is `ownsStoredPath` in libs/core/src/stored-path.ts. A change to one is a
 -- change to both, and to 013.
 --
 -- A constraint of its own rather than a wider 013, so that a refusal names

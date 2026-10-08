@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import r2Service from './r2.service';
 import { HttpError } from '../utils/http.utils';
-import { MULTIPART_THRESHOLD } from '../../lib/multipart';
+import { MULTIPART_THRESHOLD } from '../../libs/core/src/multipart';
 
 /* Hoisted: `vi.mock` factories run before the module body, so a plain `const`
    here is still in its temporal dead zone when the uploader is built. */

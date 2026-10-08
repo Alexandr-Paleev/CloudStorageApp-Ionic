@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mockRequest, mockResponse } from '../../lib/test-utils';
-import type { EraseDeps } from '../../lib/account-erase';
+import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
+import type { EraseDeps } from '../../libs/server/src/account-erase';
 
 const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, config } = vi.hoisted(
   () => ({
@@ -13,17 +13,17 @@ const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, con
   })
 );
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: {},
 }));
 
-vi.mock('../../lib/account-erase', () => ({
+vi.mock('../../libs/server/src/account-erase', () => ({
   eraseAccount: (...args: unknown[]) => eraseAccount(...args),
 }));
 
-vi.mock('../../lib/r2', () => ({
+vi.mock('../../libs/server/src/r2', () => ({
   getS3Client: () => ({ send }),
   getR2BucketName: () => 'test-bucket',
 }));

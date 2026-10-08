@@ -2,7 +2,7 @@ import { DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { v2 as cloudinary } from 'cloudinary';
 import type { EraseDeps } from './account-erase';
 import { getS3Client, getR2BucketName } from './r2';
-import { ownerPrefix } from './stored-path';
+import { ownerPrefix } from '../../core/src/stored-path';
 
 /**
  * The storage providers `eraseAccount` can be handed, as this deployment has

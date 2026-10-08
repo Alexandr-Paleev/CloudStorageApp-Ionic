@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockRequest, mockResponse, mockSupabase, type TableAnswer } from '../../lib/test-utils';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
 
 const { FakeAuthError, authenticateUser, db, refreshAccessToken } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -8,13 +13,13 @@ const { FakeAuthError, authenticateUser, db, refreshAccessToken } = vi.hoisted((
   refreshAccessToken: vi.fn(),
 }));
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
   supabase: { from: (table: string) => db.client!.from(table) },
 }));
 
-vi.mock('../../lib/dropbox', () => ({
+vi.mock('../../libs/server/src/dropbox', () => ({
   refreshAccessToken: (...args: unknown[]) => refreshAccessToken(...args),
 }));
 
