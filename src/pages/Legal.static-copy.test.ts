@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 
 /**
  * public/privacy-policy.html is a second copy of PRIVACY_POLICY.md, the
- * document the app renders at /privacy. Nothing kept the two in step, and the
- * copy fell behind. When semantic search arrived, the markdown gained a
+ * document Legal.tsx renders at /privacy. Nothing kept the two in step, and
+ * the copy fell behind. When semantic search arrived, the markdown gained a
  * section on what indexing a file sends to a model provider and a line in the
  * list of who data is shared with. The static page was served without either
  * from 4.7.0 until 2026-10-08.
@@ -13,6 +13,10 @@ import { readFileSync } from 'node:fs';
  * page word for word: each heading, paragraph and list item, with the markup
  * taken off. The page may say more, and does: it has a link back to the app.
  * It may not say less, or say it differently.
+ *
+ * The page is read through the DOM rather than with a pattern that deletes
+ * tags. A pattern like that is what CodeQL reports as an incomplete
+ * sanitiser, and a parser reads nested markup and entities correctly as well.
  *
  * The copy goes away in step 4 of decision 0014, and this file with it. The
  * terms are not compared. Their static copy is six sections shorter than the
@@ -55,15 +59,19 @@ function blocksOfMarkdown(markdown: string): string[] {
   );
 }
 
-/** The same blocks of the page: whatever sits in a heading, a paragraph or a list item. */
+/** The same blocks of the page: the text of every heading, paragraph and list item. */
 function blocksOfPage(html: string): string[] {
-  const blocks = html.match(/<(h[1-6]|p|li)[\s>][\s\S]*?<\/\1>/g) ?? [];
-  return blocks.map((block) => squeeze(block.replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, '')));
+  const page = new DOMParser().parseFromString(html, 'text/html');
+  // A line break inside a paragraph is a space in the markdown.
+  for (const lineBreak of page.querySelectorAll('br')) lineBreak.replaceWith(' ');
+  return [...page.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li')].map((block) =>
+    squeeze(block.textContent ?? '')
+  );
 }
 
 describe('the static copy of the privacy policy', () => {
-  const markdown = blocksOfMarkdown(read('../PRIVACY_POLICY.md'));
-  const page = new Set(blocksOfPage(read('../public/privacy-policy.html')));
+  const markdown = blocksOfMarkdown(read('../../PRIVACY_POLICY.md'));
+  const page = new Set(blocksOfPage(read('../../public/privacy-policy.html')));
 
   it('says everything the markdown says, word for word', () => {
     expect(markdown.filter((block) => !page.has(block))).toEqual([]);
