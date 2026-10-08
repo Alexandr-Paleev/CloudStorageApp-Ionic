@@ -143,10 +143,15 @@
             <li><strong>Cloudflare R2</strong> (optional file storage)</li>
         </ul>
 
+        <h3>Semantic search, and what it sends where</h3>
+        <p>If this deployment has semantic search switched on, asking to index a file sends <strong>that file's contents</strong> — the image itself, or the first few kilobytes of a text file — to the model provider the deployment is configured for (Anthropic, or Cloudflare Workers AI). The provider returns one sentence describing the file; that sentence and a numeric representation of it are stored next to your file's row and are readable only by you.</p>
+        <p>Indexing never happens on its own. It runs when you press the button that offers it, on the files you own, and files kept in your own Google Drive or Dropbox are never sent anywhere. Nothing is sent when the feature is switched off, which is the default.</p>
+
         <h2>Data Sharing</h2>
         <p>We <strong>DO NOT</strong> sell your personal information. We may share data with:</p>
         <ul>
             <li><strong>Service providers</strong> (Supabase, Cloudinary, Sentry) - only as necessary to provide the Service</li>
+            <li><strong>Model providers</strong> (Anthropic, or Cloudflare Workers AI) - only the contents of a file you have asked to index, and only while semantic search is enabled on this deployment</li>
             <li><strong>Law enforcement</strong> - if required by law</li>
             <li><strong>Business transfers</strong> - in case of merger or acquisition</li>
         </ul>

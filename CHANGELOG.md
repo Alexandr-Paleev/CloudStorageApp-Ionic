@@ -10,7 +10,21 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **The static copy of the privacy policy had fallen behind the one the app
+  shows.** `public/privacy-policy.html` is a second copy of
+  `PRIVACY_POLICY.md`, which the app renders at `/privacy`. When semantic
+  search arrived, the markdown gained a section on what indexing a file sends
+  to a model provider, and a line in the list of who data is shared with. The
+  static page got neither, and was served without them from 4.7.0. Both are
+  on it now. A test compares the two block by block, so the copy cannot fall
+  behind again unnoticed. Copy and test both go in step 4 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md).
+- **Three links in the legal documents led to a GitHub account that does not
+  exist.** 4.0.0 corrected them in the static pages. The markdown the app
+  renders at `/privacy` and `/terms` kept `yourusername` in all three, and
+  each was a 404.
 
 ## [4.7.5] — 2026-10-06
 
