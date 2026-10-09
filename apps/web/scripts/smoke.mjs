@@ -82,6 +82,17 @@ async function asACrawler() {
   }
   expect(!page.headers.has('x-powered-by'), 'the response says what served it');
 
+  /* This site's policy names no origin but its own. The app's names eleven,
+     and the file that carries it has reached this site once: the first
+     deployment was built with the `vercel.json` at the root of the
+     repository, which is the app's. */
+  const policy = page.headers.get('content-security-policy') ?? '';
+  expect(
+    !/https?:/.test(policy),
+    `the policy names another origin, so it is not this site's: ${policy}`
+  );
+  expect(policy.includes("frame-ancestors 'none'"), 'the policy is not the one in next.config.ts');
+
   const robots = await fetch(`${origin}/robots.txt`);
   expect(robots.status === 200, `/robots.txt answered ${robots.status}`);
   const rules = await robots.text();
