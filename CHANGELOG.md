@@ -46,6 +46,31 @@ reasoning behind the larger decisions lives in
   the same shared modules it did. The split is still a convention: the lint
   rule that makes importing `libs/server` from the app an error is the second
   half of the step.
+- **Only the functions can import `libs/server`, and lint now says so.** This
+  is the second half of step 3 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md).
+  The app, the functions, `libs/core` and `libs/server` are four Nx projects,
+  and `@nx/enforce-module-boundaries` refuses a relative import that crosses
+  from one to another. The app reaches `libs/core` by a name,
+  `@cloud-storage/core/...`. `libs/server` has none, so from the app there is
+  no spelling of that import left that lint accepts.
+
+  The functions keep their relative imports, and the rule lets those through.
+  Vercel's builder was run on a function that imports a library by name,
+  three ways, and each time the build passed and the function failed to load.
+
+  The rule reads a graph Nx keeps on disk, and checks nothing when the graph
+  is missing: on a fresh checkout `eslint .` exited 0 with the rule off. The
+  ESLint config now draws the graph itself. `libs/boundaries.test.ts` asks
+  the real config about thirteen imports and then reads the graph of the code
+  as it stands, which a disable comment cannot edit.
+
+  Three settings changed with it. Nx is told to read imports, which it was
+  not doing. The cache key of the root's tasks covers the whole repository:
+  with `api/` a project of its own, a change there would otherwise be handed
+  the previous result. And Vite's dev server and Vitest follow the names in
+  `tsconfig.base.json`, as the build already did. Built from `main` and from this change with the
+  same environment, `dist/` holds the same 60 files, byte for byte.
 
 ### Fixed
 

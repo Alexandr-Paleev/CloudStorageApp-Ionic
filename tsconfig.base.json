@@ -1,0 +1,13 @@
+{
+  /* The names one project is imported by, in one place. TypeScript, Vite,
+     Vitest and the lint rule that keeps the projects apart all read them
+     from here. libs/server has no name, and that is deliberate: see the
+     boundary rule in eslint.config.mjs, and ADR 0014. */
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@cloud-storage/core/*": ["libs/core/src/*"]
+    }
+  }
+}

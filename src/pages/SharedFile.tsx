@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isSafeHttpUrl } from '../../libs/core/src/safe-url';
+import { isSafeHttpUrl } from '@cloud-storage/core/safe-url';
 import { Link, useParams } from 'react-router';
 import {
   IonContent,

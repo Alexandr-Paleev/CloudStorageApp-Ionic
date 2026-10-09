@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import aiService from './ai.service';
 import { HttpError } from '../utils/http.utils';
-import { EMBEDDING_DIMENSIONS } from '../../libs/core/src/ai';
+import { EMBEDDING_DIMENSIONS } from '@cloud-storage/core/ai';
 
 const getSession = vi.fn();
 const rpc = vi.fn();

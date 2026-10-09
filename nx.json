@@ -4,23 +4,26 @@
   "neverConnectToCloud": true,
   "analytics": false,
   "useDaemonProcess": false,
+  "pluginsConfig": {
+    "@nx/js": { "analyzeSourceFiles": true }
+  },
   "namedInputs": {
     "envFiles": [{ "runtime": "node scripts/env-fingerprint.mjs" }],
-    "default": ["{projectRoot}/**/*", "envFiles"]
+    "workspace": ["{workspaceRoot}/**/*", "envFiles"]
   },
   "targetDefaults": {
     "build": {
       "cache": true,
-      "inputs": ["default", "^default"],
+      "inputs": ["workspace"],
       "outputs": ["{projectRoot}/dist"]
     },
-    "lint": { "cache": true, "inputs": ["default", "^default"] },
-    "typecheck": { "cache": true, "inputs": ["default", "^default"] },
-    "typecheck:api": { "cache": true, "inputs": ["default", "^default"] },
-    "test": { "cache": true, "inputs": ["default", "^default"] },
+    "lint": { "cache": true, "inputs": ["workspace"] },
+    "typecheck": { "cache": true, "inputs": ["workspace"] },
+    "typecheck:api": { "cache": true, "inputs": ["workspace"] },
+    "test": { "cache": true, "inputs": ["workspace"] },
     "test:coverage": {
       "cache": true,
-      "inputs": ["default", "^default"],
+      "inputs": ["workspace"],
       "outputs": ["{projectRoot}/coverage"]
     },
     "size": { "dependsOn": ["build"] },

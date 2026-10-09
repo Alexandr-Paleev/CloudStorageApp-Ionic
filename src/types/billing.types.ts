@@ -1,4 +1,4 @@
-import { TIER_LIMITS } from '../../libs/core/src/tiers';
+import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 
 export type SubscriptionTier = 'free' | 'pro';
 

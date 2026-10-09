@@ -3,7 +3,7 @@ import {
   partRange,
   planParts,
   type PartPlan,
-} from '../../libs/core/src/multipart';
+} from '@cloud-storage/core/multipart';
 import { HttpError } from '../utils/http.utils';
 import { withRetry } from '../utils/retry.utils';
 import type { CompletedPart, PendingUpload, UploadStore } from './upload-store';

@@ -38,6 +38,9 @@ export default defineConfig({
          */
         resolve: {
           conditions: ['browser'],
+          /* The app imports libs/core by the name tsconfig.base.json gives
+             it, and Vitest does not look there unless told. */
+          tsconfigPaths: true,
         },
         /* Vitest transforms modules through Vite's SSR pipeline, which resolves
            by its own condition list — setting it on `resolve` alone leaves the

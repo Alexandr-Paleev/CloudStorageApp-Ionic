@@ -892,12 +892,17 @@ Chrome, the same browser pointed at the R2 server, and Pixel 7 for the specs
 whose subject is the phone. `main` is protected:
 those checks are required, and changes land through pull requests only.
 
-The repository is an Nx workspace with one project, the app at its root;
+The repository is an Nx workspace of four projects: the app at its root, the
+functions in `api/`, and two libraries, `libs/core` and `libs/server`;
 [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md) says
-where that is going. Nx does two things here today. It caches `build`, `lint`,
-both type-checks and the unit tests, and its cache key includes a fingerprint
-of the env files, which git ignores and Vite inlines into the bundle. And CI
-asks it what a push touches. Documentation is listed in `.nxignore`, so a push
+where that is going. Nx does three things here today. It keeps the projects
+apart: only the functions may import `libs/server`, lint refuses anything
+else, and `libs/boundaries.test.ts` holds the rule to that. The test asks the
+real ESLint config about thirteen imports, then reads the import graph of the
+code as it stands, which a disable comment cannot edit. It caches `build`,
+`lint`, both type-checks and the unit tests, and its cache key includes a
+fingerprint of the env files, which git ignores and Vite inlines into the
+bundle. And CI asks it what a push touches. Documentation is listed in `.nxignore`, so a push
 that changes nothing else skips every step, the required checks still end
 green, and no account is opened in the live database for a paragraph of prose.
 A push to `main` runs everything regardless.

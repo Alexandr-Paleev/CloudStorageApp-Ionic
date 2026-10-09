@@ -4,7 +4,7 @@ import { providerManager } from '../providers/ProviderManager';
 import { withRetry } from '../utils/retry.utils';
 import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '../observability/sentry';
-import { DEFAULT_STORAGE_LIMIT } from '../../libs/core/src/tiers';
+import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
 import r2Service from './r2.service';
 import type { PendingUpload } from './upload-store';

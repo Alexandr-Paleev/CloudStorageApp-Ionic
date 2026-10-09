@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isSafeHttpUrl } from '../../libs/core/src/safe-url';
+import { isSafeHttpUrl } from '@cloud-storage/core/safe-url';
 
 const sanitizeFileName = (name: string): string => {
   // eslint-disable-next-line no-control-regex

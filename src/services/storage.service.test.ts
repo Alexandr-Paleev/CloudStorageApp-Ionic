@@ -4,7 +4,7 @@ import { providerManager } from '../providers/ProviderManager';
 import supabaseService from './supabase.service';
 import * as Sentry from '../observability/sentry';
 import { HttpError } from '../utils/http.utils';
-import { DEFAULT_STORAGE_LIMIT } from '../../libs/core/src/tiers';
+import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 
 vi.mock('../providers/ProviderManager', () => ({
   providerManager: {
