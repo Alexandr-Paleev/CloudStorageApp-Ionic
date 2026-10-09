@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 3 of 6 built
+Accepted · 2026-10-08 · step 3 of 6 built, and the first of three parts of step 4
 
 ## Context
 
@@ -259,3 +259,56 @@ one to another except where the plan above allows it.
   once, from the root, over everything. The libraries and `api/` are
   projects with a tag and no targets. Giving each its own tasks belongs
   with step 6, when the root stops being the app.
+
+## Update — 2026-10-09, step 4, first part
+
+Step 4 goes in as three changes: the site and its first page, then the
+plans, then the legal pages. This is the first. `apps/web` is a Next.js app,
+it renders one page into HTML, and nothing in the app has changed. The
+links to the legal pages still lead to the app, and the static copies in
+`public/` are still there.
+
+- **The site is an npm workspace, and the repository is its root.** Vercel
+  wants a `package.json` where a project is rooted, and `next` in the root
+  one would have declared the app dependent on a framework it does not use.
+  The root package is still the app, and there is still one lock file.
+- **Installed alone, it builds alone.** Vercel installs a project rooted at
+  `apps/web` from inside that folder, and npm then installs that workspace
+  and nothing else: 34 packages, none of them the app's or the functions'.
+  That failed twice before it worked. The root `prepare` script ran husky,
+  which is not among the 34. And Next, finding no TypeScript, installed the
+  newest one, which is two majors ahead of the one this repository pins and
+  rejects `tsconfig.base.json`. So `prepare` tolerates a missing husky, and
+  the site names its own TypeScript.
+- **CI gives two answers, which is what "CI runs what a change can affect"
+  above was promising.** A change under `apps/web` runs the site's lint, its
+  build, the boundary test and a smoke test, and none of the app's steps:
+  no end-to-end run, no accounts in the live database. A change to the app
+  leaves the site's steps alone. Getting Nx to say so took one correction.
+  The root project's tasks were keyed on every file in the workspace, and a
+  project keyed that way counts as touched by every file; a pattern that
+  excludes a folder does not take its files back out. The root now names
+  what its tasks read: its own files, `api/` and `libs/`.
+- **The site may import `libs/core` and nothing else of ours.** Its tag is
+  `scope:web`, the boundary test asks about five more imports, and the graph
+  it reads has the site in it. The test runs with the site's steps as well,
+  because a disable comment in a page is exactly what it is there for.
+- **Lint is per project now.** The root `lint` leaves `apps/` out and the
+  site has its own, with Next's rules. One config serves both, and the
+  folder ESLint is started in differs between them, which is the kind of
+  thing a relative path in a config gets wrong in one of the two.
+- **The site sends the app's headers and a narrower policy, with one
+  concession.** Scripts are allowed inline. Next writes its bootstrap that
+  way, and the alternative is a nonce minted per request, which means no
+  page is prerendered. These pages take no input and show nothing a visitor
+  wrote, so the policy keeps the half that matters here: no script from
+  another origin, no frame, no form posted elsewhere.
+- **One advisory moved.** `source-map-js` was already in the tree, below
+  the build tools, where the production audit does not look. Next depends
+  on it at run time, so it became a production dependency and the audit
+  turned red. It is updated, and the audit now covers 128 packages where it
+  covered 108.
+
+Not in this change, and not forgotten: the Vercel project for the site is
+made by hand, Lighthouse does not audit the site yet, and the first page
+makes no claim that depends on which keys a deployment has.

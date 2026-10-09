@@ -18,6 +18,7 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
+  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
   check:
@@ -48,11 +49,14 @@ jobs:
 
       - run: npm ci
 
-      # Not every push changes the app. scripts/ci-affected.mjs asks Nx, which
-      # leaves the files in .nxignore — documentation — out of the project, and
-      # sets AFFECTED for the steps below. A push that touches nothing else
-      # skips them and the job still ends green. The required checks need
-      # that: a workflow that never started would leave them waiting.
+      # Not every push changes everything. scripts/ci-affected.mjs asks Nx and
+      # sets two answers for the steps below: AFFECTED_APP for the app, the
+      # functions and the two libraries, and AFFECTED_WEB for the site in
+      # apps/web. A change to one leaves the other's steps alone. Nx leaves the
+      # files in .nxignore — documentation — out of every project, so a push
+      # that touches nothing else skips both and the job still ends green. The
+      # required checks need that: a workflow that never started would leave
+      # them waiting.
       #
       # A push to main runs everything regardless, and a failure in this step
       # fails the job rather than skipping the rest of it.
@@ -77,17 +81,17 @@ jobs:
       # unreachable registry is retried and then reported as not-checked. It
       # also prints the moderate and low counts the old command swallowed.
       - name: Audit production dependencies
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npm run --silent audit:prod
 
       - run: npm run lint
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
 
       # src/env.ts validates import.meta.env with Zod on startup, so the build
       # needs the two required variables present. Real values come from repo
       # secrets when they are set; the placeholders only have to satisfy Zod.
       - name: Write .env
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: |
           cat > .env <<'EOF'
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -96,7 +100,7 @@ jobs:
 
       # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
       - run: npm run build
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
 
       # The build checks what ships. This checks what does not: the unit tests,
       # the Playwright specs and playwright.config.ts, none of which any earlier
@@ -108,7 +112,7 @@ jobs:
       # a build. Adding noUncheckedIndexedAccess without this step would have
       # left the strictest half of the tree the least enforced.
       - name: Type-check the tests
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npm run typecheck
 
       # A byte count rather than a score, so it cannot be flaky: the check fails
@@ -116,7 +120,7 @@ jobs:
       # scripts/check-bundle-size.js holds the numbers and why each one is what
       # it is, and prints the table onto the run page either way.
       - name: Bundle size
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npm run --silent size | tee -a "$GITHUB_STEP_SUMMARY"
 
       # The one check that runs the built bundle rather than the source.
@@ -130,15 +134,15 @@ jobs:
       # dist/, so this step is also where it is asked whether it keeps to the
       # app and leaves /api/ and files to the network.
       - name: Install Chromium
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true' || env.AFFECTED_WEB == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Smoke-test the built bundle
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npm run --silent smoke
 
       - run: npm run test:coverage
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
 
       # Puts the numbers on the run page, so a pull request shows what its
       # tests actually reach without anyone opening an artifact.
@@ -147,7 +151,7 @@ jobs:
       # covered by different suites in different runtimes, and a single
       # blended percentage would hide which of the two moved.
       - name: Coverage summary
-        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
+        if: ${{ !cancelled() && env.AFFECTED_APP == 'true' }}
         run: |
           if [ ! -f coverage/coverage-summary.json ]; then
             echo "No coverage report produced." >> "$GITHUB_STEP_SUMMARY"
@@ -208,16 +212,46 @@ jobs:
       # Lighthouse and its Chrome tooling, some 40 MB installed, for a check
       # that runs here and occasionally on a laptop.
       - name: Lighthouse
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npm run --silent lighthouse
 
       - name: Upload Lighthouse reports
-        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
+        if: ${{ !cancelled() && env.AFFECTED_APP == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: lighthouse-report
           path: .lighthouseci/
           retention-days: 7
+
+      # The site, apps/web. It is in this job rather than one of its own
+      # because this job is a required check: a job added beside it would be
+      # one the branch protection does not know about.
+      #
+      # Its own lint, because the root one leaves apps/ out, and a build,
+      # which is also where Next type-checks it.
+      - name: Lint the site
+        if: env.AFFECTED_WEB == 'true'
+        run: npm run lint --workspace @cloud-storage/web
+
+      - name: Build the site
+        if: env.AFFECTED_WEB == 'true'
+        run: npm run build --workspace @cloud-storage/web
+
+      # libs/boundaries.test.ts reads the import graph, the site's part of it
+      # included, and a disable comment hides an import from lint and not from
+      # the graph. When the app's steps ran, the unit tests above already ran
+      # it. When only the site changed, nothing has.
+      - name: The boundary between the projects
+        if: env.AFFECTED_WEB == 'true' && env.AFFECTED_APP != 'true'
+        run: npx vitest run libs/boundaries.test.ts
+
+      # `next build` passing says the pages compile. This asks the built site
+      # what a crawler and a browser would: that the words are in the HTML
+      # with no script run, and that the browser has no complaint about the
+      # policy the site sends.
+      - name: Smoke-test the built site
+        if: env.AFFECTED_WEB == 'true'
+        run: npm run --silent smoke --workspace @cloud-storage/web
 
   e2e:
     name: Playwright
@@ -238,13 +272,13 @@ jobs:
       - run: npm ci
 
       # The same question as in `check`, and here the answer saves the most: a
-      # push that does not change the app opens no accounts in the live
-      # database.
+      # push that does not change the app — one to the site, or to
+      # documentation — opens no accounts in the live database.
       - name: What does this change touch?
         run: node scripts/ci-affected.mjs
 
       - name: Install Chromium
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: npx playwright install --with-deps chromium
 
       # auth, routing and legal specs are pure UI and pass on placeholders.
@@ -265,7 +299,7 @@ jobs:
       # test gets its own throwaway account, and e2e/fixtures.ts checks that
       # each one is removed rather than assuming it.
       - name: Write .env
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
         run: |
           cat > .env <<'EOF'
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -278,10 +312,10 @@ jobs:
           EOF
 
       - run: npm run test:e2e
-        if: env.AFFECTED == 'true'
+        if: env.AFFECTED_APP == 'true'
 
       - name: Upload report
-        if: ${{ !cancelled() && env.AFFECTED == 'true' }}
+        if: ${{ !cancelled() && env.AFFECTED_APP == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report

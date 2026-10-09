@@ -26,6 +26,9 @@ updates:
       # them than `nx` once the workspace has a second project.
       nx:
         patterns: ['nx', '@nx/*']
+      # Next and the lint plugin that knows its rules are released together.
+      next:
+        patterns: ['next', '@next/*']
     ignore:
       # Majors are migrations, not updates: they need a changelog read and a
       # decision, which is exactly what an automated PR cannot supply. The

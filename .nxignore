@@ -1,6 +1,7 @@
 # Documentation. Nothing that is built or tested reads these files, so a change
-# to them is not a change to the app. Nx leaves them out of every project, CI asks
-# Nx what a push touches, and a push that touches only these runs nothing.
+# to them is not a change to the app or to the site. Nx leaves them out of
+# every project, CI asks Nx what a push touches, and a push that touches only
+# these runs nothing.
 #
 # PRIVACY_POLICY.md and TERMS_OF_SERVICE.md are not here, on purpose: the app
 # imports both and renders them at /privacy and /terms.

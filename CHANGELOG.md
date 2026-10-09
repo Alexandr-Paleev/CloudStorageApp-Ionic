@@ -10,7 +10,42 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **The public pages have an app of their own, and it has its first page.**
+  This is the first of three parts of step 4 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md).
+  `apps/web` is a Next.js app in this workspace, for a Vercel project and an
+  origin of its own. Its first page is prerendered: the words are in the HTML
+  before any script runs, which the app, rendering in the browser, could not
+  offer a crawler. The page reads the free allowance from `libs/core`, the
+  same place the app reads it, and sends people to the app's login. The plans
+  and the legal pages follow; until then the footer's links to the terms and
+  the privacy policy lead to the app.
+
+  The site is an npm workspace and installs alone: 34 packages, none of the
+  app's or the functions'. It may import `libs/core` and nothing else of
+  ours, the lint rule that keeps the projects apart has a tag for it, and
+  `libs/boundaries.test.ts` asks about five more imports.
+
+### Changed
+
+- **CI gives two answers to "what does this push touch".** A change to the
+  site runs the site's lint, its build, the boundary test and a smoke test
+  that asks the built site for its HTML with no script run. It does not run
+  the app's end-to-end suite, so nothing is opened in the live database for
+  a sentence on the first page. A change to the app leaves the site's steps
+  alone, and what both read, `libs/core` and the lock file among it, runs
+  both.
+- **`npm run lint` covers the app, the functions and the libraries, and the
+  site has its own.** `npm run lint --workspace @cloud-storage/web` adds
+  Next's rules to the shared config. The pre-commit hook still lints whatever
+  is staged, wherever it is.
+- **The `prepare` script tolerates a missing husky.** An install of the site
+  alone does not include it, and the script used to fail that install.
+- **`source-map-js` 1.2.1 to 1.2.2.** Next depends on it at run time, which
+  moved an advisory that was among the build tools into the production
+  dependencies, where the audit is a required check.
 
 ## [4.8.0] — 2026-10-09
 
