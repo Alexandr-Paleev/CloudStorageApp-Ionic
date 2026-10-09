@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { storageMeter } from './quota.utils';
-import { TIER_LIMITS } from '../../libs/core/src/tiers';
+import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 
 const FREE = TIER_LIMITS.free.storage_limit;
 

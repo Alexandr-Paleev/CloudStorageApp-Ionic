@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "server",
+  "sourceRoot": "libs/server/src",
+  "projectType": "library",
+  "tags": ["scope:server"]
+}

@@ -128,6 +128,10 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    /* The names in tsconfig.base.json. The build finds them without being
+       told; the dev server does not, and answers 500 for the first module
+       that uses one. This makes the two agree. */
+    tsconfigPaths: true,
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },

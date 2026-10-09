@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 2 of 6 built, and the first half of step 3
+Accepted · 2026-10-08 · step 3 of 6 built
 
 ## Context
 
@@ -211,3 +211,51 @@ that changes what lint accepts.
   shared file, the ones in the migrations included. The changelog keeps the
   paths that were true when each entry was written, and so does the text of
   this record above.
+
+## Update — 2026-10-09, step 3, second half
+
+The rule is in, and step 3 is built. The app, the functions, `libs/core` and
+`libs/server` are four projects, and lint refuses an import that crosses from
+one to another except where the plan above allows it.
+
+- **The open question is settled: a function cannot import a library by
+  name.** It was settled with Vercel's builder, run here on one function,
+  rather than on a preview deployment: a preview shows whether a function
+  answers, and the builder run here shows what it was given. Three ways were
+  tried. A name from tsconfig `paths`, and an npm workspace whose `exports`
+  point at the `.ts` sources or at the `.js` the builder writes. None of the
+  three fails the build, and all three fail to load with `MODULE_NOT_FOUND`:
+  the builder leaves a name as written, and at run time the name leads
+  nowhere. A build that passes over a function that cannot start is the
+  worst outcome there is, so the second way out above is the one taken. The
+  functions and `libs/server` keep their relative imports, and the rule is
+  told to let those through. This was `@vercel/node` 12.0.1, the version the
+  lock file names.
+- **`libs/core` has a name, and `libs/server` does not.** The app imports
+  `@cloud-storage/core/...`. For `libs/server` the only spelling left to the
+  app is a relative path, and the rule refuses a relative path that leaves
+  its project. A name would have made the import one that TypeScript and
+  Vite accept and lint alone refuses. The tags are the second lock: given a
+  name for a moment, the app's import was refused as `scope:app` reaching
+  past `scope:core`.
+- **The rule can stop working without anything turning red, so it is held
+  to its job twice.** It reads the project graph from disk, and where there
+  is none it prints a warning and checks nothing: `eslint .` on a fresh
+  checkout exited 0 with the rule off. On a pull request CI happens to ask
+  Nx a question first, which leaves a graph behind. On `main` it does not.
+  The ESLint config now draws the graph before it lints.
+  `libs/boundaries.test.ts` then asks the real config about thirteen
+  imports, and after that reads the graph of the code as it stands. The
+  second half stands on its own: a disable comment silences the rule for a
+  line and leaves the import in the graph.
+- **Three settings were wrong from the moment there was a second project.**
+  Nx was not reading imports at all, so the graph had no edges. It reads
+  them only when one of a handful of its packages is installed, or when
+  told. The tasks at the root cover the whole repository while their cache
+  key covered the root project alone, so a change under `api/` was handed
+  the result of the run before it. And Vite's build found the name by
+  itself, while its dev server answered 500 and Vitest could not resolve it.
+- **The tasks did not move.** Lint, the type-checks and the tests still run
+  once, from the root, over everything. The libraries and `api/` are
+  projects with a tag and no targets. Giving each its own tasks belongs
+  with step 6, when the root stops being the app.

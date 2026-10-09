@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Asks Nx whether this push changes the app, and tells the workflow.
+ * Asks Nx whether this push changes any project, and tells the workflow.
  *
  * Until this existed, every push ran everything. The pull request that added
  * decision 0014 changed two markdown files, and for them CI built the app,
  * ran Lighthouse and put the whole end-to-end suite through the live
  * database: 43 tests, 30 accounts opened and removed.
  *
- * What is not the app is listed in .nxignore, and it is documentation only.
- * Nx leaves those files out of the project, so a push that touches nothing
- * else affects no project and the steps after this one are skipped. The jobs
- * still end green, which is what the required checks need.
+ * What belongs to no project is listed in .nxignore, and it is documentation
+ * only. Nx leaves those files out of every project, so a push that touches
+ * nothing else affects none of them and the steps after this one are skipped.
+ * The jobs still end green, which is what the required checks need.
  *
  * A push to main is not asked. It runs everything, so that a mistake in what
  * Nx is told cannot hide behind a skipped check for long.

@@ -50,7 +50,7 @@ import { applyPending } from '../services/mutation-queue';
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import storageService, { type Folder } from '../services/storage.service';
 import aiService from '../services/ai.service';
-import { DEFAULT_STORAGE_LIMIT } from '../../libs/core/src/tiers';
+import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
 import { billingIsOffered } from '../utils/billing.utils';

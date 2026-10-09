@@ -4,7 +4,7 @@ import type { PendingUpload, UploadStore } from './upload-store';
 
 /** The signature the uploader actually wants, so the mock can be cast to it once. */
 type PutPart = Parameters<typeof createMultipartUploader>[0]['putPart'];
-import { planParts } from '../../libs/core/src/multipart';
+import { planParts } from '@cloud-storage/core/multipart';
 import { HttpError } from '../utils/http.utils';
 
 const MiB = 1024 * 1024;

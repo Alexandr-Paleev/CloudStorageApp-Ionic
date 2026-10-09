@@ -1,7 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { apiUrl } from '../utils/api.utils';
 import { httpErrorFrom } from '../utils/http.utils';
-import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '../../libs/core/src/ai';
+import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '@cloud-storage/core/ai';
 import type { FileMetadata } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
 
