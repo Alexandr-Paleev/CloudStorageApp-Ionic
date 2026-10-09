@@ -26,6 +26,16 @@ export const APP_ORIGIN = (
 
 export const REPOSITORY_URL = 'https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic';
 
+/**
+ * Whether paying is real. It is not: the app's deployment runs Stripe on test
+ * keys, and the plans page says so before anyone reaches a checkout.
+ *
+ * A line of code rather than a variable, on purpose. The day billing goes
+ * live changes more than one sentence on one page, and that day should be a
+ * commit somebody reads, not a setting somebody flips.
+ */
+export const BILLING_IS_A_DEMONSTRATION = true;
+
 export const SITE_NAME = 'Cloud Storage';
 
 export const SITE_DESCRIPTION =

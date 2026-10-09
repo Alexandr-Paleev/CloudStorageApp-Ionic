@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { formatStorage } from '@cloud-storage/core/format';
 import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 import { APP_ORIGIN, REPOSITORY_URL } from '../lib/site';
 import styles from './page.module.css';
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
 /* The number the app enforces, read from where the app reads it. A figure
    typed into this page would be a second copy, and the limits have drifted
    between copies before. */
-const FREE_MEGABYTES = TIER_LIMITS.free.storage_limit / (1024 * 1024);
+const FREE_STORAGE = formatStorage(TIER_LIMITS.free.storage_limit);
 
 const FEATURES = [
   {
@@ -33,9 +35,9 @@ const FEATURES = [
       'There is nothing to download from a store.',
   },
   {
-    title: `${FREE_MEGABYTES} MB without paying`,
+    title: `${FREE_STORAGE} without paying`,
     body:
-      `A free account holds ${FREE_MEGABYTES} MB of files. It asks for no card, and it is ` +
+      `A free account holds ${FREE_STORAGE} of files. It asks for no card, and it is ` +
       'not a trial that ends.',
   },
 ] as const;
@@ -74,6 +76,9 @@ export default function HomePage() {
             </li>
           ))}
         </ul>
+        <p className={styles.more}>
+          <Link href="/pricing">See both plans</Link>
+        </p>
       </section>
 
       <section className={styles.section} aria-labelledby="in-the-open">

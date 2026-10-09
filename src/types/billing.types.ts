@@ -1,3 +1,4 @@
+import { PLANS } from '@cloud-storage/core/plans';
 import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 
 export type SubscriptionTier = 'free' | 'pro';
@@ -19,29 +20,11 @@ export interface UserProfile {
   updated_at: string;
 }
 
-/** Presentation on top of the shared limits — names, prices and copy are the
- *  client's business; the numbers are not. */
+/** Each plan as the shared library describes it, with the limits it enforces.
+ *  The names, the price and the copy used to be written here; the site shows
+ *  them too now, so they are in `libs/core` and this only puts the two
+ *  halves side by side. */
 export const TIER_CONFIG = {
-  free: {
-    name: 'Free',
-    ...TIER_LIMITS.free,
-    price: 0,
-    features: [
-      '500 MB storage',
-      'Auto provider selection',
-      'Google Drive overflow',
-      'Basic analytics',
-    ],
-  },
-  pro: {
-    name: 'Pro',
-    ...TIER_LIMITS.pro,
-    price: 900, // $9.00 in cents
-    features: [
-      '5 GB storage',
-      'All providers + Dropbox',
-      'Choose upload provider',
-      'Priority support',
-    ],
-  },
+  free: { ...PLANS.free, ...TIER_LIMITS.free },
+  pro: { ...PLANS.pro, ...TIER_LIMITS.pro },
 } as const;

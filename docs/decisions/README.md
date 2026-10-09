@@ -29,4 +29,4 @@ piece ships.
 | [0011](0011-majors-are-taken-by-hand.md)         | Majors are taken by hand, in one deliberate piece               | v4.1.0     |
 | [0012](0012-the-native-build-sells-nothing.md)   | The native build sells nothing                                   | v4.3.0     |
 | [0013](0013-search-by-meaning-is-indexed-on-demand.md) | Search by meaning is indexed on demand, by a swappable model | v4.7.0     |
-| [0014](0014-the-public-pages-are-a-second-app.md) | The public pages are a second app on its own origin, in one Nx workspace | step 3 of 6, part of 4 |
+| [0014](0014-the-public-pages-are-a-second-app.md) | The public pages are a second app on its own origin, in one Nx workspace | step 3 of 6, two parts of 4 |

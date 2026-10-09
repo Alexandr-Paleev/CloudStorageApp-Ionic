@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 3 of 6 built, and the first of three parts of step 4
+Accepted · 2026-10-08 · step 3 of 6 built, and two of the three parts of step 4
 
 ## Context
 
@@ -340,3 +340,38 @@ output directory named `dist`.
   the site met the platform was its first deployment. The site's pull
   requests get a preview from now on, which is where the next such thing
   will show.
+
+## Update — 2026-10-09, step 4, second part
+
+The plans are on the site, at `/pricing`, and the app and the site read them
+from one place.
+
+- **The plans are in `libs/core`: the name, the price, and what each says
+  it gives.** Until now the price was in the app twice, as `$9` typed into
+  the page and as 900 cents beside it that the page did not use. The storage
+  each plan promises was written out as text, next to the numbers that
+  enforce it. The line about storage is now made from the limit, and a test
+  holds the two together.
+- **`format` moved to `libs/core`, as the first half of step 3 said it would
+  when a second side asked.** The site is that side. The module gained one
+  function: a limit is stated as the round number somebody chose, "500 MB",
+  where a measurement keeps its decimals.
+- **The price on the page is not the price that is charged.** That one is
+  configured in Stripe, and nothing in this repository can compare the two.
+  It was as true before. The code now says it where the price is written.
+- **The site says that paying is a demonstration.** The app's deployment
+  runs Stripe on test keys, and its own pricing page says so to someone who
+  has signed in. The site says it to someone who has not. It is a constant in
+  the site's code rather than a variable: the day billing goes live changes
+  more than one sentence, and should be a commit somebody reads.
+- **Not every line on the page is true of this deployment.** The feature
+  lines other than storage are the app's own copy, moved as they were so
+  that the app's page did not change in a pull request about where text
+  lives. Two of them, "Basic analytics" and "Priority support", describe
+  nothing this repository implements, and "All providers + Dropbox" names a
+  backend the production deployment has switched off. They were shown to
+  people who had signed in; they are now shown to anyone. Rewording them is
+  a decision about the product, and it is one line in `libs/core`.
+- **The smoke test asks about width.** Adding one link to the header pushed
+  the page sideways on a 320-pixel screen. That was caught on a screenshot
+  and not by a check, so the test now loads both pages at three widths.

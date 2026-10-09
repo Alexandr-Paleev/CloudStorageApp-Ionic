@@ -1,5 +1,5 @@
 import { supabase } from './auth';
-import { formatBytes } from './format';
+import { formatBytes } from '../../core/src/format';
 import { DEFAULT_STORAGE_LIMIT } from '../../core/src/tiers';
 
 export type Quota = {

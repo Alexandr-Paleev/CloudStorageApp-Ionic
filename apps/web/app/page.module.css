@@ -103,6 +103,10 @@
   color: var(--color-text-muted);
 }
 
+.more {
+  margin: 1.5rem 0 0;
+}
+
 .prose {
   max-width: var(--measure);
   margin: 0 0 1rem;

@@ -35,8 +35,24 @@ reasoning behind the larger decisions lives in
   site's smoke test now also fails if the policy it is sent names any origin
   but its own, which the app's does.
 
+- **The site has the plans, at `/pricing`.** This is the second part of
+  step 4. Both plans are there with what each costs and holds, and what
+  happens to an account that leaves Pro. The page says that paying is a
+  demonstration: the app's deployment runs Stripe on test keys, and until now
+  only someone already signed in was told.
+
 ### Changed
 
+- **The plans are written once, in `libs/core`.** The price was in the app
+  twice, as `$9` typed into the pricing page and as 900 cents beside it that
+  the page did not use, and the storage each plan promises was text next to
+  the numbers that enforce it. The app and the site both read the name, the
+  price and the feature lines from `libs/core/src/plans.ts`, and the line
+  about storage is made from the limit. The app's pricing page shows what it
+  showed.
+- **`format` moved from `libs/server` to `libs/core`**, because the site
+  needed it, and gained `formatStorage`, which states a limit as the round
+  number it is: "500 MB", where a measured size reads "480.2 MB".
 - **CI gives two answers to "what does this push touch".** A change to the
   site runs the site's lint, its build, the boundary test and a smoke test
   that asks the built site for its HTML with no script run. It does not run

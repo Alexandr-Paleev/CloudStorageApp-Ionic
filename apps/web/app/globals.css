@@ -127,11 +127,25 @@ h3 {
   flex-wrap: nowrap;
 }
 
-/* On a phone the header holds the name and one button. The link to the
-   source is still in the page, twice. */
+/* On a phone the header holds the name and one button. The other links are
+   still in the page and in the footer. */
 @media (max-width: 30rem) {
-  .site-header__source {
+  .site-header__extra {
     display: none;
+  }
+}
+
+/* And on the narrowest ones the two that remain need the room. */
+@media (max-width: 22rem) {
+  .site-header {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    gap: 0.5rem;
+  }
+
+  .site-header__cta {
+    padding: 0.45rem 0.8rem;
+    font-size: 0.9375rem;
   }
 }
 

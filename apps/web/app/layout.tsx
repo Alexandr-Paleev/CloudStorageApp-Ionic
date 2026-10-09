@@ -48,10 +48,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link className="site-header__brand" href="/">
             {SITE_NAME}
           </Link>
-          {/* Every other link in the header and the footer leaves this site,
-              for the app or for GitHub, so those are plain links. */}
+          {/* The links that leave this site, for the app or for GitHub, are
+              plain ones. next/link is for the pages that are here. */}
           <nav aria-label="Site">
-            <a className="site-header__source" href={REPOSITORY_URL}>
+            <Link className="site-header__extra" href="/pricing">
+              Pricing
+            </Link>
+            <a className="site-header__extra" href={REPOSITORY_URL}>
               Source
             </a>
             <a className="site-header__cta" href={`${APP_ORIGIN}/login`}>
@@ -64,6 +67,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         <footer className="site-footer">
           <nav aria-label="Legal and source">
+            <Link href="/pricing">Pricing</Link>
             <a href={`${APP_ORIGIN}/privacy`}>Privacy</a>
             <a href={`${APP_ORIGIN}/terms`}>Terms</a>
             <a href={REPOSITORY_URL}>Source</a>
