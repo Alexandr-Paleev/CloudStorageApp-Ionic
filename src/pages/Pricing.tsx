@@ -18,6 +18,7 @@ import { env } from '../env';
 import { billingIsOffered } from '../utils/billing.utils';
 import { useProfile } from '../hooks/useProfile';
 import billingService, { SubscriptionExistsError } from '../services/billing.service';
+import { formatMonthlyPrice } from '@cloud-storage/core/plans';
 import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
 import './Legal.css';
@@ -116,7 +117,9 @@ const Pricing: React.FC = () => {
               <div className="pricing-card__header">
                 <h2>Free</h2>
                 <div className="pricing-card__price">
-                  <span className="pricing-card__amount">$0</span>
+                  <span className="pricing-card__amount">
+                    {formatMonthlyPrice(TIER_CONFIG.free.monthlyPriceCents)}
+                  </span>
                   <span className="pricing-card__period">/month</span>
                 </div>
               </div>
@@ -143,7 +146,9 @@ const Pricing: React.FC = () => {
               <div className="pricing-card__header">
                 <h2>Pro</h2>
                 <div className="pricing-card__price">
-                  <span className="pricing-card__amount">$9</span>
+                  <span className="pricing-card__amount">
+                    {formatMonthlyPrice(TIER_CONFIG.pro.monthlyPriceCents)}
+                  </span>
                   <span className="pricing-card__period">/month</span>
                 </div>
               </div>

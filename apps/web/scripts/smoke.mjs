@@ -105,7 +105,34 @@ async function asACrawler() {
 
   const sitemap = await fetch(`${origin}/sitemap.xml`);
   expect(sitemap.status === 200, `/sitemap.xml answered ${sitemap.status}`);
-  expect((await sitemap.text()).includes('<loc>'), 'the sitemap lists nothing');
+  const listed = await sitemap.text();
+  expect(listed.includes('<loc>'), 'the sitemap lists nothing');
+  expect(/<loc>[^<]+\/pricing<\/loc>/.test(listed), 'the sitemap does not list the plans');
+
+  /* The plans. No price is written in this file: the page reads it from
+     libs/core, and a figure typed here would be a second copy of it. What is
+     asked is that both plans are in the HTML, each with a price and with the
+     storage it promises. */
+  expect(html.includes('href="/pricing"'), 'the first page does not lead to the plans');
+  const pricing = await fetch(`${origin}/pricing`);
+  const plans = await pricing.text();
+  expect(pricing.status === 200, `/pricing answered ${pricing.status}`);
+  expect(
+    /<h3[^>]*>Free<\/h3>/.test(plans) && /<h3[^>]*>Pro<\/h3>/.test(plans),
+    'the two plans are not in the HTML'
+  );
+  expect(
+    (plans.match(/\$\d+(?:\.\d\d)?</g) ?? []).length >= 2,
+    'the plans have no prices in the HTML'
+  );
+  expect(
+    (plans.match(/\d+ (?:MB|GB) storage/g) ?? []).length >= 2,
+    'the plans do not say what they hold'
+  );
+  expect(
+    /<link rel="canonical" href="[^"]+\/pricing"/.test(plans),
+    'the plans page has no canonical link of its own'
+  );
 
   const missing = await fetch(`${origin}/no-such-page`);
   expect(missing.status === 404, `a page that does not exist answered ${missing.status}`);
@@ -131,7 +158,25 @@ async function asAVisitor() {
       /^https?:\/\/[^/]+\/login$/.test((await app.getAttribute('href')) ?? ''),
       'the link to the app does not lead to its login page'
     );
+    await page.goto(`${origin}/pricing`, { waitUntil: 'networkidle' });
+    expect(
+      await page.getByRole('heading', { level: 1 }).isVisible(),
+      'the plans page has no visible heading'
+    );
     expect(complaints.length === 0, `the browser complained: ${complaints.join(' | ')}`);
+
+    /* A header that does not fit pushes the whole page sideways, and it only
+       does so on a phone. It did once, at 320 pixels, when a link was added. */
+    for (const path of ['/', '/pricing']) {
+      for (const width of [320, 390, 1280]) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+        );
+        expect(overflow === 0, `${path} is ${overflow}px wider than a ${width}px screen`);
+      }
+    }
   } finally {
     await browser.close();
   }
