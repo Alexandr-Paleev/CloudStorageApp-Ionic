@@ -20,8 +20,7 @@ reasoning behind the larger decisions lives in
   before any script runs, which the app, rendering in the browser, could not
   offer a crawler. The page reads the free allowance from `libs/core`, the
   same place the app reads it, and sends people to the app's login. The plans
-  and the legal pages follow; until then the footer's links to the terms and
-  the privacy policy lead to the app.
+  and the legal pages are the two entries after this one.
 
   The site is an npm workspace and installs alone: 34 packages, none of the
   app's or the functions'. It may import `libs/core` and nothing else of
@@ -41,7 +40,53 @@ reasoning behind the larger decisions lives in
   demonstration: the app's deployment runs Stripe on test keys, and until now
   only someone already signed in was told.
 
+- **The site has the terms and the privacy policy, at `/terms` and
+  `/privacy`.** This is the third part of step 4, and the last. The two
+  documents moved into `apps/web/content/`, and that is the only copy of
+  either: the site builds its pages out of them, the footer leads there and
+  the sitemap lists them. They are still markdown, read by a reader of the
+  site's own that knows what they use and nothing more. A test puts both
+  documents through it and fails on a construct it does not know.
+
+- **The site has unit tests**, `npm test --workspace @cloud-storage/web`, as
+  a third Vitest project that the site's steps in CI run and the app's do
+  not.
+
+- **The site's smoke test asks about accessibility.** Every page is put
+  through axe at WCAG 2.1 A and AA, the level the app's pages are held to.
+  Lighthouse asked that of the two static legal pages and does not audit the
+  site. The test also listens for the browser's complaints on every page
+  now, not on the first two.
+
 ### Changed
+
+- **The app links to the terms and the privacy policy, and holds no copy.**
+  It rendered both from markdown at `/terms` and `/privacy`, and its build
+  carried two more copies as static HTML. The links on the login page and on
+  the plans page now open the site's pages in a tab of their own. The old
+  addresses still lead there: `vercel.json` redirects six of them, the two
+  routes and the static pages with and without `.html`, and the two routes
+  also forward from inside the app, for a browser that the service worker
+  answers before the server can. The redirects are temporary ones, because
+  the address of the site may still change.
+
+  `public/privacy-policy.html` and `public/terms-of-service.html` are gone,
+  with the test that held one of them to the markdown. The app's build is
+  33 kB smaller and precaches 58 files where it precached 59, and the chunk
+  that carried both documents went from 12.1 kB to 0.6 kB. Lighthouse audits
+  one page, the shell.
+
+- **A change to the legal text runs the site's steps and not the app's.**
+  The documents are inside the site's project now. Before, a sentence in the
+  privacy policy put the end-to-end suite through the live database.
+
+- **The address of the site is written once, in `libs/core/src/origins.ts`**,
+  beside the app's, which the site had typed for itself. `vercel.json` has
+  to repeat the site's, because it cannot import, and a test holds the
+  redirects there to the constant.
+
+- **CI type-checks the tests for a change to the site too.** The site's own
+  type-check is its build, which leaves test files out.
 
 - **The plans are written once, in `libs/core`.** The price was in the app
   twice, as `$9` typed into the pricing page and as 900 cents beside it that
@@ -77,6 +122,19 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **Inside the terms, the link to the privacy policy opened the app's empty
+  shell.** It is written as a link to the markdown file, which is right on
+  GitHub, and the app rendered it as written: `/PRIVACY_POLICY.md`, an
+  address the app has no page for. The site turns it into a link to
+  `/privacy`.
+- **The terms ended on a line printed with its asterisks**, and showed the
+  three steps of dispute resolution as three paragraphs. The app's reader
+  knew neither emphasis nor numbered lists.
+- **The address the store notes gave for the privacy policy never showed
+  it.** `docs/store-submission.md` named `/privacy-policy` on the app, which
+  answered with the app's shell; the static page was at
+  `/privacy-policy.html`. Both lead to the policy now, and the notes name
+  the page on the site.
 - **Every push to `main` left two failed deployments on Vercel.** CI
   publishes the coverage badges to a branch of their own, and Vercel deploys
   every branch that is pushed. That branch holds two JSON files, so the app's

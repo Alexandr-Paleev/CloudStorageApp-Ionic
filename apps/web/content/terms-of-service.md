@@ -152,7 +152,7 @@ You agree to indemnify us from claims arising from:
 
 ## 14. Privacy
 
-Your use of the Service is subject to our [Privacy Policy](./PRIVACY_POLICY.md).
+Your use of the Service is subject to our [Privacy Policy](./privacy-policy.md).
 
 ## 15. Changes to Terms
 

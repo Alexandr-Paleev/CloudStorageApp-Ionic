@@ -24,5 +24,8 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  /* The tests are type-checked with the rest of the repository's, from the
+     root. Here they would make `next build` ask for Vitest, and an install
+     of the site alone does not have it. */
+  "exclude": ["node_modules", "**/*.test.ts"]
 }

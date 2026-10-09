@@ -68,8 +68,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <footer className="site-footer">
           <nav aria-label="Legal and source">
             <Link href="/pricing">Pricing</Link>
-            <a href={`${APP_ORIGIN}/privacy`}>Privacy</a>
-            <a href={`${APP_ORIGIN}/terms`}>Terms</a>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
             <a href={REPOSITORY_URL}>Source</a>
           </nav>
           <p>Open source, under the MIT licence.</p>

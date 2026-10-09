@@ -1,7 +1,9 @@
+import { APP_ORIGIN as APP } from '@cloud-storage/core/origins';
+
 /**
  * Where this site lives, and where it sends people.
  *
- * Neither address is typed in by hand. Vercel gives every build the
+ * Its own address is not typed in here. Vercel gives every build the
  * production host of its own project, and that is this site's address: it
  * is what the canonical link, the sitemap and the social card point at, on a
  * preview as much as in production. Off Vercel there is no such host, and
@@ -18,11 +20,10 @@ export const IS_PRODUCTION = process.env.VERCEL_ENV === 'production';
 
 /**
  * The app is a different origin and a different Vercel project: decision 0014.
- * The variable is for pointing a local build at a local app.
+ * Its address is written in `libs/core`, beside the one the app has for this
+ * site. The variable is for pointing a local build at a local app.
  */
-export const APP_ORIGIN = (
-  process.env.NEXT_PUBLIC_APP_ORIGIN ?? 'https://cloud-storage-app-ionic-v0.vercel.app'
-).replace(/\/$/, '');
+export const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? APP).replace(/\/$/, '');
 
 export const REPOSITORY_URL = 'https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic';
 

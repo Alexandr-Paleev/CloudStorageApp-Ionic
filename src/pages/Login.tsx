@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import {
   IonContent,
   IonPage,
@@ -23,6 +23,7 @@ import demoService from '../services/demo.service';
 import { env } from '../env';
 import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/shell';
 import './Login.css';
+import { LEGAL_URL } from '../utils/legal.utils';
 import './Legal.css';
 
 const Login: React.FC = () => {
@@ -245,10 +246,19 @@ const Login: React.FC = () => {
             )}
 
             {/* Shown at the point of account creation, and reachable without
-                an account — Stripe checks for these before going live. */}
+                an account — Stripe checks for these before going live. They
+                are pages of the site, so they open beside the app rather
+                than in place of it. */}
             <p className="legal-links">
-              By continuing you agree to our <Link to="/terms">Terms of Service</Link> and{' '}
-              <Link to="/privacy">Privacy Policy</Link>.
+              By continuing you agree to our{' '}
+              <a href={LEGAL_URL.terms} target="_blank" rel="noreferrer">
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a href={LEGAL_URL.privacy} target="_blank" rel="noreferrer">
+                Privacy Policy
+              </a>
+              .
             </p>
 
             {error && (

@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 3 of 6 built, and two of the three parts of step 4
+Accepted · 2026-10-08 · step 4 of 6 built
 
 ## Context
 
@@ -375,3 +375,76 @@ from one place.
 - **The smoke test asks about width.** Adding one link to the header pushed
   the page sideways on a 320-pixel screen. That was caught on a screenshot
   and not by a check, so the test now loads both pages at three widths.
+
+## Update — 2026-10-09, step 4, third part
+
+The terms and the privacy policy are pages of the site, at `/terms` and
+`/privacy`, and the app holds no copy of either. Step 4 is built.
+
+- **The two documents moved into the site.** The plan said the legal pages
+  would render the same markdown, and they do. It did not say where the
+  markdown would be. It was at the root of the repository, where the app
+  imported it. The site is its only reader now, so it is in
+  `apps/web/content/`, inside the site's project. That is what answers the
+  last line of the context above: a sentence changed in the privacy policy
+  runs the site's steps, and no account is opened in the live database for
+  it.
+- **The reader of that markdown is the site's, and not a library.** It is
+  the one the app had, moved with the documents. `libs/core` is for what two
+  sides use, and one side reads these. It learned two things on the way.
+  The terms end on an emphasised line that the app printed with its
+  asterisks, and their three steps of dispute resolution were three
+  paragraphs. It is still not a markdown library. The documents use
+  headings, lists, rules, bold, emphasis and links, and a test puts both
+  through the reader and fails on anything else, so the day one of them
+  gains a table is found out in a test.
+- **A link from one document to the other is a link to a file.** That is
+  right on GitHub, where the documents are also read, so the documents keep
+  it. The site turns a file name into its page. The app did not, and inside
+  the terms the link to the privacy policy opened the app's shell at an
+  address it had no page for.
+- **The app links to the site, and its old addresses lead there.** The
+  links on the login page and the plans page open the site's pages in a tab
+  of their own. `vercel.json` redirects the two routes and the static pages,
+  with and without `.html`: six addresses. The two routes also forward from
+  inside the app, because a browser the service worker controls is given
+  the shell without the server being asked, and a native shell has no
+  server in front of it. In a native shell the page does not forward. It
+  shows the link and waits, since the window it would replace is the app.
+- **The redirects are temporary ones.** A permanent redirect is remembered
+  by the browsers that followed it, and the site's address is the one
+  Vercel gave it, which a domain would replace.
+- **The address of the site is written twice, and a test holds the two
+  together.** Once in `libs/core/src/origins.ts`, beside the app's, for the
+  app and the site to read. Once in `vercel.json`, which cannot import. The
+  site had typed the app's address for itself, and reads it from the same
+  module now.
+- **The static copies are gone, and so is what audited them.**
+  `public/privacy-policy.html` and `public/terms-of-service.html` were the
+  only HTML besides the shell that the app's build emitted, and Lighthouse
+  audited all three. It audits the shell now. Nothing audits the site with
+  Lighthouse, so the site's smoke test took over the question those two
+  pages were asked about accessibility: every page of the site is put
+  through axe at WCAG 2.1 A and AA.
+- **The site has unit tests, and the app's test run does not include
+  them.** They are a third Vitest project, run by the site's steps. Their
+  types are checked with the repository's other tests, from the root,
+  because the site's own type-check is `next build` and a build of the site
+  alone has no Vitest to check them against. CI therefore runs that
+  type-check for a change to the site too.
+- **What the two pages say was not edited.** They were moved as they were,
+  for the reason the plans were. Both still carry a contact address at
+  `example.com`, and the terms name `[Your Jurisdiction]` as the governing
+  law. The privacy policy gives January 10, 2026 as the day it was last
+  updated, and gained a section on 2026-09-27. All of that was public
+  before, on the app. It is public now on the site, which lists both pages
+  in its sitemap.
+
+Two things about this part were not seen working before it merged, and
+could not be. The redirects are applied by Vercel, and a preview deployment
+answers every request with a redirect to a login. What was checked instead
+is the table Vercel's own routing library builds from the file: the six
+redirects come before the filesystem and before the rewrite that serves the
+shell. And the native shells were not run. What happens to a link there was
+read in Capacitor's source: on both platforms it does not load another
+origin in the app's window, and asks the system to open it.

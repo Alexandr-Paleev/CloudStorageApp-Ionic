@@ -95,9 +95,10 @@ not:
 - **Can users request deletion?** Yes, in the app at `/account`. Google also
   wants a **publicly reachable URL** for deletion requests from people who no
   longer have the app installed. The privacy policy page is the natural home for
-  it: <https://cloud-storage-app-ionic-v0.vercel.app/privacy-policy>. Add a
-  paragraph there naming the in-app path and an email before submitting; the
-  page exists but does not say this yet.
+  it: <https://cloud-storage-web-xi.vercel.app/privacy>, a page of the public
+  site whose text is `apps/web/content/privacy-policy.md`. Add a paragraph
+  there naming the in-app path and an email before submitting; the page exists
+  but does not say this yet.
 
 ## Assets
 

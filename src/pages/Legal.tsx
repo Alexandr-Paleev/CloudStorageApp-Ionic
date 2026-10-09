@@ -1,127 +1,49 @@
-import {
-  IonBackButton,
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/react';
-import termsMarkdown from '../../TERMS_OF_SERVICE.md?raw';
-import privacyMarkdown from '../../PRIVACY_POLICY.md?raw';
+import { useEffect } from 'react';
+import { IonContent, IonPage } from '@ionic/react';
+import { isNative } from '../native/shell';
+import { LEGAL_URL, type LegalDocument } from '../utils/legal.utils';
 import './Legal.css';
 
+const TITLES: Record<LegalDocument, string> = {
+  terms: 'Terms of Service',
+  privacy: 'Privacy Policy',
+};
+
 /**
- * Renders the legal documents that live as markdown at the repository root, so
- * there is one copy rather than a second one drifting inside the app.
+ * What is left in the app at `/terms` and `/privacy`: a way on to the site,
+ * where the two documents are pages now.
  *
- * These routes are deliberately public: Stripe reviews them before enabling
- * live payments, and app stores need a reachable privacy policy — neither has
- * an account to log in with.
+ * The app used to render them here, from markdown, once its JavaScript had
+ * run. A reader that runs none was given an empty shell, which is why two
+ * static copies were kept beside it. On the site they are in the HTML.
+ *
+ * Most requests for these addresses never get here: `vercel.json` redirects
+ * them before a byte of the app is served. The ones that do get here are a
+ * browser this app's service worker controls, which is given the shell for
+ * every navigation, and the native shells, which have no server in front of
+ * them.
+ *
+ * A browser is sent straight on. A native shell is left where it is: its
+ * window is the app and not a browser, and what that window shows is not
+ * for this page to replace. There the page shows the link and waits.
  */
-const DOCUMENTS = {
-  terms: { title: 'Terms of Service', markdown: termsMarkdown },
-  privacy: { title: 'Privacy Policy', markdown: privacyMarkdown },
-} as const;
-
-export type LegalDocument = keyof typeof DOCUMENTS;
-
-/** Inline formatting: **bold**, `code` and [text](href) */
-function renderInline(text: string, keyPrefix: string) {
-  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
-  return text.split(pattern).map((part, index) => {
-    const key = `${keyPrefix}-${index}`;
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={key}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={key}>{part.slice(1, -1)}</code>;
-    }
-    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (link) {
-      return (
-        <a key={key} href={link[2]} target="_blank" rel="noreferrer">
-          {link[1]}
-        </a>
-      );
-    }
-    return <span key={key}>{part}</span>;
-  });
-}
-
-/**
- * Small on purpose: these documents only use headings, bullets, bold, links,
- * code spans and rules. A markdown library would be a dependency for four
- * hundred lines of static text.
- */
-function renderMarkdown(markdown: string) {
-  const blocks: React.ReactNode[] = [];
-  let listItems: string[] = [];
-
-  const flushList = (key: string) => {
-    if (!listItems.length) return;
-    blocks.push(
-      <ul key={key}>
-        {listItems.map((item, index) => (
-          <li key={`${key}-${index}`}>{renderInline(item, `${key}-${index}`)}</li>
-        ))}
-      </ul>
-    );
-    listItems = [];
-  };
-
-  markdown.split('\n').forEach((rawLine, index) => {
-    const line = rawLine.trimEnd();
-    const key = `l${index}`;
-
-    if (/^\s*[-*]\s+/.test(line)) {
-      listItems.push(line.replace(/^\s*[-*]\s+/, ''));
-      return;
-    }
-    flushList(`ul${index}`);
-
-    if (!line.trim()) return;
-    if (/^---+$/.test(line.trim())) {
-      blocks.push(<hr key={key} />);
-      return;
-    }
-
-    const heading = line.match(/^(#{1,4})\s+(.*)$/);
-    const hashes = heading?.[1];
-    const headingText = heading?.[2];
-    /* Both groups are checked rather than the match as a whole: a heading whose
-       text is empty is still a heading, so `headingText` is compared against
-       undefined and not tested for truthiness. */
-    if (hashes !== undefined && headingText !== undefined) {
-      const Tag = `h${hashes.length}` as 'h1' | 'h2' | 'h3' | 'h4';
-      blocks.push(<Tag key={key}>{renderInline(headingText, key)}</Tag>);
-      return;
-    }
-
-    blocks.push(<p key={key}>{renderInline(line, key)}</p>);
-  });
-
-  flushList('ul-last');
-  return blocks;
-}
-
 const Legal: React.FC<{ document: LegalDocument }> = ({ document }) => {
-  const { title, markdown } = DOCUMENTS[document];
+  const url = LEGAL_URL[document];
+
+  useEffect(() => {
+    if (!isNative()) window.location.replace(url);
+  }, [url]);
 
   return (
     <IonPage>
-      <IonHeader className="ion-no-border">
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref="/login" />
-          </IonButtons>
-          <IonTitle>{title}</IonTitle>
-        </IonToolbar>
-      </IonHeader>
       <IonContent className="ion-padding">
-        <article className="legal-document" data-testid={`legal-${document}`}>
-          {renderMarkdown(markdown)}
-        </article>
+        <p className="legal-moved" data-testid={`legal-${document}`}>
+          The {TITLES[document]} is at{' '}
+          <a href={url} target="_blank" rel="noreferrer">
+            {url}
+          </a>
+          .
+        </p>
       </IonContent>
     </IonPage>
   );

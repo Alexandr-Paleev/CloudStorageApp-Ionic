@@ -111,8 +111,13 @@ jobs:
       # to. Both compiled under the editor's red squiggle and neither could fail
       # a build. Adding noUncheckedIndexedAccess without this step would have
       # left the strictest half of the tree the least enforced.
+      #
+      # The site's unit tests are among them. Its own type-check is `next
+      # build`, which leaves test files out, because a build of the site
+      # alone has no Vitest to check them against. So this runs for a change
+      # to the site as well.
       - name: Type-check the tests
-        if: env.AFFECTED_APP == 'true'
+        if: env.AFFECTED_APP == 'true' || env.AFFECTED_WEB == 'true'
         run: npm run typecheck
 
       # A byte count rather than a score, so it cannot be flaky: the check fails
@@ -242,6 +247,13 @@ jobs:
       - name: Lint the site
         if: env.AFFECTED_WEB == 'true'
         run: npm run lint --workspace @cloud-storage/web
+
+      # The reader of the legal documents, and the two documents put through
+      # it: a construct it does not know fails here and is not printed on a
+      # page with its punctuation.
+      - name: Test the site
+        if: env.AFFECTED_WEB == 'true'
+        run: npm test --workspace @cloud-storage/web
 
       - name: Build the site
         if: env.AFFECTED_WEB == 'true'

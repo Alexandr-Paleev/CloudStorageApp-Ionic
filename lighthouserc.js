@@ -16,9 +16,10 @@ module.exports = {
   ci: {
     collect: {
       staticDistDir: './dist',
-      /* index.html plus the two static legal pages — the whole set this build
-         emits as HTML. Every route past the login wall is the same shell.
-         Three runs of each, so the performance floor below is judged on a
+      /* index.html — the whole of what this build emits as HTML. Every route
+         is the same shell. The two static legal pages that used to be audited
+         beside it are pages of the site now: decision 0014.
+         Three runs of it, so the performance floor below is judged on a
          median rather than on whichever single run a shared runner was slow
          for. */
       numberOfRuns: 3,
@@ -38,7 +39,7 @@ module.exports = {
         'categories:best-practices': ['error', { minScore: 0.95 }],
         'categories:seo': ['error', { minScore: 0.95 }],
 
-        /* 97 on the shell locally, 100 on the legal pages. The floor is set low
+        /* 97 on the shell locally. The floor is set low
            enough that a slow runner cannot fail the build on its own, and high
            enough that putting a blocking script back on the critical path
            will. With one run the first half did not hold: on 2026-10-01 a push
