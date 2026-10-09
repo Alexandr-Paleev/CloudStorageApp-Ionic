@@ -36,6 +36,38 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/terms",
+      "destination": "https://cloud-storage-web-xi.vercel.app/terms",
+      "permanent": false
+    },
+    {
+      "source": "/privacy",
+      "destination": "https://cloud-storage-web-xi.vercel.app/privacy",
+      "permanent": false
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "https://cloud-storage-web-xi.vercel.app/terms",
+      "permanent": false
+    },
+    {
+      "source": "/terms-of-service.html",
+      "destination": "https://cloud-storage-web-xi.vercel.app/terms",
+      "permanent": false
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "https://cloud-storage-web-xi.vercel.app/privacy",
+      "permanent": false
+    },
+    {
+      "source": "/privacy-policy.html",
+      "destination": "https://cloud-storage-web-xi.vercel.app/privacy",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",

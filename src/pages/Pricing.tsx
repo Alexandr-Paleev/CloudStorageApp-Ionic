@@ -13,7 +13,7 @@ import {
 } from '@ionic/react';
 import { checkmarkCircle, lockClosed, informationCircle } from 'ionicons/icons';
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Navigate } from 'react-router';
 import { env } from '../env';
 import { billingIsOffered } from '../utils/billing.utils';
 import { useProfile } from '../hooks/useProfile';
@@ -21,6 +21,7 @@ import billingService, { SubscriptionExistsError } from '../services/billing.ser
 import { formatMonthlyPrice } from '@cloud-storage/core/plans';
 import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
+import { LEGAL_URL } from '../utils/legal.utils';
 import './Legal.css';
 
 const Pricing: React.FC = () => {
@@ -200,7 +201,14 @@ const Pricing: React.FC = () => {
           {/* Consumer rules expect the terms to be readable before paying */}
           <p className="legal-links">
             Subscriptions renew monthly until cancelled. See our{' '}
-            <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
+            <a href={LEGAL_URL.terms} target="_blank" rel="noreferrer">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href={LEGAL_URL.privacy} target="_blank" rel="noreferrer">
+              Privacy Policy
+            </a>
+            .
           </p>
         </div>
       </IonContent>

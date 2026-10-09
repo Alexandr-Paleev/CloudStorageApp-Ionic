@@ -11,6 +11,11 @@
  * is only enforced by one. A script the policy refuses does not fail a
  * request. It prints to the console, and the page stays half alive.
  *
+ * The browser is also where each page is put through axe. Two of these pages
+ * were static files of the app once, and Lighthouse held them to a score for
+ * accessibility there. Nothing audits this site with Lighthouse, so the
+ * question is asked here.
+ *
  * Usage: node scripts/smoke.mjs                       (from apps/web, after `next build`)
  *        node scripts/smoke.mjs <url>                 (against a site that is running)
  *        node scripts/smoke.mjs <url> --production    (against the production deployment)
@@ -32,6 +37,12 @@ const args = process.argv.slice(2);
 const given = args.find((arg) => !arg.startsWith('--'));
 const production = args.includes('--production');
 const origin = (given ?? `http://localhost:${PORT}`).replace(/\/$/, '');
+
+/** Every page there is. A page added to the site is added here. */
+const PAGES = ['/', '/pricing', '/privacy', '/terms'];
+
+/** WCAG 2.1 A and AA: what the app's own pages are held to in e2e/a11y.spec.ts. */
+const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 const problems = [];
 const expect = (ok, what) => {
@@ -134,6 +145,37 @@ async function asACrawler() {
     'the plans page has no canonical link of its own'
   );
 
+  /* The legal documents. They are written as markdown and read by a small
+     reader of this site's own, so what is asked is that each arrived as a
+     document: one title, its sections, and none of the punctuation it was
+     written in. */
+  for (const [path, title] of [
+    ['/privacy', 'Privacy Policy'],
+    ['/terms', 'Terms of Service'],
+  ]) {
+    const response = await fetch(`${origin}${path}`);
+    const document = await response.text();
+    const article = document.match(/<article[^>]*>([\s\S]*?)<\/article>/)?.[1] ?? '';
+
+    expect(response.status === 200, `${path} answered ${response.status}`);
+    expect(
+      (article.match(/<h1[\s>]/g) ?? []).length === 1,
+      `${path} does not have exactly one title`
+    );
+    expect(article.includes(title), `${path} is not the ${title}`);
+    expect((article.match(/<h2[\s>]/g) ?? []).length >= 5, `${path} has lost its sections`);
+    expect(!/\*\*|\]\(|^#{1,6}\s/m.test(article), `${path} shows markdown punctuation`);
+    /* The documents link to each other by file name, which is right where
+       they are files. On a page it has to have become the other page. */
+    expect(!/href="[^"]*\.md"/.test(article), `${path} links to a markdown file`);
+    expect(
+      new RegExp(`<link rel="canonical" href="[^"]+${path}"`).test(document),
+      `${path} has no canonical link of its own`
+    );
+    expect(new RegExp(`<loc>[^<]+${path}</loc>`).test(listed), `the sitemap does not list ${path}`);
+    expect(html.includes(`href="${path}"`), `the first page does not lead to ${path}`);
+  }
+
   const missing = await fetch(`${origin}/no-such-page`);
   expect(missing.status === 404, `a page that does not exist answered ${missing.status}`);
 }
@@ -141,9 +183,12 @@ async function asACrawler() {
 /** What a browser makes of it, the policy included. */
 async function asAVisitor() {
   const { chromium } = require('playwright');
+  const { AxeBuilder } = require('@axe-core/playwright');
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage();
+    /* A context of its own, which axe asks for. */
+    const context = await browser.newContext();
+    const page = await context.newPage();
     const complaints = [];
     page.on('console', (message) => {
       if (message.type() === 'error') complaints.push(message.text());
@@ -163,11 +208,10 @@ async function asAVisitor() {
       await page.getByRole('heading', { level: 1 }).isVisible(),
       'the plans page has no visible heading'
     );
-    expect(complaints.length === 0, `the browser complained: ${complaints.join(' | ')}`);
 
     /* A header that does not fit pushes the whole page sideways, and it only
        does so on a phone. It did once, at 320 pixels, when a link was added. */
-    for (const path of ['/', '/pricing']) {
+    for (const path of PAGES) {
       for (const width of [320, 390, 1280]) {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
@@ -176,7 +220,17 @@ async function asAVisitor() {
         );
         expect(overflow === 0, `${path} is ${overflow}px wider than a ${width}px screen`);
       }
+
+      const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(
+        violations.length === 0,
+        `${path} breaks accessibility rules: ` +
+          violations.map(({ id, nodes }) => `${id} (${nodes.length})`).join(', ')
+      );
     }
+
+    /* Asked last, so that it is asked of every page above. */
+    expect(complaints.length === 0, `the browser complained: ${complaints.join(' | ')}`);
   } finally {
     await browser.close();
   }

@@ -66,9 +66,8 @@ const App: React.FC = () => (
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
-                {/* Public on purpose: Stripe reviews these before enabling live
-                  payments, and app stores need a reachable privacy policy —
-                  neither has an account to sign in with. */}
+                {/* The two documents are pages of the site now. These addresses
+                  are kept for whoever still has them, and lead there. */}
                 <Route path="/terms" element={<Legal document="terms" />} />
                 <Route path="/privacy" element={<Legal document="privacy" />} />
                 {/* Also public, and necessarily so: the token in the URL is the

@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Login from './Login';
 import { renderWithProviders } from '../test/utils';
+import { SITE_ORIGIN } from '@cloud-storage/core/origins';
 
 /**
  * The four ways into this app, and what each of them does when it fails.
@@ -157,6 +158,20 @@ describe('Login', () => {
     });
 
     release();
+  });
+
+  /* The two documents are pages of the site. This is the page an account is
+     made on, so it is where they have to be offered, and offered beside the
+     app: a link that replaced the form would lose what was typed into it. */
+  it('offers the terms and the privacy policy, on the site and in a tab of their own', () => {
+    show();
+
+    const terms = screen.getByRole('link', { name: 'Terms of Service' });
+    const privacy = screen.getByRole('link', { name: 'Privacy Policy' });
+
+    expect(terms).toHaveAttribute('href', `${SITE_ORIGIN}/terms`);
+    expect(privacy).toHaveAttribute('href', `${SITE_ORIGIN}/privacy`);
+    for (const link of [terms, privacy]) expect(link).toHaveAttribute('target', '_blank');
   });
 
   it('sends an already-signed-in visitor away rather than showing the form', () => {

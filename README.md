@@ -613,25 +613,27 @@ a 40 KB dependency is the one that has to justify it.
 
 #### Lighthouse, on the same run
 
-`npm run lighthouse` audits the built `dist/` — the shell and both static legal
-pages — with the desktop preset. Current scores:
+`npm run lighthouse` audits the built `dist/` with the desktop preset. That is
+one page, the shell: it is the only HTML the app's build emits. Current scores:
 
 | | Performance | Accessibility | Best practices | SEO |
 | --- | ---: | ---: | ---: | ---: |
 | App shell | 97 | 100 | 100 | 100 |
-| Privacy policy | 100 | 100 | 100 | 100 |
-| Terms of service | 100 | 100 | 100 | 100 |
 
 CI asserts accessibility, best practices and SEO at ≥ 95 — near-deterministic
 audits of markup and metadata — and performance at ≥ 80, low enough that a busy
 runner cannot fail the build on its own and high enough to catch a blocking
 script returning to the critical path.
 
-The legal pages did not start at 100. The first run found body text at `#999`
-on white (2.8:1, against the 4.5:1 that text needs), links distinguished by
-colour alone, no meta description, and four GitHub links pointing at a username
-that does not exist — leftovers of a rename that the earlier link sweep missed
-because these two pages are static HTML and nothing else references them.
+Two static legal pages were audited beside the shell until they became pages of
+the public site. They had not started at 100. The first run found body text at
+`#999` on white (2.8:1, against the 4.5:1 that text needs), links distinguished
+by colour alone, no meta description, and four GitHub links pointing at a
+username that does not exist — leftovers of a rename that the earlier link
+sweep missed because those two pages were static HTML and nothing else
+referenced them. Lighthouse does not audit the site. What it asked of those two
+pages about accessibility, the site's smoke test now asks of every page there,
+with axe at WCAG 2.1 A and AA.
 
 ## 🚀 Deployment
 
@@ -857,8 +859,9 @@ only ever read server-side.
 # Linting: the app, the functions and the libraries
 npm run lint
 
-# The public site in apps/web has its own: lint, dev server, build, smoke test
+# The public site in apps/web has its own: lint, unit tests, dev server, build, smoke test
 npm run lint --workspace @cloud-storage/web
+npm test --workspace @cloud-storage/web
 npm run dev --workspace @cloud-storage/web
 npm run build --workspace @cloud-storage/web
 npm run smoke --workspace @cloud-storage/web
@@ -866,7 +869,7 @@ npm run smoke --workspace @cloud-storage/web
 # Code formatting
 npm run format
 
-# Unit tests (Vitest) — both projects, server and client
+# Unit tests (Vitest) — both of the app's projects, server and client
 npm test
 
 # ...with the coverage report CI prints as two tables
@@ -912,11 +915,12 @@ code as it stands, which a disable comment cannot edit. It caches `build`,
 `lint`, both type-checks and the unit tests, and its cache key includes a
 fingerprint of the env files, which git ignores and Vite inlines into the
 bundle. And CI asks it what a push touches, and gets two answers. A change to
-the site runs the site's steps: its lint, its build, and a smoke test that
-asks the built site for its HTML with no script run. It does not run the
-app's end-to-end suite, so no account is opened in the live database for a
-sentence on the first page. A change to the app leaves the site alone, and a
-change to what both read, `libs/core` or the lock file, runs both.
+the site runs the site's steps: its lint, its unit tests, its build, and a
+smoke test that asks the built site for its HTML with no script run. It does
+not run the app's end-to-end suite, so no account is opened in the live
+database for a sentence on the first page or in the privacy policy. A change
+to the app leaves the site alone, and a change to what both read, `libs/core`
+or the lock file, runs both.
 Documentation is listed in `.nxignore`, so a push that changes nothing else
 skips every step and the required checks still end green. A push to `main`
 runs everything regardless.
@@ -928,6 +932,10 @@ places: `server` executes the Vercel handlers and the `libs/` helpers under
 node, `client` renders the React layer under jsdom. CI prints their coverage
 as two tables — a single blended percentage would hide which half a pull
 request moved.
+
+The site has a third, `site`, which its own `npm test` runs and the app's does
+not: the reader of the two legal documents, and both documents put through it,
+so that a construct it does not know fails a test and is not printed on a page.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is red, and it is meant to
@@ -974,8 +982,8 @@ in its scope, `/api/` and file paths included.
 `@axe-core/playwright` — on the login page, the dashboard with folders and
 files on it, the upload page with a queue, the file view and the plans page.
 `eslint-plugin-jsx-a11y` reads the source and Lighthouse audits the built
-shell, which behind a login form is an empty page and two static documents;
-everything the app actually is had been checked by neither. The first run found
+shell, which behind a login form is an empty page; everything the app actually
+is had been checked by neither. The first run found
 five rule classes, including a delete button nested inside the button that
 opens the file, and a list whose children were not list items.
 
@@ -1158,8 +1166,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📄 Legal
 
-- **[Privacy Policy](PRIVACY_POLICY.md)** - How we handle your data
-- **[Terms of Service](TERMS_OF_SERVICE.md)** - Rules and guidelines
+- **[Privacy Policy](https://cloud-storage-web-xi.vercel.app/privacy)** - How we handle your data
+- **[Terms of Service](https://cloud-storage-web-xi.vercel.app/terms)** - Rules and guidelines
+
+Both are pages of the public site, built from
+[`apps/web/content/`](apps/web/content). That folder holds the only copy of
+either: the app links to the pages and renders neither.
 
 ## 🌟 Star History
 

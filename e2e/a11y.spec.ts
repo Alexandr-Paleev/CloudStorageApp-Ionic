@@ -6,10 +6,10 @@ import { anonymousPage, test, expect, seedFile, seedFolder, supabaseReady } from
  * Accessibility, measured on the rendered DOM.
  *
  * `eslint-plugin-jsx-a11y` reads the source and Lighthouse audits the built
- * shell — which, behind a login form, is an empty page and two static legal
- * documents. Everything the app actually is has been checked by neither: the
- * dashboard, the upload queue, the file view and the plans page only exist
- * once React has run and a session exists.
+ * shell — which, behind a login form, is an empty page. Everything the app
+ * actually is has been checked by neither: the dashboard, the upload queue,
+ * the file view and the plans page only exist once React has run and a
+ * session exists.
  *
  * Scoped to WCAG 2.1 A and AA. axe also ships best-practice rules, and mixing
  * them in makes a failure ambiguous — "this breaks a standard" and "this is

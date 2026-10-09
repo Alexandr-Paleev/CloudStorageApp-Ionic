@@ -3,8 +3,9 @@
 # every project, CI asks Nx what a push touches, and a push that touches only
 # these runs nothing.
 #
-# PRIVACY_POLICY.md and TERMS_OF_SERVICE.md are not here, on purpose: the app
-# imports both and renders them at /privacy and /terms.
+# The privacy policy and the terms are not here, and are not documentation in
+# this sense: they are in apps/web/content/, and the site builds its /privacy
+# and /terms out of them. A change to either is a change to the site.
 docs/
 README.md
 CHANGELOG.md

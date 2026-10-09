@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * Two suites, two runtimes.
+ * Two suites for the app, in two runtimes, and one for the site.
  *
  * `server` runs the Vercel handlers and the shared helpers under node.
  * `client` renders the React layer under jsdom.
+ * `site` is apps/web, and is run by the site: see below.
  *
  * They were one node project until now, and coverage was scoped to api/ and
  * lib/ with a note saying Playwright covered the pages instead. It did not:
@@ -21,6 +22,18 @@ export default defineConfig({
           include: ['api/**/*.test.ts', 'libs/**/*.test.ts'],
           /* e2e/ belongs to Playwright — vitest must not pick those specs up */
           exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+        },
+      },
+      {
+        /* The site, apps/web. `npm test` at the root runs the two above and
+           leaves this one to the site's own `npm test`, because CI checks
+           the two apart: a change to the site runs the site's steps, and a
+           change to the app runs the app's. */
+        test: {
+          name: 'site',
+          environment: 'node',
+          include: ['apps/web/**/*.test.ts'],
+          exclude: ['**/node_modules/**', '**/.next/**'],
         },
       },
       {
