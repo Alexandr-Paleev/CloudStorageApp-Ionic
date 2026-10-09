@@ -11,3 +11,8 @@ CHANGELOG.md
 SECURITY.md
 PWA_TESTING.md
 LICENSE
+
+# Read by Dependabot and by nothing that is built or tested. A change to which
+# packages it groups is no reason to put the end-to-end suite through the live
+# database.
+.github/dependabot.yml
