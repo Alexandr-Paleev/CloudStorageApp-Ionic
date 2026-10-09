@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.8.0] — 2026-10-09
+
 ### Changed
 
 - **The repository is an Nx workspace, and CI asks it what a push touches.**
@@ -69,8 +73,9 @@ reasoning behind the larger decisions lives in
   not doing. The cache key of the root's tasks covers the whole repository:
   with `api/` a project of its own, a change there would otherwise be handed
   the previous result. And Vite's dev server and Vitest follow the names in
-  `tsconfig.base.json`, as the build already did. Built from `main` and from this change with the
-  same environment, `dist/` holds the same 60 files, byte for byte.
+  `tsconfig.base.json`, as the build already did. Built from `main` and from
+  this change with the same environment, `dist/` holds the same 60 files,
+  byte for byte.
 
 ### Fixed
 
@@ -1395,7 +1400,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...HEAD
+[4.8.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...v4.8.0
 [4.7.5]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...v4.7.5
 [4.7.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.3...v4.7.4
 [4.7.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.2...v4.7.3
