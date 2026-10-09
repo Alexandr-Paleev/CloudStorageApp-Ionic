@@ -230,7 +230,7 @@ one to another except where the plan above allows it.
   worst outcome there is, so the second way out above is the one taken. The
   functions and `libs/server` keep their relative imports, and the rule is
   told to let those through. This was `@vercel/node` 12.0.1, the version the
-  lock file names.
+  lock file named that day.
 - **`libs/core` has a name, and `libs/server` does not.** The app imports
   `@cloud-storage/core/...`. For `libs/server` the only spelling left to the
   app is a relative path, and the rule refuses a relative path that leaves
