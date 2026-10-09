@@ -28,6 +28,13 @@ reasoning behind the larger decisions lives in
   ours, the lint rule that keeps the projects apart has a tag for it, and
   `libs/boundaries.test.ts` asks about five more imports.
 
+  It states its own framework, install, build and output directory in
+  `apps/web/vercel.json`. Its first deployment built every page and then
+  failed looking for `dist`: it had been built with the values of the
+  `vercel.json` at the root of the repository, which is the app's. The
+  site's smoke test now also fails if the policy it is sent names any origin
+  but its own, which the app's does.
+
 ### Changed
 
 - **CI gives two answers to "what does this push touch".** A change to the

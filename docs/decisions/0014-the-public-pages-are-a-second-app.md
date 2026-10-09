@@ -312,3 +312,31 @@ links to the legal pages still lead to the app, and the static copies in
 Not in this change, and not forgotten: the Vercel project for the site is
 made by hand, Lighthouse does not audit the site yet, and the first page
 makes no claim that depends on which keys a deployment has.
+
+### The first deployment, and what it added
+
+The project was made the same day, rooted at `apps/web`, and its first
+deployment failed. Next built every page, and then Vercel looked for an
+output directory named `dist`.
+
+- **The site states its own configuration, in `apps/web/vercel.json`.** The
+  project's settings said Next.js, and the build was not run as one: it ran
+  `npm run build` and then expected `dist`, the way the app is built. Those
+  are the values of the `vercel.json` at the root of the repository, which
+  is the app's. A project rooted in a folder is documented to read that file
+  from the folder, and this one had none there. Now it has, and it names the
+  framework, the install, the build and the output directory, so that
+  nothing outside `apps/web` decides them.
+- **The install it names is the one that was tried first.** Left to itself
+  Vercel saw Nx in the repository and installed everything from the root:
+  1034 packages, a minute. The site's file asks for its own workspace, which
+  is 34.
+- **The smoke test asks whose policy the site sends.** The root file also
+  carries the app's headers, the content security policy among them. The
+  site's policy names no origin but its own and the app's names eleven, so
+  the test fails on a policy that names one.
+- **What local checks could not see.** Everything about this was right on a
+  laptop and in CI. Only the platform reads that file, and the first place
+  the site met the platform was its first deployment. The site's pull
+  requests get a preview from now on, which is where the next such thing
+  will show.
