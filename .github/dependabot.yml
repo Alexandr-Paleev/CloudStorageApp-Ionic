@@ -20,6 +20,14 @@ updates:
         patterns: ['@ionic/*', 'ionicons']
       testing:
         patterns: ['vitest', '@vitest/*', '@playwright/*', 'playwright']
+      # React does not start unless react and react-dom are the same version.
+      # An update that moved one without the other built an app that rendered
+      # nothing; the smoke test and the end-to-end suite both said so, and the
+      # pull request could only be closed. Listed before `types`, because a
+      # dependency joins the first group it matches and these two have types
+      # of their own.
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
       types:
         patterns: ['@types/*']
       # Nx wants its own packages on one version, and there will be more of

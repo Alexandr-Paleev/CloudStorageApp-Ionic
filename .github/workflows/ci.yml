@@ -197,7 +197,17 @@ jobs:
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           cp "$RUNNER_TEMP"/badges/*.json .
-          git add ./*.json
+
+          # Vercel deploys every branch that is pushed, for each project on
+          # this repository, and this branch holds nothing either can build.
+          # The app's project ran `npm run build` with no package.json, the
+          # site's looked for apps/web, and every push to main left two failed
+          # deployments behind. A vercel.json where each project looks for
+          # one tells it not to deploy this branch.
+          mkdir -p apps/web
+          printf '{ "git": { "deploymentEnabled": false } }\n' | tee vercel.json > apps/web/vercel.json
+
+          git add --all
           git commit --quiet -m "coverage badges for ${GITHUB_SHA::7}"
           git push --force --quiet \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \

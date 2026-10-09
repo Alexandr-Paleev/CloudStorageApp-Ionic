@@ -53,6 +53,20 @@ reasoning behind the larger decisions lives in
 - **`source-map-js` 1.2.1 to 1.2.2.** Next depends on it at run time, which
   moved an advisory that was among the build tools into the production
   dependencies, where the audit is a required check.
+- **Dependabot moves `react` and `react-dom` together.** It had proposed
+  `react` 19.3.0 with `react-dom` left at 19.2.8, and React does not start on
+  two versions: the built app rendered nothing. The smoke test and the
+  end-to-end suite both failed on it, so nothing reached `main`. The two
+  packages and their types are one group now.
+
+### Fixed
+
+- **Every push to `main` left two failed deployments on Vercel.** CI
+  publishes the coverage badges to a branch of their own, and Vercel deploys
+  every branch that is pushed. That branch holds two JSON files, so the app's
+  project failed on a missing `package.json`, which it had been doing
+  unnoticed, and the site's failed on a missing `apps/web`. The branch now
+  carries a `vercel.json` for each project that says not to deploy it.
 
 ## [4.8.0] — 2026-10-09
 
