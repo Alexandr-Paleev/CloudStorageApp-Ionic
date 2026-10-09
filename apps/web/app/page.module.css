@@ -1,0 +1,109 @@
+.hero,
+.section {
+  width: 100%;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.hero {
+  padding-top: clamp(2.5rem, 8vw, 6rem);
+  padding-bottom: clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.hero h1 {
+  max-width: 18ch;
+  margin: 0;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  max-width: var(--measure);
+  margin: 1.5rem 0 0;
+  font-size: 1.1875rem;
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.primary,
+.secondary {
+  display: inline-block;
+  padding: 0.8rem 1.4rem;
+  border-radius: 999px;
+  border: 2px solid var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.primary {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+.secondary {
+  color: var(--color-primary);
+}
+
+.note {
+  max-width: var(--measure);
+  margin: 1.5rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.section {
+  padding-top: clamp(2rem, 5vw, 3.5rem);
+  padding-bottom: clamp(2rem, 5vw, 3.5rem);
+  border-top: 1px solid var(--color-border);
+}
+
+.section h2 {
+  margin: 0 0 1.5rem;
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Four of them: two rows of two, or one column. Three and one is neither. */
+@media (min-width: 48rem) {
+  .features {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.features li {
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.features h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+}
+
+.features p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.prose {
+  max-width: var(--measure);
+  margin: 0 0 1rem;
+}

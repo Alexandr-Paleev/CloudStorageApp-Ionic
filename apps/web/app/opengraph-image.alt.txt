@@ -1,0 +1,1 @@
+Cloud Storage: the dashboard, showing the storage meter and a list of files

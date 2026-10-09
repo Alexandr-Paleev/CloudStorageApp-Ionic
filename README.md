@@ -795,8 +795,10 @@ cloud-storage-app/
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here
 │   └── stripe/                    # Checkout, Customer Portal, webhook
+├── apps/
+│   └── web/                       # The public pages: Next.js, a Vercel project and an origin of its own
 ├── libs/
-│   ├── core/                      # What the app and the functions both use (tiers, upload parts, URL rules)
+│   ├── core/                      # What the app, the site and the functions all use (tiers, upload parts, URL rules)
 │   └── server/                    # What only the functions may use (auth, signing, Stripe, erasure)
 ├── migrations/                    # The whole schema, in order, each re-runnable
 ├── e2e/                           # Playwright specs
@@ -852,8 +854,14 @@ only ever read server-side.
 ## 🛠️ Development
 
 ```bash
-# Linting
+# Linting: the app, the functions and the libraries
 npm run lint
+
+# The public site in apps/web has its own: lint, dev server, build, smoke test
+npm run lint --workspace @cloud-storage/web
+npm run dev --workspace @cloud-storage/web
+npm run build --workspace @cloud-storage/web
+npm run smoke --workspace @cloud-storage/web
 
 # Code formatting
 npm run format
@@ -892,20 +900,26 @@ Chrome, the same browser pointed at the R2 server, and Pixel 7 for the specs
 whose subject is the phone. `main` is protected:
 those checks are required, and changes land through pull requests only.
 
-The repository is an Nx workspace of four projects: the app at its root, the
-functions in `api/`, and two libraries, `libs/core` and `libs/server`;
+The repository is an Nx workspace of five projects: the app at its root, the
+public site in `apps/web`, the functions in `api/`, and two libraries,
+`libs/core` and `libs/server`;
 [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md) says
 where that is going. Nx does three things here today. It keeps the projects
 apart: only the functions may import `libs/server`, lint refuses anything
 else, and `libs/boundaries.test.ts` holds the rule to that. The test asks the
-real ESLint config about thirteen imports, then reads the import graph of the
+real ESLint config about eighteen imports, then reads the import graph of the
 code as it stands, which a disable comment cannot edit. It caches `build`,
 `lint`, both type-checks and the unit tests, and its cache key includes a
 fingerprint of the env files, which git ignores and Vite inlines into the
-bundle. And CI asks it what a push touches. Documentation is listed in `.nxignore`, so a push
-that changes nothing else skips every step, the required checks still end
-green, and no account is opened in the live database for a paragraph of prose.
-A push to `main` runs everything regardless.
+bundle. And CI asks it what a push touches, and gets two answers. A change to
+the site runs the site's steps: its lint, its build, and a smoke test that
+asks the built site for its HTML with no script run. It does not run the
+app's end-to-end suite, so no account is opened in the live database for a
+sentence on the first page. A change to the app leaves the site alone, and a
+change to what both read, `libs/core` or the lock file, runs both.
+Documentation is listed in `.nxignore`, so a push that changes nothing else
+skips every step and the required checks still end green. A push to `main`
+runs everything regardless.
 
 ### What the tests cover, and what they deliberately do not
 

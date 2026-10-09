@@ -9,21 +9,32 @@
   },
   "namedInputs": {
     "envFiles": [{ "runtime": "node scripts/env-fingerprint.mjs" }],
-    "workspace": ["{workspaceRoot}/**/*", "envFiles"]
+    "root": [
+      "{projectRoot}/**/*",
+      "{workspaceRoot}/api/**/*",
+      "{workspaceRoot}/libs/**/*",
+      "envFiles"
+    ],
+    "project": [
+      "{projectRoot}/**/*",
+      "{workspaceRoot}/package-lock.json",
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/.github/workflows/ci.yml"
+    ]
   },
   "targetDefaults": {
     "build": {
       "cache": true,
-      "inputs": ["workspace"],
+      "inputs": ["root"],
       "outputs": ["{projectRoot}/dist"]
     },
-    "lint": { "cache": true, "inputs": ["workspace"] },
-    "typecheck": { "cache": true, "inputs": ["workspace"] },
-    "typecheck:api": { "cache": true, "inputs": ["workspace"] },
-    "test": { "cache": true, "inputs": ["workspace"] },
+    "lint": { "cache": true, "inputs": ["root"] },
+    "typecheck": { "cache": true, "inputs": ["root"] },
+    "typecheck:api": { "cache": true, "inputs": ["root"] },
+    "test": { "cache": true, "inputs": ["root"] },
     "test:coverage": {
       "cache": true,
-      "inputs": ["workspace"],
+      "inputs": ["root"],
       "outputs": ["{projectRoot}/coverage"]
     },
     "size": { "dependsOn": ["build"] },

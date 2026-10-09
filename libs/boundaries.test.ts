@@ -141,6 +141,36 @@ describe('what lint says about an import', () => {
       "export { env } from '../src/env';",
       ACROSS,
     ],
+    [
+      'the site reaches libs/core by its name',
+      'apps/web/app/probe.tsx',
+      "export { TIER_LIMITS } from '@cloud-storage/core/tiers';",
+      NOTHING,
+    ],
+    [
+      'and not by its path',
+      'apps/web/app/probe.tsx',
+      "export { TIER_LIMITS } from '../../../libs/core/src/tiers';",
+      ACROSS,
+    ],
+    [
+      'the site does not reach libs/server',
+      'apps/web/app/probe.tsx',
+      "export { authenticateUser } from '../../../libs/server/src/auth';",
+      ACROSS,
+    ],
+    [
+      'the site does not reach the app',
+      'apps/web/app/probe.tsx',
+      "export { env } from '../../../src/env';",
+      ACROSS,
+    ],
+    [
+      'and the app does not reach the site',
+      'src/probe.ts',
+      "export { SITE_NAME } from '../apps/web/lib/site';",
+      ACROSS,
+    ],
   ])('%s', async (_claim, file, code, expected) => {
     expect(await lint(file, code)).toEqual(expected);
   });
@@ -166,6 +196,7 @@ describe('what the code imports today', () => {
 
     expect(edges).toEqual({
       'cloud-storage-app': ['core'],
+      web: ['core'],
       api: ['core', 'server'],
       server: ['core'],
       core: [],

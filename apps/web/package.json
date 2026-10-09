@@ -1,0 +1,50 @@
+{
+  "name": "@cloud-storage/web",
+  "private": true,
+  "description": "The public pages of Cloud Storage: Next.js, on an origin of its own",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings 0",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "next": "^16.4.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "5.9.3"
+  },
+  "nx": {
+    "name": "web",
+    "tags": [
+      "scope:web"
+    ],
+    "targets": {
+      "build": {
+        "cache": true,
+        "inputs": [
+          "project",
+          "^project"
+        ],
+        "outputs": [
+          "{projectRoot}/.next",
+          "!{projectRoot}/.next/cache"
+        ]
+      },
+      "lint": {
+        "cache": true,
+        "inputs": [
+          "project",
+          "^project",
+          "{workspaceRoot}/eslint.config.mjs"
+        ]
+      }
+    }
+  }
+}
