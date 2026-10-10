@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.9.0] — 2026-10-10
+
 ### Added
 
 - **The public pages have an app of their own, and it has its first page.**
@@ -119,6 +123,11 @@ reasoning behind the larger decisions lives in
   two versions: the built app rendered nothing. The smoke test and the
   end-to-end suite both failed on it, so nothing reached `main`. The two
   packages and their types are one group now.
+- **The first screen of the README says what the repository now is.** An app
+  and the public site in front of it, in one Nx workspace. The opening
+  paragraph named Ionic, React and Supabase, and nothing built since. It
+  links to the site, and the highlights lead to the two records about how the
+  repository is put together, decisions 0013 and 0014.
 
 ### Fixed
 
@@ -141,6 +150,20 @@ reasoning behind the larger decisions lives in
   project failed on a missing `package.json`, which it had been doing
   unnoticed, and the site's failed on a missing `apps/web`. The branch now
   carries a `vercel.json` for each project that says not to deploy it.
+- **The README had stopped describing the repository in seven places.** It
+  said the workspace held one project, where it holds five. It said
+  `src/pages` had no tests at all, where the unit tests reach 323 of its 642
+  statements. Its list of migrations stopped at `008` and called all nine
+  safe to re-run: there are sixteen, and all of them are. Its table of bundle
+  budgets still showed the day the check was written, 401.0 kB against a
+  ceiling of 420, where the build is 437.2 kB against 445. It named the
+  router by a package that is no longer installed, and `vite.config.ts` where
+  the file is `vite.config.mts`.
+
+  The seventh was about money. The README said that cancelling Pro takes
+  effect at once. The Customer Portal this deployment sends people to ends a
+  subscription at the end of the period already paid for, which is also what
+  the terms say.
 
 ## [4.8.0] — 2026-10-09
 
@@ -1530,7 +1553,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...HEAD
+[4.9.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...v4.8.0
 [4.7.5]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...v4.7.5
 [4.7.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.3...v4.7.4

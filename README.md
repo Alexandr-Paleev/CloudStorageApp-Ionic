@@ -12,9 +12,9 @@
   <sub>One <code>npm run build</code>, three shells — the browser, a Pixel 7 emulator and an iPhone 17 simulator</sub>
 </p>
 
-A modern, **open-source** web application for storing, viewing, and managing files with PWA and mobile device support. Built with Ionic + React + Supabase, with Stripe billing and five storage backends.
+An **open-source** cloud storage product: an app for storing, viewing, sharing and managing files, and the public site in front of it. The app is Ionic + React, an installable PWA that also builds for iOS and Android through Capacitor. The site is Next.js, on an origin of its own. They share one Nx workspace with the Vercel functions behind them, on Supabase, with Stripe billing, five storage backends, and search by meaning over pgvector.
 
-🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[Releases](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)** | 📓 **[Changelog](CHANGELOG.md)**
+🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 🌐 **[Site](https://cloud-storage-web-xi.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[Releases](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)** | 📓 **[Changelog](CHANGELOG.md)**
 
 > ⚡ **No sign-up needed.** "Just looking? Open a demo account", at the foot of
 > the login page, opens a private account seeded with a few files and deletes it
@@ -50,6 +50,22 @@ up where it happened:
   check-then-act: two parallel uploads both passed. It is now a trigger on the
   row every upload must reach, holding a lock while it counts.
 
+Two more are about how the repository is put together, and not about
+something that went wrong in it:
+
+- **[The public pages are a second app, on an origin of its own](docs/decisions/0014-the-public-pages-are-a-second-app.md)** —
+  a Next.js site beside the Ionic app, in one Nx workspace of five projects.
+  Only the functions may import the library that holds the service-role
+  client. Lint refuses anything else, and a test holds the rule to its job by
+  reading the import graph, which a disable comment cannot edit. CI asks the
+  workspace what a push touches, so a sentence changed on the site does not
+  put the end-to-end suite through the live database.
+- **[Search by meaning is indexed on demand, by a swappable model](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md)** —
+  a model writes one sentence about a file, the sentence becomes a vector, and
+  Postgres ranks by distance with pgvector, inside the caller's own rows and
+  under RLS. Two model backends sit behind one seam, and a deployment that has
+  not switched the mode on does not show it. The public demo is one of those.
+
 Every decision of this kind has a short record in
 **[`docs/decisions/`](docs/decisions/)** — context, decision, and the
 consequences that cost something.
@@ -60,7 +76,7 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
 
 - Securely store files in the cloud (PDFs, images, documents)
 - View and manage files through a user-friendly interface
-- Use the app in a browser, as an installable PWA, or as a native iOS build
+- Use the app in a browser, as an installable PWA, or as a native iOS or Android build
 - Automatically expand storage via Google Drive when the limit is exceeded
 - Upgrade to a paid tier for more space and additional providers
 
@@ -303,8 +319,25 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `008` — drops `early_access`, a Pro-plan waitlist table that existed in the
      database, in no migration and in no line of code, and was accepting
      anonymous writes. On a new project it finds nothing and does nothing
+   - `009` — pins the `search_path` of two trigger functions, and takes back
+     the `EXECUTE` grant that three had inherited and no caller needed
+   - `010` — constrains `files.download_url` to `http(s)`. The row is written
+     by the browser, and a `javascript:` URL in it became the Download button
+     of a share page
+   - `011` — search by meaning: the `vector` extension, the `file_embeddings`
+     table with a read-only policy, and `match_files`, the function that ranks
+     a caller's own rows
+   - `012` — takes back the table grants `anon` and `authenticated` had
+     inherited and nothing used. `TRUNCATE` was among them, and row-level
+     security does not apply to it
+   - `013` — constrains `files.storage_path` to the row owner's own folder, so
+     that a row cannot name somebody else's object
+   - `014` — refuses a `storage_path` that a URL parser would rewrite: `..`, a
+     backslash, a percent sign, a control character
+   - `015` — reads `auth.uid()` once per query, not once per row, in the five
+     policies that compare a column with it
 
-   All nine are safe to re-run, so there is no need to track which ones have
+   All sixteen are safe to re-run, so there is no need to track which ones have
    already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
@@ -435,14 +468,16 @@ The app will be available at: `http://localhost:8100`
 ## 📦 Tech Stack
 
 - **Frontend**: React 19 + Ionic 9 + TypeScript 5.9
+- **Public site**: Next.js 16 (App Router), every page prerendered. It is `apps/web`, a Vercel project and an origin of its own
 - **File Storage**: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
+- **Search by meaning**: pgvector in Postgres, with Claude and Voyage or Cloudflare Workers AI writing and embedding the descriptions
 - **Database**: Supabase (PostgreSQL, RLS)
 - **Authentication**: Supabase Auth
 - **Billing**: Stripe (Checkout, Customer Portal, webhooks)
 - **State Management**: TanStack Query + React Context API
-- **Routing**: React Router DOM
+- **Routing**: React Router 7
 - **Build**: Vite + Capacitor
-- **Workspace**: Nx, with one project so far: it caches tasks and tells CI what a push touches
+- **Workspace**: Nx, five projects: the app, the public site, the functions and two libraries. It keeps them apart by lint, caches tasks and tells CI what a push touches
 - **Backend API**: Vercel Functions
 - **Testing**: Vitest (node and jsdom projects) + Playwright (e2e), run in GitHub Actions
 - **Analytics**: Google Analytics 4 (GA4) + Hotjar
@@ -603,13 +638,18 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 401.0 kB | 420 kB |
-| Largest chunk (Ionic) | 239.4 kB | 250 kB |
-| All assets, route chunks included | 485.1 kB | 520 kB |
+| First load (JS + CSS) | 437.2 kB | 445 kB |
+| Largest chunk (Ionic) | 245.5 kB | 260 kB |
+| All assets, route chunks included | 530.2 kB | 540 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
+
+Those are the figures of 4.9.0, as CI measured them. When the check was written
+the three ceilings were 420, 250 and 520 kB, over a first load of 401.0 kB. They
+have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
+them. `scripts/check-bundle-size.js` says where that went.
 
 #### Lighthouse, on the same run
 
@@ -641,6 +681,12 @@ with axe at WCAG 2.1 A and AA.
 
 1. Install Vercel CLI: `npm install -g vercel`
 2. Deploy: `vercel --prod`
+
+That deploys the app and its functions, from the root of the repository. The
+public site is a second Vercel project, with `apps/web` as its Root Directory.
+Its framework, install command, build command and output directory are stated
+in `apps/web/vercel.json`, because a project rooted in a folder that has no
+such file is built with the one at the root, and that one is the app's.
 
 ## 📱 Mobile app
 
@@ -792,20 +838,23 @@ cloud-storage-app/
 │   ├── App.tsx                    # Main component
 │   └── main.tsx                   # Entry point
 ├── api/                           # Vercel Functions — anything holding a secret
+│   ├── account/delete.ts          # Erases the caller's account and everything under it
+│   ├── ai/[action].ts             # Search by meaning: describe a file, embed a query
 │   ├── cloudinary/[action].ts     # sign (quota-checked) and delete (ownership-checked)
 │   ├── demo/session.ts            # Throwaway account for "Try the demo"
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here
+│   ├── share.ts                   # Create, open and revoke share links
 │   └── stripe/                    # Checkout, Customer Portal, webhook
 ├── apps/
 │   └── web/                       # The public pages: Next.js, a Vercel project and an origin of its own
 ├── libs/
-│   ├── core/                      # What the app, the site and the functions all use (tiers, upload parts, URL rules)
+│   ├── core/                      # What the app, the site and the functions all use (tiers, plans, upload parts, URL rules)
 │   └── server/                    # What only the functions may use (auth, signing, Stripe, erasure)
 ├── migrations/                    # The whole schema, in order, each re-runnable
 ├── e2e/                           # Playwright specs
 ├── capacitor.config.ts            # Capacitor config
-├── vite.config.ts                 # Vite config (incl. vendor chunk splitting)
+├── vite.config.mts                # Vite config (incl. vendor chunk splitting)
 ├── nx.json                        # Nx: which tasks are cached, and on what
 ├── .nxignore                      # What is not the app: documentation
 └── package.json
@@ -938,11 +987,13 @@ not: the reader of the two legal documents, and both documents put through it,
 so that a construct it does not know fails a test and is not printed on a page.
 
 The two badges at the top of this file are those two numbers, and they are
-deliberately not averaged into one. The client badge is red, and it is meant to
-be: `src/pages` has no tests at all, which is roughly six hundred statements of
-the four page components. That is the largest untested thing in the repository
-and it is named here rather than hidden behind an average that would read
-`~48%` and sound fine.
+deliberately not averaged into one. The client badge is the lower of the two by
+a long way, and it is meant to be: the pages are where the untested code is. As
+of 4.9.0, `src/pages` is 642 statements and the unit tests reach 323 of them.
+`Dashboard.tsx` is the largest at 163, and 66 of those are reached. Six smaller
+pages have no unit test at all, the plans page and the page a share link opens
+among them. That is the largest untested thing in the repository, and it is
+named here rather than hidden behind one average that would sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
 money and quota** has a test:
@@ -960,11 +1011,15 @@ money and quota** has a test:
   `shareUnusableReason()` from `libs/server/src/share.ts` rather than pull `node:crypto`
   into the bundle. Two implementations can drift; each side is tested.
 
-Pages are left to Playwright rather than jsdom: `e2e/` opens a throwaway
-account per test and drives the real file lifecycle, share links, quota, folder
-navigation, search, a multi-file upload and the offline queue against a live
-Supabase project. Rendering a page in jsdom proves the markup exists; it does
-not prove an upload works.
+What a page does from end to end is left to Playwright rather than jsdom: `e2e/`
+opens a throwaway account per test and drives the real file lifecycle, share
+links, quota, folder navigation, search, a multi-file upload and the offline
+queue against a live Supabase project. Rendering a page in jsdom proves the
+markup exists; it does not prove an upload works. The unit tests that five of
+the pages do have are about what a page decides, not what it draws: that a
+deletion asks first, that a failed change says so, that a queue keeps going
+after one file is refused, and that nothing is offered for sale inside the
+native shell.
 
 **One check runs the built bundle rather than the source.** `npm run smoke`
 opens `dist/` in a real browser and asks two questions: whether the page
@@ -1130,9 +1185,11 @@ Shipped in [v3.0.0](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/rel
 | Google Drive overflow  | ✅                                             | ✅             |
 
 Manage or cancel a subscription from the Stripe Customer Portal, reachable from
-the plans page. Cancelling takes effect immediately and the tier drops back to
-Free — see [Limits](#-limits-and-restrictions) for what happens to files already
-stored.
+the plans page. Cancelling there keeps Pro until the end of the period already
+paid for, and the tier then drops back to Free — see
+[Limits](#-limits-and-restrictions) for what happens to files already stored.
+When a cancellation takes effect is a setting of the portal, which lives in
+Stripe and not in this repository.
 
 > **The public demo runs on Stripe test keys.** Real cards are declined; use
 > `4242 4242 4242 4242` with any future expiry and any CVC. Nothing is charged.
@@ -1181,4 +1238,4 @@ If you find this project useful, please give it a ⭐ on GitHub!
 
 **Created with ❤️ by Aleksandr Paleev**
 
-**Stack**: Ionic + React + TypeScript + Supabase + Cloudinary + Vercel
+**Stack**: Ionic + React + Next.js + TypeScript + Nx + Supabase + Cloudinary + Stripe + Vercel
