@@ -125,9 +125,10 @@ Nothing yet.
   packages and their types are one group now.
 - **The first screen of the README says what the repository now is.** An app
   and the public site in front of it, in one Nx workspace. The opening
-  paragraph named Ionic, React and Supabase, and nothing built since. It
-  links to the site, and the highlights lead to the two records about how the
-  repository is put together, decisions 0013 and 0014.
+  paragraph described the app alone, with no word for the site, the workspace
+  or the search by meaning. It links to the site now, and the highlights lead
+  to decisions 0013 and 0014, the two that are about how something was built
+  and not about a fault.
 
 ### Fixed
 

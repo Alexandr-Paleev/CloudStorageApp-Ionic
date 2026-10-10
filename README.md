@@ -50,8 +50,7 @@ up where it happened:
   check-then-act: two parallel uploads both passed. It is now a trigger on the
   row every upload must reach, holding a lock while it counts.
 
-Two more are about how the repository is put together, and not about
-something that went wrong in it:
+Two more are not about a fault. They are about how something was built:
 
 - **[The public pages are a second app, on an origin of its own](docs/decisions/0014-the-public-pages-are-a-second-app.md)** —
   a Next.js site beside the Ionic app, in one Nx workspace of five projects.
