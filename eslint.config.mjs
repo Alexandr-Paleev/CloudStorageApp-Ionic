@@ -145,6 +145,35 @@ export default tseslint.config(
   },
 
   {
+    /**
+     * In the code that ships, a variable of the environment is read by its
+     * name: `import.meta.env.VITE_X`, and never `import.meta.env` whole.
+     *
+     * Vite writes a named variable's value into the bundle. Handed the
+     * object, it writes out every variable the build was given: destructured,
+     * spread, passed to a function or indexed by a key, it is the whole
+     * object each time. One such line in `src/env.ts` put fourteen of
+     * Vercel's variables into the public bundle and gave 16 of its 44 files
+     * a new name on every deployment. The comment there has the rest.
+     *
+     * Tests are left out. Nothing bundles them.
+     */
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/test/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            ":not(MemberExpression[computed=false]) > MemberExpression[object.type='MetaProperty'][property.name='env']",
+          message:
+            'Read a variable by its name, import.meta.env.VITE_X. Vite inlines every variable the build was given wherever import.meta.env is used whole: see src/env.ts.',
+        },
+      ],
+    },
+  },
+
+  {
     /* The site is rendered on a server and then runs in a browser, and one
        file can be asked to do both. */
     files: ['apps/web/**/*.{ts,tsx}'],

@@ -88,9 +88,48 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * What the build was given, one variable at a time.
+ *
+ * Each is read by its name, and `import.meta.env` is never handed over whole.
+ * Shown a name, Vite writes that variable's value into the bundle. Shown the
+ * object, it writes out every variable the build was given, whoever gave it.
+ * Vercel gives a Vite build fourteen of its own, the id and the message of
+ * the commit among them, and all of them were in the public bundle. They
+ * differ from one deployment to the next, so the files that held them took a
+ * new name every time. Measured on 2026-10-10 that was 16 of the 44 files
+ * under `assets/`, and a new service worker for every returning visitor,
+ * after a merge that had not touched the app.
+ *
+ * The type keeps this list and the schema the same list: a key the schema
+ * has and this lacks does not compile, and neither does one the schema has
+ * not. What the type cannot see is the right-hand side, so `env.test.ts`
+ * holds every line to the name it is written under. Lint refuses the whole
+ * object anywhere in the code that ships.
+ */
+const given: Record<keyof z.input<typeof envSchema>, unknown> = {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  VITE_CLOUDINARY_CLOUD_NAME: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+  VITE_CLOUDINARY_DELETE_API_URL: import.meta.env.VITE_CLOUDINARY_DELETE_API_URL,
+  VITE_R2_BUCKET_NAME: import.meta.env.VITE_R2_BUCKET_NAME,
+  VITE_API_ORIGIN: import.meta.env.VITE_API_ORIGIN,
+  VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
+  VITE_GA4_MEASUREMENT_ID: import.meta.env.VITE_GA4_MEASUREMENT_ID,
+  VITE_HOTJAR_SITE_ID: import.meta.env.VITE_HOTJAR_SITE_ID,
+  VITE_HOTJAR_VERSION: import.meta.env.VITE_HOTJAR_VERSION,
+  VITE_BILLING_ENABLED: import.meta.env.VITE_BILLING_ENABLED,
+  VITE_SMART_SEARCH_ENABLED: import.meta.env.VITE_SMART_SEARCH_ENABLED,
+  VITE_BILLING_DEMO_MODE: import.meta.env.VITE_BILLING_DEMO_MODE,
+  VITE_DEMO_ENABLED: import.meta.env.VITE_DEMO_ENABLED,
+  VITE_DROPBOX_APP_KEY: import.meta.env.VITE_DROPBOX_APP_KEY,
+  VITE_DROPBOX_REDIRECT_URI: import.meta.env.VITE_DROPBOX_REDIRECT_URI,
+};
+
 function parseEnv(): Env {
   try {
-    return envSchema.parse(import.meta.env);
+    return envSchema.parse(given);
   } catch (error) {
     const message =
       error instanceof z.ZodError

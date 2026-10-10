@@ -10,7 +10,39 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Every deployment gave a third of the app's files a new name, and every
+  returning visitor a new service worker, whatever the merge had changed.**
+  `src/env.ts` handed its schema the whole of `import.meta.env`, and Vite,
+  shown that object, writes out every variable the build was given. On Vercel
+  that includes fourteen of the platform's own, the id and the message of the
+  commit among them. They differ from one deployment to the next, so the file
+  that held them took a new name each time, and so did every file that
+  imports it: 16 of the 44 under `assets/`, 67 kB gzipped, and a service
+  worker that listed them. A browser that had the app installed the new
+  worker, fetched those files again and reloaded the page. The app's project
+  builds on every push to `main`, so this was the price of a sentence changed
+  on the site.
+
+  The variables are now read by name, one at a time. Built twice with a
+  different commit id, deployment id and commit message, `dist/` is the same
+  59 files, byte for byte. Lint refuses `import.meta.env` used whole anywhere
+  in the code that ships, and a test holds each line of the list to the
+  variable it is named for, which the type on the list cannot see.
+
+- **Variables that no code reads were in the public bundle.** Vercel's
+  fourteen were, and so were two of this project's:
+  `VITE_CLOUDINARY_API_KEY` and `VITE_CLOUDINARY_UPLOAD_PRESET`, which are
+  set on the production deployment and read by nothing. Neither is a secret,
+  and the README has warned since 4.0.0 that a prefix publishes a variable
+  whether the app reads it or not. That is no longer so: the bundle carries
+  the seventeen the app reads, and no others.
+
+- **CI never uploaded the Lighthouse reports.** `.lighthouseci/` is a hidden
+  folder, and `actions/upload-artifact` leaves hidden files out unless it is
+  told otherwise. From 2026-09-02, the day the step was added, it printed "No
+  files were found" as a warning and ended green on every run.
 
 ## [4.9.0] — 2026-10-10
 

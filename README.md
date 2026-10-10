@@ -250,9 +250,9 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Cloudinary Configuration
 # The API key is deliberately absent: it belongs to the server-side block below,
-# without the VITE_ prefix. src/env.ts parses the whole of import.meta.env, so
-# Vite inlines every VITE_ variable into the public bundle — even ones no code
-# reads. Anything prefixed here is published.
+# without the VITE_ prefix. Vite writes every VITE_ variable the app reads into
+# the public bundle, so a prefix is a decision to publish. The app reads the
+# ones named in src/env.ts, and no others reach the bundle.
 VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name
 
 # Required: API endpoint for file deletion
@@ -532,8 +532,8 @@ flowchart TB
 ```
 
 **The rule the layout follows:** anything holding a secret runs in `/api`. The
-browser bundle is public — Vite inlines every `VITE_`-prefixed value into it —
-so provider credentials, the Stripe secret key, the Supabase service-role key
+browser bundle is public — Vite inlines every `VITE_`-prefixed value the app
+reads into it — so provider credentials, the Stripe secret key, the Supabase service-role key
 and Dropbox refresh tokens are only ever read server-side. The client talks to
 Postgres directly, but always through the anon key with RLS applied, and only
 for rows it owns.
@@ -860,7 +860,7 @@ cloud-storage-app/
 ```
 
 Anything that needs a secret lives in `api/`. The browser bundle is public — Vite
-inlines every `VITE_`-prefixed value into it — so provider credentials, the
+inlines every `VITE_`-prefixed value the app reads into it — so provider credentials, the
 Stripe secret key, the Supabase service-role key and Dropbox refresh tokens are
 only ever read server-side.
 
