@@ -843,7 +843,7 @@ cloud-storage-app/
 │   ├── demo/session.ts            # Throwaway account for "Try the demo"
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect
 │   ├── r2/                        # Presigned URLs, quota enforced here
-│   ├── share.ts                   # Create, open and revoke share links
+│   ├── share.ts                   # Create, describe, open and revoke share links
 │   └── stripe/                    # Checkout, Customer Portal, webhook
 ├── apps/
 │   └── web/                       # The public pages: Next.js, a Vercel project and an origin of its own

@@ -10,7 +10,27 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`/api/share` can say what a link holds without opening it.** This is the
+  first of three parts of step 5 of
+  [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md):
+  the page a share link opens is moving to the site, where it is rendered on
+  a server, for whoever asks. `GET /api/share?token=…&describe` answers with
+  the file's name, size and type. It refuses a link exactly as opening one
+  does, and it signs nothing: a signed address in a server-rendered page
+  would be minted for every messenger that unfurls the link, and cached with
+  the page. It reads three columns of the file's row and no others.
+
+### Changed
+
+- **The functions answer the public site's origin on one route, for
+  reading.** A browser on the site may read `/api/share`, which is how its
+  share page will ask for the file when a person wants it. It is not told it
+  may send an `Authorization` header or use any method but `GET`, so a page
+  on that origin can neither make a link nor revoke one, and the other eleven
+  functions do not answer it at all. Nothing a visitor sees changes yet: the
+  app's own page still opens every link.
 
 ## [4.9.1] — 2026-10-10
 
