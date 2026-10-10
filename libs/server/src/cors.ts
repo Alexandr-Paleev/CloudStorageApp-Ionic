@@ -31,13 +31,29 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 /**
+ * What one route adds to the list above.
+ *
+ * `readers` are origins that may read this route's answer to a GET, and may
+ * do nothing else here. A shell is the app, somewhere else: it signs in and
+ * sends a token with everything it asks. A reader is another site. It has no
+ * session to send, so it is not told it may send an `Authorization` header,
+ * and a browser on that origin will then not send a request that carries
+ * one. The public site is the one reader there is, on the one route it reads:
+ * the page a share link opens asks `/api/share` for the file, from the
+ * visitor's browser. See decision 0014.
+ */
+interface RouteCors {
+  readers?: readonly string[];
+}
+
+/**
  * Answers the CORS half of a request, and says whether that was all of it.
  *
  * Returns `true` when the request was a preflight and has been answered, so
  * handlers read as `if (applyCors(req, res)) return;` — a preflight carries no
  * `Authorization` header and must never reach the code that expects one.
  */
-export function applyCors(req: VercelRequest, res: VercelResponse): boolean {
+export function applyCors(req: VercelRequest, res: VercelResponse, route: RouteCors = {}): boolean {
   const origin = req.headers.origin;
 
   if (origin && ALLOWED_ORIGINS.has(origin)) {
@@ -46,6 +62,14 @@ export function applyCors(req: VercelRequest, res: VercelResponse): boolean {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     /* A day, so the shell stops asking before every upload part. */
     res.setHeader('Access-Control-Max-Age', '86400');
+  } else if (origin && route.readers?.includes(origin)) {
+    /* No Allow-Headers at all. A plain GET needs none and is never
+       preflighted. A request that carries a token or a JSON body is, and so
+       is a DELETE, and this answer refuses all three. A POST that carries
+       neither is one any page on the internet can already send: the
+       handlers answer it 401. */
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   }
 
   /* Set whether or not the origin matched: the response genuinely differs by

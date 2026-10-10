@@ -17,6 +17,7 @@ import {
 } from '../libs/server/src/rate-limit';
 import { applyCors } from '../libs/server/src/cors';
 import { isSafeHttpUrl } from '../libs/core/src/safe-url';
+import { SITE_ORIGIN } from '../libs/core/src/origins';
 import { signOwnedPath } from '../libs/server/src/sign-owned-path';
 
 /**
@@ -25,12 +26,21 @@ import { signOwnedPath } from '../libs/server/src/sign-owned-path';
  * One file rather than three: Vercel turns every module under api/ into its own
  * serverless function and the Hobby plan allows twelve.
  *
- *   POST   /api/share            create a link for a file the caller owns
- *   GET    /api/share?token=...  open a link — no authentication, by design
- *   DELETE /api/share?id=...     revoke one of the caller's links
+ *   POST   /api/share                     create a link for a file the caller owns
+ *   GET    /api/share?token=...           open a link — no authentication, by design
+ *   GET    /api/share?token=...&describe  say what a link holds, and sign nothing
+ *   DELETE /api/share?id=...              revoke one of the caller's links
  *
  * The token is never stored, only its SHA-256. Lookup therefore happens here,
  * with the service-role key: shared_links has no policy the client could use.
+ *
+ * Describing is for a page that is rendered on a server, which is what the
+ * public site does with a share link (decision 0014). A page like that is
+ * rendered for whoever asks, a messenger unfurling the link included, and
+ * may be cached. A signed address written into it would be minted for every
+ * one of them and kept with the page. So the page is made from the file's
+ * name, size and type, and the address is signed when a person asks for it,
+ * from their own browser, by opening the link as before.
  */
 
 const SIGNED_URL_TTL = 3600;
@@ -161,6 +171,11 @@ async function openLink(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ message: 'token is required' });
   }
 
+  /* Present is enough: `&describe`, `&describe=1`. The link is found and
+     refused exactly as it is for opening, so a link that would not open is
+     not described either. */
+  const describeOnly = req.query.describe !== undefined;
+
   const { data: links, error } = await supabase
     .from('shared_links')
     .select('file_id, expires_at, revoked_at')
@@ -185,9 +200,16 @@ async function openLink(req: VercelRequest, res: VercelResponse) {
     return res.status(410).json({ message: 'This link has expired' });
   }
 
+  /* A description is made from three columns, and asks the database for no
+     others. Where the file is kept and whose it is are not read here at all,
+     so no later edit of the answer below can hand them out. */
   const { data: files, error: fileError } = await supabase
     .from('files')
-    .select('id, name, size, type, storage_path, storage_type, download_url, user_id')
+    .select(
+      describeOnly
+        ? 'id, name, size, type'
+        : 'id, name, size, type, storage_path, storage_type, download_url, user_id'
+    )
     .eq('id', link.file_id)
     .limit(1);
 
@@ -195,6 +217,10 @@ async function openLink(req: VercelRequest, res: VercelResponse) {
 
   const file = (files || [])[0] as FileRow | undefined;
   if (!file) return res.status(404).json({ message: 'The shared file no longer exists' });
+
+  if (describeOnly) {
+    return res.status(200).json({ name: file.name, size: file.size, type: file.type });
+  }
 
   // Deliberately narrow: the recipient gets the file, not the owner's identity
   // or anything else stored alongside it.
@@ -232,8 +258,12 @@ async function revokeLink(req: VercelRequest, res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   /* Before anything else: a preflight from the native shell carries no
-     Authorization header, and everything below expects one. */
-  if (applyCors(req, res)) return;
+     Authorization header, and everything below expects one.
+
+     The public site may read this route and no other: its share page asks
+     for the file from the visitor's browser. Reading is all it is given, so
+     a page on that origin cannot make a link or revoke one. */
+  if (applyCors(req, res, { readers: [SITE_ORIGIN] })) return;
 
   const ip = clientIp(req.headers, req.socket?.remoteAddress);
   if (!byAddress.allow(ip)) {

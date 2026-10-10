@@ -84,4 +84,53 @@ describe('applyCors', () => {
     expect(res.statusCode).toBe(204);
     expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBeUndefined();
   });
+
+  /* A shell is the app, somewhere else, and signs in. A reader is another
+     site with no session to send: the public site, on the one route it
+     reads. */
+  describe('an origin a route names as a reader', () => {
+    const SITE = 'https://site.example';
+
+    it('may read the answer to a GET', () => {
+      const res = mockResponse();
+      const done = applyCors(mockRequest({ method: 'GET', headers: { origin: SITE } }), res, {
+        readers: [SITE],
+      });
+
+      expect(done).toBe(false);
+      expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBe(SITE);
+    });
+
+    /* A request carrying a token or a JSON body is preflighted, and this is
+       what the preflight is told: no header may be added, and no method but
+       GET used. The browser then never sends the request itself. */
+    it('is not told it may send a token, a body, or anything but a GET', () => {
+      const res = mockResponse();
+      const done = applyCors(mockRequest({ method: 'OPTIONS', headers: { origin: SITE } }), res, {
+        readers: [SITE],
+      });
+
+      expect(done).toBe(true);
+      expect(res.statusCode).toBe(204);
+      expect(headersSetOn(res)['Access-Control-Allow-Headers']).toBeUndefined();
+      expect(headersSetOn(res)['Access-Control-Allow-Methods']).toBe('GET, OPTIONS');
+    });
+
+    it('is a stranger to a route that does not name it', () => {
+      const res = mockResponse();
+      applyCors(mockRequest({ headers: { origin: SITE } }), res);
+
+      expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBeUndefined();
+    });
+
+    it('takes nothing from what a shell is given on the same route', () => {
+      const res = mockResponse();
+      applyCors(mockRequest({ headers: { origin: 'capacitor://localhost' } }), res, {
+        readers: [SITE],
+      });
+
+      expect(headersSetOn(res)['Access-Control-Allow-Headers']).toContain('Authorization');
+      expect(headersSetOn(res)['Access-Control-Allow-Methods']).toContain('DELETE');
+    });
+  });
 });

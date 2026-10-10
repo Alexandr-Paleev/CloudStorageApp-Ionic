@@ -448,3 +448,40 @@ redirects come before the filesystem and before the rewrite that serves the
 shell. And the native shells were not run. What happens to a link there was
 read in Capacitor's source: on both platforms it does not load another
 origin in the app's window, and asks the system to open it.
+
+## Update — 2026-10-10, step 5, first part
+
+Step 5 goes in as three changes, as step 4 did: the API learns what the page
+will ask of it, then the page, then the links move. This is the first.
+Nothing a visitor sees has changed. The app's own page still opens every
+share link, the way it did.
+
+- **`/api/share` can describe a link without opening it.** `GET` with the
+  token and `describe` answers with the file's name, size and type. It finds
+  the link and refuses it exactly as opening does, so a link that is revoked,
+  expired or unknown is not described either. It signs nothing.
+- **A description asks the database for three columns.** Opening a link reads
+  where the file is kept and whose it is, because it signs an address.
+  Describing does not read them at all. The answer could have been narrowed
+  after reading the whole row, and then one edit to the answer would be
+  enough to hand the rest out.
+- **The site is a reader, and a reader is given less than a shell.** The
+  record above says the API gains an allowed origin, as it did for the shells
+  in 0010. It gains one on one route, and for reading. The site's origin is
+  answered on `/api/share` and on none of the other eleven functions. It may
+  use `GET`, and it is not told it may send an `Authorization` header. A
+  shell is the app somewhere else, and signs in. The site has no session to
+  send, so there is nothing it needs that a preflight has to allow, and a
+  page on its origin can neither make a link nor revoke one.
+- **Only the production site is named.** A preview of the site is another
+  origin and is not answered, and neither is a site running on a laptop. The
+  second change has to decide how the page is tested against an API that
+  will not answer it from there.
+- **Nothing is cached here.** The record above says that what a page says
+  about a link is cached for a short while. That is the page's cache, and it
+  belongs to the second change. The API answers every request it is asked.
+
+One thing was not seen working before it merged: the answer to a preflight.
+The dev server answers `OPTIONS` itself, before the function is reached, so
+what the function says to one is held by unit tests until production can be
+asked.

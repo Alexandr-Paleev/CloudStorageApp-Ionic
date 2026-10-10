@@ -7,6 +7,7 @@ import {
 } from '../libs/server/src/test-utils';
 import { hashShareToken } from '../libs/server/src/share';
 import { SHARE_CREATE_LIMIT, SHARE_IP_LIMIT, resetRateLimits } from '../libs/server/src/rate-limit';
+import { SITE_ORIGIN } from '../libs/core/src/origins';
 
 const APP_URL = 'https://app.example';
 const TOKEN = 'test-token-value';
@@ -355,6 +356,144 @@ describe('share: opening a link', () => {
       expect(db.storage.createSignedUrl).not.toHaveBeenCalled();
     }
   );
+});
+
+/* What the public site renders its share page from, on a server, for whoever
+   asks: a person, or a messenger unfurling the link. A signed address in that
+   page would be minted for every one of them and cached with it. */
+describe('share: describing a link', () => {
+  const describing = (query: Record<string, string> = {}) =>
+    get({ token: TOKEN, describe: '', ...query });
+
+  it('says what the link holds, and gives no address for it', async () => {
+    const res = mockResponse();
+    await handler(describing(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ name: 'report.pdf', size: 1024, type: 'application/pdf' });
+    expect(authenticateUser).not.toHaveBeenCalled();
+  });
+
+  it('is asked for by the parameter being there, whatever it is set to', async () => {
+    const res = mockResponse();
+    await handler(describing({ describe: '1' }), res);
+
+    expect(res.body).toEqual({ name: 'report.pdf', size: 1024, type: 'application/pdf' });
+  });
+
+  it.each(['r2', 'supabase_storage'])(
+    'signs nothing for a file in %s, where every address is a signed one',
+    async (storage_type) => {
+      setup({
+        files: { data: [{ ...FILE_ROW, storage_type }] },
+        shared_links: { data: [liveLink()] },
+      });
+      await handler(describing(), mockResponse());
+
+      expect(signedUrl).not.toHaveBeenCalled();
+      expect(db.storage.createSignedUrl).not.toHaveBeenCalled();
+    }
+  );
+
+  /* The answer above is made from three columns. Asking for no others is what
+     keeps it that way: where the file is kept and whose it is never reach
+     this function, so an edit to the answer cannot hand them out. */
+  it('asks the database for what it answers with, and not for where the file is', async () => {
+    await handler(describing(), mockResponse());
+
+    const select = (db.calls as RecordedCall[]).find(
+      (c) => c.table === 'files' && c.op === 'select'
+    );
+    expect(select?.args).toEqual(['id, name, size, type']);
+  });
+
+  it('still reads the whole row when the link is opened', async () => {
+    await handler(get({ token: TOKEN }), mockResponse());
+
+    const select = (db.calls as RecordedCall[]).find(
+      (c) => c.table === 'files' && c.op === 'select'
+    );
+    expect(String(select?.args?.[0])).toContain('storage_path');
+  });
+
+  /* A link that would not open is not described either: the page that asks
+     is the page that would offer the download. */
+  it.each([
+    ['a token that was never issued', { shared_links: { data: [] } }, 404],
+    [
+      'a revoked link',
+      { shared_links: { data: [liveLink({ revoked_at: new Date().toISOString() })] } },
+      410,
+    ],
+    [
+      'an expired link',
+      {
+        shared_links: {
+          data: [liveLink({ expires_at: new Date(Date.now() - 1000).toISOString() })],
+        },
+      },
+      410,
+    ],
+    ['a file deleted since', { files: { data: [] } }, 404],
+  ])('refuses %s as it does when the link is opened', async (_what, tables, status) => {
+    setup({ files: { data: [FILE_ROW] }, shared_links: { data: [liveLink()] }, ...tables });
+    const res = mockResponse();
+    await handler(describing(), res);
+
+    expect(res.statusCode).toBe(status);
+    expect(res.body).not.toHaveProperty('name');
+  });
+
+  it('requires a token, like opening', async () => {
+    const res = mockResponse();
+    await handler(get({ describe: '' }), res);
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+/* The site is another origin, and its share page asks for the file from the
+   visitor's browser. It is given reading and nothing else. */
+describe('share: the public site, reading from a browser', () => {
+  const headersSetOn = (res: ReturnType<typeof mockResponse>) =>
+    Object.fromEntries(
+      (res.setHeader as unknown as { mock: { calls: [string, string][] } }).mock.calls
+    );
+
+  it('may read a link', async () => {
+    const res = mockResponse();
+    await handler(
+      mockRequest({ method: 'GET', query: { token: TOKEN }, headers: { origin: SITE_ORIGIN } }),
+      res
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBe(SITE_ORIGIN);
+  });
+
+  /* Making a link and revoking one both carry a token, and a request that
+     carries one is preflighted. This is the answer to that preflight. */
+  it('is not told it may send a token, so it can neither make a link nor revoke one', async () => {
+    const res = mockResponse();
+    await handler(mockRequest({ method: 'OPTIONS', headers: { origin: SITE_ORIGIN } }), res);
+
+    expect(res.statusCode).toBe(204);
+    expect(headersSetOn(res)['Access-Control-Allow-Headers']).toBeUndefined();
+    expect(headersSetOn(res)['Access-Control-Allow-Methods']).toBe('GET, OPTIONS');
+  });
+
+  it('leaves any other site unanswered', async () => {
+    const res = mockResponse();
+    await handler(
+      mockRequest({
+        method: 'GET',
+        query: { token: TOKEN },
+        headers: { origin: 'https://another.example' },
+      }),
+      res
+    );
+
+    expect(headersSetOn(res)['Access-Control-Allow-Origin']).toBeUndefined();
+  });
 });
 
 describe('share: revoking a link', () => {

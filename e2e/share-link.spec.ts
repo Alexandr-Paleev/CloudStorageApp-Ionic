@@ -52,6 +52,18 @@ async function api(
   );
 }
 
+/**
+ * The address that describes a link without opening it, on the deployment
+ * that issued the link.
+ *
+ * It is what the public site renders its share page from (decision 0014),
+ * and it is asked here as that page asks: with the token and nothing else.
+ */
+function describeUrl(shareUrl: string): string {
+  const token = new URL(shareUrl).pathname.split('/').pop();
+  return new URL(`/api/share?token=${token}&describe=1`, shareUrl).href;
+}
+
 test.describe('A share link, from both sides', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
@@ -72,6 +84,15 @@ test.describe('A share link, from both sides', () => {
 
     const guest = await anonymousPage(browser);
     try {
+      // Described first: the file's name, size and type, and no address for
+      // it. The exact set of keys is the point. An address in this answer
+      // would be one minted for every bot that unfurls the link.
+      const described = await guest.page.request.get(describeUrl(url));
+      expect(described.status()).toBe(200);
+      const description = (await described.json()) as Record<string, unknown>;
+      expect(Object.keys(description).sort()).toEqual(['name', 'size', 'type']);
+      expect(description.name).toBe(name);
+
       await guest.page.goto(url);
 
       await expect(guest.page.locator('.shared-file__name')).toHaveText(name);
@@ -112,6 +133,11 @@ test.describe('A share link, from both sides', () => {
 
     const guest = await anonymousPage(browser);
     try {
+      // Not described either: a page made from a revoked link's description
+      // would still be showing the file's name.
+      const described = await guest.page.request.get(describeUrl(url));
+      expect(described.status()).toBe(410);
+
       await guest.page.goto(url);
 
       await expect(guest.page.getByText('Link unavailable')).toBeVisible();
