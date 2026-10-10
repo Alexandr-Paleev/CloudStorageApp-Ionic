@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.9.1] — 2026-10-10
+
 ### Fixed
 
 - **Every deployment gave a third of the app's files a new name, and every
@@ -1586,7 +1590,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...HEAD
+[4.9.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...v4.9.1
 [4.9.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...v4.8.0
 [4.7.5]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.4...v4.7.5
