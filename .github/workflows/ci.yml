@@ -230,12 +230,17 @@ jobs:
         if: env.AFFECTED_APP == 'true'
         run: npm run --silent lighthouse
 
+      # `.lighthouseci/` is a hidden folder, and this action leaves hidden
+      # files out unless it is told otherwise. From 2026-09-02, the day this
+      # step was added, it uploaded nothing: it printed "No files were found"
+      # as a warning and ended green, on every run.
       - name: Upload Lighthouse reports
         if: ${{ !cancelled() && env.AFFECTED_APP == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: lighthouse-report
           path: .lighthouseci/
+          include-hidden-files: true
           retention-days: 7
 
       # The site, apps/web. It is in this job rather than one of its own
