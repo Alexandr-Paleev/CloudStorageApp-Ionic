@@ -29,6 +29,12 @@ export default defineConfig({
            leaves this one to the site's own `npm test`, because CI checks
            the two apart: a change to the site runs the site's steps, and a
            change to the app runs the app's. */
+        resolve: {
+          /* The site imports libs/core by name, as the app does, and Vitest
+             does not look in tsconfig.base.json unless told. Its first tests
+             read nothing from there, so nothing had asked. */
+          tsconfigPaths: true,
+        },
         test: {
           name: 'site',
           environment: 'node',

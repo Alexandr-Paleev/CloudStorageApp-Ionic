@@ -22,6 +22,43 @@ reasoning behind the larger decisions lives in
   would be minted for every messenger that unfurls the link, and cached with
   the page. It reads three columns of the file's row and no others.
 
+- **The site has the page a share link opens, and nothing leads to it yet.**
+  The second part of step 5. `/s/` and a token, on the public site, is a page
+  rendered on a server: the file's name, size and type are in the HTML, and a
+  messenger that unfurls the link is given them as the card, where a link on
+  the app unfurls as "Cloud Storage App" whichever file it is. The page holds
+  no address for the file. Its button asks `/api/share` for one from the
+  visitor's browser, and checks that what it is handed is an http(s) address
+  before going there. A link that was revoked or has expired says which, a
+  link that does not exist is a 404, and when the functions cannot be asked
+  the page is shown without a name and still downloads. Links are still
+  issued on the app and its own page still opens them: moving them is the
+  third part.
+
+  What the functions say about a link is kept for a strict minute, so that a
+  link passed round an office does not spend the 120 requests a minute the
+  site is allowed as one address. A link taken back stops downloading at once
+  and stops being described within that minute. Next's own cache for `fetch`
+  was tried for this and is not used: it keeps an answer of 200 until a newer
+  200 replaces it, a revoked link answers 410, and with a lifetime of two
+  seconds the page still named the file thirty seconds after the link was
+  revoked.
+
+  A recipient downloads 142.0 kB of scripts and styles, gzipped, and the
+  site's smoke test fails past 148. The app's first load, built on the same
+  machine and counted the same way, is 437.6 kB. All but 1.0 kB of the 142.0
+  is React and Next.
+
+- **The site's smoke test builds the site and brings a stand-in for the
+  functions.** `/api/share` answers a browser on the production site's origin
+  only, so the share page cannot be tried against it from a laptop or from
+  CI. `npm run smoke --workspace @cloud-storage/web` now builds the site to
+  take `apps/web/scripts/stub-api.mjs` for the app, and asks the page what a
+  messenger and a visitor would: what is in the HTML, where the button leads,
+  what happens when a link is revoked while its page is open, and whether the
+  policy lets that one request through and no other. It leaves that build in
+  `.next`.
+
 ### Changed
 
 - **The functions answer the public site's origin on one route, for
@@ -31,6 +68,10 @@ reasoning behind the larger decisions lives in
   on that origin can neither make a link nor revoke one, and the other eleven
   functions do not answer it at all. Nothing a visitor sees changes yet: the
   app's own page still opens every link.
+
+- **The site's unit tests can import `libs/core` by name.** The site's code
+  does, and Vitest does not read `tsconfig.base.json` unless told. No test of
+  the site had imported anything from there, so nothing had asked.
 
 ## [4.9.1] — 2026-10-10
 

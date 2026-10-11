@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Starts the built site and asks it what a visitor and a crawler would.
+ * Builds the site, starts it, and asks it what a visitor and a crawler would.
  *
  * `next build` passing says the pages compile. It does not say that the
  * words are in the HTML, and that is the reason this site exists: the app
@@ -16,20 +16,37 @@
  * accessibility there. Nothing audits this site with Lighthouse, so the
  * question is asked here.
  *
- * Usage: node scripts/smoke.mjs                       (from apps/web, after `next build`)
+ * One page needs somebody to talk to. The page a share link opens asks the
+ * app's functions what the link holds, and its button asks them for the
+ * file. The real functions answer a browser on the production site's origin
+ * and on no other, so here they are a stand-in, `stub-api.mjs`, and the site
+ * is built to take that stand-in for the app. That is why this builds the
+ * site for itself, and it leaves that build behind in `.next`: one that
+ * sends people to the stand-in. `npm run build` makes the real one again.
+ *
+ * Usage: node scripts/smoke.mjs                       (from apps/web: builds, starts, asks)
  *        node scripts/smoke.mjs <url>                 (against a site that is running)
  *        node scripts/smoke.mjs <url> --production    (against the production deployment)
  *
  * Only the production deployment asks to be indexed, so the two kinds of
- * target are held to opposite answers on that one point.
+ * target are held to opposite answers on that one point. A site that is
+ * already running has no stand-in behind it, and its share page is asked
+ * only what can be asked without one: `smoke-share.mjs` says what that is.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  sharePageAsACrawler,
+  sharePageAsAVisitor,
+  sharePageOfARunningSite,
+} from './smoke-share.mjs';
+import { STUB_ORIGIN, startStubApi } from './stub-api.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(root, 'package.json'));
+const next = require.resolve('next/dist/bin/next');
 const PORT = 4123;
 const STARTUP_MS = 30_000;
 
@@ -38,7 +55,7 @@ const given = args.find((arg) => !arg.startsWith('--'));
 const production = args.includes('--production');
 const origin = (given ?? `http://localhost:${PORT}`).replace(/\/$/, '');
 
-/** Every page there is. A page added to the site is added here. */
+/** Every page that is the same for everyone. The share page is asked apart. */
 const PAGES = ['/', '/pricing', '/privacy', '/terms'];
 
 /** WCAG 2.1 A and AA: what the app's own pages are held to in e2e/a11y.spec.ts. */
@@ -48,6 +65,18 @@ const problems = [];
 const expect = (ok, what) => {
   if (!ok) problems.push(what);
 };
+
+/** The site, built to take the stand-in for the app. */
+function build() {
+  const built = spawnSync(process.execPath, [next, 'build'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, NEXT_PUBLIC_APP_ORIGIN: STUB_ORIGIN },
+  });
+  if (built.status !== 0) {
+    throw new Error(`the site did not build:\n${built.stdout}\n${built.stderr}`);
+  }
+}
 
 async function waitUntilUp() {
   const deadline = Date.now() + STARTUP_MS;
@@ -62,7 +91,12 @@ async function waitUntilUp() {
   throw new Error(`${origin} did not answer within ${STARTUP_MS / 1000} s`);
 }
 
-/** What a client that runs no script is given. */
+/**
+ * What a client that runs no script is given.
+ *
+ * Returns the address the site sends people to for the app. The share page
+ * is held to it: that is the one origin its policy may name.
+ */
 async function asACrawler() {
   const page = await fetch(`${origin}/`);
   const html = await page.text();
@@ -93,10 +127,11 @@ async function asACrawler() {
   }
   expect(!page.headers.has('x-powered-by'), 'the response says what served it');
 
-  /* This site's policy names no origin but its own. The app's names eleven,
-     and the file that carries it has reached this site once: the first
-     deployment was built with the `vercel.json` at the root of the
-     repository, which is the app's. */
+  /* This site's policy names no origin but its own, on every page but the
+     one a share link opens. The app's names eleven, and the file that
+     carries it has reached this site once: the first deployment was built
+     with the `vercel.json` at the root of the repository, which is the
+     app's. */
   const policy = page.headers.get('content-security-policy') ?? '';
   expect(
     !/https?:/.test(policy),
@@ -119,6 +154,9 @@ async function asACrawler() {
   const listed = await sitemap.text();
   expect(listed.includes('<loc>'), 'the sitemap lists nothing');
   expect(/<loc>[^<]+\/pricing<\/loc>/.test(listed), 'the sitemap does not list the plans');
+  /* A share link is a credential. The site lists none, and could not: it
+     does not know one until it is asked about it. */
+  expect(!/<loc>[^<]+\/s\//.test(listed), 'the sitemap lists a share link');
 
   /* The plans. No price is written in this file: the page reads it from
      libs/core, and a figure typed here would be a second copy of it. What is
@@ -178,13 +216,38 @@ async function asACrawler() {
 
   const missing = await fetch(`${origin}/no-such-page`);
   expect(missing.status === 404, `a page that does not exist answered ${missing.status}`);
+
+  const appOrigin = html.match(/href="(https?:\/\/[^/"]+)\/login"/)?.[1] ?? '';
+  expect(appOrigin !== '', 'the first page does not say where the app is');
+  return appOrigin;
 }
 
 /** What a browser makes of it, the policy included. */
-async function asAVisitor() {
+async function asAVisitor(stub) {
   const { chromium } = require('playwright');
   const { AxeBuilder } = require('@axe-core/playwright');
   const browser = await chromium.launch();
+
+  /* A header that does not fit pushes the whole page sideways, and it only
+     does so on a phone. It did once, at 320 pixels, when a link was added. */
+  const audit = async (page, path) => {
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow === 0, `${path} is ${overflow}px wider than a ${width}px screen`);
+    }
+
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(
+      violations.length === 0,
+      `${path} breaks accessibility rules: ` +
+        violations.map(({ id, nodes }) => `${id} (${nodes.length})`).join(', ')
+    );
+  };
+
   try {
     /* A context of its own, which axe asks for. */
     const context = await browser.newContext();
@@ -209,53 +272,51 @@ async function asAVisitor() {
       'the plans page has no visible heading'
     );
 
-    /* A header that does not fit pushes the whole page sideways, and it only
-       does so on a phone. It did once, at 320 pixels, when a link was added. */
-    for (const path of PAGES) {
-      for (const width of [320, 390, 1280]) {
-        await page.setViewportSize({ width, height: 800 });
-        await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
-        const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-        );
-        expect(overflow === 0, `${path} is ${overflow}px wider than a ${width}px screen`);
-      }
-
-      const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(
-        violations.length === 0,
-        `${path} breaks accessibility rules: ` +
-          violations.map(({ id, nodes }) => `${id} (${nodes.length})`).join(', ')
-      );
-    }
+    for (const path of PAGES) await audit(page, path);
 
     /* Asked last, so that it is asked of every page above. */
     expect(complaints.length === 0, `the browser complained: ${complaints.join(' | ')}`);
+    await context.close();
+
+    if (stub) await sharePageAsAVisitor({ browser, origin, stub, expect, audit });
   } finally {
     await browser.close();
   }
 }
 
-const server = given
-  ? null
-  : spawn(
-      process.execPath,
-      [require.resolve('next/dist/bin/next'), 'start', '--port', String(PORT)],
-      {
-        cwd: root,
-        stdio: ['ignore', 'ignore', 'inherit'],
-        env: { ...process.env, NODE_ENV: 'production' },
-      }
-    );
+let server = null;
+let stub = null;
 
 try {
+  if (!given) {
+    build();
+    stub = await startStubApi({ siteOrigin: origin });
+    server = spawn(process.execPath, [next, 'start', '--port', String(PORT)], {
+      cwd: root,
+      stdio: ['ignore', 'ignore', 'inherit'],
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+  }
+
   await waitUntilUp();
-  await asACrawler();
-  await asAVisitor();
+  const appOrigin = await asACrawler();
+
+  if (stub) {
+    expect(
+      appOrigin === stub.origin,
+      `the site sends people to ${appOrigin} for the app, and was built to send them to the stand-in at ${stub.origin}`
+    );
+    await sharePageAsACrawler({ origin, stub, appOrigin, expect });
+  } else {
+    await sharePageOfARunningSite({ origin, production, appOrigin, expect });
+  }
+
+  await asAVisitor(stub);
 } catch (error) {
   problems.push(String(error?.message ?? error));
 } finally {
   server?.kill();
+  await stub?.close();
 }
 
 if (problems.length > 0) {
