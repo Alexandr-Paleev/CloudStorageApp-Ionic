@@ -85,8 +85,6 @@ beforeEach(() => {
   // The limiters are module-scope singletons: without this, the eleventh test
   // in this file would be the one that finds the create limit spent.
   resetRateLimits();
-  // getAppUrl takes an Origin only when it is this deployment's own address.
-  process.env.VERCEL_PROJECT_PRODUCTION_URL = 'app.example';
   authenticateUser.mockResolvedValue('user-1');
   signedUrl.mockResolvedValue('https://r2.example/signed');
   db.storage.createSignedUrl.mockResolvedValue({
@@ -155,30 +153,34 @@ describe('share: creating a link', () => {
     expect(res.statusCode).toBe(201);
   });
 
-  it('returns a URL on this deployment', async () => {
-    const res = mockResponse();
-    await handler(post({ fileId: FILE_ID }), res);
-
-    expect(res.statusCode).toBe(201);
-    const { url } = res.body as { url: string };
-    expect(url.startsWith(`${APP_URL}/s/`)).toBe(true);
-  });
-
-  it('points a link made in a native shell at the deployment, not at the phone', async () => {
-    // The shell's Origin is capacitor://localhost, and a link built on it
-    // opens nothing on anyone else's device.
+  /* A link is opened on the public site, so that is where its address is.
+     It used to be built on the origin of the request that asked for it: a
+     preview, a dev server and a native shell were each answered differently,
+     a shell's link pointed at the phone that made it until that was caught,
+     and a request with no Origin and no deployment behind it was a 500. The
+     request is not asked any more. */
+  it.each([
+    ['the app', APP_URL],
+    ['a native shell', 'capacitor://localhost'],
+    ['a dev server', 'http://localhost:8100'],
+    ['a page on another site', 'https://another.example'],
+    ['a caller that names no origin', undefined],
+  ])('issues the link on the site when %s asks for it', async (_who, origin) => {
     const res = mockResponse();
     await handler(
       mockRequest({
         method: 'POST',
         body: { fileId: FILE_ID },
-        headers: { authorization: 'Bearer t', origin: 'capacitor://localhost' },
+        headers: { authorization: 'Bearer t', ...(origin ? { origin } : {}) },
       }),
       res
     );
 
     expect(res.statusCode).toBe(201);
-    expect((res.body as { url: string }).url.startsWith(`${APP_URL}/s/`)).toBe(true);
+    const { url } = res.body as { url: string };
+    const address = `${SITE_ORIGIN}/s/`;
+    expect(url.startsWith(address)).toBe(true);
+    expect(url.slice(address.length)).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 
   it('stores only the hash, never the token itself', async () => {

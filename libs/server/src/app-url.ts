@@ -32,14 +32,18 @@ function isLocalDevServer(origin: string): boolean {
 }
 
 /**
- * Base URL for the addresses this API hands back: Stripe's return URLs, share
- * links, and the host the demo fetches its seed assets from.
+ * Base URL for the addresses this API hands back: Stripe's return URLs, and
+ * the host the demo fetches its seed assets from.
+ *
+ * Share links were built on it too, until they moved to the public site.
+ * Their address asks no request anything: `libs/core/src/share-link.ts`.
  *
  * Origin comes first so a preview deployment returns to itself instead of
  * production — but only an Origin that is one of this deployment's own. The
  * native shells send `capacitor://localhost` and `https://localhost`: a share
- * link built on either pointed at the phone that made it, and the demo, which
- * fetches its assets from here, seeded nothing in a shell. And a request that
+ * link built on either pointed at the phone that made it, when links were
+ * still built here, and the demo, which fetches its assets from here, seeded
+ * nothing in a shell. And a request that
  * merely claimed an Origin could point that fetch at any host at all.
  *
  * Anything else gets VERCEL_PROJECT_PRODUCTION_URL, which Vercel populates

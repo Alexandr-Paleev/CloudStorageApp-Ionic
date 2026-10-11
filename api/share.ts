@@ -1,12 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, AuthError, supabase } from '../libs/server/src/auth';
-import { getAppUrl } from '../libs/server/src/app-url';
 import {
   generateShareToken,
   hashShareToken,
   resolveExpiry,
   shareUnusableReason,
-  shareUrl,
 } from '../libs/server/src/share';
 import {
   RateLimiter,
@@ -18,6 +16,7 @@ import {
 import { applyCors } from '../libs/server/src/cors';
 import { isSafeHttpUrl } from '../libs/core/src/safe-url';
 import { SITE_ORIGIN } from '../libs/core/src/origins';
+import { shareLinkUrl } from '../libs/core/src/share-link';
 import { signOwnedPath } from '../libs/server/src/sign-owned-path';
 
 /**
@@ -34,13 +33,16 @@ import { signOwnedPath } from '../libs/server/src/sign-owned-path';
  * The token is never stored, only its SHA-256. Lookup therefore happens here,
  * with the service-role key: shared_links has no policy the client could use.
  *
- * Describing is for a page that is rendered on a server, which is what the
- * public site does with a share link (decision 0014). A page like that is
- * rendered for whoever asks, a messenger unfurling the link included, and
- * may be cached. A signed address written into it would be minted for every
- * one of them and kept with the page. So the page is made from the file's
- * name, size and type, and the address is signed when a person asks for it,
- * from their own browser, by opening the link as before.
+ * A link is opened on the public site, and its address is on the site: see
+ * `libs/core/src/share-link.ts`, and decision 0014. Nothing here opens one in
+ * a page of its own any more.
+ *
+ * Describing is for that page, which is rendered on a server. A page like
+ * that is rendered for whoever asks, a messenger unfurling the link
+ * included. A signed address written into it would be minted for every one
+ * of them. So the page is made from the file's name, size and type, and the
+ * address is signed when a person asks for it, from their own browser, by
+ * opening the link.
  */
 
 const SIGNED_URL_TTL = 3600;
@@ -158,9 +160,13 @@ async function createLink(req: VercelRequest, res: VercelResponse) {
 
   if (error) throw new Error(`Failed to create share link: ${error.message}`);
 
-  // The only time the plaintext token exists outside the recipient's URL.
+  /* The only time the plaintext token exists outside the recipient's URL.
+
+     The address is the site's, whoever asked and from where. It used to be
+     built on the request's own origin, which a preview, a dev server and a
+     native shell each answered differently. */
   return res.status(201).json({
-    url: shareUrl(getAppUrl(req), token),
+    url: shareLinkUrl(token),
     expiresAt: expiresAt.toISOString(),
   });
 }

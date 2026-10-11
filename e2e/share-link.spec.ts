@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { SITE_ORIGIN } from '@cloud-storage/core/origins';
 import {
   test,
   expect,
@@ -19,20 +20,20 @@ import {
  * reaches them — /api/share answers a caller carrying no credential except the
  * token in the URL.
  *
+ * The page a link opens is not in this suite. It is the public site's
+ * (decision 0014): another origin, another deployment, and nothing here
+ * starts it. But everything that page shows, and the one thing it does, is
+ * made of two answers of /api/share: what the link holds, and where the file
+ * is. Both are asked here, as that page asks them, of the functions under
+ * test. What the page makes of the answers is the site's own smoke test,
+ * whose stand-in for these functions is a copy of what is checked below.
+ *
  * It is also the regression test for the policy migration 006 removed, which
  * made every file that had ever been shared readable straight from PostgREST,
  * revoked ones included — exactly what the second case here denies.
  */
 
-/**
- * Minting a link from inside the page rather than through page.request.
- *
- * /api/share builds the returned URL from the Origin header (libs/server/src/app-url.ts),
- * and browsers send Origin on every POST while Playwright's APIRequestContext
- * does not — through page.request this route answers 500, which is a property
- * of the test harness and not of the app. Running the same fetch the app runs,
- * in the page that would run it, keeps the two in step.
- */
+/** Asked from inside the page, as the app asks: its own fetch, its own origin. */
 async function api(
   page: Page,
   accessToken: string,
@@ -53,21 +54,28 @@ async function api(
 }
 
 /**
- * The address that describes a link without opening it, on the deployment
- * that issued the link.
+ * The two things a recipient's side asks, on the deployment that made the
+ * link, with the token and nothing else.
  *
- * It is what the public site renders its share page from (decision 0014),
- * and it is asked here as that page asks: with the token and nothing else.
+ * The first is what the site's server asks to render the page, and it must
+ * not sign anything: the page is rendered for every bot that unfurls the
+ * link. The second is what the visitor's browser asks when the button is
+ * pressed.
  */
-function describeUrl(shareUrl: string): string {
+function asks(app: Page, shareUrl: string) {
   const token = new URL(shareUrl).pathname.split('/').pop();
-  return new URL(`/api/share?token=${token}&describe=1`, shareUrl).href;
+  const functions = new URL(app.url()).origin;
+
+  return {
+    whatItHolds: `${functions}/api/share?token=${token}&describe=1`,
+    forTheFile: `${functions}/api/share?token=${token}`,
+  };
 }
 
 test.describe('A share link, from both sides', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
-  test('the recipient sees the file and nothing about its owner', async ({
+  test('the recipient is given the file and nothing about its owner', async ({
     page,
     user,
     browser,
@@ -82,26 +90,36 @@ test.describe('A share link, from both sides', () => {
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const { url } = created.body as { url: string };
 
+    // A link is opened on the site, so that is where its address is, and not
+    // on this server, which is a dev server on a port.
+    expect(url.startsWith(`${SITE_ORIGIN}/s/`), url).toBe(true);
+
     const guest = await anonymousPage(browser);
     try {
-      // Described first: the file's name, size and type, and no address for
-      // it. The exact set of keys is the point. An address in this answer
-      // would be one minted for every bot that unfurls the link.
-      const described = await guest.page.request.get(describeUrl(url));
+      const ask = asks(page, url);
+
+      // What the page is rendered from: the file's name, size and type, and
+      // no address for it. The exact set of keys is the point. An address in
+      // this answer would be one minted for every bot that unfurls the link.
+      const described = await guest.page.request.get(ask.whatItHolds);
       expect(described.status()).toBe(200);
       const description = (await described.json()) as Record<string, unknown>;
       expect(Object.keys(description).sort()).toEqual(['name', 'size', 'type']);
       expect(description.name).toBe(name);
 
-      await guest.page.goto(url);
+      // The point of the whole page: the owner is not on it. Their address
+      // and id are the identifying strings this test can assert the absence
+      // of, in everything the page prints.
+      expect(JSON.stringify(description)).not.toContain(user.email);
+      expect(JSON.stringify(description)).not.toContain(user.id);
 
-      await expect(guest.page.locator('.shared-file__name')).toHaveText(name);
-      await expect(guest.page.locator('ion-button', { hasText: 'Download' })).toBeVisible();
-
-      // The point of the whole page: the owner is not on it. Their address and
-      // id are the identifying strings this test can assert the absence of.
-      await expect(guest.page.locator('body')).not.toContainText(user.email);
-      await expect(guest.page.locator('body')).not.toContainText(user.id);
+      // What the button asks for: the same three, and where the file is.
+      const opened = await guest.page.request.get(ask.forTheFile);
+      expect(opened.status()).toBe(200);
+      const file = (await opened.json()) as Record<string, unknown>;
+      expect(Object.keys(file).sort()).toEqual(['downloadUrl', 'name', 'size', 'type']);
+      expect(String(file.downloadUrl)).toMatch(/^https?:\/\//);
+      expect(JSON.stringify(file)).not.toContain(user.email);
     } finally {
       await guest.close();
     }
@@ -133,16 +151,18 @@ test.describe('A share link, from both sides', () => {
 
     const guest = await anonymousPage(browser);
     try {
-      // Not described either: a page made from a revoked link's description
-      // would still be showing the file's name.
-      const described = await guest.page.request.get(describeUrl(url));
-      expect(described.status()).toBe(410);
+      const ask = asks(page, url);
 
-      await guest.page.goto(url);
+      // Not described: a page made from a revoked link's description would
+      // still be showing the file's name. And not opened. The sentence is
+      // checked too, because the page prints it as it comes.
+      for (const question of [ask.whatItHolds, ask.forTheFile]) {
+        const refused = await guest.page.request.get(question);
+        expect(refused.status()).toBe(410);
 
-      await expect(guest.page.getByText('Link unavailable')).toBeVisible();
-      await expect(guest.page.locator('.shared-file__message')).toContainText('revoked');
-      await expect(guest.page.locator('.shared-file__name')).toHaveCount(0);
+        const answer = (await refused.json()) as Record<string, unknown>;
+        expect(answer).toEqual({ message: 'This link has been revoked' });
+      }
     } finally {
       await guest.close();
     }

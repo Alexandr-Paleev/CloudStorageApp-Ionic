@@ -73,6 +73,23 @@ reasoning behind the larger decisions lives in
   does, and Vitest does not read `tsconfig.base.json` unless told. No test of
   the site had imported anything from there, so nothing had asked.
 
+- **Share links are issued on the public site, and the app sends the ones it
+  issued on to it.** The third part of step 5, and the step is built. A new
+  link's address is `/s/` and the token on the site, whoever asks for the
+  link and from where. It was built on the origin of the request: a preview,
+  a dev server and a native shell were each answered differently, and a
+  request with no origin and no deployment behind it was a 500. A link issued
+  until now keeps the app's address for as long as it lives, a year at the
+  most, and that address leads to the same link on the site: by a redirect
+  for nearly everyone, a messenger unfurling an old link included, and by
+  the app's own first lines in a browser its service worker controls.
+
+### Removed
+
+- **The app's own page for a share link.** A recipient who will never have
+  an account downloaded the app's whole first load to read one file name:
+  437.6 kB of scripts and styles, where the site's page is 142.0.
+
 ### Fixed
 
 - **The file page went on handing out a link after it had been revoked.** The
@@ -85,6 +102,27 @@ reasoning behind the larger decisions lives in
   list was added. It was found by revoking a link to try the new share page,
   and then asking the app for another. A revoke now makes the page forget the
   link it holds, and the next Copy or Share makes a new one.
+
+### Security
+
+- **The app told Google Analytics the token of every share link opened on
+  it.** The app starts its analytics before it renders anything, and they are
+  told the address of the page. At `/s/` and a token the address is the
+  token, which is all it takes to read the file. Asked of production before
+  this change, with a made-up token and every collector refused, a browser
+  made three requests to `www.google-analytics.com` and three to
+  `www.google.com`, each carrying the page's address. Hotjar and Sentry are
+  started the same way. It has been so since 3.1.0, when share links were
+  added, and it was found while deciding how the app should send an old link
+  on.
+
+  The app no longer starts at that address. A link there is sent on to the
+  site before anything else in the app runs, and the built app, at that
+  address, asks for its fonts and for the site and nobody else. What was
+  already sent is not taken back: those tokens are worth what their links
+  are, seven days from the day each was made unless its owner asked for
+  longer, and a year at the most. A link that should not be readable by
+  whoever can read the analytics is best revoked.
 
 ## [4.9.1] — 2026-10-10
 

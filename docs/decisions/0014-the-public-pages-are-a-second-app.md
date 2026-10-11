@@ -1,6 +1,6 @@
 # 0014 — The public pages are a second app, on an origin of its own
 
-Accepted · 2026-10-08 · step 4 of 6 built
+Accepted · 2026-10-08 · step 5 of 6 built
 
 ## Context
 
@@ -601,3 +601,94 @@ preview is another origin. After the merge the smoke test is pointed at
 production, where it asks about a link nobody made: that is a 404 only if
 the real functions answered, and a page with a button if they did not. A
 real link is then opened there by hand.
+
+### The second part, on production
+
+It was merged on 2026-10-11, and what could not be seen before was looked at
+the same day.
+
+- **The site reaches the functions.** The smoke test, pointed at production,
+  asks about a link nobody made and is answered 404 by the share page
+  itself, which it is only when the functions said so. The policy for the
+  page is the second of two rules for one header, and Vercel's router sends
+  it as Next does.
+- **A real link was opened there, in a browser.** The page named the file
+  and gave its size, the button asked the functions from the site's origin
+  and was answered, and the browser went to the file. A messenger that runs
+  no script is given the file's name as the title of the card.
+- **An answer is reused.** The second part said nothing measured that. Two
+  links nobody had asked about were each asked for six times in a row. The
+  first request took 690 and 940 ms to its first byte, and the five after it
+  450 to 560, where a page no function renders took 390. So an instance
+  outlives a request, and the minute is kept on Vercel as it is on a laptop.
+- **Trying it by hand found a fault in the app that was older than any of
+  this.** The file page kept the link it had made and went on handing it out
+  after the link was revoked. It is in the changelog, under what was fixed.
+
+## Update — 2026-10-11, step 5, third part
+
+Links are issued on the site, the app sends the ones it issued on to the
+site, and the app has no page for a link any more. Step 5 is built.
+
+- **A link's address is the site's, and no request is asked.** The record
+  above says the origin links are issued on becomes configuration. It is a
+  function in `libs/core`, beside the two origins. The functions used to
+  build the address on the origin of the request that asked: a preview, a
+  dev server and a native shell were each answered differently, a shell's
+  link pointed at the phone that made it until that was caught, and a
+  request with no origin and no deployment behind it was a 500. All five
+  kinds of caller are answered alike now.
+- **One address for every deployment is enough here, and is the only one
+  that works.** A dev server, a preview and production all write to one
+  database, so a link issued by any of them is known to the functions the
+  site asks. And a link on a preview of the site could be described and not
+  downloaded, because the functions answer a browser on the production site
+  alone.
+- **The app's old address leads to the site in two ways.** A redirect in
+  `vercel.json` answers it before a byte of the app is served, and that is
+  what nearly everyone who holds an old link will get, a messenger
+  unfurling one included: the old link is given the file's card too. The
+  redirect was not seen on Vercel, where a preview answers every request
+  with a redirect of its own. What was checked is the table Vercel's
+  routing library builds from the file: it is a 307, it comes before the
+  filesystem and before the rewrite that serves the shell, it carries the
+  token over, and it leaves `/s/a/b`, `/settings` and `/api/share` alone.
+  The second way is for a browser the app's service worker controls, which
+  is handed the shell without the server being asked.
+- **That second way is the app's first lines, and not a page of the app.**
+  The two legal addresses are forwarded from a page. A share link cannot
+  be, and finding out why was not planned. The app starts its analytics
+  before it renders anything, and the first thing they are told is the
+  address of the page. At this address the address is the token, which is
+  all it takes to read the file. So for as long as the app opened links,
+  every link opened on it was sent to Google Analytics. Asked of production
+  before this change, with a token made up for the purpose and every
+  collector refused: three requests to `www.google-analytics.com` and three
+  to `www.google.com`, each carrying the page's address. Hotjar and Sentry
+  are started the same way.
+- **Now the app does not start at that address.** The same build, at the
+  same address, asks for its fonts and for the site, and nobody else, in a
+  browser that has never seen the app and in one its service worker
+  controls. The login page, as a control, reaches Google's tag manager and
+  Hotjar. A native shell is left alone: sending its window to another
+  origin opens the system's browser and leaves the window empty, and
+  nothing in a shell leads to that address.
+- **What was sent is not taken back.** The tokens of links opened on the app
+  until now are in an analytics property. They are worth what the links
+  are: seven days from the day each was made unless its owner asked for
+  longer, and a year at the very most.
+- **The forwarding has an end.** No link is issued for more than 365 days,
+  so the last one issued at the app's address is dead a year after this is
+  deployed, and after that the redirect and the app's first lines send
+  nobody anywhere. The record above says no link in production is without
+  an expiry. That was read from the database on 2026-10-08 and was not read
+  again for this.
+- **What a recipient is given is checked on the functions' answers.** The
+  end-to-end suite used to open a link in the app's page and look at it.
+  The page is the site's now, and that suite does not start the site. It
+  asks the functions the two things the page asks, what the link holds and
+  where the file is, and holds each answer to its exact set of fields. The
+  site's stand-in for the functions is a copy of those answers, and this is
+  the nearest thing there is to holding the copy to the original. That an
+  old address goes on to the site is one test more, and it fails with the
+  app's first lines taken out.
