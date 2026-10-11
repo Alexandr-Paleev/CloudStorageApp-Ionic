@@ -10,30 +10,34 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.10.0] — 2026-10-11
+
 ### Added
 
 - **`/api/share` can say what a link holds without opening it.** This is the
   first of three parts of step 5 of
   [decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md):
-  the page a share link opens is moving to the site, where it is rendered on
-  a server, for whoever asks. `GET /api/share?token=…&describe` answers with
+  the page a share link opens moves to the site, where it is rendered on a
+  server, for whoever asks. `GET /api/share?token=…&describe` answers with
   the file's name, size and type. It refuses a link exactly as opening one
   does, and it signs nothing: a signed address in a server-rendered page
   would be minted for every messenger that unfurls the link, and cached with
   the page. It reads three columns of the file's row and no others.
 
-- **The site has the page a share link opens, and nothing leads to it yet.**
-  The second part of step 5. `/s/` and a token, on the public site, is a page
-  rendered on a server: the file's name, size and type are in the HTML, and a
-  messenger that unfurls the link is given them as the card, where a link on
-  the app unfurls as "Cloud Storage App" whichever file it is. The page holds
+- **The site has the page a share link opens.** The second part of step 5.
+  `/s/` and a token, on the public site, is a page rendered on a server: the
+  file's name, size and type are in the HTML, and a messenger that unfurls
+  the link is given them as the card, where a link on the app unfurled as
+  "Cloud Storage App" whichever file it was. The page holds
   no address for the file. Its button asks `/api/share` for one from the
   visitor's browser, and checks that what it is handed is an http(s) address
   before going there. A link that was revoked or has expired says which, a
   link that does not exist is a 404, and when the functions cannot be asked
-  the page is shown without a name and still downloads. Links are still
-  issued on the app and its own page still opens them: moving them is the
-  third part.
+  the page is shown without a name and still downloads. Nothing led to the
+  page when it was merged. Links are issued there by the third part, under
+  what changed.
 
   What the functions say about a link is kept for a strict minute, so that a
   link passed round an office does not spend the 120 requests a minute the
@@ -63,11 +67,10 @@ reasoning behind the larger decisions lives in
 
 - **The functions answer the public site's origin on one route, for
   reading.** A browser on the site may read `/api/share`, which is how its
-  share page will ask for the file when a person wants it. It is not told it
-  may send an `Authorization` header or use any method but `GET`, so a page
-  on that origin can neither make a link nor revoke one, and the other eleven
-  functions do not answer it at all. Nothing a visitor sees changes yet: the
-  app's own page still opens every link.
+  share page asks for the file when a person wants it. It is not told it may
+  send an `Authorization` header or use any method but `GET`, so a page on
+  that origin can neither make a link nor revoke one, and the other eleven
+  functions do not answer it at all.
 
 - **The site's unit tests can import `libs/core` by name.** The site's code
   does, and Vitest does not read `tsconfig.base.json` unless told. No test of
@@ -87,8 +90,8 @@ reasoning behind the larger decisions lives in
 ### Removed
 
 - **The app's own page for a share link.** A recipient who will never have
-  an account downloaded the app's whole first load to read one file name:
-  437.6 kB of scripts and styles, where the site's page is 142.0.
+  an account downloaded the app's whole first load to read one file name,
+  three times what the site's page weighs.
 
 ### Fixed
 
@@ -1702,7 +1705,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...HEAD
+[4.10.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...v4.10.0
 [4.9.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...v4.9.1
 [4.9.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.7.5...v4.8.0
