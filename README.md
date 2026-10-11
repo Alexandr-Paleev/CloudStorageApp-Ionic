@@ -643,15 +643,15 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 437.2 kB | 445 kB |
+| First load (JS + CSS) | 437.3 kB | 445 kB |
 | Largest chunk (Ionic) | 245.5 kB | 260 kB |
-| All assets, route chunks included | 530.2 kB | 540 kB |
+| All assets, route chunks included | 528.3 kB | 540 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.9.0, as CI measured them. When the check was written
+Those are the figures of 4.10.0, as CI measured them. When the check was written
 the three ceilings were 420, 250 and 520 kB, over a first load of 401.0 kB. They
 have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
 them. `scripts/check-bundle-size.js` says where that went.
