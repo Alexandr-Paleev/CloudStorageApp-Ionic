@@ -467,7 +467,7 @@ The app will be available at: `http://localhost:8100`
 ## 📦 Tech Stack
 
 - **Frontend**: React 19 + Ionic 9 + TypeScript 5.9
-- **Public site**: Next.js 16 (App Router), every page prerendered. It is `apps/web`, a Vercel project and an origin of its own
+- **Public site**: Next.js 16 (App Router). Every page is prerendered but the one a share link opens, which is rendered when it is asked for. It is `apps/web`, a Vercel project and an origin of its own
 - **File Storage**: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
 - **Search by meaning**: pgvector in Postgres, with Claude and Voyage or Cloudflare Workers AI writing and embedding the descriptions
 - **Database**: Supabase (PostgreSQL, RLS)
@@ -649,6 +649,16 @@ Those are the figures of 4.9.0, as CI measured them. When the check was written
 the three ceilings were 420, 250 and 520 kB, over a first load of 401.0 kB. They
 have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
 them. `scripts/check-bundle-size.js` says where that went.
+
+The public site has one budget, for the one page whose visitors are the least
+likely to have anything cached: the page a share link opens, which is moving
+there from the app
+([decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md),
+step 5). The site's smoke test loads it in a browser and adds up the scripts
+and styles that arrived, gzipped the same way: 142.0 kB, under a ceiling of
+148, where the app's first load is three times that. 1.0 kB of it is the
+page's own. The rest is React and Next.js, which every page of the site
+carries, the four that do nothing in a browser included.
 
 #### Lighthouse, on the same run
 
@@ -964,9 +974,10 @@ code as it stands, which a disable comment cannot edit. It caches `build`,
 fingerprint of the env files, which git ignores and Vite inlines into the
 bundle. And CI asks it what a push touches, and gets two answers. A change to
 the site runs the site's steps: its lint, its unit tests, its build, and a
-smoke test that asks the built site for its HTML with no script run. It does
-not run the app's end-to-end suite, so no account is opened in the live
-database for a sentence on the first page or in the privacy policy. A change
+smoke test that asks the built site for its HTML with no script run and then
+opens every page in a browser. It does not run the app's end-to-end suite, so
+no account is opened in the live database for a sentence on the first page or
+in the privacy policy. A change
 to the app leaves the site alone, and a change to what both read, `libs/core`
 or the lock file, runs both.
 Documentation is listed in `.nxignore`, so a push that changes nothing else
@@ -984,6 +995,18 @@ request moved.
 The site has a third, `site`, which its own `npm test` runs and the app's does
 not: the reader of the two legal documents, and both documents put through it,
 so that a construct it does not know fails a test and is not printed on a page.
+It also holds the two halves of the page a share link opens: what the site
+asks the functions about a link and how long it keeps the answer, and what the
+browser does with the address it is handed for the file.
+
+That page cannot be tried against the real functions from a laptop or from CI:
+`/api/share` answers a browser on the production site's origin and no other.
+So the site's smoke test brings a stand-in for them,
+`apps/web/scripts/stub-api.mjs`, builds the site to take it for the app, and
+presses the button in a real browser. Each thing it claims about the page was
+broken once on purpose, to see the test fail. It failed for ten of eleven. The
+eleventh, a script handed over as the file's address, it passed while the
+browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by

@@ -1,0 +1,80 @@
+.page {
+  width: 100%;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 8vw, 6rem) 1.5rem clamp(2.5rem, 6vw, 4.5rem);
+}
+
+.card {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: clamp(1.75rem, 5vw, 2.5rem) clamp(1.25rem, 5vw, 2.25rem);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+/* A file's name is whatever its owner called it: one word of ninety
+   characters, as often as not. It breaks wherever it has to. */
+.name {
+  margin: 0;
+  font-size: clamp(1.375rem, 4.5vw, 1.875rem);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.measure {
+  margin: 0.75rem 0 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.download {
+  margin-top: 1.75rem;
+}
+
+/* The link styles of the first page, on a button: what a button does not
+   take from the page by itself is its font. */
+.button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.button[aria-disabled='true'] {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.problem {
+  margin: 0;
+  color: #b91c1c;
+}
+
+.problem:not(:empty) {
+  margin-top: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .problem {
+    color: #fca5a5;
+  }
+}
+
+.note {
+  margin: 1.75rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}

@@ -485,3 +485,119 @@ One thing was not seen working before it merged: the answer to a preflight.
 The dev server answers `OPTIONS` itself, before the function is reached, so
 what the function says to one is held by unit tests until production can be
 asked.
+
+## Update — 2026-10-10, step 5, second part
+
+The site has the page a share link opens, at `/s/` and the token. Nothing
+leads to it yet. Links are still issued on the app, and the app's own page
+still opens every one of them. A link opens on the site when its token is
+put after the site's address by hand, and that is how this part is tried.
+
+- **It is the one page of the site that is rendered when it is asked for.**
+  The others are written out when the site is built. This one is about a
+  link its owner can take back, so no copy of the page is kept anywhere, and
+  a function answers every request for it. It is not the first function the
+  site has on Vercel. Vercel keeps one behind each prerendered page as
+  well: its list for the site had 27 entries before this change and has 29
+  with it. It is the first that answers a visitor. The other pages are
+  answered with the file written at build time, and say so in a header.
+- **A page says one of four things.** What the link holds, with a button.
+  That the link was revoked or has expired, in the functions' own sentence.
+  That there is no file behind it, which is answered 404. Or, when the
+  functions could not be asked, that a file was shared and its name could not
+  be read, and that page still has the button. The button asks from the
+  visitor's browser, and a visitor is counted apart from the site, so a file
+  can be had while its name cannot.
+- **What is kept is the answer, for a strict minute, in the memory of one
+  instance.** The record above says a description is cached for a short
+  while. An answer older than a minute is shown to nobody: the next visitor
+  waits for a new one. It is per instance for the reason the functions'
+  limits are (0007), and how often an answer is reused on Vercel depends on
+  how long Vercel keeps an instance, which nothing here measures.
+- **It is not Next's cache, and the reason was measured.** Next can keep the
+  answers to `fetch`, with a lifetime. It keeps an answer of 200 and no
+  other, and goes on serving the one it has until a newer 200 replaces it.
+  A revoked link answers 410, so nothing ever does. Built that way with a
+  lifetime of two seconds, the page named the file 4, 6, 10, 20 and 30
+  seconds after the link was revoked, on every visit, while the functions
+  answered each of those five visits with 410.
+- **A minute is what taking a link back costs.** The download is refused at
+  once, because it is asked for separately and nothing about it is kept. The
+  page goes on naming the file until the minute is up. The smoke test does
+  exactly that: it opens a page, revokes the link, presses the button, is
+  refused, reloads, and reads the name again.
+- **A link that does not exist is a 404 with no words in it.** Next answers a
+  404 raised while a page is rendered on demand with an empty document, and
+  the browser puts the page together from what came with it. With or without
+  `force-dynamic`, it was the same. The other choice was to answer 200 and
+  have the words in the HTML, and the status was kept: every other page of
+  this site has its words in the HTML, and this answer does not.
+- **A revoked link is a 200.** The App Router can answer 404 from a page and
+  cannot answer 410. The functions still do, to whoever asks them.
+- **The card is the file's.** A messenger is given the file's name as the
+  title, with its size and type. On the app a link unfurls as "Cloud Storage
+  App", whichever file it is. Two things about the card were found by
+  looking. A page that sets its own loses the image the layout had, which
+  has to be handed on. And the tags are in the head only because the page
+  and its metadata wait for the one answer: Next writes them into the body
+  for any reader it does not know by name whose page was ready first. When
+  the two were made to ask separately, that is where the tags went.
+- **The policy names the app on this page and on no other**, in
+  `connect-src`, so that the button may ask. It still allows inline script,
+  and the reason the first part of step 4 gave no longer covers every page:
+  this one shows a name a stranger wrote. What stands between that name and
+  a script is React writing it out as text. The page is rendered on demand,
+  so it could carry a nonce, and does not yet. It is also on an origin where
+  nobody is signed in. As a page of the app, the same name was shown beside
+  a session.
+- **The address the browser is sent to is asked about twice.** The
+  functions refuse to hand out anything but an http(s) address, and the page
+  asks again before it goes there. With that second check taken out, the
+  browser in the smoke test was handed a script for an address and ran it.
+- **The page is tried against a stand-in for the functions.** The first part
+  left this open. The real functions answer a browser on the production
+  site's origin and nowhere else, so the smoke test starts a stand-in and
+  builds the site to take it for the app. The stand-in is a copy of what
+  `/api/share` answers, and nothing holds the copy to the original but
+  reading both. The original is checked by the app's end-to-end suite.
+- **Each thing the test claims was broken once, to see it fail.** Eleven
+  ways: the policy naming somebody else, or naming the app on every page,
+  the page opening the link when it is rendered, a refusal kept as an
+  answer, nothing kept, anything taken for a token, the page left open to
+  indexing, the card without its image, a missing link answered 200, an
+  ended link keeping its button, and the address not checked. The test
+  noticed ten. The eleventh it passed, with the browser running the script:
+  a script address that comes to a value replaces the page with that value,
+  and the test was looking at the page for a mark the script had left. It
+  looks at the window now.
+- **What a recipient downloads has a budget.** 142.0 kB of scripts and
+  styles, gzipped, counted the way the app's first load is, under a ceiling
+  of 148. Built on the same machine the same day, the app's first load is
+  437.6 kB. Of the 142.0, the page's own script is 1.0. The rest is React
+  and Next, and every page of the site carries it, the four that do nothing
+  in a browser included. The HTML is 3.2 kB, and about 16 kB more is fetched
+  ahead for the links in the header and the footer.
+- **The app's address is now written twice in the site.** `next.config.ts`
+  needs it for the policy and cannot import it: Next compiles its config
+  apart from the site and resolves a tsconfig's `baseUrl` against the folder
+  it runs in, and ours is declared two folders up. A test holds the copy to
+  `libs/core`, and the smoke test holds the policy to the address the page
+  sends people to.
+- **One line outside the site changed.** The site's unit tests could not
+  import `libs/core` by name, because Vitest does not read
+  `tsconfig.base.json` unless told, and until now no test of the site had
+  asked. That line is in the root's Vitest config, so this change runs the
+  app's checks as well as the site's.
+
+Several things about this part cannot be seen before it is merged. The page
+is rendered by a function on Vercel and by a Node server everywhere it was
+tried. The preview of this change shows that the function was built, as
+`s/[token]`, and not what it answers: a preview answers every request with
+a redirect to a login. The function asks the app's functions over the
+network, from an address that is Vercel's. The policy for this page is the second of two
+rules that set one header, and Vercel's router applies them, not Next. And a
+preview of the site describes a link and cannot download it, because a
+preview is another origin. After the merge the smoke test is pointed at
+production, where it asks about a link nobody made: that is a 404 only if
+the real functions answered, and a page with a button if they did not. A
+real link is then opened there by hand.
