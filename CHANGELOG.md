@@ -73,6 +73,19 @@ reasoning behind the larger decisions lives in
   does, and Vitest does not read `tsconfig.base.json` unless told. No test of
   the site had imported anything from there, so nothing had asked.
 
+### Fixed
+
+- **The file page went on handing out a link after it had been revoked.** The
+  page keeps the link it made for the rest of the visit, so that pressing Copy
+  twice does not leave two. The list under the buttons is where a link is
+  revoked, and the two were never told about each other. After a revoke, Copy
+  Link and Share gave the same address again, the page said it expires in 7
+  days, and whoever was sent it read "This link has been revoked". Only
+  reloading the page led to a new one. It has been so since 3.1.0, when the
+  list was added. It was found by revoking a link to try the new share page,
+  and then asking the app for another. A revoke now makes the page forget the
+  link it holds, and the next Copy or Share makes a new one.
+
 ## [4.9.1] — 2026-10-10
 
 ### Fixed

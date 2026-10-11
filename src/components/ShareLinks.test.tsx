@@ -71,6 +71,32 @@ describe('ShareLinks', () => {
     await waitFor(() => expect(shareService.listLinks).toHaveBeenCalledTimes(2));
   });
 
+  /* The page that shows this list keeps the link it made, to hand it out
+     again. It has to hear that a link stopped opening, or it goes on handing
+     out a dead one. */
+  it('says that a link was revoked, to whoever shows the list', async () => {
+    vi.mocked(shareService.listLinks).mockResolvedValue([link({ id: 'still-valid' })]);
+    vi.mocked(shareService.revokeLink).mockResolvedValue(undefined);
+    const onRevoked = vi.fn();
+
+    renderWithProviders(<ShareLinks fileId="file-1" onRevoked={onRevoked} />);
+    fireEvent.click(await screen.findByText('Revoke'));
+
+    await waitFor(() => expect(onRevoked).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not say so when the revoke did not go through', async () => {
+    vi.mocked(shareService.listLinks).mockResolvedValue([link({ id: 'still-valid' })]);
+    vi.mocked(shareService.revokeLink).mockRejectedValue(new Error('Link not found'));
+    const onRevoked = vi.fn();
+
+    renderWithProviders(<ShareLinks fileId="file-1" onRevoked={onRevoked} />);
+    fireEvent.click(await screen.findByText('Revoke'));
+
+    await screen.findByText('Link not found');
+    expect(onRevoked).not.toHaveBeenCalled();
+  });
+
   it('tells the owner when the revoke did not go through', async () => {
     vi.mocked(shareService.listLinks).mockResolvedValue([link({ id: 'still-valid' })]);
     vi.mocked(shareService.revokeLink).mockRejectedValue(new Error('Link not found'));

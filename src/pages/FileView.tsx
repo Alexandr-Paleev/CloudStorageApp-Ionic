@@ -187,7 +187,8 @@ const FileView: React.FC = () => {
   };
 
   /**
-   * A share link, created on demand and reused for the rest of the visit.
+   * A share link, created on demand and reused for the rest of the visit, or
+   * until a link of this file is revoked: see where the list is rendered.
    *
    * Sharing download_url directly, as this page used to, meant handing out
    * either a permanent unrevocable URL (Cloudinary, Dropbox) or a signed one
@@ -497,7 +498,16 @@ const FileView: React.FC = () => {
                 </IonText>
               )}
 
-              {fileId && sharedByLink && <ShareLinks fileId={fileId} />}
+              {/* A revoke makes the page forget the link it holds, so that the
+                  next Copy or Share makes a new one. It cannot tell which of
+                  the links in the list is its own: making one hands back an
+                  address and an expiry, and the list has ids and no
+                  addresses. So any revoke does it, and the worst that costs
+                  is one link more than was needed. Keeping it cost a link
+                  that opens nothing, handed over as one that works. */}
+              {fileId && sharedByLink && (
+                <ShareLinks fileId={fileId} onRevoked={() => setShareLink(null)} />
+              )}
             </div>
           </div>
         </div>

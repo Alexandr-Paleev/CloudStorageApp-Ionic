@@ -26,6 +26,8 @@ const LABELS: Record<LinkState, string> = {
 
 interface Props {
   fileId: string;
+  /** Called when a link of this file has been revoked, whichever one it was. */
+  onRevoked?: () => void;
 }
 
 /**
@@ -35,7 +37,7 @@ interface Props {
  * token itself is never stored, so there is nothing secret to leak here. A
  * link cannot be shown again after creation; it can only be revoked.
  */
-const ShareLinks: React.FC<Props> = ({ fileId }) => {
+const ShareLinks: React.FC<Props> = ({ fileId, onRevoked }) => {
   const queryClient = useQueryClient();
 
   const { data: links, isLoading } = useQuery({
@@ -46,7 +48,12 @@ const ShareLinks: React.FC<Props> = ({ fileId }) => {
 
   const revoke = useMutation({
     mutationFn: (id: string) => shareService.revokeLink(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shareLinks', fileId] }),
+    onSuccess: () => {
+      /* Before the list is read again: the page above may be holding the
+         link that has just stopped opening. */
+      onRevoked?.();
+      return queryClient.invalidateQueries({ queryKey: ['shareLinks', fileId] });
+    },
   });
 
   if (isLoading) {
