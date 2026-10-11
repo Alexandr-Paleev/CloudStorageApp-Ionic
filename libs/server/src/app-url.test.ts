@@ -51,7 +51,8 @@ describe('getAppUrl', () => {
   });
 
   // The shells' own origins. A share link built on one of them pointed at the
-  // phone that made it, and the demo fetched its seed assets from it.
+  // phone that made it, while links were built here, and the demo fetched its
+  // seed assets from it.
   it.each(['capacitor://localhost', 'https://localhost', 'http://localhost'])(
     'answers a native shell (%s) with the production URL',
     (origin) => {

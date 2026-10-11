@@ -46,8 +46,3 @@ export function shareUnusableReason(
   if (row.expires_at && new Date(row.expires_at).getTime() <= now.getTime()) return 'expired';
   return null;
 }
-
-/** The public URL for a token, on whichever deployment issued it. */
-export function shareUrl(appUrl: string, token: string): string {
-  return `${appUrl.replace(/\/$/, '')}/s/${token}`;
-}

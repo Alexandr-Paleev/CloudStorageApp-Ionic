@@ -188,6 +188,9 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Links expire (7 days by default) and can be revoked from the file page
 - ✅ Each file lists its links with their state: active, expired or revoked
 - ✅ The recipient sees the file and nothing about its owner
+- ✅ A link opens a page of the public site, rendered on a server: a messenger
+  that unfurls the link shows the file's name, and the recipient does not
+  download the app to read it
 
 > **What revoking does, precisely.** It stops `/s/:token` from opening. It cannot
 > withdraw a file someone already downloaded, and on providers that serve
@@ -528,7 +531,9 @@ flowchart TB
     auth --- anon
     auth --- api
 
-    guest["Recipient of a share link<br/>no account"] -->|"GET /api/share?token"| api
+    guest["Recipient of a share link<br/>no account"] -->|"opens /s/token"| site["Public site · Next.js<br/>another origin, no secrets"]
+    site -->|"what the link holds: name, size, type"| api
+    guest -->|"asks for the file, when the button is pressed"| api
 ```
 
 **The rule the layout follows:** anything holding a secret runs in `/api`. The
@@ -564,6 +569,7 @@ uploads first, to save the round trip — but it is the pre-flight, not the gate
 | Demo accounts are swept by email prefix, never by age alone                           | the sweep runs with the service-role key; a filter on age alone would eventually reach a real account                                                                                                                                                                                                 |
 | The demo rate limit is 20/hour per address, and per instance                          | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what all of these limits still want |
 | Share and upload limits count per account, and per address before the token check    | an address can be a whole office, so the limit that matters belongs to the account; the address one runs first because validating a token costs a round trip that an anonymous caller must not be able to buy by repeating the request. Revoking a share link is exempt                                |
+| A share link at the app's old address is sent on before the app starts                | the app tells its analytics where it is as soon as it starts, and at that address the address is the token: until links moved to the site, every one opened on the app was sent to Google Analytics                                                                                                   |
 
 ### Security headers
 
@@ -651,8 +657,8 @@ have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
 them. `scripts/check-bundle-size.js` says where that went.
 
 The public site has one budget, for the one page whose visitors are the least
-likely to have anything cached: the page a share link opens, which is moving
-there from the app
+likely to have anything cached: the page a share link opens, which moved there
+from the app
 ([decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md),
 step 5). The site's smoke test loads it in a browser and adds up the scripts
 and styles that arrived, gzipped the same way: 142.0 kB, under a ceiling of
@@ -741,9 +747,10 @@ reasoning.
   `https://localhost` (Android) are answered by name, never `*`: these routes
   read bearer tokens and open Stripe sessions. The list said `http://localhost`
   for Android until 2026-09-30, and every `/api` call from that shell failed.
-- **A shell's origin is not the app's address.** Share links and the demo's
-  seed assets are built on the deployment's own URL, never on the caller's
-  `Origin` — a link made on a phone used to point at the phone.
+- **A shell's origin is not the app's address.** The demo's seed assets are
+  built on the deployment's own URL, never on the caller's `Origin`. A share
+  link's address is the public site's and asks no request anything — a link
+  made on a phone used to point at the phone.
 - **Sign in with Google could not come back to a page.** It leaves through the
   system browser and returns through `com.cloudstorage.app://auth/callback`.
 
@@ -1010,12 +1017,12 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be: the pages are where the untested code is. As
-of 4.9.0, `src/pages` is 642 statements and the unit tests reach 323 of them.
-`Dashboard.tsx` is the largest at 163, and 66 of those are reached. Six smaller
-pages have no unit test at all, the plans page and the page a share link opens
-among them. That is the largest untested thing in the repository, and it is
-named here rather than hidden behind one average that would sound fine.
+a long way, and it is meant to be: the pages are where the untested code is. With
+the page a share link opens gone to the site, `src/pages` is 620 statements and
+the unit tests reach 324 of them. `Dashboard.tsx` is the largest at 163, and 66
+of those are reached. Five smaller pages have no unit test at all, the plans
+page among them. That is the largest untested thing in the repository, and it
+is named here rather than hidden behind one average that would sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
 money and quota** has a test:

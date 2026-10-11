@@ -4,7 +4,6 @@ import {
   hashShareToken,
   resolveExpiry,
   shareUnusableReason,
-  shareUrl,
   DEFAULT_SHARE_DAYS,
   MAX_SHARE_DAYS,
 } from './share';
@@ -110,15 +109,5 @@ describe('shareUnusableReason', () => {
 
   it('accepts a link with no expiry set', () => {
     expect(shareUnusableReason({ expires_at: null, revoked_at: null }, now)).toBeNull();
-  });
-});
-
-describe('shareUrl', () => {
-  it('builds a link on the given deployment', () => {
-    expect(shareUrl('https://app.example', 'tok')).toBe('https://app.example/s/tok');
-  });
-
-  it('does not double the slash', () => {
-    expect(shareUrl('https://app.example/', 'tok')).toBe('https://app.example/s/tok');
   });
 });
