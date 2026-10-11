@@ -14,15 +14,25 @@ import { renderWithProviders } from '../test/utils';
  * expires on a schedule its owner can cut short. None of that was tested.
  */
 
-const { getFileMetadata, renameFile, createLink, runOrQueue, navigate, offerSystemShare } =
-  vi.hoisted(() => ({
-    getFileMetadata: vi.fn(),
-    renameFile: vi.fn(),
-    createLink: vi.fn(),
-    runOrQueue: vi.fn(),
-    navigate: vi.fn(),
-    offerSystemShare: vi.fn(),
-  }));
+const {
+  getFileMetadata,
+  renameFile,
+  createLink,
+  listLinks,
+  revokeLink,
+  runOrQueue,
+  navigate,
+  offerSystemShare,
+} = vi.hoisted(() => ({
+  getFileMetadata: vi.fn(),
+  renameFile: vi.fn(),
+  createLink: vi.fn(),
+  listLinks: vi.fn(),
+  revokeLink: vi.fn(),
+  runOrQueue: vi.fn(),
+  navigate: vi.fn(),
+  offerSystemShare: vi.fn(),
+}));
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', email: 'someone@example.com' } }),
@@ -39,8 +49,8 @@ vi.mock('../services/storage.service', () => ({
 vi.mock('../services/share.service', () => ({
   default: {
     createLink: (...a: unknown[]) => createLink(...a),
-    listLinks: vi.fn().mockResolvedValue([]),
-    revokeLink: vi.fn(),
+    listLinks: (...a: unknown[]) => listLinks(...a),
+    revokeLink: (...a: unknown[]) => revokeLink(...a),
   },
 }));
 
@@ -101,6 +111,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   getFileMetadata.mockResolvedValue(FILE);
   createLink.mockResolvedValue({ url: 'https://app.example.com/s/tok', expiresAt: '2026-09-08' });
+  listLinks.mockResolvedValue([]);
+  revokeLink.mockResolvedValue(undefined);
   runOrQueue.mockImplementation((_op: unknown, run: () => Promise<unknown>) => run());
   offerSystemShare.mockResolvedValue(false);
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
@@ -181,6 +193,53 @@ describe('FileView', () => {
       fireEvent.click(copy);
       await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2));
       expect(createLink).toHaveBeenCalledTimes(1);
+    });
+
+    /* The link is kept for the visit, and the list under the buttons is where
+       a link is taken back. The two were never told about each other. After a
+       revoke the page went on copying and sharing the link it held, said it
+       expires in 7 days, and what its owner sent on opened "This link has
+       been revoked". Only a reload led to a new one. */
+    it('makes a new link once the one it made has been revoked', async () => {
+      const addresses = ['https://app.example.com/s/first', 'https://app.example.com/s/second'];
+      createLink.mockImplementation(async () => ({
+        url: addresses[createLink.mock.calls.length - 1],
+        expiresAt: '2026-09-08',
+      }));
+
+      const made = {
+        id: 'link-1',
+        created_at: '2026-09-01T00:00:00Z',
+        expires_at: '2099-01-01T00:00:00Z',
+        revoked_at: null as string | null,
+      };
+      listLinks.mockImplementation(async () => [{ ...made }]);
+      revokeLink.mockImplementation(async () => {
+        made.revoked_at = '2026-09-02T00:00:00Z';
+      });
+
+      show();
+      await screen.findByText('report.pdf');
+      const copy = ionButtonByText('Copy Link');
+
+      fireEvent.click(copy);
+      await waitFor(() =>
+        expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+          'https://app.example.com/s/first'
+        )
+      );
+
+      fireEvent.click(await screen.findByText('Revoke'));
+      await waitFor(() => expect(revokeLink).toHaveBeenCalledWith('link-1'));
+      await screen.findByText('Revoked');
+
+      fireEvent.click(copy);
+      await waitFor(() =>
+        expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+          'https://app.example.com/s/second'
+        )
+      );
+      expect(createLink).toHaveBeenCalledTimes(2);
     });
 
     it('says why when the link cannot be made, and copies nothing', async () => {
