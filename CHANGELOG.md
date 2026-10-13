@@ -10,7 +10,38 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **A share link could send its recipient to any site.** `/api/share` hands
+  out the address a file is stored at, and for Cloudinary, Dropbox and Google
+  Drive that address is read from the file's row. The row is written by the
+  owner's browser, and all the route asked of the address was that it be
+  http(s). That stopped a `javascript:` address, which is what the check was
+  written for, and nothing else: an account could write any https address
+  into a row of its own and share the row. The page the link opens is the
+  public site's, with the file's name and size on it, and its Download button
+  sent the recipient to that address. The row could also be rewritten after
+  the link was made.
+
+  The address now has to be on the provider the row names, as the row stands
+  when the link is opened. For Cloudinary that is its delivery host and the
+  owner's own folder, the rule the indexer has applied since it was written.
+  For Dropbox and Google Drive it is the host their APIs return for a file.
+  A provider the route has not heard of is refused. R2 and Supabase Storage
+  are as they were: their stored address is never used, and the path is
+  signed again. The tests were written first, and the route as it stood
+  handed out all five of the addresses it now refuses.
+
+  No row in production was read for this. One live link was opened, and what
+  it hands out is Cloudinary's address in its owner's folder.
+
+### Changed
+
+- **The check on a stored Cloudinary address moved out of the module about
+  search.** `cloudinaryUrlIsOwned` was in `libs/core/src/ai.ts` because the
+  indexer was the first to need it. It is in `libs/server/src/stored-url.ts`
+  now, beside the rule for the other providers, and the indexer and the
+  share route ask the same function. What it accepts has not changed.
 
 ## [4.10.1] — 2026-10-13
 

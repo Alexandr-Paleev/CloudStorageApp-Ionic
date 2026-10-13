@@ -5,7 +5,6 @@ import {
   MAX_DESCRIBE_BYTES,
   ProviderNotConfigured,
   TEXT_SAMPLE_BYTES,
-  cloudinaryUrlIsOwned,
   embeddingInput,
   planFor,
   toVectorLiteral,
@@ -15,6 +14,7 @@ import {
 import { fetchBytes } from '../../libs/server/src/fetch-bytes';
 import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
+import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
 import { activeBackend } from '../../libs/server/src/ai-provider';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
