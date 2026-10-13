@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.10.2] — 2026-10-13
+
 ### Security
 
 - **A share link could send its recipient to any site.** `/api/share` hands
@@ -32,8 +36,11 @@ reasoning behind the larger decisions lives in
   signed again. The tests were written first, and the route as it stood
   handed out all five of the addresses it now refuses.
 
-  No row in production was read for this. One live link was opened, and what
-  it hands out is Cloudinary's address in its owner's folder.
+  No row in production was read for this. One live link was opened there
+  before the change and again after it, and both times it handed out
+  Cloudinary's address in its owner's folder. A refusal was not tried there:
+  that takes a row written to mislead, in the live database. It is held by
+  the tests.
 
 ### Changed
 
@@ -1793,7 +1800,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...HEAD
+[4.10.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...v4.10.2
 [4.10.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...v4.10.1
 [4.10.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...v4.10.0
 [4.9.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...v4.9.1

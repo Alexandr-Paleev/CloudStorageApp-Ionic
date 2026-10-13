@@ -653,7 +653,7 @@ A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.10.1, as CI measured them. When the check was written
+Those are the figures of 4.10.2, as CI measured them. When the check was written
 the three ceilings were 420, 250 and 520 kB, over a first load of 401.0 kB. They
 have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
 them. `scripts/check-bundle-size.js` says where that went.
