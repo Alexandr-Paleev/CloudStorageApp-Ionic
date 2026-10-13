@@ -25,8 +25,9 @@ export class NotOwnedError extends Error {}
  *
  * Returns null for the providers that store a delivery URL instead of a private
  * object — Cloudinary, Google Drive and Dropbox. The caller decides what to do
- * with that URL, because what makes it safe differs: the share page needs
- * http(s), and the indexer needs the caller's own Cloudinary folder.
+ * with that URL, because what it is for differs: the indexer reads a file in
+ * Cloudinary and no other, and a share link hands out all three. What makes
+ * the URL safe to obey is asked in one place for both, `stored-url.ts`.
  */
 export async function signOwnedPath(
   file: { storage_type: string; storage_path: string },

@@ -14,10 +14,10 @@ import {
   tooManyRequests,
 } from '../libs/server/src/rate-limit';
 import { applyCors } from '../libs/server/src/cors';
-import { isSafeHttpUrl } from '../libs/core/src/safe-url';
 import { SITE_ORIGIN } from '../libs/core/src/origins';
 import { shareLinkUrl } from '../libs/core/src/share-link';
 import { signOwnedPath } from '../libs/server/src/sign-owned-path';
+import { storedUrlIsOnItsProvider } from '../libs/server/src/stored-url';
 
 /**
  * Public share links.
@@ -90,14 +90,21 @@ async function downloadUrlFor(file: FileRow): Promise<string> {
   const signed = await signOwnedPath(file, file.user_id, SIGNED_URL_TTL);
   if (signed) return signed;
 
-  /* The only value on this path the owner controls directly. RLS lets an
-     account write anything into its own row, `FileMetadataSchema` stopped
-     checking the shape years ago, and there is no constraint on the column —
-     so a `javascript:` URL written here and then shared is script running on
-     this origin in the recipient's session. Refused rather than sanitised:
-     there is no legitimate stored value this rejects. */
-  if (!isSafeHttpUrl(file.download_url)) {
-    throw new Error('The stored location for this file is not a usable URL');
+  /* The one value on this path that the owner writes and this route hands
+     on. RLS lets an account put anything into a row of its own, and the
+     constraint on the column asks only that it be http(s).
+
+     That was what this asked too. It stopped a `javascript:` address, which
+     the page a link opens would have run as script, and it let every https
+     address through: a row could name a page anywhere, and the site's own
+     Download button, under a file's name and size, sent the recipient there.
+
+     So the address has to be on the provider the row names, as the row
+     stands now: an owner can rewrite it after the link is made. Refused
+     rather than repaired. An upload stores what its provider's API returned,
+     and that is on the provider. */
+  if (!storedUrlIsOnItsProvider(file, file.user_id)) {
+    throw new Error('The stored location for this file is not an address of its storage provider');
   }
 
   return file.download_url;

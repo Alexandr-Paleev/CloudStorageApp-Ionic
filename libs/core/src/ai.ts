@@ -12,8 +12,6 @@
  * is the part worth testing without a network.
  */
 
-import { ownerPrefix } from './stored-path';
-
 /**
  * What writes the sentence.
  *
@@ -55,34 +53,6 @@ export const SEARCH_RESULTS = 15;
  * lives here and not in the SQL default.
  */
 export const SEARCH_MIN_SIMILARITY = 0.25;
-
-/**
- * Whether a stored Cloudinary delivery URL is one of ours, for this user.
- *
- * Cloudinary is the one provider whose stored URL is used as-is, because it is
- * a permanent delivery link rather than a signature that expired months ago.
- * That makes the column an instruction to fetch, and the column is written by
- * the browser — so without this the route would fetch any `http(s)` address a
- * caller cared to store and hand the answer back as a description.
- *
- * Fails closed on anything unexpected, including a custom delivery domain: a
- * file that stops being indexable is a visible, fixable annoyance, and a
- * server that fetches arbitrary URLs is not.
- */
-export function cloudinaryUrlIsOwned(url: string, userId: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return false;
-  }
-
-  return (
-    parsed.protocol === 'https:' &&
-    parsed.hostname === 'res.cloudinary.com' &&
-    parsed.pathname.includes(`/${ownerPrefix('cloudinary', userId)}`)
-  );
-}
 
 /**
  * The ceiling on an image sent to a model as bytes rather than as a link.

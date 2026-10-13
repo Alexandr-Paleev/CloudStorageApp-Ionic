@@ -44,6 +44,10 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 
 import handler from './share';
 
+/* As an upload leaves it: Cloudinary's own host, and the owner's folder in
+   the path. */
+const STORED_AT = 'https://res.cloudinary.com/demo/raw/upload/v1/users/user-1/report.pdf';
+
 const FILE_ROW = {
   id: FILE_ID,
   name: 'report.pdf',
@@ -51,7 +55,7 @@ const FILE_ROW = {
   type: 'application/pdf',
   storage_path: 'users/user-1/report.pdf',
   storage_type: 'cloudinary',
-  download_url: 'https://cdn.example/report.pdf',
+  download_url: STORED_AT,
   user_id: 'user-1',
 };
 
@@ -227,7 +231,11 @@ describe('share: opening a link', () => {
     expect(JSON.stringify(eqCalls)).not.toContain(TOKEN);
   });
 
-  it('returns the file, and nothing about its owner', async () => {
+  /* The exact set of fields is the point: nothing of the row but these four.
+     The owner's id is in the address all the same. A file is kept in a
+     folder named after its account, and a recipient reads that folder in
+     every address they are handed, a signed one included. */
+  it('returns the file and where it is, and no field about its owner', async () => {
     const res = mockResponse();
     await handler(get({ token: TOKEN }), res);
 
@@ -235,9 +243,8 @@ describe('share: opening a link', () => {
       name: 'report.pdf',
       size: 1024,
       type: 'application/pdf',
-      downloadUrl: 'https://cdn.example/report.pdf',
+      downloadUrl: STORED_AT,
     });
-    expect(JSON.stringify(res.body)).not.toContain('user-1');
   });
 
   /* `files.download_url` is written by the browser, under a policy that lets an
@@ -267,6 +274,74 @@ describe('share: opening a link', () => {
     expect(res.statusCode).toBe(500);
     expect(JSON.stringify(res.body)).not.toContain('javascript:');
   });
+
+  /* The scheme was all that was asked, and any https address passed it. So a
+     row could name a page anywhere, and the site's own Download button, under
+     a file's name and size, sent whoever held the link there.
+
+     The provider is the row's writing too, and the row can be rewritten after
+     the link is made. So it is read when the link is opened, and a provider
+     nobody has heard of is refused with the rest. */
+  it.each([
+    [
+      'a Cloudinary file stored on another site',
+      { storage_type: 'cloudinary', download_url: 'https://elsewhere.example/users/user-1/a.pdf' },
+    ],
+    [
+      'a Cloudinary file in another account’s folder',
+      {
+        storage_type: 'cloudinary',
+        download_url: 'https://res.cloudinary.com/demo/raw/upload/v1/users/user-2/a.pdf',
+      },
+    ],
+    [
+      'a Dropbox file stored on another site',
+      { storage_type: 'dropbox', download_url: 'https://elsewhere.example/s/abc/a.pdf?raw=1' },
+    ],
+    [
+      'a Drive file stored on another site',
+      { storage_type: 'googledrive', download_url: 'https://elsewhere.example/file/d/abc/view' },
+    ],
+    [
+      'a file whose provider nobody has heard of',
+      { storage_type: 'somewhere', download_url: 'https://elsewhere.example/a.pdf' },
+    ],
+  ])('refuses to hand out %s', async (_what, stored) => {
+    setup({
+      files: { data: [{ ...FILE_ROW, ...stored }] },
+      shared_links: { data: [liveLink()] },
+    });
+
+    const res = mockResponse();
+    await handler(get({ token: TOKEN }), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toHaveProperty('downloadUrl');
+    expect(JSON.stringify(res.body)).not.toContain(stored.download_url);
+  });
+
+  /* What the two providers' own APIs return for a file, and what an upload
+     stores. Nothing in either names an account of ours, so its host is all
+     there is to hold it to. A link to a Drive file is one made before this
+     route stopped making them. */
+  it.each([
+    ['dropbox', 'https://www.dropbox.com/s/abc/report.pdf?raw=1'],
+    ['googledrive', 'https://drive.google.com/file/d/abc/view?usp=drivesdk'],
+  ])(
+    'hands out the address of a file in %s as it is stored',
+    async (storage_type, download_url) => {
+      setup({
+        files: { data: [{ ...FILE_ROW, storage_type, download_url }] },
+        shared_links: { data: [liveLink()] },
+      });
+
+      const res = mockResponse();
+      await handler(get({ token: TOKEN }), res);
+
+      expect(res.statusCode).toBe(200);
+      expect((res.body as { downloadUrl: string }).downloadUrl).toBe(download_url);
+    }
+  );
 
   it('answers 404 for a token that was never issued', async () => {
     setup({ files: { data: [FILE_ROW] }, shared_links: { data: [] } });

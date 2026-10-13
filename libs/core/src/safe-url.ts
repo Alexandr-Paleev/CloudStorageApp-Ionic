@@ -19,12 +19,17 @@
  * `'unsafe-inline'` on both origins and that is what governs `javascript:`
  * URLs.
  *
- * So: an allowlist of two schemes, checked where the value crosses from one
- * account to another and again before it is stored. Deliberately narrower than
- * "is this a URL" and much narrower than a denylist of `javascript:` — a
- * denylist has to be right about every scheme a browser will ever navigate,
- * including the ones with whitespace and control characters in the middle that
- * `new URL()` normalises away.
+ * So: an allowlist of two schemes, asked before the value is stored and again
+ * before a browser is sent to it. Deliberately narrower than "is this a URL"
+ * and much narrower than a denylist of `javascript:` — a denylist has to be
+ * right about every scheme a browser will ever navigate, including the ones
+ * with whitespace and control characters in the middle that `new URL()`
+ * normalises away.
+ *
+ * It is the least that can be asked of an address, and where the value
+ * crosses from one account to another it is not enough: an https address can
+ * be a page anywhere. `/api/share` asked this and nothing more until it was
+ * noticed, and now asks whose address it is: `libs/server/src/stored-url.ts`.
  */
 
 const SAFE_SCHEMES = new Set(['http:', 'https:']);

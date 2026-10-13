@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   MAX_SUMMARY_CHARS,
-  cloudinaryUrlIsOwned,
   MAX_TAGS,
   MAX_TAG_CHARS,
   clampSummary,
@@ -152,26 +151,6 @@ describe('embeddingInput', () => {
 
   it('leaves out the tag line when there are no tags', () => {
     expect(embeddingInput({ name: 'a.txt' }, 'A note.', [])).toBe('a.txt\nA note.');
-  });
-});
-
-describe('cloudinaryUrlIsOwned', () => {
-  const uid = '11111111-1111-1111-1111-111111111111';
-  const good = `https://res.cloudinary.com/demo/image/upload/v1/users/${uid}/holiday.jpg`;
-
-  it('accepts a delivery URL from our own cloud, in the caller’s folder', () => {
-    expect(cloudinaryUrlIsOwned(good, uid)).toBe(true);
-  });
-
-  it.each([
-    ['another account’s folder', `https://res.cloudinary.com/demo/image/upload/users/2222/x.jpg`],
-    ['another host entirely', `https://evil.example/image/upload/users/${uid}/x.jpg`],
-    ['a host that merely ends in ours', `https://res.cloudinary.com.evil.example/users/${uid}/x`],
-    ['plain http', `http://res.cloudinary.com/demo/image/upload/users/${uid}/x.jpg`],
-    ['an internal address', 'http://169.254.169.254/latest/meta-data/'],
-    ['not a URL at all', 'users/' + uid + '/x.jpg'],
-  ])('refuses %s', (_label, url) => {
-    expect(cloudinaryUrlIsOwned(url, uid)).toBe(false);
   });
 });
 
