@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Opens the built bundle in a real browser and asks two questions: did it
- * render anything at all, and does its service worker keep to the app?
+ * Opens the built bundle in a real browser and asks three questions: did it
+ * render anything at all, does its service worker keep to the app, and is a
+ * collector told a secret that is in the address?
  *
  * Everything else in this repository tests the source. `npm run dev` serves
  * unbundled modules, so `manualChunks` in vite.config.mts is inert there, and
@@ -22,11 +23,17 @@
  * does not precache: a browser sent to either was shown the app's "not found"
  * page instead of what the server would have said.
  *
+ * The third question is here for a reason of its own. Analytics start only in
+ * a production build, so the dev server, and every test that runs against
+ * it, starts none. What they are sent can be seen in the build and nowhere
+ * else: `ask-the-collectors.mjs` says what is asked, and what it found.
+ *
  * Usage: node scripts/smoke-built-bundle.mjs [url]
  * Serves dist/ itself unless a URL is given.
  */
 import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
+import { askTheCollectors } from './ask-the-collectors.mjs';
 
 const PORT = 4173;
 const url = process.argv[2];
@@ -123,6 +130,7 @@ async function askWorker() {
 
 let rendered = '';
 let worker;
+let collectors;
 try {
   await page.goto(target, { waitUntil: 'networkidle', timeout: 30_000 });
   rendered = ((await page.textContent('body')) ?? '').trim();
@@ -134,6 +142,14 @@ try {
 
   worker = await askWorker().catch((error) => ({
     problem: `The service worker could not be asked: ${error.message.split('\n')[0]}`,
+  }));
+
+  // In browsers of their own, each one new to the app: what a collector is
+  // sent depends on the address the app was opened at.
+  collectors = await askTheCollectors(browser, target).catch((error) => ({
+    configured: true,
+    problems: [`The collectors could not be asked: ${error.message.split('\n')[0]}`],
+    said: 'could not be asked',
   }));
 } finally {
   await browser.close();
@@ -151,6 +167,7 @@ for (const error of errors.slice(0, 5)) console.log(`    ${error}`);
 console.log(
   `  service worker: ${worker.problem ?? [THE_APP, ...NOT_THE_APP].map(whoAnswered).join(', ')}`
 );
+console.log(`  collectors: ${collectors.said}`);
 
 if (tooEmpty || errors.length > 0) {
   console.error(
@@ -183,4 +200,13 @@ if (overreach.length > 0) {
   process.exit(1);
 }
 
-console.log('\nThe built bundle renders, and its service worker keeps to the app.');
+if (collectors.problems.length > 0) {
+  console.error(`\n${collectors.problems.join('\n')}`);
+  process.exit(1);
+}
+
+console.log(
+  collectors.configured
+    ? '\nThe built bundle renders, its service worker keeps to the app, and no collector is told a secret.'
+    : '\nThe built bundle renders, and its service worker keeps to the app.'
+);

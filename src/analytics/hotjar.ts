@@ -34,13 +34,15 @@ export function initHotjar() {
 }
 
 /**
- * Hook to track route changes in Hotjar for SPA
+ * Tells Hotjar that the page changed, in an app that changes pages without
+ * loading one. It is told the path, and not the query string: see
+ * `collectors.ts` for what a query string has carried here.
  */
 export function useHotjarStateChange() {
   const location = useLocation();
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).hj?.('stateChange', location.pathname + location.search);
-  }, [location.pathname, location.search]);
+    (window as any).hj?.('stateChange', location.pathname);
+  }, [location.pathname]);
 }

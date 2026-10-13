@@ -570,6 +570,7 @@ uploads first, to save the round trip — but it is the pre-flight, not the gate
 | The demo rate limit is 20/hour per address, and per instance                          | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what all of these limits still want |
 | Share and upload limits count per account, and per address before the token check    | an address can be a whole office, so the limit that matters belongs to the account; the address one runs first because validating a token costs a round trip that an anonymous caller must not be able to buy by repeating the request. Revoking a share link is exempt                                |
 | A share link at the app's old address is sent on before the app starts                | the app tells its analytics where it is as soon as it starts, and at that address the address is the token: until links moved to the site, every one opened on the app was sent to Google Analytics                                                                                                   |
+| Analytics wait for an address that is a path; Sentry cuts every address it sends      | a sign-in returns with its tokens after the `#` and an OAuth callback with its code after the `?`, and all three collectors report addresses: the code reached Google and the tokens reached Sentry                                                                                                   |
 
 ### Security headers
 
@@ -1051,16 +1052,24 @@ after one file is refused, and that nothing is offered for sale inside the
 native shell.
 
 **One check runs the built bundle rather than the source.** `npm run smoke`
-opens `dist/` in a real browser and asks two questions: whether the page
-rendered anything at all, and whether the service worker keeps to the app. It
-exists because nothing else could: `npm run dev` serves unbundled modules, so
+opens `dist/` in a real browser and asks three questions: whether the page
+rendered anything at all, whether the service worker keeps to the app, and
+whether a collector is told a secret that is in the address. It exists because
+nothing else could: `npm run dev` serves unbundled modules, so
 `manualChunks` in `vite.config.mts` never executes there, and the Playwright
 suite runs against that dev server. A split that put React and react-dom in
 different chunks painted a blank page while lint, 621 unit tests, the whole
 e2e suite and the bundle budgets stayed green. The service worker is out of
 sight the same way. The dev server generates one of its own, which falls back
 to the app shell for `/` alone, while the built one answered every navigation
-in its scope, `/api/` and file paths included.
+in its scope, `/api/` and file paths included. And analytics start in a
+production build and in no other. Started at an OAuth callback, the built app
+told Google Analytics the callback's code, and at a returning sign-in it could
+tell Sentry the tokens. The smoke test now starts the built app at both, with
+made-up values and every collector refused, and reads what leaves
+([decision 0015](docs/decisions/0015-collectors-are-told-paths.md)). CI's build
+has no collectors configured, so there it says so, and unit tests hold the two
+rules instead.
 
 **Accessibility is asserted on the rendered DOM**, at WCAG 2.1 A and AA, by
 `@axe-core/playwright` — on the login page, the dashboard with folders and
