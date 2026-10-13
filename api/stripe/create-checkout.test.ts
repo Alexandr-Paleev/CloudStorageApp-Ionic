@@ -180,6 +180,24 @@ describe('create-checkout: the session', () => {
     expect(args.cancel_url.startsWith(APP_URL)).toBe(true);
   });
 
+  /* The address a payment returns to used to carry the id of the Checkout
+     session, which nothing read and the app's analytics were told. The two
+     collectors that read addresses for themselves are also not started on
+     an address with a query string, so the page that says a payment went
+     through would have gone uncounted. */
+  it('sends the user back to addresses that carry nothing but a path', async () => {
+    await handler(request(), mockResponse());
+
+    const [args] = stripe.createSession.mock.calls[0] as [
+      { success_url: string; cancel_url: string },
+    ];
+    for (const address of [args.success_url, args.cancel_url]) {
+      const { search, hash } = new URL(address);
+      expect(search + hash, address).toBe('');
+    }
+    expect(args.success_url).not.toContain('CHECKOUT_SESSION_ID');
+  });
+
   it('carries the user id into the session metadata', async () => {
     await handler(request(), mockResponse());
     expect(stripe.createSession).toHaveBeenCalledWith(

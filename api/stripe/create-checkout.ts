@@ -91,7 +91,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+      /* A path and nothing after it. This used to end in
+         `?session_id={CHECKOUT_SESSION_ID}`, which nothing in the app ever
+         read: the page it leads to asks for the profile again, and the tier
+         is written by the webhook. What it did do was put the id of a
+         payment into an address the app's analytics were then told. An
+         address carries what something reads, and nothing more: decision
+         0015. */
+      success_url: `${appUrl}/subscription/success`,
       cancel_url: `${appUrl}/pricing`,
       metadata: { supabase_user_id: userId },
     });

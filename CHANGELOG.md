@@ -10,7 +10,54 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **A sign-in's tokens could reach Sentry, and an OAuth code reached Google
+  Analytics.** 4.10.0 stopped the app from telling its analytics the token of
+  a share link, and left every other address as it was. Some of them are
+  credentials for as long as they stand: a sign-in comes back with its access
+  token and its refresh token after the `#`, and an OAuth callback carries
+  its code after the `?`. Looked at in the built app, with made-up values and
+  every collector refused: the code reached Google at two of its hosts, as
+  the path of a page view, because the app's own tracker reported a page with
+  its query string. And both tokens of a sign-in reached Sentry, in four
+  fields of one event. That was a sign-in the app could not use, whose tokens
+  stay in the address until the app moves on. One it accepts is cleaned out
+  of the address after a single request to Supabase, so whether its tokens
+  got out depended on which script loaded first. Google Analytics does not
+  send the fragment, and was not sent them.
+
+  Three things changed
+  ([decision 0015](docs/decisions/0015-collectors-are-told-paths.md)). Google
+  Analytics and Hotjar read the address for themselves, so they are not
+  started while it has a query string or a fragment, and the page views the
+  app sends are paths. Sentry is needed at the worst address as much as at
+  any other, so it starts as before, and every address in what it sends is
+  cut at its `?` and its `#`. And the address Stripe returns to no longer
+  carries the id of the checkout session, which nothing read.
+
+### Added
+
+- **`npm run smoke` asks a third question of the built app: is a collector
+  told a secret that is in the address?** Analytics start in a production
+  build and in no other, so no test against the dev server could have seen
+  any of the above. The smoke test starts the built app at a returning
+  sign-in and at an OAuth callback, with values it makes up each time, and
+  reads every request that leaves: nothing is delivered. Google Analytics and
+  Hotjar may not be asked for before the sign-in is accepted, and nobody may
+  be sent a made-up value. With each rule taken out of the app in turn, it
+  failed. CI's build has no collectors configured, and there it says so and
+  asks nothing: in CI the two rules are held by unit tests.
+
+### Changed
+
+- **A visit is counted once its address is a path and nothing else.** That is
+  what holding the two collectors back costs. The first page of a returning
+  sign-in is counted when its tokens are gone, and the page an OAuth callback
+  lands on is not counted at all.
+- **Sentry no longer has the query string of a request.** Which filter a
+  request carried is not in a breadcrumb or a span any more. The path and the
+  status are.
 
 ## [4.10.0] — 2026-10-11
 

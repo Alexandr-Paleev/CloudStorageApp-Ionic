@@ -1,4 +1,5 @@
 import { env } from '../env';
+import { withoutSecrets } from './scrub';
 
 /**
  * Sentry, loaded off the critical path.
@@ -44,6 +45,13 @@ function load(): Promise<SentryModule | null> {
         integrations: [module.browserTracingIntegration()],
         tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,
         environment: import.meta.env.MODE,
+        /* Every address in what is sent is cut at its `?` and its `#`. This
+           one collector is started whatever the address is, because the
+           errors most worth having are the ones at startup, and a sign-in
+           comes back with its tokens in the address. So it is what leaves
+           that is cleaned, on both of the roads out: scrub.ts. */
+        beforeSend: withoutSecrets,
+        beforeSendTransaction: withoutSecrets,
       });
 
       sentry = module;

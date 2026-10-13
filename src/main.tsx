@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './observability/sentry';
-import { initializeGA4, trackApiErrorStandalone } from './hooks/useAnalytics';
-import { initHotjar } from './analytics/hotjar';
+import { trackApiErrorStandalone } from './hooks/useAnalytics';
+import { startCollectorsOnABareAddress } from './analytics/collectors';
 import { initDarkMode } from './theme/dark-mode';
 import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
@@ -43,9 +43,15 @@ function start(): void {
   // on the answer.
   void initNativeShell();
 
-  // Initialize Analytics (GA4 + Hotjar)
-  initializeGA4();
-  initHotjar();
+  // Google Analytics and Hotjar, unless the address carries a query string or
+  // a fragment: both read the address for themselves, and a sign-in comes
+  // back with its tokens in it. If they are held back here they are started
+  // when the address has lost what it carried. A change of route is one such
+  // moment, and PageViewTracker asks then. The fragment being emptied is the
+  // other: that is how the Supabase client removes a sign-in's tokens, and no
+  // route changes when it does.
+  startCollectorsOnABareAddress();
+  window.addEventListener('hashchange', () => startCollectorsOnABareAddress());
 
   /**
    * Handle query/mutation errors globally for analytics tracking
