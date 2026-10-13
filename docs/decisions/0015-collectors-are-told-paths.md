@@ -1,6 +1,6 @@
 # 0015 — Collectors are told paths, and two of them wait for a bare address
 
-Accepted · 2026-10-13 · not yet released ·
+Accepted · shipped in v4.10.1 ·
 [`src/analytics/collectors.ts`](../../src/analytics/collectors.ts),
 [`src/observability/scrub.ts`](../../src/observability/scrub.ts)
 
