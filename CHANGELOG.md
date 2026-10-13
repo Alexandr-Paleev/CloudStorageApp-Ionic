@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.10.1] — 2026-10-13
+
 ### Security
 
 - **A sign-in's tokens could reach Sentry, and an OAuth code reached Google
@@ -46,8 +50,14 @@ reasoning behind the larger decisions lives in
   reads every request that leaves: nothing is delivered. Google Analytics and
   Hotjar may not be asked for before the sign-in is accepted, and nobody may
   be sent a made-up value. With each rule taken out of the app in turn, it
-  failed. CI's build has no collectors configured, and there it says so and
-  asks nothing: in CI the two rules are held by unit tests.
+  failed. Against 4.10.0 in production it failed on every count. CI's build
+  has no collectors configured, and there it says so and asks nothing: in CI
+  the two rules are held by unit tests.
+
+  It tells a collector's host by its whole name. As first merged it looked
+  for the name anywhere in an address, and an address can carry any name in
+  its path. CodeQL said so on the pull request that added it. That pull
+  request was merged with the check red, and the next one put it right.
 
 ### Changed
 
@@ -1752,7 +1762,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...HEAD
+[4.10.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...v4.10.1
 [4.10.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...v4.10.0
 [4.9.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.0...v4.9.1
 [4.9.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.8.0...v4.9.0

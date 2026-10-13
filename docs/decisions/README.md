@@ -30,4 +30,4 @@ piece ships.
 | [0012](0012-the-native-build-sells-nothing.md)   | The native build sells nothing                                   | v4.3.0     |
 | [0013](0013-search-by-meaning-is-indexed-on-demand.md) | Search by meaning is indexed on demand, by a swappable model | v4.7.0     |
 | [0014](0014-the-public-pages-are-a-second-app.md) | The public pages are a second app on its own origin, in one Nx workspace | step 5 of 6 |
-| [0015](0015-collectors-are-told-paths.md)        | Collectors are told paths, and two of them wait for a bare address | unreleased |
+| [0015](0015-collectors-are-told-paths.md)        | Collectors are told paths, and two of them wait for a bare address | v4.10.1  |
