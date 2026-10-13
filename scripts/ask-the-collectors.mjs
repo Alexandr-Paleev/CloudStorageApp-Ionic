@@ -42,13 +42,36 @@ const WATCH_MS = 12_000;
 /** How many times the address Sentry leaked from is opened. */
 const SESSIONS_FOR_A_SAMPLED_TRACE = 4;
 
-/** The two that read the address for themselves. */
-const READS_THE_ADDRESS =
-  /(^|\.)(googletagmanager\.com|google-analytics\.com|hotjar\.com|hotjar\.io)$/;
+/** The two that read the address for themselves, by the names their hosts end in. */
+const READS_THE_ADDRESS = [
+  'googletagmanager.com',
+  'google-analytics.com',
+  'hotjar.com',
+  'hotjar.io',
+];
 
-/** Their scripts, which are let through. */
-const A_COLLECTORS_SCRIPT =
-  /googletagmanager\.com\/gtag\/js|static\.hotjar\.com\/|script\.hotjar\.com\//;
+const readsTheAddress = (host) =>
+  READS_THE_ADDRESS.some((name) => host === name || host.endsWith(`.${name}`));
+
+/**
+ * Their scripts, which are let through: the host, compared whole, and the
+ * path it serves a script at.
+ *
+ * It was a pattern looked for anywhere in the address, and an address can
+ * carry any host's name in its path or its query string. In a file that is
+ * about who is sent what, that was the wrong way to tell a host. CodeQL said
+ * so on the pull request that added it.
+ */
+const SERVES_A_COLLECTORS_SCRIPT = new Map([
+  ['www.googletagmanager.com', (path) => path === '/gtag/js'],
+  ['static.hotjar.com', () => true],
+  ['script.hotjar.com', () => true],
+]);
+
+const isACollectorsScript = (url) =>
+  SERVES_A_COLLECTORS_SCRIPT.get(url.hostname)?.(url.pathname) ?? false;
+
+const isSentry = (host) => host === 'sentry.io' || host.endsWith('.sentry.io');
 
 const made = () => `made-up-${randomUUID()}`;
 const base64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -101,14 +124,14 @@ async function visit(browser, origin, address, secrets, signIn) {
       const everything = `${decoded(url.href)}\n${request.postData() ?? ''}`;
       asked.push({
         at: Date.now() - opened,
-        host: url.host,
+        host: url.hostname,
         origin: url.origin,
         carried: Object.entries(secrets)
           .filter(([, value]) => everything.includes(value))
           .map(([name]) => name),
       });
 
-      return A_COLLECTORS_SCRIPT.test(url.href) ? route.continue() : route.abort();
+      return isACollectorsScript(url) ? route.continue() : route.abort();
     }
   );
 
@@ -125,7 +148,7 @@ async function visit(browser, origin, address, secrets, signIn) {
   return { asked: asked.filter((request) => request.origin !== supabase), acceptedAt };
 }
 
-const readers = (asked) => asked.filter((request) => READS_THE_ADDRESS.test(request.host));
+const readers = (asked) => asked.filter((request) => readsTheAddress(request.host));
 
 /**
  * @returns {Promise<{ configured: boolean, problems: string[], said: string }>}
@@ -201,7 +224,7 @@ export async function askTheCollectors(browser, target) {
     }
   }
 
-  const sentry = refused.flatMap(({ asked }) => asked).filter(({ host }) => /sentry/.test(host));
+  const sentry = refused.flatMap(({ asked }) => asked).filter(({ host }) => isSentry(host));
   const when =
     `first asked for at ${first?.at ?? '?'} ms, with a sign-in’s tokens in the address ` +
     `until ${signIn.acceptedAt ?? '?'} ms`;
