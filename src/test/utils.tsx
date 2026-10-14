@@ -16,6 +16,29 @@ export function createTestQueryClient(): QueryClient {
   });
 }
 
+/**
+ * The provider a hook of this app assumes, around a client the test keeps.
+ *
+ * Nothing in it is collected. A test puts entries in the cache, has the hook
+ * do something, and reads back which of them it marked stale. Under the
+ * `gcTime: 0` above, an entry that nothing is watching is gone before it can
+ * be read.
+ */
+export function withQueryClient() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+
+  return { queryClient, wrapper };
+}
+
 type Options = Omit<RenderOptions, 'wrapper'> & {
   route?: string;
   queryClient?: QueryClient;
