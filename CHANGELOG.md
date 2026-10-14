@@ -49,6 +49,17 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **A folder that had just been renamed opened under its old name.** The
+  title of a folder's page is read from a cache entry of its own, and a
+  rename marked an entry stale: the one of the page the rename was made on,
+  not the one of the folder that was renamed. A folder whose page had been
+  opened in the five minutes before kept its old name in the title, under
+  breadcrumbs that had the new one. It was found while the queries were moved
+  into hooks, and the move kept it, as it kept everything else. The fix is
+  one line in `useStorageMutations`. A test of the hook failed before it and
+  passes after it, and the end-to-end test that renames a folder now opens
+  the folder afterwards.
+
 - **A test of the dashboard could not fail.** "When a mutation fails: says so
   instead of failing silently" looked in the DOM for the Create button of the
   new-folder dialog. An Ionic alert has no buttons under jsdom, so it found

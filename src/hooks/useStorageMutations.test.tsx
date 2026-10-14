@@ -196,6 +196,20 @@ describe('useStorageMutations', () => {
       });
     });
 
+    /* The folder renamed is a card on this page, not the folder this page is
+       in. Its name is read from this entry on its own page, as the title. The
+       rename used to mark this page's entry instead, and the renamed folder
+       opened under its old name, below breadcrumbs that had the new one. */
+    it('a rename: the renamed folder’s own name, which its page shows as the title', async () => {
+      const { result, queryClient } = show('folder-9');
+      queryClient.setQueryData(['folder', 'work'], WORK);
+
+      act(() => result.current.renameFolder.mutate({ folder: WORK, name: 'Archive' }));
+
+      await waitFor(() => expect(result.current.renameFolder.isSuccess).toBe(true));
+      expect(queryClient.getQueryState(['folder', 'work'])?.isInvalidated).toBe(true);
+    });
+
     // Deleting a folder deletes its files, so the meter moves too.
     it('a deleted folder: every listing, and the meter', async () => {
       const { result, queryClient } = show();
