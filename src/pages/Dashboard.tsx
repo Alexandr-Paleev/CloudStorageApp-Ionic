@@ -1,4 +1,3 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import {
   IonContent,
@@ -45,16 +44,17 @@ import FolderActions from '../components/FolderActions';
 import FolderBreadcrumbs from '../components/FolderBreadcrumbs';
 import NewFolderDialog from '../components/NewFolderDialog';
 import OfflineQueueBanner from '../components/OfflineQueueBanner';
+import { useFileListing } from '../hooks/useFileListing';
+import { useFolderTrail } from '../hooks/useFolderTrail';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
-import { applyPending } from '../services/mutation-queue';
+import { useSearchIndex } from '../hooks/useSearchIndex';
+import { useStorageMutations } from '../hooks/useStorageMutations';
+import { useStorageUsage } from '../hooks/useStorageUsage';
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
-import storageService, { type Folder } from '../services/storage.service';
-import aiService from '../services/ai.service';
-import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
+import type { Folder } from '../services/storage.service';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
 import { billingIsOffered } from '../utils/billing.utils';
-import { smartSearchIsOffered } from '../utils/smart-search.utils';
 import { HttpError } from '../utils/http.utils';
 import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
@@ -63,11 +63,10 @@ import { storageMeter } from '../utils/quota.utils';
 import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const { profile } = useProfile();
   const navigate = useNavigate();
   const { folderId } = useParams<{ folderId?: string }>();
-  const queryClient = useQueryClient();
   const offlineQueue = useOfflineQueue();
   /* Which dialog is open, and about what. What each one asks, and what it
      does with the answer, is in the component that shows it. */
@@ -83,240 +82,30 @@ const Dashboard: React.FC = () => {
     mode: 'name',
   });
 
-  const PAGE_SIZE = 15;
-
-  const searching = filters.search.trim().length > 0;
-  /** A search by meaning, offered by this deployment, with something to
-   *  search for. All three, or the ordinary list. */
-  const smartSearching = smartSearchIsOffered() && filters.mode === 'smart' && searching;
-
-  const { data, fetchNextPage, hasNextPage, isLoading, error } = useInfiniteQuery({
-    /* The filters belong in the key: they are part of the question being
-       asked, so changing one has to fetch rather than re-render what the
-       previous question returned. */
-    queryKey: ['items', user?.id, folderId || 'root', filters],
-    queryFn: ({ pageParam = 0 }) => {
-      if (!user?.id) throw new Error('User not authenticated');
-      return storageService.getItems(user.id, {
-        folderId: folderId || null,
-        page: pageParam as number,
-        pageSize: PAGE_SIZE,
-        ...filters,
-      });
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      if (lastPage.files.length < PAGE_SIZE) return undefined;
-      return allPages.length;
-    },
-    initialPageParam: 0,
-    // Not merely ignored while searching by meaning — not asked for. The two
-    // lists answer different questions, and the ordinary one costs a query.
-    enabled: !!user?.id && !smartSearching,
-  });
-
-  /**
-   * The same question asked of the index instead of the file names.
-   *
-   * One page and no scrolling: `match_files` returns the nearest handful, and
-   * "more results" past the twentieth nearest neighbour is not a page of a
-   * list, it is noise with a worse score.
-   */
+  /* What the page shows and what it can change. Where each comes from, and
+     what a change makes stale, is in the hook that holds it. */
+  const listing = useFileListing(folderId, filters);
   const {
-    data: smartFiles,
-    isLoading: smartLoading,
-    error: smartError,
-  } = useQuery({
-    queryKey: ['smart-search', user?.id, filters.search.trim()],
-    queryFn: () => aiService.smartSearch(filters.search),
-    enabled: !!user?.id && smartSearching,
-    /* Typing "invoice" again a moment later is the same question, and the
-       answer costs an embedding on a paid API. */
-    staleTime: 60_000,
-    retry: false,
+    items,
+    searching,
+    smartSearching,
+    loading: listLoading,
+    error: listError,
+    hasNextPage,
+    fetchNextPage,
+  } = listing;
+  const { unindexed, indexing, indexMissing } = useSearchIndex({
+    enabled: smartSearching,
+    onProblem: setErrorToast,
   });
-
-  /* The server's answer, plus whatever this device has queued and not yet
-     sent. The cache stays a truthful snapshot; the queue is applied on top —
-     including over search results, where a file deleted offline would
-     otherwise come back from the database as a perfectly good match. */
-  const items = applyPending(
-    smartSearching
-      ? { files: smartFiles ?? [], folders: [] }
-      : {
-          files: data?.pages.flatMap((page) => page.files) || [],
-          folders: data?.pages[0]?.folders || [],
-        },
-    offlineQueue.ops
-  );
-
-  const listLoading = smartSearching ? smartLoading : isLoading;
-  const listError = smartSearching ? smartError : error;
-
-  /* Only asked while a smart search is on screen: it is the one moment the
-     answer matters, and the answer is two reads the dashboard need not make
-     on every visit. */
-  const { data: unindexed } = useQuery({
-    queryKey: ['unindexed', user?.id],
-    queryFn: () => aiService.unindexedFileIds(user!.id),
-    enabled: !!user?.id && smartSearching,
+  const { folder: currentFolder, path: folderPath, parentId } = useFolderTrail(folderId);
+  const usage = useStorageUsage();
+  const { renameFolder, deleteFolder, deleteFile, createFolder } = useStorageMutations({
+    folderId,
+    onProblem: setErrorToast,
   });
-
-  const [indexing, setIndexing] = useState<{ done: number; total: number } | null>(null);
-
-  /* Indexing is a deliberate act, not something an upload triggers on its
-     own: every file costs a request at a model provider, and this deployment
-     hands an account to any visitor. */
-  const indexMissing = async () => {
-    const ids = unindexed ?? [];
-    setIndexing({ done: 0, total: ids.length });
-    try {
-      /* Counted rather than awaited in silence: describing twenty files is
-         minutes of a spinner, and a run where every one of them failed — no
-         key on this deployment, say — used to end exactly like a run where
-         every one succeeded. */
-      const { indexed, skipped, failed } = await aiService.indexMany(ids, (done, total) =>
-        setIndexing({ done, total })
-      );
-
-      if (failed > 0) {
-        setErrorToast(
-          `Indexed ${indexed} of ${ids.length}. ${failed} failed — smart search will not find those yet.`
-        );
-      } else if (indexed === 0 && skipped > 0) {
-        setErrorToast(
-          `Nothing to index: ${skipped} file${skipped === 1 ? '' : 's'} cannot be read.`
-        );
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ['unindexed', user?.id] });
-      await queryClient.invalidateQueries({ queryKey: ['smart-search'] });
-    } finally {
-      setIndexing(null);
-    }
-  };
-
-  const { data: storageSize } = useQuery({
-    queryKey: ['storageSize', user?.id],
-    queryFn: () => {
-      if (!user?.id) throw new Error('User not authenticated');
-      return storageService.getUserStorageSize(user.id);
-    },
-    enabled: !!user?.id,
-  });
-
-  const { data: currentFolder } = useQuery({
-    queryKey: ['folder', folderId],
-    queryFn: () => {
-      if (!user?.id || !folderId) return null;
-      return storageService.getFolder(folderId, user.id);
-    },
-    enabled: !!user?.id && !!folderId,
-  });
-
-  /* The chain above the current folder, for the breadcrumb bar and for the
-     back button — which used to go to the root from any depth. */
-  const { data: folderPath = [] } = useQuery({
-    queryKey: ['folderPath', user?.id, folderId],
-    queryFn: () => {
-      if (!user?.id || !folderId) return [];
-      return storageService.getFolderPath(folderId, user.id);
-    },
-    enabled: !!user?.id && !!folderId,
-  });
-
-  const parentId = folderPath.length > 1 ? (folderPath[folderPath.length - 2]?.id ?? null) : null;
 
   const openFolder = (id: string | null) => navigate(id ? `/dashboard/${id}` : '/dashboard');
-
-  const renameFolderMutation = useMutation({
-    mutationFn: ({ folder, name }: { folder: Folder; name: string }) => {
-      if (!user?.id || !folder.id) throw new Error('User not authenticated');
-      const folderId = folder.id;
-
-      return offlineQueue.runOrQueue({ kind: 'renameFolder', folderId, name }, () =>
-        storageService.renameFolder(folderId, user.id, name)
-      );
-    },
-    /* Without this TanStack pauses the mutation while the browser reports no
-       network and never calls mutationFn at all — the change would live only
-       in this tab's memory, and a reload would lose it. The queue in
-       services/mutation-queue.ts is what makes it durable, and it only gets
-       the chance if the attempt is actually made. */
-    networkMode: 'always' as const,
-
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['folder', folderId] });
-      queryClient.invalidateQueries({ queryKey: ['folderPath', user?.id] });
-    },
-    onError: (err: Error) => setErrorToast(err.message),
-  });
-
-  const deleteFolderMutation = useMutation({
-    mutationFn: (folder: Folder) => {
-      if (!user?.id || !folder.id) throw new Error('User not authenticated');
-      const folderId = folder.id;
-
-      /* No deadline: this walks the whole tree, one request per file, and is
-         the one operation a timeout would duplicate rather than rescue. */
-      return offlineQueue.runOrQueue(
-        { kind: 'deleteFolder', folderId },
-        () => storageService.deleteFolder(folderId, user.id),
-        { deadline: null }
-      );
-    },
-    /* Without this TanStack pauses the mutation while the browser reports no
-       network and never calls mutationFn at all — the change would live only
-       in this tab's memory, and a reload would lose it. The queue in
-       services/mutation-queue.ts is what makes it durable, and it only gets
-       the chance if the attempt is actually made. */
-    networkMode: 'always' as const,
-
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      // Deleting a folder deletes its files, so the meter moves too.
-      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
-    },
-    onError: (err: Error) => setErrorToast(err.message),
-  });
-
-  const deleteFileMutation = useMutation({
-    mutationFn: (fileId: string) => {
-      if (!user?.id) throw new Error('User not authenticated');
-      const userId = user.id;
-
-      /* Offline this is written down and applied to the listing; online it is
-         an ordinary delete. Either way the button does what it says. */
-      return offlineQueue.runOrQueue({ kind: 'deleteFile', fileId }, () =>
-        storageService.deleteFile(fileId, userId)
-      );
-    },
-    /* Without this TanStack pauses the mutation while the browser reports no
-       network and never calls mutationFn at all — the change would live only
-       in this tab's memory, and a reload would lose it. The queue in
-       services/mutation-queue.ts is what makes it durable, and it only gets
-       the chance if the attempt is actually made. */
-    networkMode: 'always' as const,
-
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
-    },
-  });
-
-  const createFolderMutation = useMutation({
-    mutationFn: (name: string) => {
-      if (!user?.id) throw new Error('User not authenticated');
-      return storageService.createFolder(user.id, name, folderId || null);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      setShowFolderAlert(false);
-    },
-    onError: (err: Error) => {
-      setErrorToast(err.message || 'Failed to create folder. Ensure Supabase is configured.');
-    },
-  });
 
   const handleLogout = async () => {
     await logout();
@@ -324,10 +113,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleRefresh = async (event: CustomEvent) => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['items', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] }),
-    ]);
+    await Promise.all([listing.refresh(), usage.refresh()]);
     (event.target as HTMLIonRefresherElement).complete();
   };
 
@@ -338,9 +124,7 @@ const Dashboard: React.FC = () => {
     return documentTextOutline;
   };
 
-  // Safe calculation for storage — use dynamic limit from profile
-  const usedBytes = storageSize || 0;
-  const storageLimit = profile?.storage_limit ?? DEFAULT_STORAGE_LIMIT;
+  const { usedBytes, storageLimit } = usage;
   const {
     barWidth,
     percentage: percentageDisplay,
@@ -691,12 +475,12 @@ const Dashboard: React.FC = () => {
         <FolderActions
           folder={folderMenu}
           onClose={() => setFolderMenu(null)}
-          onRename={(folder, name) => renameFolderMutation.mutate({ folder, name })}
-          onDelete={(folder) => deleteFolderMutation.mutate(folder)}
+          onRename={(folder, name) => renameFolder.mutate({ folder, name })}
+          onDelete={(folder) => deleteFolder.mutate(folder)}
         />
 
         <IonToast
-          isOpen={deleteFileMutation.isError}
+          isOpen={deleteFile.isError}
           message="Failed to delete file"
           duration={3000}
           color="danger"
@@ -705,13 +489,13 @@ const Dashboard: React.FC = () => {
         <DeleteFileDialog
           fileId={fileToDelete}
           onDismiss={() => setFileToDelete(null)}
-          onConfirm={(fileId) => deleteFileMutation.mutate(fileId)}
+          onConfirm={(fileId) => deleteFile.mutate(fileId)}
         />
 
         <NewFolderDialog
           isOpen={showFolderAlert}
           onDismiss={() => setShowFolderAlert(false)}
-          onCreate={(name) => createFolderMutation.mutate(name)}
+          onCreate={(name) => createFolder.mutate(name)}
         />
 
         <IonToast

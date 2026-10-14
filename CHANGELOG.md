@@ -24,6 +24,29 @@ reasoning behind the larger decisions lives in
   It is the first of three steps. The queries and the mutations go next, into
   hooks, and the markup after them.
 
+- **The dashboard's queries and mutations are hooks.** The second of the
+  three steps; the markup is the third. What the page lists is
+  `useFileListing`: one folder under the filters, page by page, or the same
+  search asked of the index, with the changes still waiting in the offline
+  queue laid over either. `useSearchIndex` is the files a search by meaning
+  cannot find yet, and the run that indexes them. `useFolderTrail` is the
+  folder the page is in and the path above it, `useStorageUsage` the two
+  numbers of the meter, and `useStorageMutations` the four changes the page
+  makes. Why three of those changes are tried while the browser is offline
+  was explained three times, and is explained once. `Dashboard.tsx` is 513
+  lines, and keeps what is on screen: which dialog is open, the two toasts,
+  and the markup.
+
+  One line went. When a new folder had been made, the page closed the New
+  Folder dialog. The dialog had closed itself by then: Ionic closes an alert
+  as soon as its button's handler returns anything but `false`. The only
+  dialog that line could still reach was a second one, opened while the
+  first folder was being made, and it closed that one in the middle of the
+  typing.
+
+  The hooks have tests of their own, 44 of them. Forty rules were broken on
+  purpose, one at a time, and a test failed each time.
+
 ### Fixed
 
 - **A test of the dashboard could not fail.** "When a mutation fails: says so
