@@ -39,9 +39,11 @@ export function useStorageMutations({ folderId, onProblem }: StorageMutationsOpt
         storageService.renameFolder(folderId, user.id, name)
       );
     },
-    onSuccess: () => {
+    onSuccess: (_renamed, { folder }) => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['folder', folderId] });
+      /* The folder that was renamed, whose own page shows its name as the
+         title. It is a card on this page, not the folder this page is in. */
+      queryClient.invalidateQueries({ queryKey: ['folder', folder.id] });
       queryClient.invalidateQueries({ queryKey: ['folderPath', user?.id] });
     },
     onError: (err: Error) => onProblem(err.message),

@@ -60,6 +60,20 @@ test.describe('Folders, from the inside', () => {
       await expect(page.locator('.folder-card', { hasText: 'Work' })).toHaveCount(0);
     });
 
+    await test.step('the renamed folder opens under its new name', async () => {
+      /* Its page was opened above, under the old name, and the rename was
+         made from the page above it. The title was read from what that first
+         visit had cached, and for five minutes the folder opened as "Work"
+         below breadcrumbs that already said "Archive". */
+      await page.locator('.folder-card', { hasText: 'Archive' }).click();
+      await expect(page).toHaveURL(new RegExp(`/dashboard/${work}$`));
+      await expect(page.locator('.folder-breadcrumbs')).toContainText('Archive');
+      await expect(page.locator('ion-title')).toHaveText('Archive');
+
+      await page.locator('ion-button[title="Up one folder"]').click();
+      await expect(page).toHaveURL(/\/dashboard$/);
+    });
+
     await test.step('deleting it takes what is inside with it', async () => {
       await page.getByTestId(`folder-actions-${work}`).click();
       await page.locator('ion-action-sheet button', { hasText: 'Delete' }).click();
