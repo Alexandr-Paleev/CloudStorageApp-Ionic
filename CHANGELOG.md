@@ -10,7 +10,40 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The dashboard's dialogs are components of their own.** `Dashboard.tsx` was
+  one component of 844 lines: six queries, four mutations, a menu, four
+  dialogs and all of the markup. The menu of a folder, with the two dialogs
+  it leads to, is now `FolderActions`. The dialog for a new folder is
+  `NewFolderDialog`, and the question asked before a file is deleted is
+  `DeleteFileDialog`. The page kept six pieces of state for them and keeps
+  three: which dialog is open, and about what. It is 729 lines. Nothing a
+  person sees has changed.
+
+  It is the first of three steps. The queries and the mutations go next, into
+  hooks, and the markup after them.
+
+### Fixed
+
+- **A test of the dashboard could not fail.** "When a mutation fails: says so
+  instead of failing silently" looked in the DOM for the Create button of the
+  new-folder dialog. An Ionic alert has no buttons under jsdom, so it found
+  none, pressed nothing, waited two seconds for a call that could not come,
+  and caught its own timeout. It asserted nothing, and had been green since it
+  was written.
+
+  The dialogs are tested now through what the app hands to Ionic: a test
+  calls the handler the app wrote for a button, and sends the event Ionic
+  sends when an overlay has gone (`src/test/overlays.ts`). That is the app's
+  half, and a real press in a real browser stays with the end-to-end suite.
+  It reaches what the page test said it could not: that a confirmed delete
+  goes through the offline queue, that a new folder is made inside the folder
+  that is open, that an empty name keeps the dialog open, and that the fields
+  of a dialog are the same array on every render. That last one is the bug
+  4.7.4 fixed, where anything that rendered the page while a dialog was open
+  wiped what had been typed into it. Fifteen rules were broken on purpose,
+  one at a time, and a test failed each time.
 
 ## [4.10.2] — 2026-10-13
 

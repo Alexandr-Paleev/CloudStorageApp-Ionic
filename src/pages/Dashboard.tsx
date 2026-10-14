@@ -15,8 +15,6 @@ import {
   IonSpinner,
   IonRefresher,
   IonRefresherContent,
-  IonAlert,
-  IonActionSheet,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonList,
@@ -24,7 +22,6 @@ import {
   IonRow,
   IonCol,
   IonText,
-  type AlertInput,
 } from '@ionic/react';
 import {
   add,
@@ -42,8 +39,11 @@ import {
   star,
 } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
+import DeleteFileDialog from '../components/DeleteFileDialog';
 import FileFilters, { type FileFiltersValue } from '../components/FileFilters';
+import FolderActions from '../components/FolderActions';
 import FolderBreadcrumbs from '../components/FolderBreadcrumbs';
+import NewFolderDialog from '../components/NewFolderDialog';
 import OfflineQueueBanner from '../components/OfflineQueueBanner';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { applyPending } from '../services/mutation-queue';
@@ -56,25 +56,11 @@ import UpgradeBanner from '../components/UpgradeBanner';
 import { billingIsOffered } from '../utils/billing.utils';
 import { smartSearchIsOffered } from '../utils/smart-search.utils';
 import { HttpError } from '../utils/http.utils';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { getThumbnailUrl } from '../utils/thumbnail.utils';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
 import { storageMeter } from '../utils/quota.utils';
 import './Dashboard.css';
-
-/**
- * One array for the life of the module, never a literal in the JSX.
- *
- * Ionic's alert rebuilds its fields whenever `inputs` is a different array,
- * and what has been typed lives in those fields. A literal is a new array on
- * every render, so any render while the dialog was open, such as a query
- * settling, wiped the typing. The text stayed on screen, the button read an
- * empty value, and New Folder quietly created nothing. Reproduced in Chrome
- * with Ionic 9.0.5. The same holds for Rename, below, whose array is memoised.
- */
-const NEW_FOLDER_INPUTS: AlertInput[] = [
-  { name: 'folderName', type: 'text', placeholder: 'Folder name' },
-];
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -83,24 +69,12 @@ const Dashboard: React.FC = () => {
   const { folderId } = useParams<{ folderId?: string }>();
   const queryClient = useQueryClient();
   const offlineQueue = useOfflineQueue();
+  /* Which dialog is open, and about what. What each one asks, and what it
+     does with the answer, is in the component that shows it. */
   const [showFolderAlert, setShowFolderAlert] = useState(false);
-  const [showDeleteAlert, setShowDeleteAlert] = useState<{
-    isOpen: boolean;
-    fileId: string | null;
-  }>({
-    isOpen: false,
-    fileId: null,
-  });
-  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [folderMenu, setFolderMenu] = useState<Folder | null>(null);
-  const [folderAction, setFolderAction] = useState<'rename' | 'delete' | null>(null);
-  const [renaming, setRenaming] = useState<Folder | null>(null);
-  // A new array only when another name is being edited; see NEW_FOLDER_INPUTS.
-  const renameInputs = useMemo<AlertInput[]>(
-    () => [{ name: 'name', type: 'text', value: renaming?.name, placeholder: 'Folder name' }],
-    [renaming?.name]
-  );
-  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [filters, setFilters] = useState<FileFiltersValue>({
     search: '',
     sort: DEFAULT_SORT,
@@ -347,10 +321,6 @@ const Dashboard: React.FC = () => {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
-  };
-
-  const handleDeleteFile = (fileId: string) => {
-    setShowDeleteAlert({ isOpen: true, fileId });
   };
 
   const handleRefresh = async (event: CustomEvent) => {
@@ -692,7 +662,7 @@ const Dashboard: React.FC = () => {
                     aria-label={`Delete ${file.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteFile(file.id!);
+                      setFileToDelete(file.id!);
                     }}
                   >
                     <IonIcon
@@ -718,62 +688,11 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <IonActionSheet
-          isOpen={!!folderMenu}
-          header={folderMenu?.name}
-          /* The dialog opens here rather than in the button handler: Ionic
-             presents one overlay at a time, and an alert asked for while the
-             sheet is still dismissing never appears. */
-          onDidDismiss={() => {
-            const folder = folderMenu;
-            setFolderMenu(null);
-            if (folderAction === 'rename') setRenaming(folder);
-            if (folderAction === 'delete') setDeletingFolder(folder);
-            setFolderAction(null);
-          }}
-          buttons={[
-            { text: 'Rename', handler: () => setFolderAction('rename') },
-            { text: 'Delete', role: 'destructive', handler: () => setFolderAction('delete') },
-            { text: 'Cancel', role: 'cancel' },
-          ]}
-        />
-
-        <IonAlert
-          isOpen={!!renaming}
-          onDidDismiss={() => setRenaming(null)}
-          header="Rename folder"
-          inputs={renameInputs}
-          buttons={[
-            { text: 'Cancel', role: 'cancel' },
-            {
-              text: 'Save',
-              handler: (data: { name?: string }) => {
-                const name = data.name?.trim();
-                if (!renaming || !name || name === renaming.name) return;
-                renameFolderMutation.mutate({ folder: renaming, name });
-              },
-            },
-          ]}
-        />
-
-        <IonAlert
-          isOpen={!!deletingFolder}
-          onDidDismiss={() => setDeletingFolder(null)}
-          header="Delete folder?"
-          /* Said in full, because it cannot be undone and because what goes is
-             more than what was clicked: every file inside, and every folder
-             below it. */
-          message={`“${deletingFolder?.name}” and everything inside it — files and subfolders — will be deleted from storage. This cannot be undone.`}
-          buttons={[
-            { text: 'Cancel', role: 'cancel' },
-            {
-              text: 'Delete',
-              role: 'destructive',
-              handler: () => {
-                if (deletingFolder) deleteFolderMutation.mutate(deletingFolder);
-              },
-            },
-          ]}
+        <FolderActions
+          folder={folderMenu}
+          onClose={() => setFolderMenu(null)}
+          onRename={(folder, name) => renameFolderMutation.mutate({ folder, name })}
+          onDelete={(folder) => deleteFolderMutation.mutate(folder)}
         />
 
         <IonToast
@@ -783,52 +702,18 @@ const Dashboard: React.FC = () => {
           color="danger"
         />
 
-        <IonAlert
-          isOpen={showDeleteAlert.isOpen}
-          onDidDismiss={() => setShowDeleteAlert({ isOpen: false, fileId: null })}
-          header="Delete File"
-          message="Are you sure you want to delete this file? This action is permanent."
-          buttons={[
-            {
-              text: 'Cancel',
-              role: 'cancel',
-              handler: () => setShowDeleteAlert({ isOpen: false, fileId: null }),
-            },
-            {
-              text: 'Delete',
-              role: 'destructive',
-              handler: () => {
-                if (showDeleteAlert.fileId) {
-                  deleteFileMutation.mutate(showDeleteAlert.fileId);
-                }
-              },
-            },
-          ]}
+        <DeleteFileDialog
+          fileId={fileToDelete}
+          onDismiss={() => setFileToDelete(null)}
+          onConfirm={(fileId) => deleteFileMutation.mutate(fileId)}
         />
 
-        <IonAlert
+        <NewFolderDialog
           isOpen={showFolderAlert}
-          onDidDismiss={() => setShowFolderAlert(false)}
-          header={'New Folder'}
-          inputs={NEW_FOLDER_INPUTS}
-          buttons={[
-            {
-              text: 'Cancel',
-              role: 'cancel',
-              handler: () => setShowFolderAlert(false),
-            },
-            {
-              text: 'Create',
-              handler: (data: { folderName?: string }) => {
-                const name = data.folderName?.trim();
-                // Kept open rather than closed on nothing: an empty name is a
-                // slip to correct, and a dialog that vanishes reads as success.
-                if (!name) return false;
-                createFolderMutation.mutate(name);
-              },
-            },
-          ]}
+          onDismiss={() => setShowFolderAlert(false)}
+          onCreate={(name) => createFolderMutation.mutate(name)}
         />
+
         <IonToast
           isOpen={!!errorToast}
           message={errorToast || 'An error occurred'}

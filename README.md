@@ -1020,11 +1020,13 @@ browser ran the script, and it was the test that was fixed.
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
 a long way, and it is meant to be: the pages are where the untested code is. With
-the page a share link opens gone to the site, `src/pages` is 620 statements and
-the unit tests reach 324 of them. `Dashboard.tsx` is the largest at 163, and 66
-of those are reached. Five smaller pages have no unit test at all, the plans
-page among them. That is the largest untested thing in the repository, and it
-is named here rather than hidden behind one average that would sound fine.
+the page a share link opens gone to the site, and the dashboard's dialogs gone
+to components of their own, `src/pages` is 592 statements and the unit tests
+reach 331 of them. `Upload.tsx` is the largest at 157, with 101 reached, and
+`Dashboard.tsx` is next at 135, with 73. Five smaller pages have no unit test
+at all, the plans page among them. That is the largest untested thing in the
+repository, and it is named here rather than hidden behind one average that
+would sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
 money and quota** has a test:
