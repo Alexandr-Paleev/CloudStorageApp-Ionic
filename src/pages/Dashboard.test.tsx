@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Dashboard from './Dashboard';
 import { renderWithProviders } from '../test/utils';
+import { overlay, overlays, press } from '../test/overlays';
 
 /**
  * The quota arithmetic, the delete path and what the screen says when a
@@ -143,47 +144,100 @@ describe('Dashboard', () => {
       });
     });
 
-    /* Deletion is permanent and there is no trash, so the one thing this page
-       must never do is delete on a single tap. The confirmation itself is an
-       IonAlert whose buttons live in a shadow root Ionic does not build under
-       jsdom — what happens after Delete is pressed is covered end to end in
-       e2e/file-lifecycle.spec.ts, against a real browser. */
-    it('asks before deleting rather than deleting on the tap', async () => {
+    const confirmation = () => overlay('ion-alert', 'Delete File');
+
+    async function tapTheBin() {
       show();
       expect(await screen.findByText('report.pdf')).toBeInTheDocument();
-      expect(runOrQueue).not.toHaveBeenCalled();
-
       fireEvent.click(document.querySelector('[aria-label="Delete report.pdf"]') as HTMLElement);
 
       /* Several alerts live on this page — rename, delete folder, delete file —
          and all of them are in the DOM whether showing or not. The one that
          matters is found by its header, and `isOpen` is a property rather than
          an attribute, as every Ionic prop is. */
-      await waitFor(() => {
-        const alert = [...document.querySelectorAll('ion-alert')].find(
-          (a) => (a as HTMLElement & { header?: string }).header === 'Delete File'
-        ) as HTMLElement & { isOpen?: boolean };
-        expect(alert?.isOpen).toBe(true);
-      });
+      await waitFor(() => expect(confirmation().isOpen).toBe(true));
+    }
+
+    /* Deletion is permanent and there is no trash, so the one thing this page
+       must never do is delete on a single tap. */
+    it('asks before deleting rather than deleting on the tap', async () => {
+      await tapTheBin();
+
+      expect(runOrQueue).not.toHaveBeenCalled();
+    });
+
+    /* Through the queue, which is what lets a delete survive being offline.
+       The alert has no button to click under jsdom, so this calls the handler
+       the page gave it: see test/overlays.ts. A real press, in a real browser,
+       is in e2e/offline-queue.spec.ts. */
+    it('deletes through the queue once the person has said yes', async () => {
+      await tapTheBin();
+      press(confirmation(), 'Delete');
+
+      await waitFor(() =>
+        expect(runOrQueue).toHaveBeenCalledWith(
+          { kind: 'deleteFile', fileId: 'f1' },
+          expect.any(Function)
+        )
+      );
+      expect(deleteFile).toHaveBeenCalledWith('f1', 'user-1');
+      expect(confirmation().isOpen).toBe(false);
+    });
+
+    it('deletes nothing when the person says no', async () => {
+      await tapTheBin();
+      press(confirmation(), 'Cancel');
+
+      expect(confirmation().isOpen).toBe(false);
       expect(runOrQueue).not.toHaveBeenCalled();
     });
   });
 
-  describe('when a mutation fails', () => {
-    it('says so instead of failing silently', async () => {
+  describe('making a folder', () => {
+    const newFolder = () => overlay('ion-alert', 'New Folder');
+
+    async function askForAFolder(route?: string) {
+      show(route);
+      fireEvent.click(ionButtonByText('New Folder'));
+      await waitFor(() => expect(newFolder().isOpen).toBe(true));
+    }
+
+    it('makes it at the root, under the name that was typed', async () => {
+      createFolder.mockResolvedValue({ id: 'new', name: 'Invoices' });
+
+      await askForAFolder();
+      press(newFolder(), 'Create', { folderName: 'Invoices' });
+
+      await waitFor(() => expect(createFolder).toHaveBeenCalledWith('user-1', 'Invoices', null));
+      expect(newFolder().isOpen).toBe(false);
+    });
+
+    it('makes it inside the folder that is open', async () => {
+      createFolder.mockResolvedValue({ id: 'new', name: 'Invoices' });
+
+      await askForAFolder('/dashboard/folder-9');
+      press(newFolder(), 'Create', { folderName: 'Invoices' });
+
+      await waitFor(() =>
+        expect(createFolder).toHaveBeenCalledWith('user-1', 'Invoices', 'folder-9')
+      );
+    });
+
+    /* This is the test that could not fail. It looked in the DOM for a Create
+       button, found none, because an alert has no buttons under jsdom, waited
+       two seconds for a call that could not come, and caught its own timeout.
+       It asserted nothing, and was green from the day it was written. */
+    it('says so when the folder cannot be made, instead of failing silently', async () => {
       createFolder.mockRejectedValue(new Error('Ensure Supabase is configured'));
 
-      show();
-      fireEvent.click(ionButtonByText('New Folder'));
+      await askForAFolder();
+      press(newFolder(), 'Create', { folderName: 'Invoices' });
 
-      const input = document.querySelector('ion-alert input') as HTMLInputElement;
-      if (input) fireEvent.input(input, { target: { value: 'Invoices' } });
-
-      const create = ionButtonByText('Create');
-      if (create) fireEvent.click(create);
-
-      await waitFor(() => expect(createFolder).toHaveBeenCalled(), { timeout: 2000 }).catch(
-        () => undefined
+      await waitFor(() => expect(createFolder).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(overlays('ion-toast').find((toast) => toast.isOpen)?.message).toBe(
+          'Ensure Supabase is configured'
+        )
       );
     });
   });
