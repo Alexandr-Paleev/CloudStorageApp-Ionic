@@ -1,5 +1,6 @@
 import { env } from '../env';
 import { withoutSecrets } from './scrub';
+import { whenLoadedAndIdle } from '../utils/when-loaded';
 
 /**
  * Sentry, loaded off the critical path.
@@ -70,21 +71,18 @@ function load(): Promise<SentryModule | null> {
 }
 
 /**
- * Starts loading once the browser is idle.
+ * Starts loading once the page has loaded and the browser is idle.
  *
- * requestIdleCallback rather than a timer so the fetch competes with nothing
- * the user is waiting on; the timeout is the ceiling for a tab that never goes
- * idle, and the setTimeout branch covers Safari versions without it.
+ * The fetch then competes with nothing the user is waiting on. An idle moment
+ * alone was not enough: one could fall between two of the page's own files,
+ * and the reporter arrived while the login page was still being drawn.
+ * `utils/when-loaded.ts` has the details, and Google Analytics and Hotjar wait
+ * the same way.
  */
 export function initSentry(): void {
   if (!enabled) return;
 
-  const start = () => void load();
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(start, { timeout: 4000 });
-  } else {
-    setTimeout(start, 2000);
-  }
+  whenLoadedAndIdle(() => void load());
 }
 
 /**

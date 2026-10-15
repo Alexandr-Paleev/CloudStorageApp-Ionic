@@ -110,3 +110,16 @@ Three other ways were considered.
 - **What was already sent is not taken back.** An OAuth code is spent the
   moment it is used. A refresh token is worth a session until that session
   ends.
+
+## Update — 2026-10-15
+
+Google Analytics and Hotjar now wait, as well, for the page to have loaded and
+for an idle moment: the visitor is not waiting for them, and started at once
+their scripts were asked for 0.3 to 0.4 s into the load, in production under
+Lighthouse, before the login page had drawn its largest element. The rule is
+unchanged, and so is what it guards. Since the address can change between the
+moment the collectors are asked to start and the moment they do, it is asked
+again then, and an address that has a query string or a fragment by that time
+sends them back to waiting for the next bare one. The first page of a visit is
+counted by Google Analytics' own page view, which it sends when it starts; the
+app's report of that page comes before Analytics is running and is not sent.

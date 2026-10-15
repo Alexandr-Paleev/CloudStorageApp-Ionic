@@ -10,7 +10,64 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The login page gets to its largest element sooner on a phone.** Four
+  things stood between a phone and that page, and three of them were not the
+  app's own code.
+
+  Inter came from Google Fonts: a stylesheet on a host the browser had not
+  connected to yet, naming font files on a third. Lighthouse put what waiting
+  for it cost the login page on a phone at 0.9 s. The same files, Inter v20 in
+  Google's seven subsets with Google's unicode ranges, are served by the app
+  now (`public/fonts/`, `src/theme/fonts.css`), and `index.html` preloads the
+  Latin one. Without the preload the first paint came 0.3 s later in the same
+  measurement, so it stays. The policy names no font host any more, and a
+  visitor's browser no longer tells Google its address to fetch a font.
+
+  Google Analytics, Hotjar and Sentry were asked for 0.3 to 0.4 s into the
+  load, in production, before the login page had drawn its largest element.
+  All three wait for the load event and an idle moment now
+  (`src/utils/when-loaded.ts`). The two that read the address ask it again at
+  the moment they start, and wait for the next bare one if it has a query
+  string by then (decision 0015). The first page of a visit is counted by
+  Google Analytics' own page view when it starts; the app's own report of
+  that page came before Analytics was running, and is not sent.
+
+  The login page was lazy, fetched only once the app had started: one more
+  round trip, after all the others, before the page every new visitor sees
+  first. It is in the first load now, for 3 kB.
+
+  And every file of the build was served with `max-age=0`, so a visit without
+  the service worker asked about each one again. `/assets/` and `/fonts/` are
+  `immutable` for a year now. Both have the version in the name of every file.
+
+  Lighthouse's mobile preset, on the login page of a local build served
+  gzipped with the analytics blocked, three runs each: the largest paint at
+  4.38 s before and 4.21 after, performance 78 before and 79 after. The
+  analytics are what the local runs leave out, so production is measured
+  once this is deployed.
+
+### Fixed
+
+- **`/robots.txt` was the app's HTML.** The rewrite that sends every path of
+  the app to `index.html` sent that one too, and Lighthouse counted 75 errors
+  in it: SEO 91 on the login page. There is a real one now, allowing
+  everything: the app's pages are behind a sign-in, and the public site is the
+  part meant to be found. SEO is 100.
+
+### Tests
+
+- **The smoke test asks about the Ionic elements nobody renders by name.** The
+  rule that leaves Ionic's unused components out of the bundle (4.10.3) holds
+  while each component registers what it needs, and the smoke test asked only
+  about the 38 components the source renders. It now reads, from Ionic's own
+  code, what each of them registers along with itself, the backdrop behind a
+  dialog or the popover a select opens, and asks the built app for all 47.
+  Ionic shipped exactly this fault itself in 2021, when a popover's backdrop
+  went missing from production builds (ionic-team/ionic-framework#24129). If
+  Ionic changes the way it writes those lists, the test fails and says so,
+  rather than asking about fewer elements.
 
 ## [4.10.3] — 2026-10-15
 

@@ -1,4 +1,5 @@
 import { initializeGA4 } from '../hooks/useAnalytics';
+import { whenLoadedAndIdle } from '../utils/when-loaded';
 import { initHotjar } from './hotjar';
 
 /**
@@ -21,9 +22,13 @@ import { initHotjar } from './hotjar';
  * Sentry is not here. It is needed at the worst address as much as at any
  * other, so it starts regardless and what it sends is cleaned on the way
  * out: `observability/scrub.ts`.
+ *
+ * And neither starts before the page has loaded and the browser is idle:
+ * the visitor is not waiting for them. Since the address can change in that
+ * time, it is asked again at the moment they start.
  */
 
-let started = false;
+let state: 'not asked' | 'waiting' | 'started' = 'not asked';
 
 /** A path and nothing else: no query string, and no fragment. */
 export function addressIsBare(address: Pick<Location, 'search' | 'hash'>): boolean {
@@ -31,24 +36,34 @@ export function addressIsBare(address: Pick<Location, 'search' | 'hash'>): boole
 }
 
 /**
- * Starts the two collectors, once, if the address allows it.
+ * Starts the two collectors, once, if the address allows it, as soon as the
+ * page has loaded and the browser is idle.
  *
  * It is asked again whenever the address may have become bare: on every
  * change of route, and when the fragment changes, which is how the Supabase
- * client removes a sign-in's tokens. Asking costs nothing, and after the
- * first start it does nothing.
+ * client removes a sign-in's tokens. Asking costs nothing, and once a start
+ * is waiting or done it does nothing.
  */
 export function startCollectorsOnABareAddress(
   address: Pick<Location, 'search' | 'hash'> = window.location
 ): void {
-  if (started || !addressIsBare(address)) return;
+  if (state !== 'not asked' || !addressIsBare(address)) return;
 
-  started = true;
-  initializeGA4();
-  initHotjar();
+  state = 'waiting';
+  whenLoadedAndIdle(() => {
+    /* What they will read is the address as it is now. If it has a query
+       string or a fragment again, they wait for the next bare one. */
+    if (!addressIsBare(window.location)) {
+      state = 'not asked';
+      return;
+    }
+    state = 'started';
+    initializeGA4();
+    initHotjar();
+  });
 }
 
 /** Puts this module back as it was loaded. For tests. */
 export function forgetCollectorsWereStarted(): void {
-  started = false;
+  state = 'not asked';
 }

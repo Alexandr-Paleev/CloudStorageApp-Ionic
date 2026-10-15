@@ -39,11 +39,19 @@
  * registers its element when it is created, and every wrapper is created
  * when the app starts.
  *
+ * Asked about too: the elements those components need and nobody renders by
+ * name, the backdrop behind a dialog, the popover a select opens. Ionic lists
+ * them in each component's own code, and they are read from there. Ionic has
+ * shipped exactly this fault itself: in 2021 a popover's backdrop was left out
+ * of production builds (ionic-team/ionic-framework#24129).
+ *
  * Usage: node scripts/smoke-built-bundle.mjs [url]
  * Serves dist/ itself unless a URL is given.
  */
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { askTheCollectors } from './ask-the-collectors.mjs';
@@ -96,7 +104,62 @@ function ionicElementsInSource() {
   return [...tags].sort();
 }
 
+const IONIC_COMPONENTS = join(
+  dirname(createRequire(import.meta.url).resolve('@ionic/core/package.json')),
+  'components'
+);
+
+/**
+ * The elements `tag` registers along with itself, as Ionic's own code lists
+ * them: each component's registration walks a list that starts with the
+ * component and names everything it renders. A component that other
+ * components use keeps that code in a shared module, which its own file
+ * imports, so both are read. The list is matched as Ionic ships it, minified
+ * and with no spaces; written any other way it is not found, and the smoke
+ * test stops and says so.
+ */
+function dependenciesOf(tag) {
+  const own = readFileSync(join(IONIC_COMPONENTS, `${tag}.js`), 'utf8');
+  const shared = [...own.matchAll(/from\s*["']\.\/(p-[\w-]+\.js)["']/g)].map(([, file]) =>
+    readFileSync(join(IONIC_COMPONENTS, file), 'utf8')
+  );
+  for (const code of [own, ...shared]) {
+    for (const [, list] of code.matchAll(
+      /\[("ion-[a-z0-9-]+"(?:,"ion-[a-z0-9-]+")*)\]\.forEach/g
+    )) {
+      const tags = list.split(',').map((name) => name.slice(1, -1));
+      if (tags[0] === tag) return tags;
+    }
+  }
+  return null;
+}
+
+/** The source's elements and everything they need, or the tags whose needs could not be read. */
+function ionicElementsNeeded(rendered) {
+  const needed = new Set();
+  const unreadable = [];
+  const pending = [...rendered];
+  while (pending.length > 0) {
+    const tag = pending.pop();
+    if (needed.has(tag)) continue;
+    needed.add(tag);
+    const dependencies = dependenciesOf(tag);
+    if (dependencies === null) unreadable.push(tag);
+    else pending.push(...dependencies);
+  }
+  return { needed: [...needed].sort(), unreadable };
+}
+
 const ionicElements = ionicElementsInSource();
+const ionic = ionicElementsNeeded(ionicElements);
+if (ionic.unreadable.length > 0) {
+  console.error(
+    `Could not read from @ionic/core what ${ionic.unreadable.join(', ')} register along with themselves.\n` +
+      'The way Ionic writes its components has changed. Before the treeshake rule in vite.config.mts\n' +
+      'is trusted again, find out how they register now.'
+  );
+  process.exit(1);
+}
 
 let preview;
 if (!url) {
@@ -170,7 +233,7 @@ try {
   rendered = ((await page.textContent('body')) ?? '').trim();
   unregistered = await page.evaluate(
     (tags) => tags.filter((tag) => !customElements.get(tag)),
-    ionicElements
+    ionic.needed
   );
 
   // The first question is answered. What this tab logs from here on, while
@@ -201,7 +264,7 @@ const whoAnswered = (path) =>
 console.log(`Smoke test of the built bundle — ${target}`);
 console.log(`  rendered: ${rendered.length} characters`);
 console.log(
-  `  ionic: ${ionicElements.length} elements the source renders, ${
+  `  ionic: ${ionicElements.length} elements the source renders, ${ionic.needed.length} with what they need, ${
     unregistered.length === 0 ? 'all registered' : `not registered: ${unregistered.join(', ')}`
   }`
 );
@@ -223,7 +286,7 @@ if (tooEmpty || errors.length > 0) {
 
 if (unregistered.length > 0) {
   console.error(
-    `\nThe source renders ${unregistered.join(', ')}, and nothing in the built app registered ${
+    `\nThe app needs ${unregistered.join(', ')}, and nothing in the built app registered ${
       unregistered.length === 1 ? 'it, so it draws' : 'them, so they draw'
     } nothing.\n` +
       'The likeliest cause is the treeshake rule in vite.config.mts, after an upgrade of Ionic\n' +

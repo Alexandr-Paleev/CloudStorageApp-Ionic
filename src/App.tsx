@@ -9,6 +9,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
+/* Not lazy, unlike every other page. It is the page a new visitor sees
+   first, and a lazy page is fetched only once the app has started: one more
+   round trip, after all the others, before the page that matters most draws
+   anything. It costs the first load 3 kB. */
+import Login from './pages/Login';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -25,13 +30,13 @@ import '@ionic/react/css/text-alignment.css';
 import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
+import './theme/fonts.css';
 import './theme/variables.css';
 import './theme/global.css';
 
 setupIonicReact();
 
 // Lazy-loaded pages for code-splitting
-const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Upload = lazy(() => import('./pages/Upload'));
 const FileView = lazy(() => import('./pages/FileView'));

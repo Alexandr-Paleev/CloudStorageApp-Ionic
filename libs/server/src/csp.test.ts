@@ -69,9 +69,13 @@ describe('the shipped policy', () => {
     expect(allows(directives, 'script-src', origin)).toBe(true);
   });
 
-  it('allows the Google Fonts stylesheet index.html links to', () => {
-    expect(allows(directives, 'style-src', 'https://fonts.googleapis.com')).toBe(true);
-    expect(allows(directives, 'font-src', 'https://fonts.gstatic.com')).toBe(true);
+  /* Inter is served by the app (src/theme/fonts.css). It came from Google
+     Fonts, and a font host left in the policy would be a door that nothing
+     the app loads goes through. */
+  it('takes fonts and stylesheets from the app, and from no font host', () => {
+    expect(directives['font-src']).toContain("'self'");
+    expect(allows(directives, 'style-src', 'https://fonts.googleapis.com')).toBe(false);
+    expect(allows(directives, 'font-src', 'https://fonts.gstatic.com')).toBe(false);
   });
 
   it('allows the Stripe pages billing redirects to be framed', () => {

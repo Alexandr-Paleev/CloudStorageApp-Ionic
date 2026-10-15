@@ -40,6 +40,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        /* Of Inter's subsets only the Latin one is precached: every screen
+           needs it. The others are for a file name that asks for them, and
+           are fetched then, by the fonts cache below. */
+        globIgnores: ['fonts/inter-v20-!(latin).woff2'],
         /**
          * Workbox answers every navigation inside the worker's scope with the
          * cached index.html, and nothing tells it where the app ends. A
@@ -66,30 +70,16 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^[^?]*\.[a-z0-9]+(\?|$)/i],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            /* The font subsets the precache leaves out, once a page has asked
+               for one. Their names carry Inter's version, so a kept file
+               cannot go stale. */
+            urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname.startsWith('/fonts/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'fonts-cache',
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'gstatic-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
               },
             },
           },
