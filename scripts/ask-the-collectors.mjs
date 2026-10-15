@@ -36,8 +36,24 @@ import { randomUUID } from 'node:crypto';
 /** How long the made-up sign-in takes to be accepted. */
 const ACCEPTED_AFTER_MS = 3000;
 
-/** Long enough for Sentry, which loads when the browser is idle and then waits for a trace to end. */
+/**
+ * How long a visit is watched once its page has loaded. Long enough for
+ * Sentry, which loads when the browser is idle and then waits for a trace to
+ * end.
+ */
 const WATCH_MS = 12_000;
+
+/**
+ * How long a page gets to load before the watch starts anyway.
+ *
+ * The collectors start once the page has loaded and the browser is idle
+ * (src/utils/when-loaded.ts), so the watch starts at the load event. It used
+ * to start at the first byte. On 2026-10-15, against production over a slow
+ * VPN, seven visits at once did not reach the load event in twelve seconds:
+ * one run reported that the app never tried its sign-in, and the next that
+ * the build started no collectors at all, which passed. Production has two.
+ */
+const LOAD_TIMEOUT_MS = 60_000;
 
 /** How many times the address Sentry leaked from is opened. */
 const SESSIONS_FOR_A_SAMPLED_TRACE = 4;
@@ -138,6 +154,7 @@ async function visit(browser, origin, address, secrets, signIn) {
   try {
     const page = await context.newPage();
     await page.goto(origin + address, { waitUntil: 'commit' }).catch(() => undefined);
+    await page.waitForLoadState('load', { timeout: LOAD_TIMEOUT_MS }).catch(() => undefined);
     await page.waitForTimeout(WATCH_MS);
   } finally {
     await context.close();
