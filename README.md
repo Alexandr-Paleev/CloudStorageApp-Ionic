@@ -1020,9 +1020,9 @@ browser ran the script, and it was the test that was fixed.
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
 a long way, and it is meant to be: the pages are where the untested code is. With
-the page a share link opens gone to the site, and the dashboard's dialogs and
-data gone to components and hooks of their own, `src/pages` is 517 statements
-and the unit tests reach 294 of them. `Upload.tsx` is the largest at 157, with
+the page a share link opens gone to the site, and the dashboard's dialogs, data
+and markup gone to components and hooks of their own, `src/pages` is 494
+statements and the unit tests reach 283 of them. `Upload.tsx` is the largest at 157, with
 101 reached, and `FileView.tsx` is next at 133, with 70. Five smaller pages
 have no unit test at all, the plans page among them. That is the largest
 untested thing in the repository, and it is named here rather than hidden

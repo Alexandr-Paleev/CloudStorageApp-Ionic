@@ -47,6 +47,26 @@ reasoning behind the larger decisions lives in
   The hooks have tests of their own, 44 of them. Forty rules were broken on
   purpose, one at a time, and a test failed each time.
 
+- **The dashboard's markup is components of its own.** The last of the three
+  steps. The bar across the top is `DashboardHeader`, the storage meter is
+  `StorageMeter`, and the folders are `FolderGrid`. The files are `FileList`,
+  with what the list says instead of rows while it loads, when it fails and
+  when there is nothing in it. `Dashboard.tsx` is 223 lines. What is left in
+  it is where each part takes its data from and where each button leads.
+
+  Nothing a person sees has changed, and that was checked rather than
+  assumed. The page as it was and the page as it is were rendered side by
+  side in seven states, and gave the same HTML. Ionic's props were compared
+  as well, because they reach an element as properties and the HTML does not
+  show them. Twelve changes to the markup, made on purpose, were each caught
+  by that comparison. It stayed out of the repository: it compares the page
+  with a copy of its own past.
+
+  One helper went. It chose a file's icon by its type, and only files that
+  are not images ever reached it, so it had one answer. The four components
+  have tests of their own, 39 of them. Forty rules were broken on purpose,
+  one at a time, and a test failed each time.
+
 ### Fixed
 
 - **A folder that had just been renamed opened under its old name.** The

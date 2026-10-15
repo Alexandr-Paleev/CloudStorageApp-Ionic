@@ -9,12 +9,14 @@ import { overlay, overlays, press } from '../test/overlays';
  * The quota arithmetic, the delete path and what the screen says when a
  * mutation fails: the page's half of each.
  *
- * Not the markup. The hooks the page takes its data from are tested beside
- * them in src/hooks/, for what each decides on its own: which changes go
- * through the offline queue, and what each one makes stale. This file holds
- * the page to using them. The meter reads the limit the profile carries, a
- * delete asks first and then goes through the queue, and a change that fails
- * says so on screen.
+ * Not the markup, and not the data. The parts the page is drawn with are
+ * components tested beside them in src/components/, for what each shows and
+ * which way each of its buttons leads. The hooks the page takes its data from
+ * are tested beside them in src/hooks/, for what each decides on its own:
+ * which changes go through the offline queue, and what each one makes stale.
+ * This file holds the page to putting the two together. The meter reads the
+ * limit the profile carries, a delete asks first and then goes through the
+ * queue, and a change that fails says so on screen.
  */
 
 const { getItems, deleteFile, createFolder, getUserStorageSize, profile, runOrQueue, ops } =
