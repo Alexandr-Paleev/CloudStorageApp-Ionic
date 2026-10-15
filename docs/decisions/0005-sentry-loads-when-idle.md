@@ -32,3 +32,14 @@ download, and crash reports plus tracing cover what this app needs.
   sent immediately. If the tab is closed inside that window it is lost.
 - Session playback of a bug report is not available. `replayIntegration()` is a
   one-line addition if that changes, at a known cost.
+
+## Update — 2026-10-15
+
+An idle moment alone turned out to come too early. One can fall between two of
+the page's own files: in production, under Lighthouse, the reporter's chunk
+was asked for 0.3 to 0.4 s into the load, before the login page had drawn its
+largest element. Sentry now waits for the load event and then for an idle
+moment, through [`src/utils/when-loaded.ts`](../../src/utils/when-loaded.ts),
+and Google Analytics and Hotjar wait the same way (decision 0015). The window
+in which an error is queued rather than sent is longer by however long the
+page takes to load; nothing raised in it is dropped.

@@ -10,17 +10,17 @@
     />
     <meta name="theme-color" content="#3880ff" />
 
-    <!-- Inter, without the round trip an @import inside CSS costs.
-         It used to live at the top of theme/variables.css, which meant the
-         browser had to download and parse that stylesheet before it learned a
-         font was needed at all — three sequential requests before any text
-         could be painted. Declared here, the preconnect opens the connection
-         while the bundle is still downloading. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Inter's Latin subset, the one every screen of the app needs. The font
+         is served by the app itself (theme/fonts.css), and a font is found
+         only once the stylesheet that names it has been parsed: preloaded, it
+         downloads beside the bundle instead of after it. crossorigin, or the
+         preload is not the request the stylesheet makes and is fetched twice. -->
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="preload"
+      href="/fonts/inter-v20-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
 
     <!-- PWA Meta Tags -->

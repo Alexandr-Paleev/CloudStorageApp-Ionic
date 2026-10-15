@@ -611,10 +611,10 @@ Two changes, both cheap:
   _and_ of `ErrorBoundary.tsx`, so 151 KB of crash reporter (51 KB gzipped, an
   ninth of the shell) was fetched before the first paint — by a library that has
   nothing to report until the app is running. `src/observability/sentry.ts` is
-  now a facade every module imports instead; the real package arrives on
-  `requestIdleCallback`, and events raised in the meantime are queued rather
-  than dropped. The cost, stated plainly: `browserTracingIntegration` no longer
-  sees the initial pageload transaction.
+  now a facade every module imports instead; the real package arrives once
+  the page has loaded and the browser is idle, and events raised in the
+  meantime are queued rather than dropped. The cost, stated plainly:
+  `browserTracingIntegration` no longer sees the initial pageload transaction.
 
   Two traps on the way, both only visible in the build output:
 
@@ -628,10 +628,19 @@ Two changes, both cheap:
      nothing, and `dist/index.html` still listed `sentry-*.js` under
      `modulepreload`. `manualChunks` now assigns the facade its own chunk.
 
-- **Inter is linked from `index.html` with a preconnect.** It was an `@import` at
-  the top of `theme/variables.css`, which is the slowest way to load a font: the
-  browser has to download and parse that stylesheet before it discovers a font
-  is needed at all.
+- **Inter is served by the app, and its Latin subset is preloaded.** It was an
+  `@import` at the top of `theme/variables.css`, which is the slowest way to
+  load a font: the browser has to download and parse that stylesheet before it
+  discovers a font is needed at all. Then it was a Google Fonts stylesheet
+  linked from `index.html`, which on a phone still cost the login page about
+  0.9 s by Lighthouse's count: a host the browser had not connected to, before
+  any text could be drawn. The files are in `public/fonts/` now, Google's own
+  subsets and unicode ranges, and a visitor's browser asks no font host
+  anything.
+
+Google Analytics, Hotjar and Sentry all wait for the page to have loaded and
+the browser to be idle (`src/utils/when-loaded.ts`). Started at once, they
+were asked for before the login page had drawn its largest element.
 
 What remained was mostly Ionic, and this README called that structural: "the
 framework registers its components eagerly". It registers only the ones the app
