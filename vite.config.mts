@@ -142,6 +142,41 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      /**
+       * Ionic's components, as modules with no side effects of their own.
+       *
+       * @ionic/core says nothing about side effects in its package.json, so the
+       * bundler has to assume every module it imports has some, and keeps it.
+       * @ionic/react imports all of Ionic's components to wrap them, and the
+       * wrappers nothing uses are dropped: they are marked pure. The modules
+       * behind them stayed. Of the 80 Ionic component modules in the bundle,
+       * 37 were components this app never renders — datetime, range, menu,
+       * accordion, input-otp and the rest — and the Ionic chunk was 245.7 kB
+       * gzipped, of a first load of 438.2. Without them it is 177.2 of 369.6.
+       *
+       * Nothing that runs changed with them. A wrapper registers its element
+       * when the wrapper is created, so every element the app can show is
+       * registered the moment the Ionic chunk has run, and the built app
+       * registered the same 52 elements before this rule as after it
+       * (2026-10-15). The dropped modules defined classes that nothing
+       * registered. A component the app does render is used by its wrapper,
+       * and a module whose code is used stays, whatever this rule says.
+       *
+       * The rule covers the component modules and nothing else in Ionic. Its
+       * shared modules, the stylesheets and initialize() keep the default.
+       * scripts/smoke-built-bundle.mjs checks, in the built app, that every
+       * Ionic component the source renders is registered: what this rule
+       * asserts about a package that does not assert it about itself has to
+       * be asked again after every upgrade of that package.
+       */
+      treeshake: {
+        moduleSideEffects: [
+          {
+            test: /\/node_modules\/@ionic\/core\/components\/ion-[a-z0-9-]+\.js$/,
+            sideEffects: false,
+          },
+        ],
+      },
       output: {
         /**
          * Routes are already lazy (App.tsx), but every dependency still landed
