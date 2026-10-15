@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.10.4] — 2026-10-15
+
 ### Changed
 
 - **The login page gets to its largest element sooner on a phone.** Four
@@ -45,8 +49,11 @@ reasoning behind the larger decisions lives in
   Lighthouse's mobile preset, on the login page of a local build served
   gzipped with the analytics blocked, three runs each: the largest paint at
   4.38 s before and 4.21 after, performance 78 before and 79 after. The
-  analytics are what the local runs leave out, so production is measured
-  once this is deployed.
+  analytics are what the local runs leave out. In production, three runs
+  each, the largest paint went from 6.4–7.0 s to 3.4–3.9 s and performance
+  from 66–69 to 74–79, with nothing left blocking the first paint. The runs
+  after went through a VPN that put the first byte at 1.3 s, against 0.6 s
+  before, so they understate the change rather than overstate it.
 
 ### Fixed
 
@@ -1991,7 +1998,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...HEAD
+[4.10.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...v4.10.4
 [4.10.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...v4.10.3
 [4.10.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...v4.10.2
 [4.10.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...v4.10.1
