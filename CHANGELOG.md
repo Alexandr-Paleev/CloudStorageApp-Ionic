@@ -69,6 +69,17 @@ reasoning behind the larger decisions lives in
   Ionic changes the way it writes those lists, the test fails and says so,
   rather than asking about fewer elements.
 
+- **The check on the collectors watched from the wrong moment, and could pass
+  without asking anything.** It watched each visit for twelve seconds from the
+  first byte, which was enough while the collectors started with the app.
+  Since they wait for the page to load (above), a slow connection can end the
+  watch before they start. Against production over a slow VPN, the first run
+  after the change said the app never tried its sign-in. The second said the
+  build started no collectors at all, and passed: that answer is meant for a
+  build with none, and production has two. The watch starts at the load event
+  now. Over the same VPN the check then saw them asked for 15 ms after the
+  sign-in's tokens had left the address, and nothing made up sent.
+
 ## [4.10.3] — 2026-10-15
 
 ### Changed
