@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.10.3] — 2026-10-15
+
 ### Changed
 
 - **The dashboard's dialogs are components of their own.** `Dashboard.tsx` was
@@ -17,12 +21,12 @@ reasoning behind the larger decisions lives in
   dialogs and all of the markup. The menu of a folder, with the two dialogs
   it leads to, is now `FolderActions`. The dialog for a new folder is
   `NewFolderDialog`, and the question asked before a file is deleted is
-  `DeleteFileDialog`. The page kept six pieces of state for them and keeps
-  three: which dialog is open, and about what. It is 729 lines. Nothing a
-  person sees has changed.
+  `DeleteFileDialog`. The page had six pieces of state for them and has
+  three: which dialog is open, and about what. Nothing a person sees has
+  changed.
 
-  It is the first of three steps. The queries and the mutations go next, into
-  hooks, and the markup after them.
+  It is the first of three steps. The queries and the mutations went next,
+  into hooks, and the markup after them; both are below.
 
 - **The dashboard's queries and mutations are hooks.** The second of the
   three steps; the markup is the third. What the page lists is
@@ -33,9 +37,9 @@ reasoning behind the larger decisions lives in
   folder the page is in and the path above it, `useStorageUsage` the two
   numbers of the meter, and `useStorageMutations` the four changes the page
   makes. Why three of those changes are tried while the browser is offline
-  was explained three times, and is explained once. `Dashboard.tsx` is 513
-  lines, and keeps what is on screen: which dialog is open, the two toasts,
-  and the markup.
+  was explained three times, and is explained once. After this step
+  `Dashboard.tsx` kept what is on screen: which dialog is open, the two
+  toasts, and the markup.
 
   One line went. When a new folder had been made, the page closed the New
   Folder dialog. The dialog had closed itself by then: Ionic closes an alert
@@ -67,7 +71,7 @@ reasoning behind the larger decisions lives in
   have tests of their own, 39 of them. Forty rules were broken on purpose,
   one at a time, and a test failed each time.
 
-- **The app downloads 68.6 kB less before it can draw anything, all of it
+- **The app downloads 68.5 kB less before it can draw anything, all of it
   Ionic that the app never shows.** `@ionic/react` imports every component
   Ionic has, to wrap each one. The wrappers the app does not use were dropped
   from the bundle; the components behind them were not. `@ionic/core` does not
@@ -75,12 +79,15 @@ reasoning behind the larger decisions lives in
   one it saw imported. Of the 80 Ionic component modules in the bundle, 37
   were components the app never renders, a date picker, a side menu and a
   one-time-code input among them. A rule in `vite.config.mts` now says it for
-  Ionic: those modules have no side effects of their own. The first load is
-  369.6 kB gzipped instead of 438.2, and the Ionic chunk 177.2 instead of
-  245.7. Lighthouse's mobile preset, on the login page of a local build
-  served gzipped with the analytics blocked, three runs each way: performance
-  75 before and 77 to 79 after, the largest paint 4.7 s before and 4.2 to 4.4
-  after. Production is measured once this is deployed.
+  Ionic: those modules have no side effects of their own. CI measures the
+  first load at 369.3 kB gzipped instead of 437.8, and the Ionic chunk at
+  177.2 instead of 245.7. Lighthouse's mobile preset, on the login page of a
+  local build served gzipped with the analytics blocked, three runs each way:
+  performance 75 before and 77 to 79 after, the largest paint 4.7 s before
+  and 4.2 to 4.4 after. In production, with the analytics running, the same
+  preset on the same page gave performance 59 and 68 before and 66 to 69
+  after, the first paint 3.6 to 3.8 s before and 3.2 after, and the largest
+  paint 6.9 to 8.5 s before and 6.4 to 7.0 after.
 
   Nothing that runs changed with them. A wrapper registers its element when
   the app starts, and the built app registers the same 52 elements it did
@@ -1916,7 +1923,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...HEAD
+[4.10.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...v4.10.3
 [4.10.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...v4.10.2
 [4.10.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.0...v4.10.1
 [4.10.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.9.1...v4.10.0
