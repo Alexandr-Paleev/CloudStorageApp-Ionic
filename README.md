@@ -633,8 +633,21 @@ Two changes, both cheap:
   browser has to download and parse that stylesheet before it discovers a font
   is needed at all.
 
-The remaining 239 KB gzipped is Ionic, and it is structural rather than
-something to tune — the framework registers its components eagerly.
+What remained was mostly Ionic, and this README called that structural: "the
+framework registers its components eagerly". It registers only the ones the app
+uses. The code of all the others was in the bundle anyway. `@ionic/react`
+imports every Ionic component to wrap it, and `@ionic/core` does not declare its
+modules free of side effects, so the bundler kept each one it saw imported. The
+wrappers nobody used were dropped and the components behind them stayed: 37 of
+the 80 component modules in the bundle were components the app never renders,
+from a date picker to a side menu.
+
+A rule in `vite.config.mts` now says for Ionic what Ionic does not: those modules
+have no side effects of their own. The first load went from 438.2 to 369.6 kB
+gzipped, and the Ionic chunk from 245.7 to 177.2. The built app registers the
+same 52 elements it did before. Since that is a promise made on Ionic's behalf,
+`npm run smoke` asks the built app for every Ionic component the source renders,
+so that an upgrade which breaks the promise fails a check rather than a page.
 
 #### The number is now a budget, not a note in a README
 
@@ -645,18 +658,19 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 437.7 kB | 445 kB |
-| Largest chunk (Ionic) | 245.5 kB | 260 kB |
-| All assets, route chunks included | 528.7 kB | 540 kB |
+| First load (JS + CSS) | 369.6 kB | 385 kB |
+| Largest chunk (Ionic) | 177.2 kB | 185 kB |
+| All assets, route chunks included | 461.1 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.10.2, as CI measured them. When the check was written
-the three ceilings were 420, 250 and 520 kB, over a first load of 401.0 kB. They
-have been raised once, for React 19 and Ionic 9, which cost 22.4 kB between
-them. `scripts/check-bundle-size.js` says where that went.
+Those are the figures of the build that left Ionic's unused components out.
+When the check was written the three ceilings were 420, 250 and 520 kB, over a
+first load of 401.0 kB. They have been raised once, for React 19 and Ionic 9,
+which cost 22.4 kB between them, and lowered once, when the 37 components went.
+`scripts/check-bundle-size.js` says where both went.
 
 The public site has one budget, for the one page whose visitors are the least
 likely to have anything cached: the page a share link opens, which moved there

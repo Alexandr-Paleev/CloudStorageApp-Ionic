@@ -67,6 +67,35 @@ reasoning behind the larger decisions lives in
   have tests of their own, 39 of them. Forty rules were broken on purpose,
   one at a time, and a test failed each time.
 
+- **The app downloads 68.6 kB less before it can draw anything, all of it
+  Ionic that the app never shows.** `@ionic/react` imports every component
+  Ionic has, to wrap each one. The wrappers the app does not use were dropped
+  from the bundle; the components behind them were not. `@ionic/core` does not
+  declare its modules free of side effects, so the bundler had to keep every
+  one it saw imported. Of the 80 Ionic component modules in the bundle, 37
+  were components the app never renders, a date picker, a side menu and a
+  one-time-code input among them. A rule in `vite.config.mts` now says it for
+  Ionic: those modules have no side effects of their own. The first load is
+  369.6 kB gzipped instead of 438.2, and the Ionic chunk 177.2 instead of
+  245.7. Lighthouse's mobile preset, on the login page of a local build
+  served gzipped with the analytics blocked, three runs each way: performance
+  75 before and 77 to 79 after, the largest paint 4.7 s before and 4.2 to 4.4
+  after. Production is measured once this is deployed.
+
+  Nothing that runs changed with them. A wrapper registers its element when
+  the app starts, and the built app registers the same 52 elements it did
+  before: the code that went defined classes nothing ever registered. The
+  rule says something about Ionic that Ionic does not promise, and an upgrade
+  could make it untrue. So the smoke test now asks the built app for every
+  Ionic component the source renders. Built with one component's
+  registration cut out on purpose, the app failed it. The bundle budgets come
+  down to 385, 185 and 480 kB.
+
+  The README had said the opposite: that Ionic's share of the first load was
+  structural, because "the framework registers its components eagerly". It
+  registers the ones that are used. The code of the rest was carried all the
+  same.
+
 ### Fixed
 
 - **A folder that had just been renamed opened under its old name.** The

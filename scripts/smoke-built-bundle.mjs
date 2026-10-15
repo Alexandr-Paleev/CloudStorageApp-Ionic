@@ -28,10 +28,23 @@
  * it, starts none. What they are sent can be seen in the build and nowhere
  * else: `ask-the-collectors.mjs` says what is asked, and what it found.
  *
+ * Alongside the first question, one more: is every Ionic component the source
+ * renders registered in the built app? vite.config.mts tells the bundler that
+ * Ionic's component modules have no side effects, so the ones nothing imports
+ * are left out. That holds for Ionic as it is, and Ionic does not promise it.
+ * An upgrade that registered a component somewhere the bundler cannot see
+ * would leave that component out, and it would draw nothing on the pages
+ * this check never opens. The end-to-end suite would not notice either: the
+ * dev server bundles nothing. One page is enough to ask, because a wrapper
+ * registers its element when it is created, and every wrapper is created
+ * when the app starts.
+ *
  * Usage: node scripts/smoke-built-bundle.mjs [url]
  * Serves dist/ itself unless a URL is given.
  */
 import { spawn } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { askTheCollectors } from './ask-the-collectors.mjs';
 
@@ -64,6 +77,26 @@ const THE_APP = '/dashboard';
  * the fallback and must not pick up a navigation the fallback has let go.
  */
 const NOT_THE_APP = ['/api/smoke', '/smoke.txt', '/smoke.png'];
+
+/** Rendered by @ionic/react as a div of its own, so there is nothing to register. */
+const NOT_ELEMENTS = new Set(['ion-page']);
+
+/** The Ionic components the app's source renders, as the elements they register. */
+function ionicElementsInSource() {
+  const src = fileURLToPath(new URL('../src/', import.meta.url));
+  const tags = new Set();
+  for (const file of readdirSync(src, { recursive: true })) {
+    if (!file.endsWith('.tsx') || file.endsWith('.test.tsx')) continue;
+    if (file.split(/[\\/]/)[0] === 'test') continue;
+    for (const [, name] of readFileSync(src + file, 'utf8').matchAll(/<Ion([A-Z][A-Za-z]*)/g)) {
+      const tag = `ion-${name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
+      if (!NOT_ELEMENTS.has(tag)) tags.add(tag);
+    }
+  }
+  return [...tags].sort();
+}
+
+const ionicElements = ionicElementsInSource();
 
 let preview;
 if (!url) {
@@ -129,11 +162,16 @@ async function askWorker() {
 }
 
 let rendered = '';
+let unregistered = [];
 let worker;
 let collectors;
 try {
   await page.goto(target, { waitUntil: 'networkidle', timeout: 30_000 });
   rendered = ((await page.textContent('body')) ?? '').trim();
+  unregistered = await page.evaluate(
+    (tags) => tags.filter((tag) => !customElements.get(tag)),
+    ionicElements
+  );
 
   // The first question is answered. What this tab logs from here on, while
   // the worker is being asked, is not part of it.
@@ -162,6 +200,11 @@ const whoAnswered = (path) =>
 
 console.log(`Smoke test of the built bundle — ${target}`);
 console.log(`  rendered: ${rendered.length} characters`);
+console.log(
+  `  ionic: ${ionicElements.length} elements the source renders, ${
+    unregistered.length === 0 ? 'all registered' : `not registered: ${unregistered.join(', ')}`
+  }`
+);
 console.log(`  console errors: ${errors.length}`);
 for (const error of errors.slice(0, 5)) console.log(`    ${error}`);
 console.log(
@@ -174,6 +217,17 @@ if (tooEmpty || errors.length > 0) {
     tooEmpty
       ? `\nThe page rendered ${rendered.length} characters. That is a blank screen.`
       : '\nThe page rendered, but the console carries errors.'
+  );
+  process.exit(1);
+}
+
+if (unregistered.length > 0) {
+  console.error(
+    `\nThe source renders ${unregistered.join(', ')}, and nothing in the built app registered ${
+      unregistered.length === 1 ? 'it, so it draws' : 'them, so they draw'
+    } nothing.\n` +
+      'The likeliest cause is the treeshake rule in vite.config.mts, after an upgrade of Ionic\n' +
+      'moved a registration where the bundler cannot see it. Find where it is, or narrow the rule.'
   );
   process.exit(1);
 }
@@ -207,6 +261,6 @@ if (collectors.problems.length > 0) {
 
 console.log(
   collectors.configured
-    ? '\nThe built bundle renders, its service worker keeps to the app, and no collector is told a secret.'
-    : '\nThe built bundle renders, and its service worker keeps to the app.'
+    ? '\nThe built bundle renders with every Ionic component it uses, its service worker keeps to the app, and no collector is told a secret.'
+    : '\nThe built bundle renders with every Ionic component it uses, and its service worker keeps to the app.'
 );
