@@ -11,6 +11,7 @@
  * be tested; api/demo/session.ts holds the orchestration.
  */
 
+import { randomUUID } from 'node:crypto';
 import { ownerPrefix } from '../../core/src/stored-path';
 
 /** Demo accounts are recognised by this prefix, and deleted by it. */
@@ -65,15 +66,22 @@ export const DEMO_SEED: DemoSeedFile[] = [
 
 /** An address no real person can receive mail at, tagged so the sweep finds it.
  *  The `e2e-` accounts in e2e/fixtures.ts share this domain and are left alone —
- *  the prefix, not the domain, is what marks an account as disposable here. */
+ *  the prefix, not the domain, is what marks an account as disposable here.
+ *  `Math.random` is enough for the suffix: all it does is keep apart two
+ *  visitors who arrive in the same millisecond. */
 export function demoEmail(now: number = Date.now(), random: () => number = Math.random): string {
   const suffix = random().toString(36).slice(2, 8);
   return `${DEMO_EMAIL_PREFIX}${now}-${suffix}@example.com`;
 }
 
-/** Never shown to anyone: the visitor is handed a session, not credentials. */
-export function demoPassword(random: () => number = Math.random): string {
-  return `Demo!${random().toString(36).slice(2, 12)}${random().toString(36).slice(2, 12)}`;
+/** Never shown to anyone: the visitor is handed a session, not credentials.
+ *  It is still the password of a real account, so it comes from the system's
+ *  cryptographic generator. `Math.random` is not one: its values can be worked
+ *  out from earlier ones, and the address of the same account shows the
+ *  visitor part of one. `Demo!` and the version digit every UUID carries give
+ *  it each kind of character a password policy can ask for. */
+export function demoPassword(uuid: () => string = randomUUID): string {
+  return `Demo!${uuid()}`;
 }
 
 export function isDemoEmail(email: string | undefined): boolean {

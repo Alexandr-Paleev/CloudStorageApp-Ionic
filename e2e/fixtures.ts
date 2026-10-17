@@ -1,4 +1,5 @@
 import { test as base, expect, type Browser, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 /**
@@ -78,7 +79,9 @@ export interface TestUser {
 
 async function createUser(): Promise<{ user: TestUser; session: unknown }> {
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-  const password = `E2e!${Math.random().toString(36).slice(2, 12)}`;
+  /* A real account in the live database for as long as the test runs, so its
+     password comes from the cryptographic generator, as a demo account's does. */
+  const password = `E2e!${randomUUID()}`;
 
   const created = await (
     await admin('/auth/v1/admin/users', {

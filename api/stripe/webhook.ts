@@ -1,11 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
+/* The client the other functions use. It is built once, and building it
+   refuses a key that is not service_role (libs/server/src/supabase-key.ts).
+   The webhook built its own until now, so it would have started on an anon
+   key and failed at every event, in the one function that writes what a
+   customer paid for. */
+import { supabase } from '../../libs/server/src/auth';
 import { getPeriodEnd } from '../../libs/server/src/stripe';
 import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 async function buffer(readable: VercelRequest): Promise<Buffer> {
   const chunks: Buffer[] = [];
