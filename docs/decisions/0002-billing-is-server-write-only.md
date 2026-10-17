@@ -5,8 +5,8 @@ Accepted · shipped in v3.0.0 · migration [`002`](../../migrations/002_fix_prof
 ## Context
 
 `profiles` holds `tier`, `storage_limit` and the Stripe subscription state next
-to the fields a user may legitimately change. Migration `001` shipped the
-obvious RLS policy: users may update their own row.
+to the fields a user may legitimately change. The first draft of migration
+`001` had the obvious RLS policy: users may update their own row.
 
 Postgres row-level security has no column-level granularity. That policy
 therefore allowed, from the browser, with the published anon key:
@@ -15,7 +15,9 @@ therefore allowed, from the browser, with the published anon key:
 update profiles set tier = 'pro', storage_limit = 5368709120 where id = auth.uid();
 ```
 
-Anyone with an account could grant themselves the paid plan.
+Anyone with an account could have granted themselves the paid plan. It was
+caught on the feature branch before the merge: no release carried it, and it
+never reached the production database.
 
 ## Decision
 
