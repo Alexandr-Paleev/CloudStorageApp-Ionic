@@ -30,6 +30,39 @@ reasoning behind the larger decisions lives in
   made its accounts' passwords the same way, and now makes them the same new
   way. Code scanning had flagged the second of the two and not the first.
 
+### Fixed
+
+- **The legal pages and the plans described a service that is not this one.**
+  The privacy policy named Sentry as the analytics and said nothing of Google
+  Analytics, which sets cookies in the app, or of Hotjar, which the app also
+  loads. It names both now, says when they start and that blocking them
+  breaks nothing, and lists the providers data goes to. It said a sign-in is
+  kept in a cookie, where the app keeps it in local storage; that logs are
+  kept for 90 days, which nothing here decides; that changes are announced by
+  e-mail and in the app, which nothing does; and that it complies with the
+  GDPR and the CCPA, where it is written to meet them. It did not say that a
+  demo account is deleted after 24 hours. The terms called the paid plan
+  proprietary code, although all of it is under the MIT licence; promised
+  OneDrive, AWS S3, priority support, "advanced features" and 99.9% uptime;
+  described payments as real, on a deployment where Stripe runs in test
+  mode; and named a placeholder for a jurisdiction. The plans offered "Basic analytics", which
+  nothing implements, and "Priority support", which nobody provides. The
+  contact address was on example.com and is the author's now. Dropbox and
+  Cloudflare R2 are written and tested and switched off on the demo, and say
+  "coming soon" there.
+- **Three places said a policy had shipped that never did.** The README,
+  decision 0002 and the 3.0.0 entry below described the `profiles` policy
+  that let a signed-in user grant themselves Pro as if a release had carried
+  it. It was caught on its branch before the merge, and never reached the
+  production database.
+- **The README overstated what Ionic puts in the bundle.** `@ionic/react`
+  imports 91 of Ionic's 96 component modules, not every one, as the README
+  and the 4.10.3 entry below said, and the bundler keeps the ones it cannot
+  prove free of side effects. The table of what the browser downloads first
+  now says when it was measured: it reads 451 and 401 kB, and the first load
+  is 372 kB today. The list of storage backends says which two are not on the
+  demo yet.
+
 ## [4.10.4] — 2026-10-15
 
 ### Changed
@@ -165,11 +198,11 @@ reasoning behind the larger decisions lives in
   one at a time, and a test failed each time.
 
 - **The app downloads 68.5 kB less before it can draw anything, all of it
-  Ionic that the app never shows.** `@ionic/react` imports every component
-  Ionic has, to wrap each one. The wrappers the app does not use were dropped
-  from the bundle; the components behind them were not. `@ionic/core` does not
-  declare its modules free of side effects, so the bundler had to keep every
-  one it saw imported. Of the 80 Ionic component modules in the bundle, 37
+  Ionic that the app never shows.** `@ionic/react` imports 91 of Ionic's 96
+  component modules, to wrap each one. The wrappers the app does not use were
+  dropped from the bundle; the components behind them were not. `@ionic/core`
+  does not declare its modules free of side effects, so the bundler had to
+  keep each one it could not prove free of them. Of the 80 Ionic component modules in the bundle, 37
   were components the app never renders, a date picker, a side menu and a
   one-time-code input among them. A rule in `vite.config.mts` now says it for
   Ionic: those modules have no side effects of their own. CI measures the
@@ -1963,8 +1996,10 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
-- **Any user could grant themselves Pro.** The `profiles` UPDATE policy covered
-  every column, including `tier`; RLS has no column-level granularity
+- **A signed-in user could have granted themselves Pro.** The first draft of
+  the `profiles` UPDATE policy covered every column, including `tier`; RLS has
+  no column-level granularity. It was caught on the branch of this release, so
+  no release carried it
   ([ADR 0002](docs/decisions/0002-billing-is-server-write-only.md), migration `002`).
 - **R2 credentials were in the public bundle.** `VITE_R2_ACCESS_KEY_ID` and its
   secret were inlined by Vite and readable in DevTools. R2 now runs behind

@@ -1,6 +1,6 @@
 # Terms of Service for Cloud Storage App
 
-**Last Updated:** January 10, 2026
+**Last Updated:** October 17, 2026
 
 ## 1. Acceptance of Terms
 
@@ -19,14 +19,13 @@ Cloud Storage App is a Progressive Web Application (PWA) that allows users to:
 **Community Edition (Free)**
 - Open-source (MIT License)
 - Self-hosted or use our demo
-- Basic storage features
+- Storage up to the Free plan's limit
 - Community support
 
 **Pro Edition (Paid)**
-- Additional integrations (Dropbox, OneDrive, AWS S3)
-- Increased storage limits
-- Priority support
-- Advanced features
+- More storage than the Free plan
+- Choice of storage provider for each upload
+- Dropbox (coming soon)
 
 ## 3. User Accounts
 
@@ -64,7 +63,7 @@ You **MAY NOT**:
 - You are responsible for the legality of your content
 
 ### Storage Limits
-- **Free tier**: Subject to provider limits (Supabase, Cloudinary)
+- **Free tier**: The limit shown on the pricing page
 - **Pro tier**: Increased limits as specified in your plan
 - We reserve the right to delete inactive accounts (180+ days)
 
@@ -77,10 +76,11 @@ You **MAY NOT**:
 ## 6. Third-Party Services
 
 The Service integrates with:
-- Supabase (authentication, database)
+- Supabase (authentication, database, file storage)
 - Cloudinary (image storage)
 - Google Drive (optional)
-- Cloudflare R2 (optional)
+- Stripe (payments, for the Pro plan)
+- Cloudflare R2 and Dropbox (coming soon)
 
 You agree to comply with the terms of these third-party services.
 
@@ -92,9 +92,8 @@ You agree to comply with the terms of these third-party services.
 - Attribution is appreciated but not required
 
 ### Pro Edition
-- Proprietary code and features
-- Licensed on a subscription basis
-- No redistribution without permission
+- The same open-source code as the Community Edition
+- A subscription pays for more storage and the choice of provider, not for different code
 
 ### Trademarks
 - "Cloud Storage App" name and logo are our property
@@ -102,7 +101,7 @@ You agree to comply with the terms of these third-party services.
 
 ## 8. Service Availability
 
-We strive for 99.9% uptime, but:
+The Service runs on the free and hobby plans of its providers, so:
 - We do not guarantee uninterrupted service
 - Maintenance may cause temporary downtime
 - We are not liable for service interruptions
@@ -118,6 +117,8 @@ We may terminate your account if:
 - You violate these Terms
 - You engage in fraudulent activity
 - Required by law
+
+A demo account, opened without signing up, is deleted with its files after 24 hours.
 
 ## 10. Disclaimers
 
@@ -157,35 +158,29 @@ Your use of the Service is subject to our [Privacy Policy](./privacy-policy.md).
 ## 15. Changes to Terms
 
 We may update these Terms:
-- We will notify you of material changes
+- Every change is dated at the top, and the whole history is public in [the repository](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/commits/main/apps/web/content)
 - Continued use constitutes acceptance
 - You may terminate if you disagree
 
-## 16. Governing Law
-
-These Terms are governed by:
-- Laws of [Your Jurisdiction]
-- Courts of [Your Jurisdiction] have exclusive jurisdiction
-
-## 17. Dispute Resolution
+## 16. Dispute Resolution
 
 Before filing a lawsuit:
 1. Contact us to resolve the issue
 2. If unresolved, mediation is required
 3. Arbitration may be required (if applicable in your jurisdiction)
 
-## 18. Severability
+## 17. Severability
 
 If any provision is unenforceable, the remaining provisions remain in effect.
 
-## 19. Entire Agreement
+## 18. Entire Agreement
 
 These Terms, along with the Privacy Policy, constitute the entire agreement.
 
-## 20. Contact Information
+## 19. Contact Information
 
 For questions or concerns:
-- **Email**: aleksandr.paleev@example.com
+- **Email**: [paleev045@gmail.com](mailto:paleev045@gmail.com)
 - **GitHub Issues**: [Report Issue](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
 - **Support**: [GitHub Discussions](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/discussions)
 
@@ -194,6 +189,7 @@ For questions or concerns:
 ## Pro Edition Additional Terms
 
 If you subscribe to Pro:
+- **Test mode**: On this deployment, payments run in Stripe's test mode; no real card is charged, and real cards are declined
 - **Payment**: Subscription fees are non-refundable
 - **Billing**: Automatic renewal unless canceled
 - **Cancellation**: Cancel anytime, access until period ends

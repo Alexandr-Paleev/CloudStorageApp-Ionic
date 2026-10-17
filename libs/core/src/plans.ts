@@ -25,7 +25,7 @@ export const PLANS = {
       `${formatStorage(TIER_LIMITS.free.storage_limit)} storage`,
       'Auto provider selection',
       'Google Drive overflow',
-      'Basic analytics',
+      'Share links you can revoke',
     ],
   },
   pro: {
@@ -33,9 +33,9 @@ export const PLANS = {
     monthlyPriceCents: 900,
     features: [
       `${formatStorage(TIER_LIMITS.pro.storage_limit)} storage`,
-      'All providers + Dropbox',
+      'Everything in Free',
       'Choose upload provider',
-      'Priority support',
+      'Dropbox (coming soon)',
     ],
   },
 } as const;
