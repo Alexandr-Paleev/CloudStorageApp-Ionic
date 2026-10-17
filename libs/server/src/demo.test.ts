@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   DEMO_EMAIL_PREFIX,
   DEMO_SEED,
@@ -26,7 +26,25 @@ describe('demoEmail', () => {
 
 describe('demoPassword', () => {
   it('is long enough that Supabase accepts it', () => {
-    expect(demoPassword(() => 0.42).length).toBeGreaterThanOrEqual(12);
+    expect(demoPassword().length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('has every kind of character a password policy can ask for', () => {
+    const password = demoPassword();
+    expect(password).toMatch(/[A-Z]/);
+    expect(password).toMatch(/[a-z]/);
+    expect(password).toMatch(/[0-9]/);
+    expect(password).toMatch(/[^A-Za-z0-9]/);
+  });
+
+  it('does not come from Math.random', () => {
+    const random = vi.spyOn(Math, 'random');
+    try {
+      demoPassword();
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
   });
 });
 

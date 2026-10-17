@@ -10,7 +10,25 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **The Stripe webhook would have started on the wrong key.** The functions
+  build their Supabase client in `libs/server/src/auth.ts`, and since 3.1.0
+  building it refuses a key that is not service_role: the check that came out
+  of an anon key sitting under the service-role name for 221 days (the
+  postmortem is in the README). The webhook was the exception. It built a
+  client of its own, so it would have started on an anon key and failed at
+  every event, and it is the function that writes the plan a customer paid
+  for. It takes the shared client now, and a test loads it with an anon key
+  and expects it to refuse. The postmortem said every function builds its
+  client there. It is true now.
+- **A demo account's password came from `Math.random`.** The visitor never
+  sees it, since they are handed a session, but it is the password of a real
+  account, and `Math.random` is not a generator whose values are meant to be
+  unguessable: the address of the same account showed the visitor part of
+  one of them. It comes from `crypto.randomUUID()` now. The end-to-end suite
+  made its accounts' passwords the same way, and now makes them the same new
+  way. Code scanning had flagged the second of the two and not the first.
 
 ## [4.10.4] — 2026-10-15
 
