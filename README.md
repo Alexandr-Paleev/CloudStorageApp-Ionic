@@ -41,9 +41,12 @@ up where it happened:
   secret *is*, not what the variable is called — `assertServiceRoleKey` now
   refuses to start on the wrong one.
 - **[Privilege escalation through a row-level security policy](docs/decisions/0002-billing-is-server-write-only.md)** —
-  `profiles` shipped the obvious "users may update their own row" policy. RLS has
-  no column-level granularity, so that included `tier`, and any user could grant
-  themselves the paid plan from the browser with the published anon key.
+  `profiles` was first written with the obvious "users may update their own
+  row" policy. RLS has no column-level granularity, so that included `tier`,
+  and any signed-in user could have granted themselves the paid plan from the
+  browser with the published anon key. It was caught on the feature branch
+  before the merge: no release carried it, and it never reached the
+  production database.
 - **[A storage quota enforced on one provider out of three, with a race on that one](docs/decisions/0004-quota-lives-in-the-database.md)** —
   images go straight from the browser to Cloudinary, so no server saw them and
   the limit rested on a check in the client. Even the guarded path was
@@ -156,9 +159,10 @@ render — and the banner says the deletion has not reached the server yet:
 ### 💾 Storage
 
 - ✅ **500 MB** free per user, **5 GB** on Pro
-- ✅ Five backends: Cloudinary, Supabase Storage, Cloudflare R2, Google Drive, Dropbox (Pro)
+- ✅ Five backends: Cloudinary, Supabase Storage and Google Drive, plus Cloudflare R2
+  and Dropbox (Pro), which are written and tested and not on the demo yet
 - ✅ Images routed to Cloudinary, other files to R2/Supabase — Pro users can pick a provider by hand
-- ✅ Files over 16 MB go to R2 in parts, and can be paused and resumed — including after a reload
+- ✅ Where R2 is set up, files over 16 MB go to it in parts, and can be paused and resumed — including after a reload
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
 - ✅ Quota is enforced in the database, on every path. A file exists in this app
@@ -598,7 +602,9 @@ up only in production, in whichever browser the visitor happened to bring.
 
 ### What the browser downloads first
 
-Measured from `npm run build`, gzipped, before anything is rendered:
+Measured from `npm run build`, gzipped, before anything is rendered, when
+Sentry left the critical path in 4.0.0 (September 2026). Today's figures are in
+the budget table further down:
 
 |                             | Before                     | After                      |
 | --------------------------- | -------------------------- | -------------------------- |
@@ -644,9 +650,10 @@ were asked for before the login page had drawn its largest element.
 
 What remained was mostly Ionic, and this README called that structural: "the
 framework registers its components eagerly". It registers only the ones the app
-uses. The code of all the others was in the bundle anyway. `@ionic/react`
-imports every Ionic component to wrap it, and `@ionic/core` does not declare its
-modules free of side effects, so the bundler kept each one it saw imported. The
+uses. The code of most of the others was in the bundle anyway. `@ionic/react`
+imports 91 of Ionic's 96 component modules to wrap them, and `@ionic/core` does
+not declare its modules free of side effects, so the bundler kept each one it
+could not prove free of them on its own. The
 wrappers nobody used were dropped and the components behind them stayed: 37 of
 the 80 component modules in the bundle were components the app never renders,
 from a date picker to a side menu.
@@ -1244,12 +1251,12 @@ suppresses, or the silence it produces is indistinguishable from safety.
 
 Shipped in [v3.0.0](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases/tag/v3.0.0). Upgrading happens in the app, through Stripe Checkout.
 
-|                        | Free                                           | Pro — $9/month |
-| ---------------------- | ---------------------------------------------- | -------------- |
-| Storage                | 500 MB                                         | **5 GB**       |
-| Providers              | Cloudinary, Supabase Storage, R2, Google Drive | **+ Dropbox**  |
-| Choose upload provider | —                                              | ✅             |
-| Google Drive overflow  | ✅                                             | ✅             |
+|                        | Free                                                                 | Pro — $9/month                      |
+| ---------------------- | -------------------------------------------------------------------- | ----------------------------------- |
+| Storage                | 500 MB                                                               | **5 GB**                            |
+| Providers              | Cloudinary, Supabase Storage, Google Drive, R2 (not on the demo yet) | **+ Dropbox** (not on the demo yet) |
+| Choose upload provider | —                                                                    | ✅                                  |
+| Google Drive overflow  | ✅                                                                   | ✅                                  |
 
 Manage or cancel a subscription from the Stripe Customer Portal, reachable from
 the plans page. Cancelling there keeps Pro until the end of the period already
@@ -1286,7 +1293,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🤝 Support
 
 - 💬 **Issues**: [GitHub Issues](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
-- 📧 **Email**: support@cloudstorage.app (for Pro customers)
 
 ## 📄 Legal
 

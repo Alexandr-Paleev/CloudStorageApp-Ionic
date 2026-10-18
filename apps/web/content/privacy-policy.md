@@ -1,6 +1,6 @@
 # Privacy Policy for Cloud Storage App
 
-**Last Updated:** January 10, 2026
+**Last Updated:** October 17, 2026
 
 ## Introduction
 
@@ -22,7 +22,8 @@ Cloud Storage App ("we", "our", or "us") is committed to protecting your privacy
 - Browser type and version
 - Device information (for PWA functionality)
 - IP address and location data (for security)
-- Usage statistics (via Sentry for error tracking)
+- Usage statistics, in the app (Google Analytics 4 and Hotjar)
+- Error reports (Sentry)
 
 ## How We Use Your Information
 
@@ -38,10 +39,10 @@ We use your information to:
 ## Data Storage
 
 Your data is stored securely using:
-- **Supabase** (authentication and metadata)
+- **Supabase** (authentication, metadata and file storage)
 - **Cloudinary** (image storage)
 - **Google Drive** (optional, with your explicit consent)
-- **Cloudflare R2** (optional file storage)
+- **Cloudflare R2** and **Dropbox** (coming soon)
 
 ### Semantic search, and what it sends where
 
@@ -60,7 +61,7 @@ off, which is the default.
 ## Data Sharing
 
 We **DO NOT** sell your personal information. We may share data with:
-- **Service providers** (Supabase, Cloudinary, Sentry) - only as necessary to provide the Service
+- **Service providers** (Vercel, Supabase, Cloudinary, Stripe, Sentry, Google Analytics, Hotjar) - only as necessary to provide the Service
 - **Model providers** (Anthropic, or Cloudflare Workers AI) - only the contents of a file you have asked to index, and only while semantic search is enabled on this deployment
 - **Law enforcement** - if required by law
 - **Business transfers** - in case of merger or acquisition
@@ -76,13 +77,14 @@ You have the right to:
 
 ### How to Exercise Your Rights
 
-Contact us at: **aleksandr.paleev@example.com** (or via GitHub Issues)
+Contact us at: [paleev045@gmail.com](mailto:paleev045@gmail.com) (or via GitHub Issues)
 
 ## Data Retention
 
 - **Account data**: Retained while your account is active
 - **Files**: Retained until you delete them or close your account
-- **Logs**: Retained for 90 days for security purposes
+- **Demo accounts**: Deleted, with their files, after 24 hours
+- **Logs**: Kept by the hosting (Vercel) and the error reporting (Sentry) for as long as their plans keep them
 
 ## Security
 
@@ -95,9 +97,12 @@ We implement industry-standard security measures:
 ## Cookies and Tracking
 
 We use:
-- **Essential cookies** (for authentication)
-- **Analytics cookies** (Sentry for error tracking)
+- **Essential storage**: the app keeps your sign-in session in your browser's local storage
+- **Analytics cookies**: Google Analytics 4 sets its own cookies in the app; Hotjar is loaded there too and may set its own. Both start only once the page's address carries no sign-in tokens or codes, and blocking them in your browser does not break the app
+- **Error reports**: Sentry receives a report when the app fails, and every field in it that holds an address is cut at the address's query string and fragment
 - **No third-party advertising cookies**
+
+The public site sets no analytics cookies.
 
 ## Children's Privacy
 
@@ -105,10 +110,7 @@ Our Service is not intended for users under 13 years old. We do not knowingly co
 
 ## Changes to This Policy
 
-We may update this Privacy Policy. We will notify you of significant changes via:
-- Email notification
-- In-app notification
-- Update date at the top of this policy
+We may update this Privacy Policy. Every change is dated at the top of this policy, and its whole history is public in [the repository](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/commits/main/apps/web/content).
 
 ## Third-Party Services
 
@@ -117,16 +119,20 @@ We use the following third-party services:
 - **Cloudinary** - [Privacy Policy](https://cloudinary.com/privacy)
 - **Google Drive** - [Privacy Policy](https://policies.google.com/privacy)
 - **Sentry** - [Privacy Policy](https://sentry.io/privacy/)
+- **Vercel** - [Privacy Policy](https://vercel.com/legal/privacy-policy)
+- **Stripe** - [Privacy Policy](https://stripe.com/privacy)
+- **Google Analytics** - [Privacy Policy](https://policies.google.com/privacy)
+- **Hotjar** - [Privacy Policy](https://www.hotjar.com/legal/policies/privacy/)
 
 ## Contact Us
 
 If you have questions about this Privacy Policy:
-- **Email**: aleksandr.paleev@example.com
+- **Email**: [paleev045@gmail.com](mailto:paleev045@gmail.com)
 - **GitHub**: [Open an Issue](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/issues)
 
 ## Compliance
 
-This Privacy Policy complies with:
+This Privacy Policy is written to meet:
 - **GDPR** (General Data Protection Regulation)
 - **CCPA** (California Consumer Privacy Act)
 - **Google OAuth 2.0 Policy**
