@@ -2,9 +2,13 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
 /**
- * Initialize Hotjar tracking script
+ * Initialize Hotjar tracking script, in a production build only, as Google
+ * Analytics is. A development server with an id in its .env used to send its
+ * own sessions to Hotjar as if they were visitors'.
  */
 export function initHotjar() {
+  if (!import.meta.env.PROD) return;
+
   const id = Number(import.meta.env.VITE_HOTJAR_SITE_ID);
   const v = Number(import.meta.env.VITE_HOTJAR_VERSION ?? 6);
 

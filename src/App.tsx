@@ -7,6 +7,7 @@ import { OfflineQueueProvider } from './hooks/useOfflineQueue';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
+import { ConsentBanner } from './components/ConsentBanner';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
 /* Not lazy, unlike every other page. It is the page a new visitor sees
@@ -142,6 +143,7 @@ const App: React.FC = () => (
       </AuthProvider>
     </ErrorBoundary>
     <PWAUpdatePrompt />
+    <ConsentBanner />
   </IonApp>
 );
 

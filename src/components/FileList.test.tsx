@@ -199,3 +199,16 @@ describe('FileList', () => {
     });
   });
 });
+
+/* A file's name, the sentence a model wrote about it and its picture are the
+   owner's. Hotjar leaves out of a recording what is marked so. */
+describe('FileList and what Hotjar may record', () => {
+  it('leaves out names, descriptions and pictures', () => {
+    show({ files: [PDF, PHOTO] });
+
+    expect(screen.getByText('report.pdf').closest('[data-hj-suppress]')).not.toBeNull();
+    const pictures = document.querySelectorAll('img.file-thumbnail-img');
+    expect(pictures.length).toBeGreaterThan(0);
+    for (const picture of pictures) expect(picture).toHaveAttribute('data-hj-suppress');
+  });
+});

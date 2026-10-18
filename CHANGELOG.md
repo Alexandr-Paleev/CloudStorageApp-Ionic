@@ -30,6 +30,28 @@ reasoning behind the larger decisions lives in
   made its accounts' passwords the same way, and now makes them the same new
   way. Code scanning had flagged the second of the two and not the first.
 
+### Added
+
+- **Google Analytics and Hotjar wait for a yes.** Google Analytics sets its
+  cookies on the app's host, Hotjar may set its own, and the app needs
+  neither to work; in the EU a cookie like that needs consent first, and the
+  app is run from Spain. A banner in the app's own style now asks, with a no
+  as easy to give as a yes, and until the answer is yes neither starts. The
+  answer is kept in the browser and can be changed from the foot of the
+  sign-in page or on the Account page; turning them off removes their
+  cookies and loads the page again. The banner waits for the page to load
+  and for the visitor's first tap or key, because Chrome stops choosing the
+  largest contentful paint at that moment, and a card of text arriving on
+  its own could have become the login page's. `npm run smoke` now visits as
+  a visitor who has said yes and as one who has not, and nothing may be
+  asked for in the second visit. Decision 0015 has the details.
+
+### Changed
+
+- **Hotjar waits for a production build, as Google Analytics did.** A
+  development server whose .env named a Hotjar site sent its own sessions to
+  Hotjar as if they were visitors'.
+
 ### Fixed
 
 - **The legal pages and the plans described a service that is not this one.**
@@ -40,21 +62,21 @@ reasoning behind the larger decisions lives in
   kept in a cookie, where the app keeps it in local storage; that logs are
   kept for 90 days, which nothing here decides; that changes are announced by
   e-mail and in the app, which nothing does; and that it complies with the
-  GDPR and the CCPA, where it is written to meet them. It did not say that a
-  demo account is deleted after 24 hours. The terms called the paid plan
+  GDPR and the CCPA, where it is written to meet them. It did not say what
+  becomes of a demo account. The terms called the paid plan
   proprietary code, although all of it is under the MIT licence; promised
   OneDrive, AWS S3, priority support, "advanced features" and 99.9% uptime;
   described payments as real, on a deployment where Stripe runs in test
-  mode; and named a placeholder for a jurisdiction. The plans offered "Basic analytics", which
-  nothing implements, and "Priority support", which nobody provides. The
-  contact address was on example.com and is the author's now. Dropbox and
-  Cloudflare R2 are written and tested and switched off on the demo, and say
-  "coming soon" there.
-- **Three places said a policy had shipped that never did.** The README,
-  decision 0002 and the 3.0.0 entry below described the `profiles` policy
-  that let a signed-in user grant themselves Pro as if a release had carried
-  it. It was caught on its branch before the merge, and never reached the
-  production database.
+  mode; and named a placeholder for a jurisdiction. The plans offered "Basic
+  analytics", which nothing implements, and "Priority support", which nobody
+  provides. The contact address was on example.com and is the author's now.
+  Dropbox and Cloudflare R2 are written and tested and switched off on the
+  demo, and say "coming soon" there.
+- **Four places said a policy had shipped that never did.** The README,
+  decision 0002, the 3.0.0 entry below and the comment that opens migration
+  002 described the `profiles` policy that let a signed-in user grant
+  themselves Pro as if a release had carried it. It was caught on its branch
+  before the merge, and never reached the production database.
 - **The README overstated what Ionic puts in the bundle.** `@ionic/react`
   imports 91 of Ionic's 96 component modules, not every one, as the README
   and the 4.10.3 entry below said, and the bundler keeps the ones it cannot
@@ -62,6 +84,24 @@ reasoning behind the larger decisions lives in
   now says when it was measured: it reads 451 and 401 kB, and the first load
   is 372 kB today. The list of storage backends says which two are not on the
   demo yet.
+- **Hotjar was free to record names, pictures and an e-mail address.** The
+  README said file names and sensitive data were masked from it; only the
+  upload queue's names were. The list of files, the folders and the path
+  above them, the title and preview of an open file, and the account's
+  e-mail are now marked `data-hj-suppress`, which Hotjar leaves out of what
+  it records whatever its site settings say, and its settings for this site
+  do not hide e-mail addresses. The README also said Hotjar does not run in
+  the native builds. Nothing stops it there, and the README now says so.
+- **The privacy policy left out a recipient of semantic search, and what
+  it gets.** Indexing a file sends its name as well as its contents; when
+  the model is Anthropic's, Voyage AI turns the name and the model's
+  description into the numbers a search compares; and a search by meaning
+  sends the words searched for. The policy said none of this, and says it
+  now. It also counted Google Analytics and Hotjar among the providers the
+  service needs in order to run, which they are not.
+- **The upgrade banner promised Dropbox.** It offered Pro as "5 GB storage +
+  Dropbox", typed out by hand. It now offers the storage Pro gives, read
+  from the limit that enforces it, and nothing the deployment does not offer.
 
 ## [4.10.4] — 2026-10-15
 
@@ -202,18 +242,18 @@ reasoning behind the larger decisions lives in
   component modules, to wrap each one. The wrappers the app does not use were
   dropped from the bundle; the components behind them were not. `@ionic/core`
   does not declare its modules free of side effects, so the bundler had to
-  keep each one it could not prove free of them. Of the 80 Ionic component modules in the bundle, 37
-  were components the app never renders, a date picker, a side menu and a
-  one-time-code input among them. A rule in `vite.config.mts` now says it for
-  Ionic: those modules have no side effects of their own. CI measures the
-  first load at 369.3 kB gzipped instead of 437.8, and the Ionic chunk at
-  177.2 instead of 245.7. Lighthouse's mobile preset, on the login page of a
-  local build served gzipped with the analytics blocked, three runs each way:
-  performance 75 before and 77 to 79 after, the largest paint 4.7 s before
-  and 4.2 to 4.4 after. In production, with the analytics running, the same
-  preset on the same page gave performance 59 and 68 before and 66 to 69
-  after, the first paint 3.6 to 3.8 s before and 3.2 after, and the largest
-  paint 6.9 to 8.5 s before and 6.4 to 7.0 after.
+  keep each one it could not prove free of them. Of the 80 Ionic component
+  modules in the bundle, 37 were components the app never renders, a date
+  picker, a side menu and a one-time-code input among them. A rule in
+  `vite.config.mts` now says it for Ionic: those modules have no side effects
+  of their own. CI measures the first load at 369.3 kB gzipped instead of
+  437.8, and the Ionic chunk at 177.2 instead of 245.7. Lighthouse's mobile
+  preset, on the login page of a local build served gzipped with the analytics
+  blocked, three runs each way: performance 75 before and 77 to 79 after, the
+  largest paint 4.7 s before and 4.2 to 4.4 after. In production, with the
+  analytics running, the same preset on the same page gave performance 59 and
+  68 before and 66 to 69 after, the first paint 3.6 to 3.8 s before and 3.2
+  after, and the largest paint 6.9 to 8.5 s before and 6.4 to 7.0 after.
 
   Nothing that runs changed with them. A wrapper registers its element when
   the app starts, and the built app registers the same 52 elements it did

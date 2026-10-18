@@ -120,3 +120,10 @@ describe('DashboardHeader', () => {
     expect(screen.getByText('Login page')).toBeInTheDocument();
   });
 });
+
+describe('DashboardHeader and what Hotjar may record', () => {
+  it('leaves out the title, which names the open folder', () => {
+    show({ title: 'Invoices' });
+    expect(document.querySelector('ion-title')).toHaveAttribute('data-hj-suppress');
+  });
+});

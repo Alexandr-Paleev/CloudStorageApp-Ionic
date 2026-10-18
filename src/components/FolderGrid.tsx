@@ -26,7 +26,7 @@ const FolderGrid: React.FC<FolderGridProps> = ({ folders, onOpen, onActions }) =
             <IonCol size="6" sizeSm="4" sizeMd="3" key={f.id}>
               <div className="folder-card">
                 <IonIcon icon={folderOpen} className="folder-icon" aria-hidden="true" />
-                <IonText color="dark" className="folder-name">
+                <IonText color="dark" className="folder-name" data-hj-suppress="">
                   {f.name}
                 </IonText>
 

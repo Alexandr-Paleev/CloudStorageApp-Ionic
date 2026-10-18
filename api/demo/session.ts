@@ -25,16 +25,17 @@ import { configuredProviders } from '../../libs/server/src/erase-providers';
  * This creates a real account, seeds it so the dashboard has something to show,
  * signs it in, and returns the session for the browser to adopt.
  *
- * The account is disposable and swept after 24 hours. It is a real account in
- * every other respect — same RLS, same quota, same Stripe test-mode checkout —
- * because a demo that takes a different code path stops proving anything.
+ * The account is disposable: once it is 24 hours old, the next demo opened
+ * sweeps it. It is a real account in every other respect — same RLS, same
+ * quota, same Stripe test-mode checkout — because a demo that takes a
+ * different code path stops proving anything.
  */
 
 const BUCKET = 'files';
 const SIGNED_URL_TTL = 3600;
 
 /* Bounded, but not so tight it punishes a shared egress — see DEMO_RATE_LIMIT.
-   Each account it lets through is swept within a day regardless. */
+   Each account it lets through is swept by a demo opened a day later. */
 const limiter = new RateLimiter(DEMO_RATE_LIMIT, DEMO_RATE_WINDOW_MS);
 
 interface AdminUser {

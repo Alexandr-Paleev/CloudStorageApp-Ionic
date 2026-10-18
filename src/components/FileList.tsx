@@ -123,6 +123,7 @@ const FileList: React.FC<FileListProps> = ({
                 <img
                   src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
                   alt={file.name}
+                  data-hj-suppress=""
                   className="file-thumbnail-img"
                   loading="lazy"
                   decoding="async"
@@ -139,7 +140,10 @@ const FileList: React.FC<FileListProps> = ({
             )}
           </div>
 
-          <IonLabel className="ion-text-wrap">
+          {/* A file's name, and the sentence a model wrote about it, are the
+              owner's: kept out of what Hotjar records, as the upload queue's
+              names already were. The thumbnail above is too. */}
+          <IonLabel className="ion-text-wrap" data-hj-suppress="">
             <h2 className="file-meta-name">{file.name}</h2>
             <p className="file-meta-details">
               {formatFileSize(file.size)} • {formatDateTime(file.created_at)}

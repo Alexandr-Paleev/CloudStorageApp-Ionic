@@ -35,6 +35,12 @@ describe('UpgradeBanner', () => {
     expect(screen.getByText('Running low on storage')).toBeInTheDocument();
   });
 
+  it('offers what Pro gives, and only that', () => {
+    show({ usedBytes: LIMIT });
+    expect(screen.getByText('Upgrade to Pro for 5 GB of storage')).toBeInTheDocument();
+    expect(screen.queryByText(/dropbox/i)).not.toBeInTheDocument();
+  });
+
   it('changes its wording once nothing more will fit', () => {
     show({ usedBytes: LIMIT });
     expect(screen.getByText('Storage full!')).toBeInTheDocument();

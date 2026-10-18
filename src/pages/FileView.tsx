@@ -338,13 +338,15 @@ const FileView: React.FC = () => {
               <IonIcon icon={arrowBack} aria-hidden="true" />
             </IonButton>
           </IonButtons>
-          <IonTitle>{queuedName ?? file.name}</IonTitle>
+          {/* The file's name and the file itself, below, are the owner's:
+              kept out of what Hotjar records. */}
+          <IonTitle data-hj-suppress="">{queuedName ?? file.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent fullscreen>
         <div className="file-view-container">
-          <div className="bg-gradient-mesh preview-area">
+          <div className="bg-gradient-mesh preview-area" data-hj-suppress="">
             {openedIn ? (
               <div className="preview-placeholder">
                 <div className="preview-icon-box">

@@ -24,6 +24,7 @@ import { env } from '../env';
 import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/shell';
 import './Login.css';
 import { LEGAL_URL } from '../utils/legal.utils';
+import { askAgain, collectorsConfigured } from '../analytics/consent';
 import './Legal.css';
 
 const Login: React.FC = () => {
@@ -259,6 +260,16 @@ const Login: React.FC = () => {
                 Privacy Policy
               </a>
               .
+              {/* Where an answer about analytics cookies is changed before
+                  anyone has signed in; the Account page is the other place. */}
+              {collectorsConfigured() && (
+                <>
+                  {' '}
+                  <button type="button" className="legal-links-button" onClick={askAgain}>
+                    Cookie settings
+                  </button>
+                </>
+              )}
             </p>
 
             {error && (

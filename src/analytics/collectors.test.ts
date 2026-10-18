@@ -14,9 +14,13 @@ vi.mock('../utils/when-loaded', () => ({
 
 import {
   addressIsBare,
+  allowCollectors,
   forgetCollectorsWereStarted,
+  refuseCollectors,
+  removeTheirCookies,
   startCollectorsOnABareAddress,
 } from './collectors';
+import { forgetConsent, readConsent, writeConsent } from './consent';
 
 const at = (search: string, hash: string) => ({ search, hash });
 
@@ -29,6 +33,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   waiting.length = 0;
   forgetCollectorsWereStarted();
+  /* Most of what follows is about the address, and asks it of a visitor who
+     has said yes. What happens without one is asked at the end. */
+  forgetConsent();
+  writeConsent('granted');
   window.history.replaceState(null, '', '/dashboard');
 });
 
@@ -154,5 +162,79 @@ describe('starting Google Analytics and Hotjar', () => {
     startCollectorsOnABareAddress();
     settle();
     expect(initializeGA4).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* Both set cookies the app does not need, so neither runs before the visitor
+   has said yes, and a yes can be taken back. */
+describe("the visitor's answer", () => {
+  it('starts neither before there is one', () => {
+    forgetConsent();
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+    expect(initHotjar).not.toHaveBeenCalled();
+  });
+
+  it('starts neither after a no', () => {
+    writeConsent('denied');
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+    expect(initHotjar).not.toHaveBeenCalled();
+  });
+
+  it('starts both at a yes', () => {
+    forgetConsent();
+    allowCollectors();
+    settle();
+
+    expect(readConsent()).toBe('granted');
+    expect(initializeGA4).toHaveBeenCalledTimes(1);
+    expect(initHotjar).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start them when the yes is taken back before their moment comes', () => {
+    startCollectorsOnABareAddress(at('', ''));
+    writeConsent('denied');
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+  });
+
+  /* Neither can be stopped inside a page it runs in. */
+  it('loads the page again when a yes is taken back after they started', () => {
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    document.cookie = '_ga=GA1; path=/';
+    const reload = vi.fn();
+    refuseCollectors(reload);
+
+    expect(readConsent()).toBe('denied');
+    expect(document.cookie).not.toContain('_ga');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not load again a page they never ran in', () => {
+    forgetConsent();
+    const reload = vi.fn();
+    refuseCollectors(reload);
+
+    expect(readConsent()).toBe('denied');
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('removes their cookies, and only theirs', () => {
+    for (const cookie of ['_ga=GA1', '_ga_TEST=GS1', '_hjSessionUser_1=x', 'theme=dark']) {
+      document.cookie = `${cookie}; path=/`;
+    }
+
+    removeTheirCookies();
+
+    expect(document.cookie).toBe('theme=dark');
+    document.cookie = 'theme=; Max-Age=0; path=/';
   });
 });

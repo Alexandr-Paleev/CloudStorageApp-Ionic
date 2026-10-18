@@ -30,6 +30,13 @@
  *
  * A build with no collectors configured has nothing to ask, and says so. CI
  * is such a build.
+ *
+ * Neither collector runs before the visitor has said yes to it (the banner,
+ * src/analytics/consent.ts). So every visit above is made by a visitor who
+ * has, and one more is made by a visitor who has not: nothing may be asked
+ * for in that one. A build that has collectors says so on its sign-in page,
+ * where it offers to change the answer, and that is how a yes that started
+ * nothing is told from a build with nothing to start.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -99,13 +106,26 @@ const decoded = (text) => {
   }
 };
 
-/** One visit, from a browser that has never seen the app. */
-async function visit(browser, origin, address, secrets, signIn) {
+/* The key src/analytics/consent.ts keeps the visitor's answer under. */
+const CONSENT_KEY = 'analytics-consent';
+
+/**
+ * One visit, from a browser that has never seen the app, by a visitor who
+ * has said yes to the collectors, or, with `consent` null, has not answered.
+ */
+async function visit(browser, origin, address, secrets, signIn, consent = 'granted') {
   const context = await browser.newContext({ serviceWorkers: 'block' });
+  if (consent) {
+    await context.addInitScript(
+      ([key, value]) => window.localStorage.setItem(key, value),
+      [CONSENT_KEY, consent]
+    );
+  }
   const opened = Date.now();
   const asked = [];
   let supabase = null;
   let acceptedAt = null;
+  let offersCookieSettings = false;
 
   await context.route(
     (url) => url.origin !== origin,
@@ -156,13 +176,21 @@ async function visit(browser, origin, address, secrets, signIn) {
     await page.goto(origin + address, { waitUntil: 'commit' }).catch(() => undefined);
     await page.waitForLoadState('load', { timeout: LOAD_TIMEOUT_MS }).catch(() => undefined);
     await page.waitForTimeout(WATCH_MS);
+    offersCookieSettings = await page
+      .getByRole('button', { name: 'Cookie settings' })
+      .isVisible()
+      .catch(() => false);
   } finally {
     await context.close();
   }
 
   /* The tokens are Supabase's own, and it is sent them in the ordinary
      course of signing in. Everybody else is the question. */
-  return { asked: asked.filter((request) => request.origin !== supabase), acceptedAt };
+  return {
+    asked: asked.filter((request) => request.origin !== supabase),
+    acceptedAt,
+    offersCookieSettings,
+  };
 }
 
 const readers = (asked) => asked.filter((request) => readsTheAddress(request.host));
@@ -192,8 +220,9 @@ export async function askTheCollectors(browser, target) {
     'an OAuth code': code,
   };
 
-  const [bare, signIn, callback, ...refused] = await Promise.all([
+  const [bare, unanswered, signIn, callback, ...refused] = await Promise.all([
     visit(browser, origin, '/login', secrets, 'none'),
+    visit(browser, origin, '/login', secrets, 'none', null),
     visit(browser, origin, returning(jwt), secrets, 'accepted'),
     visit(browser, origin, `/auth/dropbox/callback?code=${code}&state=x`, secrets, 'none'),
     ...Array.from({ length: SESSIONS_FOR_A_SAMPLED_TRACE }, () =>
@@ -202,9 +231,19 @@ export async function askTheCollectors(browser, target) {
   ]);
 
   /* The control. If nothing asks for a collector on the plainest address
-     there is, this build has none, and the rest would pass by saying
-     nothing. */
+     there is, after a yes, this build has none, and the rest would pass by
+     saying nothing. Unless its sign-in page offers to change the answer:
+     then it has some, and the yes started nothing. */
   if (readers(bare.asked).length === 0) {
+    if (bare.offersCookieSettings) {
+      return {
+        configured: true,
+        problems: [
+          'The sign-in page offers cookie settings, so this build has collectors, and a visitor who had said yes started neither.',
+        ],
+        said: 'a yes started nothing',
+      };
+    }
     return {
       configured: false,
       problems: [],
@@ -213,6 +252,19 @@ export async function askTheCollectors(browser, target) {
   }
 
   const problems = [];
+
+  const unasked = readers(unanswered.asked);
+  if (unasked.length > 0) {
+    problems.push(
+      `${[...new Set(unasked.map(({ host }) => host))].join(' and ')} ${unasked.length === 1 ? 'was' : 'were'} asked for by a visitor who had not said yes. ` +
+        'In src/analytics/collectors.ts, neither collector is started before the answer in src/analytics/consent.ts is a yes.'
+    );
+  }
+  if (!bare.offersCookieSettings) {
+    problems.push(
+      'This build starts collectors, and its sign-in page offers no way to change the answer about them.'
+    );
+  }
 
   const first = readers(signIn.asked)[0];
   if (signIn.acceptedAt === null) {
@@ -254,7 +306,7 @@ export async function askTheCollectors(browser, target) {
     configured: true,
     problems,
     said:
-      `held back until the address was a path again (${when}), and sent nothing made up` +
+      `asked for by nobody who had not said yes, held back until the address was a path again (${when}), and sent nothing made up` +
       (sentry.length > 0
         ? `; Sentry sent ${sentry.length} event${sentry.length === 1 ? '' : 's'} from an address with tokens in it, and none carried one`
         : '; Sentry sent nothing from the address with tokens in it this time, so it was not seen'),

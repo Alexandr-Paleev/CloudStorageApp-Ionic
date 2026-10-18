@@ -123,3 +123,32 @@ again then, and an address that has a query string or a fragment by that time
 sends them back to waiting for the next bare one. The first page of a visit is
 counted by Google Analytics' own page view, which it sends when it starts; the
 app's report of that page comes before Analytics is running and is not sent.
+
+## Update — 2026-10-17
+
+And now they wait for a yes. Google Analytics sets its cookies on the app's
+host (`_ga` and `_ga_<id>`, seen in production), Hotjar may set its own, and
+neither is needed for the app to work. In the EU a cookie like that needs the
+visitor's consent first, and the app is run from Spain. So a banner asks, and
+until the answer is yes neither collector is started: an unanswered question
+counts as a no. The answer is kept in this browser (`src/analytics/consent.ts`)
+and can be changed from the foot of the sign-in page or on the Account page. A
+no given after a yes removes their cookies and loads the page again, because
+neither can be stopped in a page it already runs in.
+
+The banner is drawn only after the page has loaded and the visitor has first
+done something there. Chrome goes on choosing the largest contentful paint
+until that first input, and a card of text arriving on its own a few seconds
+in could have been chosen, moving the login page's largest paint to whenever
+the question appeared. After the first input nothing is chosen any more. The
+two answers are buttons of the same kind and the same size.
+
+Development and CI start neither collector, so they show no banner. Hotjar had
+started on a development server whose .env named a site, sending its sessions
+to Hotjar as visitors'. It now waits for a production build, as Google
+Analytics did.
+
+`npm run smoke` makes its visits as a visitor who has said yes, and one more as
+a visitor who has not, in which nothing may be asked for. A build's sign-in
+page offers the cookie settings when it has collectors, which tells a yes that
+started nothing from a build with nothing to start.

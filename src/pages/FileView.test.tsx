@@ -292,3 +292,13 @@ describe('FileView', () => {
     });
   });
 });
+
+describe('FileView and what Hotjar may record', () => {
+  it('leaves out the name and the file itself', async () => {
+    show();
+    await screen.findByText('report.pdf');
+
+    expect(document.querySelector('ion-title')).toHaveAttribute('data-hj-suppress');
+    expect(document.querySelector('.preview-area')).toHaveAttribute('data-hj-suppress');
+  });
+});

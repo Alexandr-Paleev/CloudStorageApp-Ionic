@@ -1,8 +1,15 @@
 import { IonButton, IonIcon, IonText } from '@ionic/react';
 import { rocketOutline } from 'ionicons/icons';
 import { useNavigate } from 'react-router';
+import { formatStorage } from '@cloud-storage/core/format';
+import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 import { billingIsOffered } from '../utils/billing.utils';
 import { storageMeter } from '../utils/quota.utils';
+
+/* What Pro gives, read from the limit that enforces it. The line used to be
+   typed out, and promised Dropbox as well, which this deployment does not
+   offer yet. */
+const PRO_STORAGE = formatStorage(TIER_LIMITS.pro.storage_limit);
 
 interface UpgradeBannerProps {
   usedBytes: number;
@@ -38,7 +45,7 @@ const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, 
             {usagePercent >= 1 ? 'Storage full!' : 'Running low on storage'}
           </h3>
           <p style={{ margin: 0, fontSize: '13px', opacity: 0.9, color: '#fff' }}>
-            Upgrade to Pro for 5 GB storage + Dropbox
+            Upgrade to Pro for {PRO_STORAGE} of storage
           </p>
         </IonText>
       </div>

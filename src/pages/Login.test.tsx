@@ -36,6 +36,15 @@ vi.mock('../services/auth.service', () => ({
 
 vi.mock('../env', () => ({ env: { VITE_DEMO_ENABLED: true, VITE_BILLING_ENABLED: false } }));
 
+const { analyticsConfigured, askAgain } = vi.hoisted(() => ({
+  analyticsConfigured: { current: false },
+  askAgain: vi.fn(),
+}));
+vi.mock('../analytics/consent', () => ({
+  collectorsConfigured: () => analyticsConfigured.current,
+  askAgain: () => askAgain(),
+}));
+
 vi.mock('../native/shell', () => ({
   setStatusBarForDarkBackground: vi.fn(),
   syncStatusBarStyle: vi.fn(),
@@ -178,5 +187,25 @@ describe('Login', () => {
     user.current = { id: 'user-1' };
     show();
     expect(document.querySelector('form')).toBeNull();
+  });
+});
+
+describe('Login: the answer about analytics cookies', () => {
+  beforeEach(() => {
+    analyticsConfigured.current = false;
+    askAgain.mockClear();
+  });
+
+  it('offers to change it before anyone has signed in', () => {
+    analyticsConfigured.current = true;
+    show();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cookie settings' }));
+    expect(askAgain).toHaveBeenCalledTimes(1);
+  });
+
+  it('has nothing to offer where no analytics run', () => {
+    show();
+    expect(screen.queryByRole('button', { name: 'Cookie settings' })).not.toBeInTheDocument();
   });
 });

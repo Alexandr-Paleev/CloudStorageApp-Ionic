@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,6 +15,8 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/react';
+import { allowCollectors, refuseCollectors } from '../analytics/collectors';
+import { collectorsConfigured, onConsentChange, readConsent } from '../analytics/consent';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import accountService from '../services/account.service';
@@ -33,6 +35,7 @@ const Account: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const consent = useSyncExternalStore(onConsentChange, readConsent);
 
   const [confirmation, setConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -116,7 +119,12 @@ const Account: React.FC = () => {
         <div className="account-page">
           <section className="account-card">
             <h2 className="account-heading">Signed in as</h2>
-            <p className="account-email">{user?.email ?? '—'}</p>
+            {/* Hotjar leaves out of what it records any element marked so
+                (`hj.privacy._isExplicitlySuppressed` in its own code), whatever
+                its site settings say. They do not hide e-mail addresses. */}
+            <p className="account-email" data-hj-suppress="">
+              {user?.email ?? '—'}
+            </p>
 
             <div className="account-plan-row">
               <span className={`account-tier account-tier-${tier}`}>{TIER_CONFIG[tier].name}</span>
@@ -188,6 +196,26 @@ const Account: React.FC = () => {
               </IonText>
             )}
           </section>
+
+          {collectorsConfigured() && (
+            <section className="account-card">
+              <h2 className="account-heading">Analytics cookies</h2>
+              <p className="account-consent">
+                {consent === 'granted'
+                  ? 'Google Analytics and Hotjar may run in this browser.'
+                  : 'Google Analytics and Hotjar do not run in this browser.'}
+              </p>
+              {consent === 'granted' ? (
+                <IonButton expand="block" fill="outline" onClick={() => refuseCollectors()}>
+                  Turn them off
+                </IonButton>
+              ) : (
+                <IonButton expand="block" fill="outline" onClick={() => allowCollectors()}>
+                  Allow them
+                </IonButton>
+              )}
+            </section>
+          )}
 
           <section
             id="account-danger"

@@ -58,3 +58,12 @@ describe('FolderGrid', () => {
     );
   });
 });
+
+describe('FolderGrid and what Hotjar may record', () => {
+  it('leaves out the names of folders', () => {
+    show([WORK, INVOICES]);
+    for (const name of document.querySelectorAll('.folder-card .folder-name')) {
+      expect(name).toHaveAttribute('data-hj-suppress');
+    }
+  });
+});
