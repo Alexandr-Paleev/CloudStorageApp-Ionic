@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
@@ -253,6 +253,25 @@ const Upload: React.FC = () => {
   });
 
   const pauseUpload = () => abortRef.current?.abort();
+
+  /* A page closed or loaded again in the middle of an upload loses it: of the
+     providers here only R2 continues one, and the demo does not run R2. So
+     while a file is on its way the browser asks first. That covers a tab
+     closed by hand, and another tab's no to analytics, which loads this one
+     again (analytics/collectors.ts). A layout effect, so that the question
+     is gone by the time a pause is on screen: reloading then is safe, and the
+     end-to-end suite does it. */
+  const sending = isUploading || resumeMutation.isPending;
+  useLayoutEffect(() => {
+    if (!sending) return;
+    const ask = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // What Chrome and Edge before 119 read instead (MDN, beforeunload).
+      event.returnValue = true;
+    };
+    window.addEventListener('beforeunload', ask);
+    return () => window.removeEventListener('beforeunload', ask);
+  }, [sending]);
 
   /** The file being sent right now, if any — what the Pause button acts on. */
   const uploading = queue.find((item) => item.status === 'uploading');

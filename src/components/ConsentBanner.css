@@ -1,0 +1,143 @@
+/* A card that rises from the foot of the screen, in the app's own surface,
+   type and indigo, so it reads as part of the app rather than a notice
+   bolted on top of it. Fixed, so nothing on the page moves when it comes. */
+.consent-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + var(--ion-safe-area-bottom, 0px));
+  z-index: 1000;
+  width: min(560px, calc(100% - 32px));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(79, 70, 229, 0.16);
+  background: var(--ion-card-background, #ffffff);
+  color: var(--ion-text-color, #0f172a);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.16),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+  font-family: var(--ion-font-family);
+  animation: consent-banner-in 220ms ease-out;
+}
+
+@keyframes consent-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-banner {
+    animation: none;
+  }
+}
+
+/* The card takes the focus when "Cookie settings" asks for it. A ring for the
+   keyboard that asked, none for a mouse. */
+.consent-banner:focus {
+  outline: none;
+}
+
+.consent-banner:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+.consent-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.consent-banner__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.consent-banner__title ion-icon {
+  flex: 0 0 auto;
+  font-size: 18px;
+  color: var(--ion-color-primary);
+}
+
+/* #475569 on the white card: 7.5:1. */
+.consent-banner__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+/* Whole or not at all: split across two lines it read as two words. */
+.consent-banner__body a {
+  color: var(--ion-color-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.consent-banner__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+/* The same outline for both: neither answer is the one the page leans on. */
+.consent-banner__actions ion-button {
+  margin: 0;
+  min-width: 96px;
+  height: 38px;
+  --border-radius: 10px;
+  --border-width: 1.5px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* A phone: the buttons go under the text, side by side and equally wide. */
+@media (max-width: 520px) {
+  .consent-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .consent-banner__actions ion-button {
+    flex: 1;
+  }
+}
+
+/* The dark card. The light theme's indigo measured 2.9:1 against it, so the
+   text, the icon and both outlines take the lighter indigo the login page's
+   dark mode already uses (#a5b4fc). #94a3b8 is what its captions use. */
+body.dark .consent-banner {
+  border-color: rgba(165, 180, 252, 0.22);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .consent-banner__body {
+  color: #94a3b8;
+}
+
+body.dark .consent-banner__body a,
+body.dark .consent-banner__title ion-icon {
+  color: #a5b4fc;
+}
+
+body.dark .consent-banner__actions ion-button {
+  --color: #a5b4fc;
+  --border-color: #a5b4fc;
+}

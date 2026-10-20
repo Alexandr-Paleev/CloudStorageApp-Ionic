@@ -74,9 +74,10 @@ function uploadButton(): HTMLElement & { disabled?: boolean } {
 }
 
 /** Ionic controls render as custom elements with no implicit ARIA role, so the
- *  remove button is reached by the label it sets rather than by role. */
+ *  remove button is reached through the words it is read out with, which it
+ *  holds as text rather than as a label (see UploadQueue). */
 function removeButton(name: string): HTMLElement {
-  return document.querySelector(`ion-button[aria-label="Remove ${name}"]`) as HTMLElement;
+  return screen.getByText(`Remove ${name}`).closest('ion-button') as HTMLElement;
 }
 
 function landed(storage_type = 'r2') {
@@ -160,6 +161,44 @@ describe('Upload', () => {
     fireEvent.click(uploadButton());
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  /* Loading the page again in the middle of an upload loses it, and another
+     tab's no to analytics does exactly that (analytics/collectors.ts). */
+  it('asks before the page is left while a file is on its way, and not after', async () => {
+    let land!: (value: unknown) => void;
+    uploadFile.mockImplementation(() => new Promise((resolve) => (land = resolve)));
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    show();
+    choose('a.txt');
+    expect(leave()).toBe(false);
+
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    expect(leave()).toBe(true);
+
+    land(landed());
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(leave()).toBe(false);
+  });
+
+  it('lets the page go once an upload is paused', async () => {
+    const paused = Object.assign(new Error('paused'), { name: 'UploadPausedError' });
+    uploadFile.mockRejectedValueOnce(paused);
+
+    show();
+    choose('a.txt');
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(screen.getByText(/paused/)).toBeInTheDocument());
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   /* Pausing raises like a failure and is not one: it stops the queue instead

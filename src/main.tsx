@@ -4,7 +4,11 @@ import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './observability/sentry';
 import { trackApiErrorStandalone } from './hooks/useAnalytics';
-import { startCollectorsOnABareAddress } from './analytics/collectors';
+import {
+  followAnswersFromOtherTabs,
+  removeTheirCookiesWithoutAYes,
+  startCollectorsOnABareAddress,
+} from './analytics/collectors';
 import { initDarkMode } from './theme/dark-mode';
 import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
@@ -43,6 +47,10 @@ function start(): void {
   // on the answer.
   void initNativeShell();
 
+  // What Google Analytics and Hotjar left in this browser without a yes goes
+  // first: they used to start without asking, and an answer runs out.
+  removeTheirCookiesWithoutAYes();
+
   // Google Analytics and Hotjar, unless the address carries a query string or
   // a fragment: both read the address for themselves, and a sign-in comes
   // back with its tokens in it. If they are held back here they are started
@@ -52,6 +60,8 @@ function start(): void {
   // route changes when it does.
   startCollectorsOnABareAddress();
   window.addEventListener('hashchange', () => startCollectorsOnABareAddress());
+  // And an answer given in another tab of the app holds in this one too.
+  followAnswersFromOtherTabs();
 
   /**
    * Handle query/mutation errors globally for analytics tracking

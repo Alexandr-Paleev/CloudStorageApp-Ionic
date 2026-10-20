@@ -38,7 +38,9 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ title, onUp, tier }) 
             </IonButton>
           )}
         </IonButtons>
-        <IonTitle>{title}</IonTitle>
+        {/* The name of the folder that is open, when one is: the owner's,
+            and kept out of what Hotjar records. */}
+        <IonTitle data-hj-suppress="">{title}</IonTitle>
         <IonButtons slot="end">
           {/* The only permanent way into billing: UpgradeBanner appears at
               80% usage, so without this a user could not reach the plans at

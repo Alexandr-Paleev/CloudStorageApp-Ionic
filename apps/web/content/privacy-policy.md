@@ -1,6 +1,6 @@
 # Privacy Policy for Cloud Storage App
 
-**Last Updated:** October 17, 2026
+**Last Updated:** October 20, 2026
 
 ## Introduction
 
@@ -47,11 +47,15 @@ Your data is stored securely using:
 ### Semantic search, and what it sends where
 
 If this deployment has semantic search switched on, asking to index a file
-sends **that file's contents** — the image itself, or the first few kilobytes
-of a text file — to the model provider the deployment is configured for
-(Anthropic, or Cloudflare Workers AI). The provider returns one sentence
-describing the file; that sentence and a numeric representation of it are
-stored next to your file's row and are readable only by you.
+sends **that file's name and contents** — the image itself, or the first few
+kilobytes of a text file — to the model provider the deployment is configured
+for: Anthropic, or Cloudflare Workers AI. The provider returns one sentence
+describing the file and a few tags. The name, the sentence and the tags are
+then turned into a numeric representation, by Voyage AI when the model is
+Anthropic's and by Cloudflare Workers AI otherwise. The sentence, the tags and
+the representation are stored next to your file's row and are readable only
+by you. A search by meaning sends the words you search for to the same
+service, to be turned into the same kind of representation.
 
 Indexing never happens on its own. It runs when you press the button that
 offers it, on the files you own, and files kept in your own Google Drive or
@@ -61,8 +65,9 @@ off, which is the default.
 ## Data Sharing
 
 We **DO NOT** sell your personal information. We may share data with:
-- **Service providers** (Vercel, Supabase, Cloudinary, Stripe, Sentry, Google Analytics, Hotjar) - only as necessary to provide the Service
-- **Model providers** (Anthropic, or Cloudflare Workers AI) - only the contents of a file you have asked to index, and only while semantic search is enabled on this deployment
+- **Service providers** (Vercel, Supabase, Cloudinary, Stripe, Sentry) - only as necessary to provide the Service
+- **Analytics** (Google Analytics, Hotjar) - only once you have accepted them in the app
+- **Model providers** (Anthropic with Voyage AI, or Cloudflare Workers AI) - only the name and contents of a file you have asked to index and the words of a search by meaning, and only while semantic search is enabled on this deployment
 - **Law enforcement** - if required by law
 - **Business transfers** - in case of merger or acquisition
 
@@ -83,7 +88,7 @@ Contact us at: [paleev045@gmail.com](mailto:paleev045@gmail.com) (or via GitHub 
 
 - **Account data**: Retained while your account is active
 - **Files**: Retained until you delete them or close your account
-- **Demo accounts**: Deleted, with their files, after 24 hours
+- **Demo accounts**: Kept for 24 hours, then deleted with their files when the next demo account is opened
 - **Logs**: Kept by the hosting (Vercel) and the error reporting (Sentry) for as long as their plans keep them
 
 ## Security
@@ -97,8 +102,8 @@ We implement industry-standard security measures:
 ## Cookies and Tracking
 
 We use:
-- **Essential storage**: the app keeps your sign-in session in your browser's local storage
-- **Analytics cookies**: Google Analytics 4 sets its own cookies in the app; Hotjar is loaded there too and may set its own. Both start only once the page's address carries no sign-in tokens or codes, and blocking them in your browser does not break the app
+- **Essential storage**: the app keeps your sign-in session, and your answer about analytics cookies, in your browser's local storage
+- **Analytics cookies**: Google Analytics 4 sets its own cookies in the app, and so does Hotjar, which the app also loads. Neither runs until you accept them in the banner the app shows. Your answer is kept in this browser for 24 months, and asked for again sooner if the tools or what they are used for change; you can change it at any time, from the foot of the sign-in page or on the Account page. Turning them off removes their cookies, and so does the app whenever it starts without a yes from you. They also wait until the page's address carries no sign-in tokens or codes, and blocking them in your browser does not break the app
 - **Error reports**: Sentry receives a report when the app fails, and every field in it that holds an address is cut at the address's query string and fragment
 - **No third-party advertising cookies**
 
@@ -123,6 +128,9 @@ We use the following third-party services:
 - **Stripe** - [Privacy Policy](https://stripe.com/privacy)
 - **Google Analytics** - [Privacy Policy](https://policies.google.com/privacy)
 - **Hotjar** - [Privacy Policy](https://www.hotjar.com/legal/policies/privacy/)
+- **Anthropic** (semantic search, when it is switched on) - [Privacy Policy](https://www.anthropic.com/legal/privacy)
+- **Voyage AI** (semantic search, when it is switched on) - [Privacy Policy](https://www.voyageai.com/privacy)
+- **Cloudflare Workers AI** (semantic search, when it is switched on) - [Privacy Policy](https://www.cloudflare.com/privacypolicy/)
 
 ## Contact Us
 

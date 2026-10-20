@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import ResumableUploads from './ResumableUploads';
 import type { PendingUpload } from '../services/storage.service';
 import { renderWithProviders } from '../test/utils';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 const MiB = 1024 * 1024;
 
@@ -55,8 +56,24 @@ describe('ResumableUploads', () => {
 
   it('keeps file names out of session recordings', () => {
     // Same rule as the upload page: a file name can be as revealing as the file.
-    show();
-    expect(screen.getByText('movie.mp4')).toHaveAttribute('data-hj-suppress');
+    // Asked of the whole card with Hotjar's own rule: its progress bar was once
+    // labelled with the name, an attribute Hotjar records whatever hides it.
+    show({
+      uploads: [pending(), pending({ key: 'users/user-1/2_photo.raw', fileName: 'photo.raw' })],
+    });
+    expect(whereHotjarWouldRead('movie.mp4')).toEqual([]);
+    expect(whereHotjarWouldRead('photo.raw')).toEqual([]);
+  });
+
+  it('names each progress bar by the file it is for', () => {
+    show({
+      uploads: [pending(), pending({ key: 'users/user-1/2_photo.raw', fileName: 'photo.raw' })],
+    });
+
+    const bars = [...document.querySelectorAll('ion-progress-bar')];
+    expect(
+      bars.map((bar) => document.getElementById(bar.getAttribute('aria-labelledby')!)?.textContent)
+    ).toEqual(['movie.mp4', 'photo.raw']);
   });
 
   it('hands the record back on resume', () => {

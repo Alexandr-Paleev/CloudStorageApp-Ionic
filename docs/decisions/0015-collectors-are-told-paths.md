@@ -123,3 +123,84 @@ again then, and an address that has a query string or a fragment by that time
 sends them back to waiting for the next bare one. The first page of a visit is
 counted by Google Analytics' own page view, which it sends when it starts; the
 app's report of that page comes before Analytics is running and is not sent.
+
+## Update — 2026-10-17
+
+And now they wait for a yes. Google Analytics sets its cookies on the app's
+host (`_ga` and `_ga_<id>`, seen in production), Hotjar may set its own, and
+neither is needed for the app to work. In the EU a cookie like that needs the
+visitor's consent first, and the app is run from Spain. So a banner asks, and
+until the answer is yes neither collector is started: an unanswered question
+counts as a no. The answer is kept in this browser (`src/analytics/consent.ts`)
+and can be changed from the foot of the sign-in page or on the Account page. A
+no given after a yes removes their cookies and loads the page again, because
+neither can be stopped in a page it already runs in.
+
+The banner is drawn only after the page has loaded and the visitor has first
+done something there. Chrome goes on choosing the largest contentful paint
+until that first input, and a card of text arriving on its own a few seconds
+in could have been chosen, moving the login page's largest paint to whenever
+the question appeared. After the first input nothing is chosen any more. The
+two answers are buttons of the same kind and the same size.
+
+Development and CI start neither collector, so they show no banner. Hotjar had
+started on a development server whose .env named a site, sending its sessions
+to Hotjar as visitors'. It now waits for a production build, as Google
+Analytics did.
+
+`npm run smoke` makes its visits as a visitor who has said yes, and one more as
+a visitor who has not, in which nothing may be asked for. A build's sign-in
+page offers the cookie settings when it has collectors, which tells a yes that
+started nothing from a build with nothing to start.
+
+## Update — 2026-10-18
+
+One address was still told to Hotjar, through the channel this record had
+not asked about: attributes. Hotjar hides text and pictures under
+`data-hj-suppress`, and records any attribute it does not know as it is
+(`hj.privacy.isAttributeSuppressable` in its own code), inside a hidden
+element or not. The frame of a PDF was given its address as `src`: on R2 and
+Supabase Storage a signed one, open to whoever held it for an hour, with the
+file's name in its path. The frame is now sent there through its own window
+and has no `src` (`src/components/PdfFrame.tsx`); the page's `frame-src`
+applies to that navigation as it did to the attribute. It goes to an http(s)
+address or nowhere: the frame starts as about:blank, of the app's own origin,
+and React, which refuses a `javascript:` address in `src`, is not asked here.
+
+Names had reached attributes the same way: as the labels of buttons, as the
+id of an upload's name, which was made of it, and as string props of
+Ionic's dialogs, which @ionic/react also writes onto their element. They are
+text, a generated id and properties now. `src/test/hotjar.ts` reads a
+rendered page with Hotjar's rule, and the tests of the dashboard and of what
+it is built from ask it about every name they show.
+
+Recording is switched off in Hotjar's settings for this site (`record: false`,
+read on 2026-10-18). The marks and the test are for the day it is switched on.
+
+## Update — 2026-10-20
+
+An answer is not kept for ever any more. It is stored with the question it
+answered and the moment it was given (`src/analytics/consent.ts`), holds for 24
+months, the longest the AEPD's cookie guide (3.2.8) counts as good practice,
+and is asked for again sooner when `QUESTION` is raised: another tool, or
+another purpose, wants a new decision (3.2.7). The app removes their cookies
+whenever it starts without a yes standing. Before the banner they started
+without asking, and set `_ga` for 400 days and `_hjSessionUser` for 365 (both
+seen in production on this date): a visitor who never answered would have kept
+them.
+
+Three places still said back what the marks hide: the words of a search, an
+unfinished upload's name, carried by its progress bar as a label, and a
+sign-in's error, which can quote the address typed and was given to a toast as
+its message, an attribute. They are marked, named through `aria-labelledby`,
+and kept below the form.
+
+Hotjar's loader starts nothing in a browser that says it is headless, nor on an
+http page. Every visit `npm run smoke` made was both, so the probe had only ever
+seen when Hotjar's loader was asked for, never what Hotjar would send. Its
+visits say they are an ordinary Chrome now, and a WebSocket is read and closed
+like any request; against an https address Hotjar runs and is read like the
+rest, and against the smoke test's own http server the summary says it was not
+seen. With `record: false`, Hotjar's code (`runRecordings`) captures nothing of
+the page: it sets its cookies and asks `vc.hotjar.io` for a session (seen on
+this date with an ordinary user agent, every request stopped).

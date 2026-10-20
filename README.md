@@ -17,10 +17,10 @@ An **open-source** cloud storage product: an app for storing, viewing, sharing a
 🔗 **[Live Demo](https://cloud-storage-app-ionic-v0.vercel.app)** | 🌐 **[Site](https://cloud-storage-web-xi.vercel.app)** | 💎 **[Pro tier](#-pro-tier)** | 📦 **[Releases](https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/releases)** | 📓 **[Changelog](CHANGELOG.md)**
 
 > ⚡ **No sign-up needed.** "Just looking? Open a demo account", at the foot of
-> the login page, opens a private account seeded with a few files and deletes it
-> after 24 hours. It is a real account — same row-level security, same quota,
-> same Stripe test-mode checkout — because a demo running down a different code
-> path stops proving anything.
+> the login page, opens a private account seeded with a few files. Once it is a
+> day old, the next demo account opened deletes it. It is a real account — same
+> row-level security, same quota, same Stripe test-mode checkout — because a
+> demo running down a different code path stops proving anything.
 >
 > It sits at the foot of that page rather than the top on purpose. As the first
 > element, styled like the submit button, it left two identical primary buttons
@@ -454,7 +454,21 @@ Analytics are automatically enabled in production when environment variables are
 2. Get your Site ID from the tracking code
 3. Add `VITE_HOTJAR_SITE_ID` to `.env`
 
-> **Privacy First**: Hotjar only runs on web (not native mobile apps). File names and sensitive data are automatically masked using `data-hj-suppress` attributes.
+> **Privacy first.** Neither runs until the visitor says yes in the app's
+> banner, and the answer can be changed from the foot of the sign-in page or on
+> the Account page; the app's other open tabs follow it. An answer holds for
+> 24 months and is asked for again when the question changes, and the app
+> removes their cookies whenever it starts without a yes. Whatever shows a
+> file's or a folder's name, file previews, the account's e-mail, both fields
+> of the sign-in form, and what is said back about them (the words of a search,
+> a sign-in's error) are marked `data-hj-suppress`. That hides text and
+> pictures and not attributes, which Hotjar records as they are, so no name is
+> written into one: a button is read out with text it holds, a progress bar is
+> named by the text beside it, and a PDF's frame is sent to the file rather
+> than given its address. A test reads the page with Hotjar's own rule
+> (`src/test/hotjar.ts`). Both run in a production build that has their ids,
+> the iOS and Android builds included. Hotjar starts nothing over http or in a
+> headless browser, so `npm run smoke` sees it only against an https address.
 
 ### 4. Run Application
 
@@ -646,17 +660,21 @@ Two changes, both cheap:
 
 Google Analytics, Hotjar and Sentry all wait for the page to have loaded and
 the browser to be idle (`src/utils/when-loaded.ts`). Started at once, they
-were asked for before the login page had drawn its largest element.
+were asked for before the login page had drawn its largest element. Google
+Analytics and Hotjar also wait for the visitor to say yes to their cookies,
+and the banner that asks waits for the visitor's first tap or key: Chrome stops
+choosing the largest paint at that moment, so the question can never become
+the login page's largest element (`src/utils/first-interaction.ts`).
 
 What remained was mostly Ionic, and this README called that structural: "the
 framework registers its components eagerly". It registers only the ones the app
 uses. The code of most of the others was in the bundle anyway. `@ionic/react`
 imports 91 of Ionic's 96 component modules to wrap them, and `@ionic/core` does
 not declare its modules free of side effects, so the bundler kept each one it
-could not prove free of them on its own. The
-wrappers nobody used were dropped and the components behind them stayed: 37 of
-the 80 component modules in the bundle were components the app never renders,
-from a date picker to a side menu.
+could not prove free of them on its own. The wrappers nobody used were dropped
+and the components behind them stayed: 37 of the 80 component modules in the
+bundle were components the app never renders, from a date picker to a side
+menu.
 
 A rule in `vite.config.mts` now says for Ionic what Ionic does not: those modules
 have no side effects of their own. The first load went from 437.8 to 369.3 kB

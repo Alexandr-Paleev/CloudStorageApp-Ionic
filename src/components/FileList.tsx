@@ -110,6 +110,13 @@ const FileList: React.FC<FileListProps> = ({
           detail={false}
           lines="none"
           className="glass-card file-list-item file-item-inner"
+          /* Everything in the row is the owner's: the picture, the name, the
+             sentence a model wrote about it, and the names the two buttons
+             are read out with. Hotjar leaves out of a recording the text and
+             the pictures under this, and records every attribute it does not
+             know as it is (src/test/hotjar.ts), so no name in the row is
+             written into an attribute. */
+          data-hj-suppress=""
         >
           <div slot="start" className="file-thumbnail-container">
             {file.type?.startsWith('image/') ? (
@@ -164,7 +171,6 @@ const FileList: React.FC<FileListProps> = ({
             slot="end"
             fill="clear"
             color="medium"
-            aria-label={`Delete ${file.name}`}
             onClick={(e) => {
               e.stopPropagation();
               onDelete(file);
@@ -176,6 +182,11 @@ const FileList: React.FC<FileListProps> = ({
               className="file-delete-icon"
               aria-hidden="true"
             />
+            {/* Its name, as text inside it rather than an aria-label: Ionic
+                passes the label on into the button, where Hotjar would read
+                it, and a screen reader takes the name from this just the
+                same. */}
+            <span className="sr-only">Delete {file.name}</span>
           </IonButton>
         </IonItem>
       ))}

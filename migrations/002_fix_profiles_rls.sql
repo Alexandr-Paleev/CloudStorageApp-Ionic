@@ -1,10 +1,12 @@
 -- Migration: remove client write access to billing columns on profiles
 -- Run this in Supabase SQL Editor.
 --
--- 001 shipped an UPDATE policy scoped to the user's own row. RLS has no
--- column-level granularity, so that policy let any authenticated user run
+-- The first draft of 001 had an UPDATE policy scoped to the user's own row.
+-- RLS has no column-level granularity, so that policy would have let any
+-- authenticated user run
 --   update profiles set tier = 'pro', storage_limit = ... where id = auth.uid()
--- straight from the browser and grant themselves the paid plan.
+-- straight from the browser and grant themselves the paid plan. It was caught
+-- on its branch before the merge, and never reached the production database.
 --
 -- Billing columns are only ever written server-side with
 -- SUPABASE_SERVICE_ROLE_KEY, which bypasses RLS, so the client needs no write

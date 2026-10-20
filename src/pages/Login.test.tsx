@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Login from './Login';
 import { renderWithProviders } from '../test/utils';
+import { whereHotjarWouldRead } from '../test/hotjar';
 import { SITE_ORIGIN } from '@cloud-storage/core/origins';
 
 /**
@@ -35,6 +36,15 @@ vi.mock('../services/auth.service', () => ({
 }));
 
 vi.mock('../env', () => ({ env: { VITE_DEMO_ENABLED: true, VITE_BILLING_ENABLED: false } }));
+
+const { analyticsConfigured, askAgain } = vi.hoisted(() => ({
+  analyticsConfigured: { current: false },
+  askAgain: vi.fn(),
+}));
+vi.mock('../analytics/consent', () => ({
+  collectorsConfigured: () => analyticsConfigured.current,
+  askAgain: () => askAgain(),
+}));
 
 vi.mock('../native/shell', () => ({
   setStatusBarForDarkBackground: vi.fn(),
@@ -119,6 +129,24 @@ describe('Login', () => {
     expect(login).not.toHaveBeenCalled();
   });
 
+  /* Supabase quotes the address it refuses (internal/api/mail.go in
+     supabase/auth). The field is hidden from Hotjar; what is said back about
+     it has to be as well, and not as a toast's message, which @ionic/react
+     writes onto the element as an attribute. */
+  it('says why an address was refused without repeating it to Hotjar', async () => {
+    const refused = 'Email address "ana@example.org" cannot be used as it is not authorized';
+    register.mockRejectedValue(new Error(refused));
+
+    show();
+    fireEvent.click(screen.getByText(/Sign up/i));
+    type('Email Address', 'ana@example.org');
+    type('Password', 'a new password');
+    submit();
+
+    expect(await screen.findByText(refused)).toBeInTheDocument();
+    expect(whereHotjarWouldRead('ana@example.org')).toEqual([]);
+  });
+
   describe('the demo account', () => {
     it('opens one and goes straight to the dashboard', async () => {
       show();
@@ -174,9 +202,42 @@ describe('Login', () => {
     for (const link of [terms, privacy]) expect(link).toHaveAttribute('target', '_blank');
   });
 
+  /* The e-mail used to be marked data-hj-allow: Hotjar would have kept it as
+     typed the day its keystroke capture was switched on. */
+  it('keeps what is typed out of what Hotjar records, the e-mail as the password', () => {
+    show();
+
+    const fields = document.querySelectorAll('ion-input');
+    expect(fields).toHaveLength(2);
+    for (const field of fields) {
+      expect(field).toHaveAttribute('data-hj-suppress');
+      expect(field).not.toHaveAttribute('data-hj-allow');
+    }
+  });
+
   it('sends an already-signed-in visitor away rather than showing the form', () => {
     user.current = { id: 'user-1' };
     show();
     expect(document.querySelector('form')).toBeNull();
+  });
+});
+
+describe('Login: the answer about analytics cookies', () => {
+  beforeEach(() => {
+    analyticsConfigured.current = false;
+    askAgain.mockClear();
+  });
+
+  it('offers to change it before anyone has signed in', () => {
+    analyticsConfigured.current = true;
+    show();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cookie settings' }));
+    expect(askAgain).toHaveBeenCalledTimes(1);
+  });
+
+  it('has nothing to offer where no analytics run', () => {
+    show();
+    expect(screen.queryByRole('button', { name: 'Cookie settings' })).not.toBeInTheDocument();
   });
 });

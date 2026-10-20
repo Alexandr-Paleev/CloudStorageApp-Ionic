@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Account from './Account';
 import { renderWithProviders } from '../test/utils';
+import { forgetConsent, readConsent, writeConsent } from '../analytics/consent';
 
 const {
   deleteAccount,
@@ -25,6 +26,19 @@ const {
   envMock: { VITE_BILLING_ENABLED: true },
   isNativePlatform: vi.fn(() => false),
 }));
+
+const { analyticsConfigured } = vi.hoisted(() => ({ analyticsConfigured: { current: false } }));
+
+/* Whether there is anything to ask about is a property of the build; the
+   rest of the module, the answer itself, is the real one. */
+vi.mock('../analytics/consent', async (importActual) => ({
+  ...(await importActual<typeof import('../analytics/consent')>()),
+  collectorsConfigured: () => analyticsConfigured.current,
+}));
+
+/* A yes starts the collectors once the page is idle; nothing here waits for
+   that, and nothing should run because a test said yes. */
+vi.mock('../utils/when-loaded', () => ({ whenLoadedAndIdle: vi.fn() }));
 
 vi.mock('../services/account.service', () => ({
   default: { deleteAccount: (...args: unknown[]) => deleteAccount(...args) },
@@ -83,6 +97,8 @@ function openDangerZone() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  analyticsConfigured.current = false;
+  forgetConsent();
   deleteAccount.mockResolvedValue({ failures: [] });
   getUserStorageSize.mockResolvedValue(125 * 1024 * 1024);
   createPortalSession.mockResolvedValue('https://billing.stripe.com/session');
@@ -240,5 +256,40 @@ describe('Account', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Failed to delete the account')
     );
     expect(screen.queryByText('Sign in')).not.toBeInTheDocument();
+  });
+});
+
+describe('Account: what the analytics may see', () => {
+  /* Hotjar leaves out of a recording any element marked so, whatever the
+     site's own settings say, and they do not hide e-mail addresses. */
+  it('keeps the address out of what Hotjar records', () => {
+    show();
+    expect(screen.getByText('someone@example.com')).toHaveAttribute('data-hj-suppress');
+  });
+
+  it('says nothing about analytics where none run', () => {
+    show();
+    expect(screen.queryByText('Analytics cookies')).not.toBeInTheDocument();
+  });
+
+  it('lets the answer be given and taken back here', () => {
+    analyticsConfigured.current = true;
+    writeConsent('denied');
+    show();
+
+    expect(
+      screen.getByText('Google Analytics and Hotjar do not run in this browser.')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Allow them'));
+    expect(readConsent()).toBe('granted');
+    /* And says what turning them off will do: the page loads again. */
+    expect(
+      screen.getByText(
+        'Google Analytics and Hotjar may run in this browser. Turning them off removes their cookies and loads the page again.'
+      )
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Turn them off'));
+    expect(readConsent()).toBe('denied');
   });
 });

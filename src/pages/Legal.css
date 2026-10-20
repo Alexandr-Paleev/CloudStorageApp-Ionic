@@ -23,3 +23,14 @@
   color: inherit;
   text-decoration: underline;
 }
+
+/* A link in looks and a button in fact: it opens a question, not a page. */
+.legal-links-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

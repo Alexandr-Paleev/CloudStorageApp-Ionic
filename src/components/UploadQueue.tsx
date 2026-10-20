@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { IonButton, IonIcon, IonLabel, IonProgressBar, IonText } from '@ionic/react';
 import { checkmarkCircle, closeCircle, close, pauseCircle } from 'ionicons/icons';
 import { formatFileSize } from '../utils/format.utils';
@@ -26,18 +27,30 @@ const STATUS_ICON = {
  * mystery until the dashboard came up short.
  */
 const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onRetry }) => {
+  /* For the ids that name the progress bars. Not the item's own id: that is
+     made of the file's name (utils/upload-queue.ts), and Hotjar records an id
+     as it is. */
+  const base = useId();
   if (items.length === 0) return null;
 
   return (
     <div className="upload-queue" data-testid="upload-queue">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const icon = STATUS_ICON[item.status as keyof typeof STATUS_ICON];
+        const nameId = `${base}-name-${index}`;
 
         return (
-          <div key={item.id} className={`upload-queue-item upload-queue-item--${item.status}`}>
+          /* The file's name, and a failure that may repeat it, are kept out of
+             what Hotjar records. The controls below are named from the text,
+             never with the name in an attribute: Hotjar records those whatever
+             is around them. */
+          <div
+            key={item.id}
+            className={`upload-queue-item upload-queue-item--${item.status}`}
+            data-hj-suppress=""
+          >
             <div className="upload-queue-head">
-              {/* data-hj-suppress masks file names from Hotjar recordings for privacy */}
-              <IonText color="dark" className="upload-queue-name" data-hj-suppress>
+              <IonText id={nameId} color="dark" className="upload-queue-name">
                 {item.file.name}
               </IonText>
 
@@ -53,13 +66,9 @@ const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onR
                   mid-flight would leave an upload running for a row nobody can
                   see. */}
               {item.status === 'pending' && !running && (
-                <IonButton
-                  fill="clear"
-                  size="small"
-                  aria-label={`Remove ${item.file.name}`}
-                  onClick={() => onRemove(item.id)}
-                >
+                <IonButton fill="clear" size="small" onClick={() => onRemove(item.id)}>
                   <IonIcon icon={close} aria-hidden="true" />
+                  <span className="sr-only">Remove {item.file.name}</span>
                 </IonButton>
               )}
             </div>
@@ -72,10 +81,7 @@ const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onR
             </IonLabel>
 
             {item.status === 'uploading' && (
-              <IonProgressBar
-                value={item.progress / 100}
-                aria-label={`Uploading ${item.file.name}`}
-              />
+              <IonProgressBar value={item.progress / 100} aria-labelledby={nameId} />
             )}
 
             {item.status === 'paused' && (

@@ -24,6 +24,7 @@ import { env } from '../env';
 import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/shell';
 import './Login.css';
 import { LEGAL_URL } from '../utils/legal.utils';
+import { askAgain, collectorsConfigured } from '../analytics/consent';
 import './Legal.css';
 
 const Login: React.FC = () => {
@@ -71,7 +72,6 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start a demo session');
-      setShowToast(true);
     } finally {
       setDemoLoading(false);
     }
@@ -92,7 +92,6 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      setShowToast(true);
     } finally {
       setLoading(false);
     }
@@ -134,7 +133,10 @@ const Login: React.FC = () => {
                     required
                     disabled={busy}
                     className="login-input-field"
-                    data-hj-allow
+                    /* Kept out of what Hotjar records, as the password is. It
+                       was marked data-hj-allow, which lets Hotjar keep what is
+                       typed here as soon as its keystroke capture is on. */
+                    data-hj-suppress
                   />
                 </IonItem>
               </div>
@@ -194,7 +196,6 @@ const Login: React.FC = () => {
                   await authService.signInWithGoogle();
                 } catch (err) {
                   setError(err instanceof Error ? err.message : 'Google login failed');
-                  setShowToast(true);
                 } finally {
                   setLoading(false);
                 }
@@ -259,10 +260,27 @@ const Login: React.FC = () => {
                 Privacy Policy
               </a>
               .
+              {/* Where an answer about analytics cookies is changed before
+                  anyone has signed in; the Account page is the other place. */}
+              {collectorsConfigured() && (
+                <>
+                  {' '}
+                  <button type="button" className="legal-links-button" onClick={askAgain}>
+                    Cookie settings
+                  </button>
+                </>
+              )}
             </p>
 
+            {/* In the server's own words, which can quote the address typed
+                above: Supabase answers 'Email address "…" cannot be used as
+                it is not authorized', and '… is invalid'. Kept out of what
+                Hotjar records, as the field is, and said only here: a
+                toast's message is written onto its element as an attribute
+                as well, which no mark hides (analytics/hotjar.ts). */}
             {error && (
               <div
+                data-hj-suppress=""
                 style={{
                   marginTop: '16px',
                   padding: '12px',
@@ -282,11 +300,9 @@ const Login: React.FC = () => {
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
-          message={
-            error || (isRegister ? 'Account created! Please sign in.' : 'Signed in successfully!')
-          }
+          message={isRegister ? 'Account created! Please sign in.' : 'Signed in successfully!'}
           duration={3000}
-          color={error ? 'danger' : 'success'}
+          color="success"
           position="top"
         />
       </IonContent>

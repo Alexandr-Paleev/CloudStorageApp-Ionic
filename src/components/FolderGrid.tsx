@@ -24,7 +24,10 @@ const FolderGrid: React.FC<FolderGridProps> = ({ folders, onOpen, onActions }) =
         <IonRow>
           {folders.map((f) => (
             <IonCol size="6" sizeSm="4" sizeMd="3" key={f.id}>
-              <div className="folder-card">
+              {/* The folder's name, wherever the card says it, is the owner's:
+                  kept out of what Hotjar records, and out of attributes,
+                  which it records whatever is around them. */}
+              <div className="folder-card" data-hj-suppress="">
                 <IonIcon icon={folderOpen} className="folder-icon" aria-hidden="true" />
                 <IonText color="dark" className="folder-name">
                   {f.name}
@@ -45,7 +48,6 @@ const FolderGrid: React.FC<FolderGridProps> = ({ folders, onOpen, onActions }) =
                   fill="clear"
                   size="small"
                   className="folder-menu-button"
-                  aria-label={`Actions for ${f.name}`}
                   data-testid={`folder-actions-${f.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -53,6 +55,7 @@ const FolderGrid: React.FC<FolderGridProps> = ({ folders, onOpen, onActions }) =
                   }}
                 >
                   <IonIcon icon={ellipsisHorizontal} aria-hidden="true" />
+                  <span className="sr-only">Actions for {f.name}</span>
                 </IonButton>
               </div>
             </IonCol>

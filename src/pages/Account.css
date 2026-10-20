@@ -85,6 +85,11 @@
   margin: 0 0 12px;
 }
 
+.account-consent {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
 /* Not a red box any more. The section is a quiet row until someone opens it,
    and only then does it look like what it is. */
 .account-danger {

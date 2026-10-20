@@ -36,8 +36,8 @@ const BUDGETS = {
 
   /* The largest single chunk, which is and should remain Ionic. A new entry
      here means something else grew into framework territory without anyone
-     noticing. 177.2 kB today. It was 245.7 with every component of Ionic in
-     it, and 241.5 on Ionic 8 before that. */
+     noticing. 177.4 kB today. It was 245.7 while it held 37 components the
+     app never renders, and 241.5 on Ionic 8 before that. */
   largestChunk: 185,
 
   /* Everything under dist/assets, route chunks included: 461.1 kB today.

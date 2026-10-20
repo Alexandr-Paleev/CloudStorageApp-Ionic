@@ -58,3 +58,10 @@ describe('FolderBreadcrumbs', () => {
     expect(screen.getByLabelText('Folder path')).toBeInTheDocument();
   });
 });
+
+describe('FolderBreadcrumbs and what Hotjar may record', () => {
+  it('leaves out the path, folder names and all', () => {
+    show([folder('a', 'Work'), folder('b', 'Invoices', 'a')]);
+    expect(screen.getByLabelText('Folder path')).toHaveAttribute('data-hj-suppress');
+  });
+});

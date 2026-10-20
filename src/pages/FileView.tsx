@@ -40,6 +40,7 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import OfflineQueueBanner from '../components/OfflineQueueBanner';
 import storageService from '../services/storage.service';
 import shareService from '../services/share.service';
+import PdfFrame from '../components/PdfFrame';
 import ShareLinks from '../components/ShareLinks';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -338,13 +339,15 @@ const FileView: React.FC = () => {
               <IonIcon icon={arrowBack} aria-hidden="true" />
             </IonButton>
           </IonButtons>
-          <IonTitle>{queuedName ?? file.name}</IonTitle>
+          {/* The file's name and the file itself, below, are the owner's:
+              kept out of what Hotjar records. */}
+          <IonTitle data-hj-suppress="">{queuedName ?? file.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent fullscreen>
         <div className="file-view-container">
-          <div className="bg-gradient-mesh preview-area">
+          <div className="bg-gradient-mesh preview-area" data-hj-suppress="">
             {openedIn ? (
               <div className="preview-placeholder">
                 <div className="preview-icon-box">
@@ -364,7 +367,7 @@ const FileView: React.FC = () => {
               />
             ) : isPDF && downloadUrl ? (
               <div className="preview-pdf-container">
-                <iframe src={downloadUrl} className="preview-pdf-frame" title={file.name} />
+                <PdfFrame url={downloadUrl} />
               </div>
             ) : (
               <div className="preview-placeholder">
@@ -562,7 +565,7 @@ const FileView: React.FC = () => {
                   Delete File?
                 </h2>
                 <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
-                  Are you sure you want to delete <b>{file?.name}</b>?<br />
+                  Are you sure you want to delete <b data-hj-suppress="">{file?.name}</b>?<br />
                   This action cannot be undone.
                 </p>
               </IonText>
@@ -610,6 +613,7 @@ const FileView: React.FC = () => {
             <div className="custom-input has-focus">
               <IonItem lines="none">
                 <IonInput
+                  data-hj-suppress=""
                   value={newName}
                   onIonInput={(e) => setNewName(e.detail.value!)}
                   placeholder="Enter new name"

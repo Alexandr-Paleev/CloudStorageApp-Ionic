@@ -58,6 +58,10 @@ const FileFilters: React.FC<FileFiltersProps> = ({
   searchFailed,
 }) => {
   const searching = value.search.trim().length > 0;
+  /* The words searched for, as the note below repeats them. Hotjar leaves
+     what is typed into the field alone, and would record the same words said
+     back as text: they are often a file's name, or what it is about. */
+  const searched = <span data-hj-suppress="">{value.search.trim()}</span>;
   /* A switch that cannot work should not be on screen: without a model
      provider the route answers 501, and the only honest thing to show would
      be an error. Deployments without keys — which is every fresh clone —
@@ -133,13 +137,17 @@ const FileFilters: React.FC<FileFiltersProps> = ({
            narrower in a different way — only indexed files can be found — and
            a person who is not told that reads an empty list as a broken one. */
         <IonLabel className="file-filters-note" color="medium">
-          {value.mode === 'smart'
-            ? resultCount === 0
-              ? `Nothing indexed matches “${value.search.trim()}” — files are indexed after upload`
-              : `Closest in meaning, every folder${resultCount === undefined ? '' : ` — ${resultCount}`}`
-            : resultCount === 0
-              ? `No files match “${value.search.trim()}” anywhere in your storage`
-              : `Searching every folder${resultCount === undefined ? '' : ` — ${resultCount} so far`}`}
+          {value.mode === 'smart' ? (
+            resultCount === 0 ? (
+              <>Nothing indexed matches “{searched}” — files are indexed after upload</>
+            ) : (
+              `Closest in meaning, every folder${resultCount === undefined ? '' : ` — ${resultCount}`}`
+            )
+          ) : resultCount === 0 ? (
+            <>No files match “{searched}” anywhere in your storage</>
+          ) : (
+            `Searching every folder${resultCount === undefined ? '' : ` — ${resultCount} so far`}`
+          )}
         </IonLabel>
       )}
     </div>

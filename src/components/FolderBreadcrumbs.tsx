@@ -20,7 +20,8 @@ const FolderBreadcrumbs: React.FC<FolderBreadcrumbsProps> = ({ path, onNavigate 
   if (path.length === 0) return null;
 
   return (
-    <nav className="folder-breadcrumbs" aria-label="Folder path">
+    /* Folder names are the owner's: kept out of what Hotjar records. */
+    <nav className="folder-breadcrumbs" aria-label="Folder path" data-hj-suppress="">
       <button type="button" className="crumb" onClick={() => onNavigate(null)}>
         <IonIcon icon={homeOutline} aria-hidden="true" />
         <span>Home</span>

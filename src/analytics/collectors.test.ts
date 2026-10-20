@@ -14,9 +14,16 @@ vi.mock('../utils/when-loaded', () => ({
 
 import {
   addressIsBare,
+  allowCollectors,
+  followAnswersFromOtherTabs,
   forgetCollectorsWereStarted,
+  refuseCollectors,
+  removeTheirCookies,
+  removeTheirCookiesWithoutAYes,
   startCollectorsOnABareAddress,
 } from './collectors';
+import { forgetConsent, readConsent, storedAnswer, writeConsent } from './consent';
+import { inAnotherTab } from '../test/another-tab';
 
 const at = (search: string, hash: string) => ({ search, hash });
 
@@ -29,6 +36,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   waiting.length = 0;
   forgetCollectorsWereStarted();
+  /* Most of what follows is about the address, and asks it of a visitor who
+     has said yes. What happens without one is asked at the end. */
+  forgetConsent();
+  writeConsent('granted');
   window.history.replaceState(null, '', '/dashboard');
 });
 
@@ -154,5 +165,157 @@ describe('starting Google Analytics and Hotjar', () => {
     startCollectorsOnABareAddress();
     settle();
     expect(initializeGA4).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* Both set cookies the app does not need, so neither runs before the visitor
+   has said yes, and a yes can be taken back. */
+describe("the visitor's answer", () => {
+  it('starts neither before there is one', () => {
+    forgetConsent();
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+    expect(initHotjar).not.toHaveBeenCalled();
+  });
+
+  it('starts neither after a no', () => {
+    writeConsent('denied');
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+    expect(initHotjar).not.toHaveBeenCalled();
+  });
+
+  it('starts both at a yes', () => {
+    forgetConsent();
+    allowCollectors();
+    settle();
+
+    expect(readConsent()).toBe('granted');
+    expect(initializeGA4).toHaveBeenCalledTimes(1);
+    expect(initHotjar).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start them when the yes is taken back before their moment comes', () => {
+    startCollectorsOnABareAddress(at('', ''));
+    writeConsent('denied');
+    settle();
+
+    expect(initializeGA4).not.toHaveBeenCalled();
+  });
+
+  /* Neither can be stopped inside a page it runs in. */
+  it('loads the page again when a yes is taken back after they started', () => {
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+
+    document.cookie = '_ga=GA1; path=/';
+    const reload = vi.fn();
+    refuseCollectors(reload);
+
+    expect(readConsent()).toBe('denied');
+    expect(document.cookie).not.toContain('_ga');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not load again a page they never ran in', () => {
+    forgetConsent();
+    const reload = vi.fn();
+    refuseCollectors(reload);
+
+    expect(readConsent()).toBe('denied');
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('removes their cookies, and only theirs', () => {
+    for (const cookie of ['_ga=GA1', '_ga_TEST=GS1', '_hjSessionUser_1=x', 'theme=dark']) {
+      document.cookie = `${cookie}; path=/`;
+    }
+
+    removeTheirCookies();
+
+    expect(document.cookie).toBe('theme=dark');
+    document.cookie = 'theme=; Max-Age=0; path=/';
+  });
+});
+
+/* They used to start without asking, and their cookies last a year and more:
+   a visitor who never answers the banner would keep them. */
+describe('what they left without a yes, as the app starts', () => {
+  afterEach(() => {
+    for (const name of ['_ga', '_hjFirstSeen']) document.cookie = `${name}=; Max-Age=0; path=/`;
+  });
+
+  it('goes when nothing has been answered', () => {
+    forgetConsent();
+    document.cookie = '_ga=GA1.1.1; path=/';
+    document.cookie = '_hjFirstSeen=1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).not.toContain('_ga');
+    expect(document.cookie).not.toContain('_hj');
+  });
+
+  it('goes after a no', () => {
+    writeConsent('denied');
+    document.cookie = '_ga=GA1.1.1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).not.toContain('_ga');
+  });
+
+  it('stays while a yes holds', () => {
+    document.cookie = '_ga=GA1.1.1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).toContain('_ga=GA1.1.1');
+  });
+});
+
+describe('an answer given in another tab', () => {
+  const fromAnotherTab = (value: 'granted' | 'denied') =>
+    inAnotherTab((storage) => storage.setItem('analytics-consent', storedAnswer(value)));
+
+  it('starts them here too at a yes', async () => {
+    forgetConsent();
+    const stop = followAnswersFromOtherTabs(vi.fn());
+
+    await fromAnotherTab('granted');
+    settle();
+
+    expect(initializeGA4).toHaveBeenCalledTimes(1);
+    expect(initHotjar).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('loads this page again at a no, once they run in it, and takes their cookies first', async () => {
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+    document.cookie = '_ga=GA1; path=/';
+    const reload = vi.fn();
+    const stop = followAnswersFromOtherTabs(reload);
+
+    await fromAnotherTab('denied');
+
+    expect(document.cookie).not.toContain('_ga');
+    expect(reload).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('leaves alone a page they never ran in', async () => {
+    forgetConsent();
+    const reload = vi.fn();
+    const stop = followAnswersFromOtherTabs(reload);
+
+    await fromAnotherTab('denied');
+
+    expect(reload).not.toHaveBeenCalled();
+    stop();
   });
 });
