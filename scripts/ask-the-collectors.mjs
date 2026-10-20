@@ -37,6 +37,14 @@
  * for in that one. A build that has collectors says so on its sign-in page,
  * where it offers to change the answer, and that is how a yes that started
  * nothing is told from a build with nothing to start.
+ *
+ * Hotjar's loader starts nothing in a browser that calls itself headless, as
+ * Playwright's Chromium does, and nothing on an http page. Until 2026-10-20
+ * every visit here was headless, and Hotjar was asked for its loader and then
+ * stayed silent, which read as a pass. The visits say they are an ordinary
+ * Chrome now. Against `npm run smoke`'s own server, which is http, Hotjar is
+ * still not seen, and the summary says so; against an https address it runs,
+ * and what it would send is read like the rest.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -106,19 +114,47 @@ const decoded = (text) => {
   }
 };
 
-/* The key src/analytics/consent.ts keeps the visitor's answer under. */
+/* The key src/analytics/consent.ts keeps the visitor's answer under, and the
+   question its answers are to. A test there holds both to that module. */
 const CONSENT_KEY = 'analytics-consent';
+const CONSENT_QUESTION = 1;
+
+/* The browser the visits say they come from: an ordinary Chrome of the same
+   version, since Hotjar starts nothing in one that says it is headless. */
+const ordinaryChrome = (browser) =>
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+  `Chrome/${browser.version().split('.')[0]}.0.0.0 Safari/537.36`;
 
 /**
  * One visit, from a browser that has never seen the app, by a visitor who
  * has said yes to the collectors, or, with `consent` null, has not answered.
+ *
+ * With `leftBehind`, the browser already holds a `_ga` cookie, as one did
+ * after any visit while the collectors started without asking. The app
+ * removes it as it starts unless a yes stands (src/analytics/collectors.ts),
+ * and the visit says whether it was still there at the end.
  */
-async function visit(browser, origin, address, secrets, signIn, consent = 'granted') {
-  const context = await browser.newContext({ serviceWorkers: 'block' });
+async function visit(
+  browser,
+  origin,
+  address,
+  secrets,
+  signIn,
+  consent = 'granted',
+  leftBehind = false
+) {
+  const context = await browser.newContext({
+    serviceWorkers: 'block',
+    userAgent: ordinaryChrome(browser),
+  });
+  if (leftBehind) {
+    await context.addCookies([{ name: '_ga', value: 'GA1.1.left-behind', url: origin }]);
+  }
   if (consent) {
     await context.addInitScript(
-      ([key, value]) => window.localStorage.setItem(key, value),
-      [CONSENT_KEY, consent]
+      ([key, answer, question]) =>
+        window.localStorage.setItem(key, JSON.stringify({ answer, question, at: Date.now() })),
+      [CONSENT_KEY, consent, CONSENT_QUESTION]
     );
   }
   const opened = Date.now();
@@ -126,6 +162,7 @@ async function visit(browser, origin, address, secrets, signIn, consent = 'grant
   let supabase = null;
   let acceptedAt = null;
   let offersCookieSettings = false;
+  let leftBehindStayed = false;
 
   await context.route(
     (url) => url.origin !== origin,
@@ -171,6 +208,25 @@ async function visit(browser, origin, address, secrets, signIn, consent = 'grant
     }
   );
 
+  /* Nor through a WebSocket, the road Hotjar records over once recording is
+     switched on: each is read for what its address carries, and closed
+     without ever being connected. */
+  await context.routeWebSocket(
+    () => true,
+    (socket) => {
+      const url = new URL(socket.url());
+      asked.push({
+        at: Date.now() - opened,
+        host: url.hostname,
+        origin: url.origin,
+        carried: Object.entries(secrets)
+          .filter(([, value]) => decoded(url.href).includes(value))
+          .map(([name]) => name),
+      });
+      socket.close();
+    }
+  );
+
   try {
     const page = await context.newPage();
     await page.goto(origin + address, { waitUntil: 'commit' }).catch(() => undefined);
@@ -180,6 +236,8 @@ async function visit(browser, origin, address, secrets, signIn, consent = 'grant
       .getByRole('button', { name: 'Cookie settings' })
       .isVisible()
       .catch(() => false);
+    leftBehindStayed =
+      leftBehind && (await context.cookies()).some((cookie) => cookie.name === '_ga');
   } finally {
     await context.close();
   }
@@ -190,6 +248,7 @@ async function visit(browser, origin, address, secrets, signIn, consent = 'grant
     asked: asked.filter((request) => request.origin !== supabase),
     acceptedAt,
     offersCookieSettings,
+    leftBehindStayed,
   };
 }
 
@@ -222,7 +281,7 @@ export async function askTheCollectors(browser, target) {
 
   const [bare, unanswered, signIn, callback, ...refused] = await Promise.all([
     visit(browser, origin, '/login', secrets, 'none'),
-    visit(browser, origin, '/login', secrets, 'none', null),
+    visit(browser, origin, '/login', secrets, 'none', null, true),
     visit(browser, origin, returning(jwt), secrets, 'accepted'),
     visit(browser, origin, `/auth/dropbox/callback?code=${code}&state=x`, secrets, 'none'),
     ...Array.from({ length: SESSIONS_FOR_A_SAMPLED_TRACE }, () =>
@@ -265,6 +324,12 @@ export async function askTheCollectors(browser, target) {
       'This build starts collectors, and its sign-in page offers no way to change the answer about them.'
     );
   }
+  if (unanswered.leftBehindStayed) {
+    problems.push(
+      'A _ga cookie left from before was still there after the app had started for a visitor who had not said yes. ' +
+        'main.tsx calls removeTheirCookiesWithoutAYes (src/analytics/collectors.ts) for that.'
+    );
+  }
 
   const first = readers(signIn.asked)[0];
   if (signIn.acceptedAt === null) {
@@ -302,11 +367,20 @@ export async function askTheCollectors(browser, target) {
     return { configured: true, problems: [...new Set(problems)], said: when };
   }
 
+  /* Its loader asked for and its modules never: Hotjar refused the page, and
+     its silence is not counted as a pass. */
+  const hotjarUnseen =
+    bare.asked.some(({ host }) => host === 'static.hotjar.com') &&
+    !bare.asked.some(({ host }) => host === 'script.hotjar.com');
+
   return {
     configured: true,
     problems,
     said:
-      `asked for by nobody who had not said yes, held back until the address was a path again (${when}), and sent nothing made up` +
+      `asked for by nobody who had not said yes, whose _ga left from before was removed, held back until the address was a path again (${when}), and sent nothing made up` +
+      (hotjarUnseen
+        ? '; Hotjar’s loader started nothing here (it refuses an http page), so what Hotjar sends was not seen'
+        : '') +
       (sentry.length > 0
         ? `; Sentry sent ${sentry.length} event${sentry.length === 1 ? '' : 's'} from an address with tokens in it, and none carried one`
         : '; Sentry sent nothing from the address with tokens in it this time, so it was not seen'),

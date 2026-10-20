@@ -125,6 +125,17 @@ export function removeTheirCookies(): void {
   }
 }
 
+/**
+ * Expires their cookies, unless a yes stands behind them. Called as the app
+ * starts. The two used to start without asking, and set cookies that last a
+ * year and more (`_ga` 400 days, `_hjSessionUser` 365, seen in production on
+ * 2026-10-20); a visitor who never answers the banner would keep those. So
+ * would one whose answer has run out (`consent.ts`).
+ */
+export function removeTheirCookiesWithoutAYes(): void {
+  if (readConsent() !== 'granted') removeTheirCookies();
+}
+
 /** Puts this module back as it was loaded. For tests. */
 export function forgetCollectorsWereStarted(): void {
   state = 'not asked';

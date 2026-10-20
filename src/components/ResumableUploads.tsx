@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import {
   IonButton,
   IonCard,
@@ -35,6 +36,9 @@ const ResumableUploads: React.FC<ResumableUploadsProps> = ({
   onResume,
   onDiscard,
 }) => {
+  /* The ids that name each row's progress bar. Not the upload's key: that is
+     its path in storage, and ends in the file's name. */
+  const base = useId();
   if (uploads.length === 0) return null;
 
   return (
@@ -46,20 +50,24 @@ const ResumableUploads: React.FC<ResumableUploadsProps> = ({
         </IonCardSubtitle>
       </IonCardHeader>
       <IonCardContent>
-        {uploads.map((upload) => {
+        {uploads.map((upload, index) => {
           const done = upload.partCount > 0 ? upload.completed.length / upload.partCount : 0;
           const busy = busyKey === upload.key;
+          const nameId = `${base}-name-${index}`;
 
           return (
-            <IonItem key={upload.key} lines="full">
+            /* The whole row is kept out of what Hotjar records, as the upload
+               queue's are, and the bar is named by the name it shows rather
+               than given it as a label: Hotjar records an attribute as it is,
+               hidden or not (src/test/hotjar.ts). */
+            <IonItem key={upload.key} lines="full" data-hj-suppress="">
               <IonLabel>
-                {/* data-hj-suppress masks file names from Hotjar recordings for privacy */}
-                <h2 data-hj-suppress>{upload.fileName}</h2>
+                <h2 id={nameId}>{upload.fileName}</h2>
                 <p>
                   {formatFileSize(upload.size)} • {Math.round(done * 100)}% sent (
                   {upload.completed.length} of {upload.partCount} parts)
                 </p>
-                <IonProgressBar value={done} aria-label={`${upload.fileName} — already uploaded`} />
+                <IonProgressBar value={done} aria-labelledby={nameId} />
               </IonLabel>
 
               <IonButton

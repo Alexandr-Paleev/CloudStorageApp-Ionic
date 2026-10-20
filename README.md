@@ -456,14 +456,19 @@ Analytics are automatically enabled in production when environment variables are
 
 > **Privacy first.** Neither runs until the visitor says yes in the app's
 > banner, and the answer can be changed from the foot of the sign-in page or on
-> the Account page; the app's other open tabs follow it. Whatever shows a
-> file's or a folder's name, file previews, the account's e-mail and both fields
-> of the sign-in form are marked `data-hj-suppress`. That hides text and
+> the Account page; the app's other open tabs follow it. An answer holds for
+> 24 months and is asked for again when the question changes, and the app
+> removes their cookies whenever it starts without a yes. Whatever shows a
+> file's or a folder's name, file previews, the account's e-mail, both fields
+> of the sign-in form, and what is said back about them (the words of a search,
+> a sign-in's error) are marked `data-hj-suppress`. That hides text and
 > pictures and not attributes, which Hotjar records as they are, so no name is
-> written into one: a button is read out with text it holds, and a PDF's frame
-> is sent to the file rather than given its address. A test reads the page with
-> Hotjar's own rule (`src/test/hotjar.ts`). Both run in a production build that
-> has their ids, the iOS and Android builds included.
+> written into one: a button is read out with text it holds, a progress bar is
+> named by the text beside it, and a PDF's frame is sent to the file rather
+> than given its address. A test reads the page with Hotjar's own rule
+> (`src/test/hotjar.ts`). Both run in a production build that has their ids,
+> the iOS and Android builds included. Hotjar starts nothing over http or in a
+> headless browser, so `npm run smoke` sees it only against an https address.
 
 ### 4. Run Application
 

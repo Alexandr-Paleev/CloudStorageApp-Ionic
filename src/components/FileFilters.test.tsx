@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FileFilters, { type FileFiltersValue } from './FileFilters';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 
@@ -95,9 +96,21 @@ describe('FileFilters', () => {
 
   it('reports an empty result as empty everywhere, not just here', () => {
     show({ search: 'invoice' }, 0);
-    expect(
-      screen.getByText(/No files match .*invoice.* anywhere in your storage/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No files match/)).toHaveTextContent(
+      'No files match “invoice” anywhere in your storage'
+    );
+  });
+
+  /* Hotjar leaves the field alone, and would record the same words said back
+     as text. They are often a file's name, or what it is about. */
+  it.each([
+    ['name', 'No files match'],
+    ['smart', 'Nothing indexed matches'],
+  ] as const)('says the words of a %s search back without telling Hotjar', (mode, note) => {
+    show({ search: 'payslip march', mode }, 0);
+
+    expect(screen.getByText(new RegExp(note))).toHaveTextContent('“payslip march”');
+    expect(whereHotjarWouldRead('payslip march')).toEqual([]);
   });
 
   it('does not claim a count it was not given', () => {

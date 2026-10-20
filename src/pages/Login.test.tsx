@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Login from './Login';
 import { renderWithProviders } from '../test/utils';
+import { whereHotjarWouldRead } from '../test/hotjar';
 import { SITE_ORIGIN } from '@cloud-storage/core/origins';
 
 /**
@@ -126,6 +127,24 @@ describe('Login', () => {
 
     await waitFor(() => expect(register).toHaveBeenCalledWith('new@example.com', 'a new password'));
     expect(login).not.toHaveBeenCalled();
+  });
+
+  /* Supabase quotes the address it refuses (internal/api/mail.go in
+     supabase/auth). The field is hidden from Hotjar; what is said back about
+     it has to be as well, and not as a toast's message, which @ionic/react
+     writes onto the element as an attribute. */
+  it('says why an address was refused without repeating it to Hotjar', async () => {
+    const refused = 'Email address "ana@example.org" cannot be used as it is not authorized';
+    register.mockRejectedValue(new Error(refused));
+
+    show();
+    fireEvent.click(screen.getByText(/Sign up/i));
+    type('Email Address', 'ana@example.org');
+    type('Password', 'a new password');
+    submit();
+
+    expect(await screen.findByText(refused)).toBeInTheDocument();
+    expect(whereHotjarWouldRead('ana@example.org')).toEqual([]);
   });
 
   describe('the demo account', () => {

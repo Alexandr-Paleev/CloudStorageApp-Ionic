@@ -40,6 +40,17 @@
   }
 }
 
+/* The card takes the focus when "Cookie settings" asks for it. A ring for the
+   keyboard that asked, none for a mouse. */
+.consent-banner:focus {
+  outline: none;
+}
+
+.consent-banner:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
 .consent-banner__text {
   flex: 1;
   min-width: 0;

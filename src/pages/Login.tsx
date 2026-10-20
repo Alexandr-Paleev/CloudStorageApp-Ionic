@@ -72,7 +72,6 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start a demo session');
-      setShowToast(true);
     } finally {
       setDemoLoading(false);
     }
@@ -93,7 +92,6 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      setShowToast(true);
     } finally {
       setLoading(false);
     }
@@ -198,7 +196,6 @@ const Login: React.FC = () => {
                   await authService.signInWithGoogle();
                 } catch (err) {
                   setError(err instanceof Error ? err.message : 'Google login failed');
-                  setShowToast(true);
                 } finally {
                   setLoading(false);
                 }
@@ -275,8 +272,15 @@ const Login: React.FC = () => {
               )}
             </p>
 
+            {/* In the server's own words, which can quote the address typed
+                above: Supabase answers 'Email address "…" cannot be used as
+                it is not authorized', and '… is invalid'. Kept out of what
+                Hotjar records, as the field is, and said only here: a
+                toast's message is written onto its element as an attribute
+                as well, which no mark hides (analytics/hotjar.ts). */}
             {error && (
               <div
+                data-hj-suppress=""
                 style={{
                   marginTop: '16px',
                   padding: '12px',
@@ -296,11 +300,9 @@ const Login: React.FC = () => {
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
-          message={
-            error || (isRegister ? 'Account created! Please sign in.' : 'Signed in successfully!')
-          }
+          message={isRegister ? 'Account created! Please sign in.' : 'Signed in successfully!'}
           duration={3000}
-          color={error ? 'danger' : 'success'}
+          color="success"
           position="top"
         />
       </IonContent>

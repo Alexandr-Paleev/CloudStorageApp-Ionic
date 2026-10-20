@@ -8,13 +8,46 @@ import { env } from '../env';
  * runs: `collectors.ts` asks here before it starts them.
  *
  * The answer is kept in this browser, in local storage, because the question
- * is put before anyone has signed in. It is put again only when the visitor
- * asks for it: from the foot of the sign-in page, or on the Account page.
+ * is put before anyone has signed in. It is put again when the visitor asks
+ * for it, from the foot of the sign-in page or on the Account page; when the
+ * answer is 24 months old; and when the question itself has changed.
  */
 export type Consent = 'granted' | 'denied';
 
-/* scripts/ask-the-collectors.mjs writes this key to answer for its visits. */
+/* scripts/ask-the-collectors.mjs writes this key to answer for its visits, in
+   the form `storedAnswer` gives, and a test holds the two to each other. */
 const KEY = 'analytics-consent';
+
+/**
+ * Which question an answer was given to. Raised when the banner asks about
+ * another tool, or about these two for another purpose: an answer to the old
+ * question is then asked again. The AEPD's cookie guide (3.2.7) wants a new
+ * decision whenever the purposes or the third parties change.
+ */
+export const QUESTION = 1;
+
+/* An answer holds for 24 months, the longest the AEPD's cookie guide (3.2.8)
+   counts as good practice, and is asked again after that. */
+const HOLDS_FOR_MS = 730 * 24 * 60 * 60 * 1000;
+
+/** What is kept in local storage for an answer given at `at`. */
+export function storedAnswer(consent: Consent, at: number = Date.now()): string {
+  return JSON.stringify({ answer: consent, question: QUESTION, at });
+}
+
+/* The answer a stored value holds, if it is one and it still holds. A bare
+   word, the form the answer was first kept in, is none: it says nothing of
+   when it was given, or to what. */
+function answerIn(value: string | null): Consent | null {
+  if (value === null) return null;
+  try {
+    const { answer, question, at } = JSON.parse(value) as Record<string, unknown>;
+    const holds = question === QUESTION && typeof at === 'number' && Date.now() - at < HOLDS_FOR_MS;
+    return holds && (answer === 'granted' || answer === 'denied') ? answer : null;
+  } catch {
+    return null;
+  }
+}
 
 /* What this page was told, for a browser that refuses local storage, as some
    private windows do. The answer then lasts as long as the page. */
@@ -26,8 +59,8 @@ const tell = () => listeners.forEach((listener) => listener());
 
 export function readConsent(): Consent | null {
   try {
-    const stored = window.localStorage.getItem(KEY);
-    if (stored === 'granted' || stored === 'denied') return stored;
+    const answer = answerIn(window.localStorage.getItem(KEY));
+    if (answer) return answer;
   } catch {
     /* Storage is refused: what this page was told stands instead. */
   }
@@ -38,7 +71,7 @@ export function writeConsent(consent: Consent): void {
   remembered = consent;
   askingAgain = false;
   try {
-    window.localStorage.setItem(KEY, consent);
+    window.localStorage.setItem(KEY, storedAnswer(consent));
   } catch {
     /* Kept for this page above. */
   }
@@ -49,6 +82,15 @@ export function writeConsent(consent: Consent): void {
 export function askAgain(): void {
   askingAgain = true;
   tell();
+}
+
+/**
+ * Whether the visitor asked for the question again, from "Cookie settings",
+ * rather than its being open because nothing holds. The banner then comes at
+ * once and takes the focus: it was asked for.
+ */
+export function questionWasPutAgain(): boolean {
+  return askingAgain;
 }
 
 /** Whether the banner should be on screen: no answer yet, or asked again. */

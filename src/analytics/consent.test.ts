@@ -1,15 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 vi.mock('../env', () => ({ env: { VITE_GA4_MEASUREMENT_ID: 'G-TEST' } }));
 
 import {
   askAgain,
   collectorsConfigured,
+  type Consent,
   forgetConsent,
   onConsentChange,
   onConsentChangeElsewhere,
+  QUESTION,
   questionIsOpen,
+  questionWasPutAgain,
   readConsent,
+  storedAnswer,
   writeConsent,
 } from './consent';
 import { inAnotherTab } from '../test/another-tab';
@@ -26,16 +32,26 @@ describe('the answer about analytics cookies', () => {
     expect(questionIsOpen()).toBe(true);
   });
 
-  it('is kept in this browser', () => {
+  it('is kept in this browser, with what it answered and when', () => {
     writeConsent('granted');
 
-    expect(window.localStorage.getItem('analytics-consent')).toBe('granted');
+    expect(JSON.parse(window.localStorage.getItem('analytics-consent')!)).toEqual({
+      answer: 'granted',
+      question: QUESTION,
+      at: expect.any(Number),
+    });
     expect(readConsent()).toBe('granted');
     expect(questionIsOpen()).toBe(false);
   });
 
   it('is not read into what something else left under its name', () => {
     window.localStorage.setItem('analytics-consent', 'yes please');
+    expect(readConsent()).toBeNull();
+  });
+
+  /* The form it was first kept in, which says neither when nor to what. */
+  it('is not read from a bare word', () => {
+    window.localStorage.setItem('analytics-consent', 'granted');
     expect(readConsent()).toBeNull();
   });
 
@@ -57,9 +73,18 @@ describe('the answer about analytics cookies', () => {
     writeConsent('denied');
     askAgain();
     expect(questionIsOpen()).toBe(true);
+    expect(questionWasPutAgain()).toBe(true);
 
     writeConsent('granted');
     expect(questionIsOpen()).toBe(false);
+    expect(questionWasPutAgain()).toBe(false);
+  });
+
+  /* Open because nothing holds is not the same as asked for: only the second
+     brings the banner at once. */
+  it('is not counted as asked for when it was simply never answered', () => {
+    expect(questionIsOpen()).toBe(true);
+    expect(questionWasPutAgain()).toBe(false);
   });
 
   it('is told to whoever listens, until they stop', () => {
@@ -72,6 +97,41 @@ describe('the answer about analytics cookies', () => {
     writeConsent('denied');
 
     expect(heard).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('how long an answer holds', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const keep = (value: string) => window.localStorage.setItem('analytics-consent', value);
+
+  /* 24 months: the longest the AEPD's cookie guide (3.2.8) counts as good
+     practice. Until then it is not asked again at every visit. */
+  it('holds for two years', () => {
+    keep(storedAnswer('granted', Date.now() - 729 * DAY));
+    expect(readConsent()).toBe('granted');
+  });
+
+  it('is asked again after that', () => {
+    keep(storedAnswer('granted', Date.now() - 731 * DAY));
+    expect(readConsent()).toBeNull();
+    expect(questionIsOpen()).toBe(true);
+  });
+
+  /* An answer about two tools says nothing about a third (the guide, 3.2.7). */
+  it('is asked again once the question has changed', () => {
+    keep(JSON.stringify({ answer: 'granted', question: QUESTION - 1, at: Date.now() }));
+    expect(readConsent()).toBeNull();
+  });
+
+  /* The collectors' probe answers for its visits by writing the key itself,
+     from a script that cannot import this module. */
+  it('is written by the collectors’ probe in the form it is read in', () => {
+    /* From the repository's root, where the tests run: under jsdom a module's
+       own address is not a file's. */
+    const probe = readFileSync(resolve('scripts/ask-the-collectors.mjs'), 'utf8');
+    expect(probe).toContain("const CONSENT_KEY = 'analytics-consent';");
+    expect(probe).toContain(`const CONSENT_QUESTION = ${QUESTION};`);
+    expect(probe).toContain('JSON.stringify({ answer, question, at: Date.now() })');
   });
 });
 
@@ -91,8 +151,8 @@ describe('whether there is anything to ask', () => {
 
 /* Local storage tells the other tabs of the app, and not the one that wrote. */
 describe('an answer given in another tab', () => {
-  const fromAnotherTab = (value: string, key = 'analytics-consent') =>
-    inAnotherTab((storage) => storage.setItem(key, value));
+  const fromAnotherTab = (consent: Consent) =>
+    inAnotherTab((storage) => storage.setItem('analytics-consent', storedAnswer(consent)));
 
   it('is passed on, and told to whoever listens here', async () => {
     const passed = vi.fn();
@@ -122,7 +182,7 @@ describe('an answer given in another tab', () => {
   /* A clear names no key: the answer went with everything else, and a page
      that only read it there has none now. */
   it('is heard when another tab clears all the app kept there', async () => {
-    window.localStorage.setItem('analytics-consent', 'granted');
+    window.localStorage.setItem('analytics-consent', storedAnswer('granted'));
     const passed = vi.fn();
     const stop = onConsentChangeElsewhere(passed);
 
@@ -136,7 +196,7 @@ describe('an answer given in another tab', () => {
     const passed = vi.fn();
     const stop = onConsentChangeElsewhere(passed);
 
-    await fromAnotherTab('dark', 'theme');
+    await inAnotherTab((storage) => storage.setItem('theme', 'dark'));
     expect(passed).not.toHaveBeenCalled();
 
     stop();

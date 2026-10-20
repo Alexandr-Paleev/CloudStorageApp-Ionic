@@ -107,6 +107,41 @@ describe('ConsentBanner', () => {
     expect(screen.getByText(TITLE)).toBeInTheDocument();
   });
 
+  /* "Cookie settings" is a request. It is not kept waiting for a page that
+     has not been idle yet, and it puts the visitor where the question is. */
+  it('comes at once when it is asked for, and takes the focus', () => {
+    writeConsent('denied');
+    render(<ConsentBanner />);
+
+    act(() => askAgain());
+
+    expect(screen.getByRole('complementary', { name: TITLE })).toHaveFocus();
+  });
+
+  it('gives the focus back once it is answered', () => {
+    writeConsent('denied');
+    const settings = document.createElement('button');
+    document.body.append(settings);
+    settings.focus();
+    render(<ConsentBanner />);
+
+    act(() => askAgain());
+    act(() => writeConsent('granted'));
+
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+    expect(settings).toHaveFocus();
+    settings.remove();
+  });
+
+  it('takes nothing when it comes on its own', () => {
+    render(<ConsentBanner />);
+    load();
+    touch();
+
+    expect(screen.getByText(TITLE)).toBeInTheDocument();
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('does not ask a visitor who has answered', () => {
     writeConsent('granted');
     render(<ConsentBanner />);

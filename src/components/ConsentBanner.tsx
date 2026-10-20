@@ -1,8 +1,13 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { analyticsOutline } from 'ionicons/icons';
 import { allowCollectors, refuseCollectors } from '../analytics/collectors';
-import { collectorsConfigured, onConsentChange, questionIsOpen } from '../analytics/consent';
+import {
+  collectorsConfigured,
+  onConsentChange,
+  questionIsOpen,
+  questionWasPutAgain,
+} from '../analytics/consent';
 import { afterFirstInteraction } from '../utils/first-interaction';
 import { LEGAL_URL } from '../utils/legal.utils';
 import { whenLoadedAndIdle } from '../utils/when-loaded';
@@ -20,10 +25,18 @@ import './ConsentBanner.css';
  * something there. Not sooner, because a block of text appearing on its own
  * a few seconds in can be counted as the login page's largest paint, the one
  * figure that page was made faster for (`utils/first-interaction.ts`).
+ *
+ * Asked for, from "Cookie settings", it comes at once, whatever the page is
+ * doing, and takes the focus, so that a keyboard or a screen reader is where
+ * the question is; the focus goes back once it is answered. Put on its own,
+ * it takes nothing: it waits for the visitor instead.
  */
 export const ConsentBanner: React.FC = () => {
   const [ready, setReady] = useState(false);
   const open = useSyncExternalStore(onConsentChange, questionIsOpen);
+  const askedFor = useSyncExternalStore(onConsentChange, questionWasPutAgain);
+  const card = useRef<HTMLElement>(null);
+  const shown = (ready || askedFor) && open && collectorsConfigured();
 
   useEffect(() => {
     let mounted = true;
@@ -38,10 +51,24 @@ export const ConsentBanner: React.FC = () => {
     };
   }, []);
 
-  if (!ready || !open || !collectorsConfigured()) return null;
+  useEffect(() => {
+    if (!shown || !askedFor) return;
+    const before = document.activeElement;
+    card.current?.focus();
+    return () => {
+      if (before instanceof HTMLElement && before.isConnected) before.focus();
+    };
+  }, [shown, askedFor]);
+
+  if (!shown) return null;
 
   return (
-    <aside className="consent-banner" aria-labelledby="consent-banner-title">
+    <aside
+      ref={card}
+      tabIndex={-1}
+      className="consent-banner"
+      aria-labelledby="consent-banner-title"
+    >
       <div className="consent-banner__text">
         <p id="consent-banner-title" className="consent-banner__title">
           <IonIcon icon={analyticsOutline} aria-hidden="true" />

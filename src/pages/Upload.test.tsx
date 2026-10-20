@@ -163,6 +163,44 @@ describe('Upload', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
   });
 
+  /* Loading the page again in the middle of an upload loses it, and another
+     tab's no to analytics does exactly that (analytics/collectors.ts). */
+  it('asks before the page is left while a file is on its way, and not after', async () => {
+    let land!: (value: unknown) => void;
+    uploadFile.mockImplementation(() => new Promise((resolve) => (land = resolve)));
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    show();
+    choose('a.txt');
+    expect(leave()).toBe(false);
+
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    expect(leave()).toBe(true);
+
+    land(landed());
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(leave()).toBe(false);
+  });
+
+  it('lets the page go once an upload is paused', async () => {
+    const paused = Object.assign(new Error('paused'), { name: 'UploadPausedError' });
+    uploadFile.mockRejectedValueOnce(paused);
+
+    show();
+    choose('a.txt');
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(screen.getByText(/paused/)).toBeInTheDocument());
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   /* Pausing raises like a failure and is not one: it stops the queue instead
      of marking the file broken and moving to the next. */
   it('stops the whole queue when an upload is paused, without failing it', async () => {

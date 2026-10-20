@@ -19,9 +19,10 @@ import {
   forgetCollectorsWereStarted,
   refuseCollectors,
   removeTheirCookies,
+  removeTheirCookiesWithoutAYes,
   startCollectorsOnABareAddress,
 } from './collectors';
-import { forgetConsent, readConsent, writeConsent } from './consent';
+import { forgetConsent, readConsent, storedAnswer, writeConsent } from './consent';
 import { inAnotherTab } from '../test/another-tab';
 
 const at = (search: string, hash: string) => ({ search, hash });
@@ -241,9 +242,45 @@ describe("the visitor's answer", () => {
   });
 });
 
+/* They used to start without asking, and their cookies last a year and more:
+   a visitor who never answers the banner would keep them. */
+describe('what they left without a yes, as the app starts', () => {
+  afterEach(() => {
+    for (const name of ['_ga', '_hjFirstSeen']) document.cookie = `${name}=; Max-Age=0; path=/`;
+  });
+
+  it('goes when nothing has been answered', () => {
+    forgetConsent();
+    document.cookie = '_ga=GA1.1.1; path=/';
+    document.cookie = '_hjFirstSeen=1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).not.toContain('_ga');
+    expect(document.cookie).not.toContain('_hj');
+  });
+
+  it('goes after a no', () => {
+    writeConsent('denied');
+    document.cookie = '_ga=GA1.1.1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).not.toContain('_ga');
+  });
+
+  it('stays while a yes holds', () => {
+    document.cookie = '_ga=GA1.1.1; path=/';
+
+    removeTheirCookiesWithoutAYes();
+
+    expect(document.cookie).toContain('_ga=GA1.1.1');
+  });
+});
+
 describe('an answer given in another tab', () => {
   const fromAnotherTab = (value: 'granted' | 'denied') =>
-    inAnotherTab((storage) => storage.setItem('analytics-consent', value));
+    inAnotherTab((storage) => storage.setItem('analytics-consent', storedAnswer(value)));
 
   it('starts them here too at a yes', async () => {
     forgetConsent();

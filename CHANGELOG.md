@@ -33,19 +33,26 @@ reasoning behind the larger decisions lives in
 ### Added
 
 - **Google Analytics and Hotjar wait for a yes.** Google Analytics sets its
-  cookies on the app's host, Hotjar may set its own, and the app needs
-  neither to work; in the EU a cookie like that needs consent first, and the
-  app is run from Spain. A banner in the app's own style now asks, with a no
-  as easy to give as a yes, and until the answer is yes neither starts. The
-  answer is kept in the browser and can be changed from the foot of the
-  sign-in page or on the Account page, and the app's other open tabs follow
-  it; turning them off removes their cookies and loads the page again, as
-  the Account page says. The banner waits for the page to load
-  and for the visitor's first tap or key, because Chrome stops choosing the
-  largest contentful paint at that moment, and a card of text arriving on
-  its own could have become the login page's. `npm run smoke` now visits as
-  a visitor who has said yes and as one who has not, and nothing may be
-  asked for in the second visit. Decision 0015 has the details.
+  cookies on the app's host (`_ga`, for 400 days), Hotjar sets its own
+  (`_hjSessionUser`, for 365), and the app needs neither to work; in the EU
+  a cookie like that needs consent first, and the app is run from Spain. A
+  banner in the app's own style now asks, with a no as easy to give as a
+  yes, and until the answer is yes neither starts. The answer is kept in the
+  browser for 24 months, the longest the AEPD's cookie guide counts as good
+  practice, and is asked for again sooner if the question changes. It can be
+  changed from the foot of the sign-in page, where "Cookie settings" brings
+  the banner at once and puts the focus in it, or on the Account page, and
+  the app's other open tabs follow it; turning them off removes their
+  cookies and loads the page again, as the Account page says, and a tab in
+  the middle of an upload asks first. The app also removes their cookies
+  whenever it starts without a yes: they started without asking until now,
+  and what they set then would have stayed for a year. The banner waits for
+  the page to load and for the visitor's first tap or key, because Chrome
+  stops choosing the largest contentful paint at that moment, and a card of
+  text arriving on its own could have become the login page's. `npm run
+  smoke` now visits as a visitor who has said yes and as one who has not,
+  and nothing may be asked for in the second visit, which also finds a
+  `_ga` left from before and expects it gone. Decision 0015 has the details.
 
 ### Changed
 
@@ -102,11 +109,22 @@ reasoning behind the larger decisions lives in
   being given its address, which was signed for an hour and carried the
   name. The sign-in form's e-mail field was marked `data-hj-allow`, which
   lets Hotjar keep what is typed there once its keystroke capture is on; it
-  is hidden like the password now. A test reads a rendered page with
-  Hotjar's rule (`src/test/hotjar.ts`), and ten deliberate leaks were each
-  caught by it or by the tests beside it. The README also said Hotjar does
-  not run in the native builds. Nothing stops it there, and the README now
-  says so.
+  is hidden like the password now. So are three things said back: the words
+  of a search ("No files match …"), an unfinished upload's name, which its
+  progress bar carried as a label, and a sign-in's error, which can quote the
+  address typed (Supabase's "Email address … cannot be used") and went into
+  a toast's message, an attribute; it stays below the form now. A test reads
+  a rendered page with Hotjar's rule (`src/test/hotjar.ts`), and fifteen
+  deliberate leaks were each caught by it or by the tests beside it. The
+  README also said Hotjar does not run in the native builds. Nothing stops
+  it there, and the README now says so.
+- **`npm run smoke` could not see Hotjar.** Hotjar's loader starts nothing in
+  a browser that says it is headless, as Playwright's does, or on an http
+  page, so every visit of the collectors' probe had Hotjar asked for its
+  loader and then silent, which read as a pass. The visits say they are an
+  ordinary Chrome now, a WebSocket is read and closed like any request, and
+  where Hotjar still starts nothing, as on the smoke test's own http server,
+  the summary says that what it sends was not seen.
 - **The privacy policy left out a recipient of semantic search, and what
   it gets.** Indexing a file sends its name as well as its contents; when
   the model is Anthropic's, Voyage AI turns the name and the model's
