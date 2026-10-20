@@ -12,6 +12,7 @@ import {
   readConsent,
   writeConsent,
 } from './consent';
+import { inAnotherTab } from '../test/another-tab';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -90,18 +91,16 @@ describe('whether there is anything to ask', () => {
 
 /* Local storage tells the other tabs of the app, and not the one that wrote. */
 describe('an answer given in another tab', () => {
-  function fromAnotherTab(value: string, key = 'analytics-consent') {
-    if (key === 'analytics-consent') window.localStorage.setItem(key, value);
-    window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }));
-  }
+  const fromAnotherTab = (value: string, key = 'analytics-consent') =>
+    inAnotherTab((storage) => storage.setItem(key, value));
 
-  it('is passed on, and told to whoever listens here', () => {
+  it('is passed on, and told to whoever listens here', async () => {
     const passed = vi.fn();
     const told = vi.fn();
     const stopTelling = onConsentChange(told);
     const stop = onConsentChangeElsewhere(passed);
 
-    fromAnotherTab('denied');
+    await fromAnotherTab('denied');
 
     expect(passed).toHaveBeenCalledWith('denied');
     expect(told).toHaveBeenCalledTimes(1);
@@ -109,26 +108,40 @@ describe('an answer given in another tab', () => {
     stopTelling();
   });
 
-  it('closes a question this tab had put again', () => {
+  it('closes a question this tab had put again', async () => {
     writeConsent('granted');
     askAgain();
     const stop = onConsentChangeElsewhere(vi.fn());
 
-    fromAnotherTab('denied');
+    await fromAnotherTab('denied');
 
     expect(questionIsOpen()).toBe(false);
     stop();
   });
 
-  it('is not heard for anything else kept there, nor once nobody listens', () => {
+  /* A clear names no key: the answer went with everything else, and a page
+     that only read it there has none now. */
+  it('is heard when another tab clears all the app kept there', async () => {
+    window.localStorage.setItem('analytics-consent', 'granted');
     const passed = vi.fn();
     const stop = onConsentChangeElsewhere(passed);
 
-    fromAnotherTab('dark', 'theme');
+    await inAnotherTab((storage) => storage.clear());
+
+    expect(passed).toHaveBeenCalledWith(null);
+    stop();
+  });
+
+  it('is not heard for anything else kept there, nor once nobody listens', async () => {
+    const passed = vi.fn();
+    const stop = onConsentChangeElsewhere(passed);
+
+    await fromAnotherTab('dark', 'theme');
     expect(passed).not.toHaveBeenCalled();
 
     stop();
-    fromAnotherTab('granted');
+    await fromAnotherTab('granted');
     expect(passed).not.toHaveBeenCalled();
+    window.localStorage.removeItem('theme');
   });
 });

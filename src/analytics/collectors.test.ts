@@ -22,6 +22,7 @@ import {
   startCollectorsOnABareAddress,
 } from './collectors';
 import { forgetConsent, readConsent, writeConsent } from './consent';
+import { inAnotherTab } from '../test/another-tab';
 
 const at = (search: string, hash: string) => ({ search, hash });
 
@@ -241,18 +242,14 @@ describe("the visitor's answer", () => {
 });
 
 describe('an answer given in another tab', () => {
-  function fromAnotherTab(value: 'granted' | 'denied') {
-    window.localStorage.setItem('analytics-consent', value);
-    window.dispatchEvent(
-      new StorageEvent('storage', { key: 'analytics-consent', newValue: value })
-    );
-  }
+  const fromAnotherTab = (value: 'granted' | 'denied') =>
+    inAnotherTab((storage) => storage.setItem('analytics-consent', value));
 
-  it('starts them here too at a yes', () => {
+  it('starts them here too at a yes', async () => {
     forgetConsent();
     const stop = followAnswersFromOtherTabs(vi.fn());
 
-    fromAnotherTab('granted');
+    await fromAnotherTab('granted');
     settle();
 
     expect(initializeGA4).toHaveBeenCalledTimes(1);
@@ -260,26 +257,26 @@ describe('an answer given in another tab', () => {
     stop();
   });
 
-  it('loads this page again at a no, once they run in it, and takes their cookies first', () => {
+  it('loads this page again at a no, once they run in it, and takes their cookies first', async () => {
     startCollectorsOnABareAddress(at('', ''));
     settle();
     document.cookie = '_ga=GA1; path=/';
     const reload = vi.fn();
     const stop = followAnswersFromOtherTabs(reload);
 
-    fromAnotherTab('denied');
+    await fromAnotherTab('denied');
 
     expect(document.cookie).not.toContain('_ga');
     expect(reload).toHaveBeenCalledTimes(1);
     stop();
   });
 
-  it('leaves alone a page they never ran in', () => {
+  it('leaves alone a page they never ran in', async () => {
     forgetConsent();
     const reload = vi.fn();
     const stop = followAnswersFromOtherTabs(reload);
 
-    fromAnotherTab('denied');
+    await fromAnotherTab('denied');
 
     expect(reload).not.toHaveBeenCalled();
     stop();
