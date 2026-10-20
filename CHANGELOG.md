@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.11.0] — 2026-10-20
+
 ### Security
 
 - **The Stripe webhook would have started on the wrong key.** The functions
@@ -53,6 +57,13 @@ reasoning behind the larger decisions lives in
   smoke` now visits as a visitor who has said yes and as one who has not,
   and nothing may be asked for in the second visit, which also finds a
   `_ga` left from before and expects it gone. Decision 0015 has the details.
+  In production after the deploy, in an ordinary browser with every request
+  to them stopped: nobody who had not said yes asked for either, a yes
+  loaded both and their four cookies, and a no from "Cookie settings"
+  removed all four and loaded the page again. Lighthouse's mobile preset on
+  the login page, three runs through a VPN as for 4.10.4: performance 77 to
+  83 and the largest paint at 3.1 to 3.6 s, against 74 to 79 and 3.4 to
+  3.9 s then, with no request to a third party left on the page.
 
 ### Changed
 
@@ -2124,7 +2135,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.0...HEAD
+[4.11.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...v4.11.0
 [4.10.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...v4.10.4
 [4.10.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...v4.10.3
 [4.10.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.1...v4.10.2
