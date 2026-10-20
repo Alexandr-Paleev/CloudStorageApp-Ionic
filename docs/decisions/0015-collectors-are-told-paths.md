@@ -204,3 +204,16 @@ rest, and against the smoke test's own http server the summary says it was not
 seen. With `record: false`, Hotjar's code (`runRecordings`) captures nothing of
 the page: it sets its cookies and asks `vc.hotjar.io` for a session (seen on
 this date with an ordinary user agent, every request stopped).
+
+Sentry was told file names, which are no secret of the address but are the
+owner's. The path of every object the app stores ends in the file's name, and
+Sentry describes a request by its address, in its breadcrumbs and its traces.
+`scrub.ts` cuts what follows the owner's id out of every address and every
+stored path in an event, and keeps the time of the upload, which still says
+which object it was. The rule follows the layout rather than a list of hosts:
+`ownerPrefix` puts the owner's id in front of every object, migrations/013 holds
+every row to it, and every one of the 23 rows in production on this date
+begins with it. A tap is described by the `alt`, `title` and `aria-label` of
+what was tapped, so a picture is named by the text beside it or through
+`aria-labelledby`, and `src/test/sentry.ts` describes each element of a
+rendered page with Sentry's own `htmlTreeAsString`.

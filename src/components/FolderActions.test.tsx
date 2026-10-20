@@ -5,6 +5,7 @@ import FolderActions from './FolderActions';
 import type { Folder } from '../services/storage.service';
 import { choose, dismiss, overlay, overlays, press } from '../test/overlays';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 const WORK = { id: 'a', name: 'Work', parent_id: null, user_id: 'user-1' } as Folder;
 
@@ -231,5 +232,16 @@ describe('FolderActions and what Hotjar may record', () => {
     expect(deleteDialog().isOpen).toBe(true);
     expect(deleteDialog().message).toContain('“Work”');
     expect(whereHotjarWouldRead('Work')).toEqual([]);
+  });
+});
+
+describe('FolderActions and what Sentry may be told', () => {
+  it('describes no tap on the menu or its dialogs by the folder’s name', () => {
+    show();
+    openMenu();
+    expect(whereSentryWouldRead('Work')).toEqual([]);
+
+    press(menu(), 'Rename');
+    expect(whereSentryWouldRead('Work')).toEqual([]);
   });
 });

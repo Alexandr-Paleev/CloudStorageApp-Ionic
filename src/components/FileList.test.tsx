@@ -4,6 +4,7 @@ import FileList from './FileList';
 import type { FileMetadata } from '../services/storage.service';
 import { HttpError } from '../utils/http.utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 const PDF = {
   id: 'f1',
@@ -86,9 +87,11 @@ describe('FileList', () => {
     it('shows an image as a small, lazily loaded picture of itself', () => {
       show({ files: [PHOTO] });
 
-      const picture = screen.getByAltText('sky.jpg');
+      const picture = document.querySelector('img.file-thumbnail-img');
+      // Its name is the row's text, beside it.
+      expect(picture).toHaveAttribute('alt', '');
       expect(picture).toHaveAttribute('loading', 'lazy');
-      expect(picture.getAttribute('src')).toContain('/upload/w_100,h_100,');
+      expect(picture?.getAttribute('src')).toContain('/upload/w_100,h_100,');
     });
 
     it('shows any other file as a document', () => {
@@ -224,5 +227,18 @@ describe('FileList and what Hotjar may record', () => {
 
     expect(screen.getByRole('button', { name: 'Open report.pdf' })).toBeInTheDocument();
     expect(screen.getByText('Delete report.pdf').closest('ion-button')).not.toBeNull();
+  });
+});
+
+/* Sentry sends the last taps with an error, each described by the element
+   tapped: its id, its classes and five attributes, the alt of a picture
+   among them. */
+describe('FileList and what Sentry may be told', () => {
+  it('describes no tap on it by a name', () => {
+    show({ files: [PDF, PHOTO] });
+
+    expect(document.querySelector('img.file-thumbnail-img')).not.toBeNull();
+    expect(whereSentryWouldRead('report.pdf')).toEqual([]);
+    expect(whereSentryWouldRead('sky.jpg')).toEqual([]);
   });
 });

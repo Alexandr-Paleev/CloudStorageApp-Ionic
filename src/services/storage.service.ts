@@ -74,9 +74,6 @@ const storageService = {
         // A rejected upload (quota, auth) fails the same way every time — surface
         // it immediately instead of making the user wait through the backoff
         shouldRetry: isRetriableError,
-        onRetry: (error, attempt) => {
-          console.warn(`Upload attempt ${attempt} failed for ${file.name}. Retrying...`, error);
-        },
       }
     );
 
@@ -118,10 +115,13 @@ const storageService = {
     } catch (dbError) {
       const overQuota = isQuotaRejection(dbError);
 
+      /* Whose upload it was, and not its name. An object left behind, below,
+         is reported by its path, and observability/scrub.ts cuts the name
+         out of that. */
       if (!overQuota) {
         Sentry.captureException(dbError, {
           tags: { context: 'storage.uploadFile' },
-          extra: { fileName: file.name, userId },
+          extra: { userId },
         });
       }
 

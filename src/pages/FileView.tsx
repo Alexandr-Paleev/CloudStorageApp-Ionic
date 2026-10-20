@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -65,6 +65,7 @@ const FileView: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const offlineQueue = useOfflineQueue();
+  const titleId = useId();
 
   /* A rename queued offline has to be visible here, or the page keeps showing
      the old name and the only reasonable conclusion is that it did not work —
@@ -341,7 +342,9 @@ const FileView: React.FC = () => {
           </IonButtons>
           {/* The file's name and the file itself, below, are the owner's:
               kept out of what Hotjar records. */}
-          <IonTitle data-hj-suppress="">{queuedName ?? file.name}</IonTitle>
+          <IonTitle id={titleId} data-hj-suppress="">
+            {queuedName ?? file.name}
+          </IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -359,9 +362,12 @@ const FileView: React.FC = () => {
                 </IonText>
               </div>
             ) : isImage && downloadUrl ? (
+              /* Named by the title above, which is the file's name: an alt
+                 holding it would be what Sentry reads when the picture is
+                 tapped. */
               <img
                 src={downloadUrl}
-                alt={file.name}
+                aria-labelledby={titleId}
                 className="preview-image"
                 onError={() => refetch()}
               />

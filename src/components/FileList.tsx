@@ -126,10 +126,13 @@ const FileList: React.FC<FileListProps> = ({
                       list would otherwise fetch every full-size image
                       at once. lazy + async decoding keeps the ones
                       below the fold out of the way; the dimensions
-                      reserve the box so the list does not jump. */}
+                      reserve the box so the list does not jump.
+                      No alt: the name is beside it as text, and a
+                      screen reader would read it twice. Sentry also
+                      describes a tap by the alt of what was tapped. */}
                 <img
                   src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
-                  alt={file.name}
+                  alt=""
                   className="file-thumbnail-img"
                   loading="lazy"
                   decoding="async"

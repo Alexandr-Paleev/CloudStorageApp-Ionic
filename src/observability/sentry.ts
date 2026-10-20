@@ -50,7 +50,8 @@ function load(): Promise<SentryModule | null> {
            one collector is started whatever the address is, because the
            errors most worth having are the ones at startup, and a sign-in
            comes back with its tokens in the address. So it is what leaves
-           that is cleaned, on both of the roads out: scrub.ts. */
+           that is cleaned, on both of the roads out: scrub.ts, which also
+           cuts a stored file's name out of the path of an upload. */
         beforeSend: withoutSecrets,
         beforeSendTransaction: withoutSecrets,
       });

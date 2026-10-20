@@ -4,6 +4,7 @@ import ResumableUploads from './ResumableUploads';
 import type { PendingUpload } from '../services/storage.service';
 import { renderWithProviders } from '../test/utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 const MiB = 1024 * 1024;
 
@@ -105,5 +106,16 @@ describe('ResumableUploads', () => {
   it('treats a record with no parts as zero rather than as not-a-number', () => {
     show({ uploads: [pending({ partCount: 0, completed: [] })] });
     expect(screen.getByText(/0% sent/)).toBeInTheDocument();
+  });
+});
+
+describe('ResumableUploads and what Sentry may be told', () => {
+  it('describes no tap on a card by its file’s name', () => {
+    show({
+      uploads: [pending(), pending({ key: 'users/user-1/2_photo.raw', fileName: 'photo.raw' })],
+    });
+
+    expect(whereSentryWouldRead('movie.mp4')).toEqual([]);
+    expect(whereSentryWouldRead('photo.raw')).toEqual([]);
   });
 });

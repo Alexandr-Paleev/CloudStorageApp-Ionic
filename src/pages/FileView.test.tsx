@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router';
 import FileView from './FileView';
 import { renderWithProviders } from '../test/utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 /**
  * Sharing, renaming and deleting — the three things this page does to a file
@@ -323,5 +324,29 @@ describe('FileView and what Hotjar may record', () => {
     expect(document.querySelector('iframe.preview-pdf-frame')).not.toBeNull();
     expect(whereHotjarWouldRead('report.pdf')).toEqual([]);
     expect(whereHotjarWouldRead('cdn.example.com')).toEqual([]);
+  });
+});
+
+/* Sentry sends the last taps with an error, each described by the element
+   tapped: the alt of a picture among what it says. */
+describe('FileView and what Sentry may be told', () => {
+  it('describes no tap on a document by its name', async () => {
+    show();
+    await screen.findByText('report.pdf');
+
+    expect(whereSentryWouldRead('report.pdf')).toEqual([]);
+  });
+
+  it('describes no tap on a picture by its name, which still names the picture', async () => {
+    getFileMetadata.mockResolvedValue({
+      ...FILE,
+      name: 'sky.jpg',
+      type: 'image/jpeg',
+      download_url: 'https://cdn.example.com/sky.jpg',
+    });
+    show();
+
+    expect(await screen.findByRole('img', { name: 'sky.jpg' })).toHaveClass('preview-image');
+    expect(whereSentryWouldRead('sky.jpg')).toEqual([]);
   });
 });

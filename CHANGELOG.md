@@ -10,7 +10,28 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Sentry was told the names of files.** A stored file's path ends in its
+  name, and Sentry describes a request by its address, in the breadcrumbs it
+  sends with an error and in its traces: an upload to Supabase Storage or R2,
+  and the signing of a file to show it, carried the name there. A failed
+  upload was also reported with the name as `fileName` and with the path of
+  the object it left behind, a retried one wrote the name to the console,
+  whose lines Sentry keeps, and a tap on a picture is described by its `alt`,
+  which was the name. `src/observability/scrub.ts` now cuts what follows the
+  owner's id out of every address and stored path in an event, and keeps the
+  time of the upload, which still says which object it was. Nothing reports
+  the name, the console line is gone (the retry's own says the same without
+  it), a thumbnail's `alt` is empty, since its name is the text beside it,
+  and the preview of a picture is named by the title above it, through
+  `aria-labelledby`. The README and the notes of 4.11.0 said no name was
+  written into an attribute; those two `alt`s were. A test describes every
+  element of the rendered pages with Sentry's own `htmlTreeAsString`
+  (`src/test/sentry.ts`), and eleven deliberate leaks and four other faults
+  were each caught by a test. The upload queue's test draws all five states
+  of an upload now; it drew two, and a label on the icon of the other three
+  would have gone unseen.
 
 ## [4.11.0] — 2026-10-20
 

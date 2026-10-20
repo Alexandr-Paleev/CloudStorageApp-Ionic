@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import PdfFrame from './PdfFrame';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 const URL_OF_FILE =
   'https://storage.example/object/sign/files/user-1/1700000000_payslip-march.pdf?token=t';
@@ -61,5 +62,13 @@ describe('PdfFrame', () => {
       render(<PdfFrame url={'javascript:alert(document.domain)'} />);
       expect(replace).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('PdfFrame and what Sentry may be told', () => {
+  it('describes no tap on the frame by the file’s name', () => {
+    render(<PdfFrame url={URL_OF_FILE} open={vi.fn()} />);
+
+    expect(whereSentryWouldRead('payslip-march')).toEqual([]);
   });
 });
