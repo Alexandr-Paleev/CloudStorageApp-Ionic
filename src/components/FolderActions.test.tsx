@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import FolderActions from './FolderActions';
 import type { Folder } from '../services/storage.service';
 import { choose, dismiss, overlay, overlays, press } from '../test/overlays';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 const WORK = { id: 'a', name: 'Work', parent_id: null, user_id: 'user-1' } as Folder;
 
@@ -204,5 +205,31 @@ describe('FolderActions', () => {
 
     expect(renameDialog().isOpen).toBe(false);
     expect(onRename).not.toHaveBeenCalled();
+  });
+});
+
+/* The folder's name is in the menu's header, the deletion's message and the
+   rename's field. Hotjar must read it in none of them: not as text, and not as
+   an attribute, which is where a string prop of an overlay also ends up. */
+describe('FolderActions and what Hotjar may record', () => {
+  it('shows it the name in neither the menu nor the rename', () => {
+    show();
+    openMenu();
+    expect(menu().header).toBe('Work');
+    expect(whereHotjarWouldRead('Work')).toEqual([]);
+
+    press(menu(), 'Rename');
+    expect(renameDialog().isOpen).toBe(true);
+    expect(whereHotjarWouldRead('Work')).toEqual([]);
+  });
+
+  it('shows it the name in the deletion neither', () => {
+    show();
+    openMenu();
+    press(menu(), 'Delete');
+
+    expect(deleteDialog().isOpen).toBe(true);
+    expect(deleteDialog().message).toContain('“Work”');
+    expect(whereHotjarWouldRead('Work')).toEqual([]);
   });
 });

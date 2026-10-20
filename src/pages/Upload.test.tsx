@@ -74,9 +74,10 @@ function uploadButton(): HTMLElement & { disabled?: boolean } {
 }
 
 /** Ionic controls render as custom elements with no implicit ARIA role, so the
- *  remove button is reached by the label it sets rather than by role. */
+ *  remove button is reached through the words it is read out with, which it
+ *  holds as text rather than as a label (see UploadQueue). */
 function removeButton(name: string): HTMLElement {
-  return document.querySelector(`ion-button[aria-label="Remove ${name}"]`) as HTMLElement;
+  return screen.getByText(`Remove ${name}`).closest('ion-button') as HTMLElement;
 }
 
 function landed(storage_type = 'r2') {

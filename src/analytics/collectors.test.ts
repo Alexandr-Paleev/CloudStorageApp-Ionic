@@ -15,6 +15,7 @@ vi.mock('../utils/when-loaded', () => ({
 import {
   addressIsBare,
   allowCollectors,
+  followAnswersFromOtherTabs,
   forgetCollectorsWereStarted,
   refuseCollectors,
   removeTheirCookies,
@@ -236,5 +237,51 @@ describe("the visitor's answer", () => {
 
     expect(document.cookie).toBe('theme=dark');
     document.cookie = 'theme=; Max-Age=0; path=/';
+  });
+});
+
+describe('an answer given in another tab', () => {
+  function fromAnotherTab(value: 'granted' | 'denied') {
+    window.localStorage.setItem('analytics-consent', value);
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'analytics-consent', newValue: value })
+    );
+  }
+
+  it('starts them here too at a yes', () => {
+    forgetConsent();
+    const stop = followAnswersFromOtherTabs(vi.fn());
+
+    fromAnotherTab('granted');
+    settle();
+
+    expect(initializeGA4).toHaveBeenCalledTimes(1);
+    expect(initHotjar).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('loads this page again at a no, once they run in it, and takes their cookies first', () => {
+    startCollectorsOnABareAddress(at('', ''));
+    settle();
+    document.cookie = '_ga=GA1; path=/';
+    const reload = vi.fn();
+    const stop = followAnswersFromOtherTabs(reload);
+
+    fromAnotherTab('denied');
+
+    expect(document.cookie).not.toContain('_ga');
+    expect(reload).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('leaves alone a page they never ran in', () => {
+    forgetConsent();
+    const reload = vi.fn();
+    const stop = followAnswersFromOtherTabs(reload);
+
+    fromAnotherTab('denied');
+
+    expect(reload).not.toHaveBeenCalled();
+    stop();
   });
 });

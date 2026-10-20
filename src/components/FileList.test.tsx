@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import FileList from './FileList';
 import type { FileMetadata } from '../services/storage.service';
 import { HttpError } from '../utils/http.utils';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 const PDF = {
   id: 'f1',
@@ -75,7 +76,7 @@ describe('FileList', () => {
     it('hands the bin’s file to the page, and does not open it', () => {
       const { onOpen, onDelete } = show({ files: [PDF, PHOTO] });
 
-      fireEvent.click(screen.getByLabelText('Delete report.pdf'));
+      fireEvent.click(screen.getByText('Delete report.pdf'));
       expect(onDelete).toHaveBeenCalledWith(PDF);
       expect(onOpen).not.toHaveBeenCalled();
     });
@@ -201,14 +202,27 @@ describe('FileList', () => {
 });
 
 /* A file's name, the sentence a model wrote about it and its picture are the
-   owner's. Hotjar leaves out of a recording what is marked so. */
+   owner's. Hotjar leaves out of a recording only what is marked, and records
+   any attribute it does not know whatever is around it: the label of a
+   button among them. */
 describe('FileList and what Hotjar may record', () => {
-  it('leaves out names, descriptions and pictures', () => {
-    show({ files: [PDF, PHOTO] });
+  it('shows it no name, no description and no picture', () => {
+    const described = { ...PDF, summary: 'A quarterly report for the board' };
+    show({ files: [described, PHOTO] });
 
-    expect(screen.getByText('report.pdf').closest('[data-hj-suppress]')).not.toBeNull();
+    expect(whereHotjarWouldRead('report.pdf')).toEqual([]);
+    expect(whereHotjarWouldRead('sky.jpg')).toEqual([]);
+    expect(whereHotjarWouldRead('quarterly report')).toEqual([]);
     const pictures = document.querySelectorAll('img.file-thumbnail-img');
     expect(pictures.length).toBeGreaterThan(0);
-    for (const picture of pictures) expect(picture).toHaveAttribute('data-hj-suppress');
+    for (const picture of pictures) expect(picture.closest('[data-hj-suppress]')).not.toBeNull();
+  });
+
+  /* What a screen reader says is unchanged: the name is text in the buttons. */
+  it('still names both buttons after the file', () => {
+    show({ files: [PDF] });
+
+    expect(screen.getByRole('button', { name: 'Open report.pdf' })).toBeInTheDocument();
+    expect(screen.getByText('Delete report.pdf').closest('ion-button')).not.toBeNull();
   });
 });

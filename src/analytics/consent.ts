@@ -65,6 +65,24 @@ export function onConsentChange(listener: () => void): () => void {
 }
 
 /**
+ * Calls `listener` with the answer as it now stands when another tab of the
+ * app gives one. Local storage tells every other document of this origin
+ * through a `storage` event, and does not tell the one that wrote. A question
+ * this tab had put again is closed: it has been answered.
+ */
+export function onConsentChangeElsewhere(listener: (consent: Consent | null) => void): () => void {
+  const heard = (event: StorageEvent) => {
+    /* A null key: the origin's storage was cleared as a whole. */
+    if (event.key !== KEY && event.key !== null) return;
+    askingAgain = false;
+    tell();
+    listener(readConsent());
+  };
+  window.addEventListener('storage', heard);
+  return () => window.removeEventListener('storage', heard);
+}
+
+/**
  * Whether there is anything to ask about. Only a production build starts
  * either collector, and only with an id to start it with. Anywhere else,
  * development and CI among them, nothing would be set, and nothing is asked.

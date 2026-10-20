@@ -282,8 +282,11 @@ describe('Account: what the analytics may see', () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText('Allow them'));
     expect(readConsent()).toBe('granted');
+    /* And says what turning them off will do: the page loads again. */
     expect(
-      screen.getByText('Google Analytics and Hotjar may run in this browser.')
+      screen.getByText(
+        'Google Analytics and Hotjar may run in this browser. Turning them off removes their cookies and loads the page again.'
+      )
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Turn them off'));

@@ -135,7 +135,10 @@ const Login: React.FC = () => {
                     required
                     disabled={busy}
                     className="login-input-field"
-                    data-hj-allow
+                    /* Kept out of what Hotjar records, as the password is. It
+                       was marked data-hj-allow, which lets Hotjar keep what is
+                       typed here as soon as its keystroke capture is on. */
+                    data-hj-suppress
                   />
                 </IonItem>
               </div>

@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router';
 import Dashboard from './Dashboard';
 import { renderWithProviders } from '../test/utils';
 import { overlay, overlays, press } from '../test/overlays';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 /**
  * The quota arithmetic, the delete path and what the screen says when a
@@ -153,7 +154,7 @@ describe('Dashboard', () => {
     async function tapTheBin() {
       show();
       expect(await screen.findByText('report.pdf')).toBeInTheDocument();
-      fireEvent.click(document.querySelector('[aria-label="Delete report.pdf"]') as HTMLElement);
+      fireEvent.click(screen.getByText('Delete report.pdf'));
 
       /* Several alerts live on this page — rename, delete folder, delete file —
          and all of them are in the DOM whether showing or not. The one that
@@ -262,5 +263,23 @@ describe('Dashboard', () => {
       await waitFor(() => expect(getItems).toHaveBeenCalled());
       expect(getItems.mock.calls[0]![1]).toMatchObject({ page: 0, pageSize: 15 });
     });
+  });
+});
+
+/* What the dashboard draws of the owner's, in one look: its folders and its
+   files, each with the buttons that are read out with their names. Hotjar may
+   read none of it. */
+describe('Dashboard and what Hotjar may record', () => {
+  it('shows it no name of a file or a folder', async () => {
+    getItems.mockResolvedValue({
+      files: [{ id: 'f1', name: 'payslip-march.pdf', size: 1024, type: 'application/pdf' }],
+      folders: [{ id: 'd1', name: 'Medical letters', parent_id: null, user_id: 'user-1' }],
+    });
+    show();
+
+    expect(await screen.findByText('payslip-march.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Medical letters')).toBeInTheDocument();
+    expect(whereHotjarWouldRead('payslip-march')).toEqual([]);
+    expect(whereHotjarWouldRead('Medical letters')).toEqual([]);
   });
 });

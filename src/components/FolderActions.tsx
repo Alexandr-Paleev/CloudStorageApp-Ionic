@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { IonActionSheet, IonAlert, type AlertInput } from '@ionic/react';
+import { HIDDEN_FROM_HOTJAR } from '../analytics/hotjar';
 import type { Folder } from '../services/storage.service';
 
 interface FolderActionsProps {
@@ -26,6 +27,27 @@ const FolderActions: React.FC<FolderActionsProps> = ({ folder, onClose, onRename
   const [renaming, setRenaming] = useState<Folder | null>(null);
   const [deleting, setDeleting] = useState<Folder | null>(null);
 
+  const menu = useRef<HTMLIonActionSheetElement>(null);
+  const deleteDialog = useRef<HTMLIonAlertElement>(null);
+
+  /* The folder's name reaches the menu and the deletion as a property of
+     their element, not as a prop: a string prop would also be written onto
+     the element as an attribute, where Hotjar reads it (HIDDEN_FROM_HOTJAR).
+     A layout effect, so it is there before the overlay is first painted. */
+  useLayoutEffect(() => {
+    if (menu.current) menu.current.header = folder?.name;
+  }, [folder]);
+
+  useLayoutEffect(() => {
+    if (!deleteDialog.current) return;
+    /* Said in full, because it cannot be undone and because what goes is
+       more than what was clicked: every file inside, and every folder below
+       it. */
+    deleteDialog.current.message = deleting
+      ? `“${deleting.name}” and everything inside it — files and subfolders — will be deleted from storage. This cannot be undone.`
+      : undefined;
+  }, [deleting]);
+
   // A new array only when another name is being edited; see NewFolderDialog.
   const renameInputs = useMemo<AlertInput[]>(
     () => [{ name: 'name', type: 'text', value: renaming?.name, placeholder: 'Folder name' }],
@@ -35,8 +57,9 @@ const FolderActions: React.FC<FolderActionsProps> = ({ folder, onClose, onRename
   return (
     <>
       <IonActionSheet
+        ref={menu}
         isOpen={!!folder}
-        header={folder?.name}
+        htmlAttributes={HIDDEN_FROM_HOTJAR}
         /* The dialog opens here rather than in the button handler: Ionic
            presents one overlay at a time, and an alert asked for while the
            sheet is still dismissing never appears. */
@@ -56,6 +79,7 @@ const FolderActions: React.FC<FolderActionsProps> = ({ folder, onClose, onRename
       <IonAlert
         isOpen={!!renaming}
         onDidDismiss={() => setRenaming(null)}
+        htmlAttributes={HIDDEN_FROM_HOTJAR}
         header="Rename folder"
         inputs={renameInputs}
         buttons={[
@@ -72,13 +96,11 @@ const FolderActions: React.FC<FolderActionsProps> = ({ folder, onClose, onRename
       />
 
       <IonAlert
+        ref={deleteDialog}
         isOpen={!!deleting}
         onDidDismiss={() => setDeleting(null)}
+        htmlAttributes={HIDDEN_FROM_HOTJAR}
         header="Delete folder?"
-        /* Said in full, because it cannot be undone and because what goes is
-           more than what was clicked: every file inside, and every folder
-           below it. */
-        message={`“${deleting?.name}” and everything inside it — files and subfolders — will be deleted from storage. This cannot be undone.`}
         buttons={[
           { text: 'Cancel', role: 'cancel' },
           {

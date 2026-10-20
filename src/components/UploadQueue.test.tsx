@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import UploadQueue from './UploadQueue';
 import { enqueue, update, type QueueItem, type QueueStatus } from '../utils/upload-queue';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 function file(name: string, size = 2048): File {
   return new File([new Uint8Array(size)], name, { type: 'application/pdf' });
@@ -41,9 +42,21 @@ describe('UploadQueue', () => {
     }
   });
 
+  /* A waiting file's name is on its row and in its remove button; a going
+     one's names its progress bar. */
   it('keeps file names out of session recordings', () => {
-    show(queue(['secret-contract.pdf', 'pending']));
-    expect(screen.getByText('secret-contract.pdf')).toHaveAttribute('data-hj-suppress');
+    show(queue(['secret-contract.pdf', 'pending'], ['payslip.pdf', 'uploading', 30]));
+
+    expect(whereHotjarWouldRead('secret-contract.pdf')).toEqual([]);
+    expect(whereHotjarWouldRead('payslip.pdf')).toEqual([]);
+  });
+
+  it('names the progress bar after its file, from the text', () => {
+    show(queue(['payslip.pdf', 'uploading', 30]));
+
+    const bar = document.querySelector('ion-progress-bar')!;
+    const name = document.getElementById(bar.getAttribute('aria-labelledby')!);
+    expect(name).toHaveTextContent('payslip.pdf');
   });
 
   it('says why a file failed, rather than only that it did', () => {
@@ -63,7 +76,7 @@ describe('UploadQueue', () => {
 
   it('lets a queued file be taken out before the run starts', () => {
     const { onRemove } = show(queue(['a.pdf', 'pending']));
-    fireEvent.click(screen.getByLabelText('Remove a.pdf'));
+    fireEvent.click(screen.getByText('Remove a.pdf'));
 
     expect(onRemove).toHaveBeenCalled();
   });
@@ -72,12 +85,12 @@ describe('UploadQueue', () => {
     // Removing the row would leave the upload itself running, for a file
     // nobody can see any more.
     show(queue(['a.pdf', 'pending']), true);
-    expect(screen.queryByLabelText('Remove a.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByText('Remove a.pdf')).not.toBeInTheDocument();
   });
 
   it('does not offer to remove a file that already went', () => {
     show(queue(['a.pdf', 'done']));
-    expect(screen.queryByLabelText('Remove a.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByText('Remove a.pdf')).not.toBeInTheDocument();
   });
 
   it('offers to resume a paused file', () => {

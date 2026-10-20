@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import FileView from './FileView';
 import { renderWithProviders } from '../test/utils';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 /**
  * Sharing, renaming and deleting — the three things this page does to a file
@@ -73,6 +74,16 @@ vi.mock('../native/shell', () => ({
   setStatusBarForDarkBackground: vi.fn(),
   initNativeShell: vi.fn(),
 }));
+
+/* The real frame, sent nowhere: jsdom does not navigate one. PdfFrame.test.tsx
+   says where it goes. */
+vi.mock('../components/PdfFrame', async (importOriginal) => {
+  const { createElement } = await vi.importActual<typeof import('react')>('react');
+  const { default: PdfFrame } = await importOriginal<typeof import('../components/PdfFrame')>();
+  return {
+    default: (props: { url: string }) => createElement(PdfFrame, { ...props, open: () => {} }),
+  };
+});
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router');
@@ -300,5 +311,17 @@ describe('FileView and what Hotjar may record', () => {
 
     expect(document.querySelector('ion-title')).toHaveAttribute('data-hj-suppress');
     expect(document.querySelector('.preview-area')).toHaveAttribute('data-hj-suppress');
+  });
+
+  /* The frame of a PDF is where the file's address would have been an
+     attribute, and the address carries the name, and on R2 and Supabase
+     Storage a signature. */
+  it('shows it neither the name nor the address of the file', async () => {
+    show();
+    await screen.findByText('report.pdf');
+
+    expect(document.querySelector('iframe.preview-pdf-frame')).not.toBeNull();
+    expect(whereHotjarWouldRead('report.pdf')).toEqual([]);
+    expect(whereHotjarWouldRead('cdn.example.com')).toEqual([]);
   });
 });

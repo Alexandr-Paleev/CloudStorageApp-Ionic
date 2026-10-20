@@ -4,7 +4,7 @@ import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './observability/sentry';
 import { trackApiErrorStandalone } from './hooks/useAnalytics';
-import { startCollectorsOnABareAddress } from './analytics/collectors';
+import { followAnswersFromOtherTabs, startCollectorsOnABareAddress } from './analytics/collectors';
 import { initDarkMode } from './theme/dark-mode';
 import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
@@ -52,6 +52,8 @@ function start(): void {
   // route changes when it does.
   startCollectorsOnABareAddress();
   window.addEventListener('hashchange', () => startCollectorsOnABareAddress());
+  // And an answer given in another tab of the app holds in this one too.
+  followAnswersFromOtherTabs();
 
   /**
    * Handle query/mutation errors globally for analytics tracking

@@ -1,6 +1,6 @@
 import { initializeGA4 } from '../hooks/useAnalytics';
 import { whenLoadedAndIdle } from '../utils/when-loaded';
-import { readConsent, writeConsent } from './consent';
+import { onConsentChangeElsewhere, readConsent, writeConsent } from './consent';
 import { initHotjar } from './hotjar';
 
 /**
@@ -87,6 +87,25 @@ export function refuseCollectors(reload: () => void = () => window.location.relo
   writeConsent('denied');
   removeTheirCookies();
   if (running) reload();
+}
+
+/**
+ * Follows an answer given in another tab of the app. A yes starts the two
+ * here as well, once the address allows. A no stops them the only way they
+ * stop, by loading this page again, as in the tab where it was given; their
+ * cookies go first, in case this page wrote them again in the meantime.
+ */
+export function followAnswersFromOtherTabs(
+  reload: () => void = () => window.location.reload()
+): () => void {
+  return onConsentChangeElsewhere((consent) => {
+    if (consent === 'granted') {
+      startCollectorsOnABareAddress();
+    } else if (state === 'started') {
+      removeTheirCookies();
+      reload();
+    }
+  });
 }
 
 /* Google Analytics names its cookies `_ga` and `_ga_<id>`, and sets them on

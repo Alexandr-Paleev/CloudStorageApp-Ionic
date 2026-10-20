@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import FolderGrid from './FolderGrid';
 import type { Folder } from '../services/storage.service';
+import { whereHotjarWouldRead } from '../test/hotjar';
 
 const folder = (id: string, name: string): Folder =>
   ({ id, name, parent_id: null, user_id: 'user-1' }) as Folder;
@@ -44,7 +45,7 @@ describe('FolderGrid', () => {
   it('opens the menu of that folder, and not the folder', () => {
     const { onOpen, onActions } = show([WORK, INVOICES]);
 
-    fireEvent.click(screen.getByLabelText('Actions for Work'));
+    fireEvent.click(screen.getByText('Actions for Work'));
     expect(onActions).toHaveBeenCalledWith(WORK);
     expect(onOpen).not.toHaveBeenCalled();
   });
@@ -52,18 +53,16 @@ describe('FolderGrid', () => {
   /* The end-to-end suite finds a folder's menu by this id. */
   it('gives each menu button an id of its folder', () => {
     show([WORK]);
-    expect(screen.getByTestId('folder-actions-a')).toHaveAttribute(
-      'aria-label',
-      'Actions for Work'
-    );
+    expect(screen.getByTestId('folder-actions-a')).toHaveTextContent('Actions for Work');
   });
 });
 
+/* The card says the name three times: on it, and to a screen reader on its two
+   buttons. Hotjar must read it in none of them. */
 describe('FolderGrid and what Hotjar may record', () => {
-  it('leaves out the names of folders', () => {
+  it('shows it no folder name', () => {
     show([WORK, INVOICES]);
-    for (const name of document.querySelectorAll('.folder-card .folder-name')) {
-      expect(name).toHaveAttribute('data-hj-suppress');
-    }
+    expect(whereHotjarWouldRead('Work')).toEqual([]);
+    expect(whereHotjarWouldRead('Invoices')).toEqual([]);
   });
 });

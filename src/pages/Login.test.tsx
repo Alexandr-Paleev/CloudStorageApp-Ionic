@@ -183,6 +183,19 @@ describe('Login', () => {
     for (const link of [terms, privacy]) expect(link).toHaveAttribute('target', '_blank');
   });
 
+  /* The e-mail used to be marked data-hj-allow: Hotjar would have kept it as
+     typed the day its keystroke capture was switched on. */
+  it('keeps what is typed out of what Hotjar records, the e-mail as the password', () => {
+    show();
+
+    const fields = document.querySelectorAll('ion-input');
+    expect(fields).toHaveLength(2);
+    for (const field of fields) {
+      expect(field).toHaveAttribute('data-hj-suppress');
+      expect(field).not.toHaveAttribute('data-hj-allow');
+    }
+  });
+
   it('sends an already-signed-in visitor away rather than showing the form', () => {
     user.current = { id: 'user-1' };
     show();

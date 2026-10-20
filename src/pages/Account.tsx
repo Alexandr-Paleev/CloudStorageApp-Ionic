@@ -202,7 +202,7 @@ const Account: React.FC = () => {
               <h2 className="account-heading">Analytics cookies</h2>
               <p className="account-consent">
                 {consent === 'granted'
-                  ? 'Google Analytics and Hotjar may run in this browser.'
+                  ? 'Google Analytics and Hotjar may run in this browser. Turning them off removes their cookies and loads the page again.'
                   : 'Google Analytics and Hotjar do not run in this browser.'}
               </p>
               {consent === 'granted' ? (

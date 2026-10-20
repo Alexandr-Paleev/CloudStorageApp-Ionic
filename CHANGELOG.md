@@ -38,8 +38,9 @@ reasoning behind the larger decisions lives in
   app is run from Spain. A banner in the app's own style now asks, with a no
   as easy to give as a yes, and until the answer is yes neither starts. The
   answer is kept in the browser and can be changed from the foot of the
-  sign-in page or on the Account page; turning them off removes their
-  cookies and loads the page again. The banner waits for the page to load
+  sign-in page or on the Account page, and the app's other open tabs follow
+  it; turning them off removes their cookies and loads the page again, as
+  the Account page says. The banner waits for the page to load
   and for the visitor's first tap or key, because Chrome stops choosing the
   largest contentful paint at that moment, and a card of text arriving on
   its own could have become the login page's. `npm run smoke` now visits as
@@ -84,14 +85,28 @@ reasoning behind the larger decisions lives in
   now says when it was measured: it reads 451 and 401 kB, and the first load
   is 372 kB today. The list of storage backends says which two are not on the
   demo yet.
-- **Hotjar was free to record names, pictures and an e-mail address.** The
-  README said file names and sensitive data were masked from it; only the
-  upload queue's names were. The list of files, the folders and the path
-  above them, the title and preview of an open file, and the account's
-  e-mail are now marked `data-hj-suppress`, which Hotjar leaves out of what
-  it records whatever its site settings say, and its settings for this site
-  do not hide e-mail addresses. The README also said Hotjar does not run in
-  the native builds. Nothing stops it there, and the README now says so.
+- **Hotjar was free to record names, pictures, an e-mail address and a
+  signed link to a file.** The README said file names and sensitive data
+  were masked from it; only the upload queue's names were, and not all of
+  them. The list of files, the folders and the path above them, a folder's
+  menu and dialogs, the title, preview and deletion of an open file, and the
+  account's e-mail are now marked `data-hj-suppress`, which Hotjar leaves
+  out of what it records whatever its site settings say, and its settings
+  for this site do not hide e-mail addresses. The mark hides text and
+  pictures, and Hotjar's own code records every attribute but a few as it
+  is, so no name is written into one any more. The buttons that were
+  labelled with a file's name hold it as text, which a screen reader reads
+  the same. A folder's name reaches its menu and its deletion as a property
+  of the element, not as a prop, which @ionic/react writes onto the element
+  as an attribute as well. The frame of a PDF is sent to the file instead of
+  being given its address, which was signed for an hour and carried the
+  name. The sign-in form's e-mail field was marked `data-hj-allow`, which
+  lets Hotjar keep what is typed there once its keystroke capture is on; it
+  is hidden like the password now. A test reads a rendered page with
+  Hotjar's rule (`src/test/hotjar.ts`), and ten deliberate leaks were each
+  caught by it or by the tests beside it. The README also said Hotjar does
+  not run in the native builds. Nothing stops it there, and the README now
+  says so.
 - **The privacy policy left out a recipient of semantic search, and what
   it gets.** Indexing a file sends its name as well as its contents; when
   the model is Anthropic's, Voyage AI turns the name and the model's

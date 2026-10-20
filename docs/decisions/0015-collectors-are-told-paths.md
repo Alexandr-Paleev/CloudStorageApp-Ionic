@@ -152,3 +152,27 @@ Analytics did.
 a visitor who has not, in which nothing may be asked for. A build's sign-in
 page offers the cookie settings when it has collectors, which tells a yes that
 started nothing from a build with nothing to start.
+
+## Update — 2026-10-18
+
+One address was still told to Hotjar, through the channel this record had
+not asked about: attributes. Hotjar hides text and pictures under
+`data-hj-suppress`, and records any attribute it does not know as it is
+(`hj.privacy.isAttributeSuppressable` in its own code), inside a hidden
+element or not. The frame of a PDF was given its address as `src`: on R2 and
+Supabase Storage a signed one, open to whoever held it for an hour, with the
+file's name in its path. The frame is now sent there through its own window
+and has no `src` (`src/components/PdfFrame.tsx`); the page's `frame-src`
+applies to that navigation as it did to the attribute. It goes to an http(s)
+address or nowhere: the frame starts as about:blank, of the app's own origin,
+and React, which refuses a `javascript:` address in `src`, is not asked here.
+
+Names had reached attributes the same way: as the labels of buttons, as the
+id of an upload's name, which was made of it, and as string props of
+Ionic's dialogs, which @ionic/react also writes onto their element. They are
+text, a generated id and properties now. `src/test/hotjar.ts` reads a
+rendered page with Hotjar's rule, and the tests of the dashboard and of what
+it is built from ask it about every name they show.
+
+Recording is switched off in Hotjar's settings for this site (`record: false`,
+read on 2026-10-18). The marks and the test are for the day it is switched on.

@@ -7,6 +7,7 @@ import {
   collectorsConfigured,
   forgetConsent,
   onConsentChange,
+  onConsentChangeElsewhere,
   questionIsOpen,
   readConsent,
   writeConsent,
@@ -84,5 +85,50 @@ describe('whether there is anything to ask', () => {
   it('is no outside a production build', () => {
     vi.stubEnv('PROD', false);
     expect(collectorsConfigured()).toBe(false);
+  });
+});
+
+/* Local storage tells the other tabs of the app, and not the one that wrote. */
+describe('an answer given in another tab', () => {
+  function fromAnotherTab(value: string, key = 'analytics-consent') {
+    if (key === 'analytics-consent') window.localStorage.setItem(key, value);
+    window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }));
+  }
+
+  it('is passed on, and told to whoever listens here', () => {
+    const passed = vi.fn();
+    const told = vi.fn();
+    const stopTelling = onConsentChange(told);
+    const stop = onConsentChangeElsewhere(passed);
+
+    fromAnotherTab('denied');
+
+    expect(passed).toHaveBeenCalledWith('denied');
+    expect(told).toHaveBeenCalledTimes(1);
+    stop();
+    stopTelling();
+  });
+
+  it('closes a question this tab had put again', () => {
+    writeConsent('granted');
+    askAgain();
+    const stop = onConsentChangeElsewhere(vi.fn());
+
+    fromAnotherTab('denied');
+
+    expect(questionIsOpen()).toBe(false);
+    stop();
+  });
+
+  it('is not heard for anything else kept there, nor once nobody listens', () => {
+    const passed = vi.fn();
+    const stop = onConsentChangeElsewhere(passed);
+
+    fromAnotherTab('dark', 'theme');
+    expect(passed).not.toHaveBeenCalled();
+
+    stop();
+    fromAnotherTab('granted');
+    expect(passed).not.toHaveBeenCalled();
   });
 });
