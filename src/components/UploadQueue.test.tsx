@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import UploadQueue from './UploadQueue';
 import { enqueue, update, type QueueItem, type QueueStatus } from '../utils/upload-queue';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 function file(name: string, size = 2048): File {
   return new File([new Uint8Array(size)], name, { type: 'application/pdf' });
@@ -98,5 +99,25 @@ describe('UploadQueue', () => {
     fireEvent.click(screen.getByText('Resume'));
 
     expect(onRetry).toHaveBeenCalled();
+  });
+});
+
+/* Each state draws a row of its own: a finished, failed or paused one has an
+   icon with a label, and a paused one its own buttons. */
+describe('UploadQueue and what Sentry may be told', () => {
+  it('describes no tap on a row by its file’s name, in any state', () => {
+    show(
+      queue(
+        ['waiting.pdf', 'pending'],
+        ['going.pdf', 'uploading', 30],
+        ['finished.pdf', 'done', 100],
+        ['refused.pdf', 'failed'],
+        ['stopped.pdf', 'paused', 60]
+      )
+    );
+
+    for (const name of ['waiting', 'going', 'finished', 'refused', 'stopped']) {
+      expect(whereSentryWouldRead(`${name}.pdf`)).toEqual([]);
+    }
   });
 });

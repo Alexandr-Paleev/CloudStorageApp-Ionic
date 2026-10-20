@@ -104,7 +104,7 @@ We implement industry-standard security measures:
 We use:
 - **Essential storage**: the app keeps your sign-in session, and your answer about analytics cookies, in your browser's local storage
 - **Analytics cookies**: Google Analytics 4 sets its own cookies in the app, and so does Hotjar, which the app also loads. Neither runs until you accept them in the banner the app shows. Your answer is kept in this browser for 24 months, and asked for again sooner if the tools or what they are used for change; you can change it at any time, from the foot of the sign-in page or on the Account page. Turning them off removes their cookies, and so does the app whenever it starts without a yes from you. They also wait until the page's address carries no sign-in tokens or codes, and blocking them in your browser does not break the app
-- **Error reports**: Sentry receives a report when the app fails, and every field in it that holds an address is cut at the address's query string and fragment
+- **Error reports**: Sentry receives a report when the app fails. Every field in it that holds an address is cut at the address's query string and fragment, and the names of your files are cut out of the addresses and paths in it
 - **No third-party advertising cookies**
 
 The public site sets no analytics cookies.

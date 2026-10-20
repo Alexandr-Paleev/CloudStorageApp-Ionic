@@ -3,6 +3,7 @@ import storageService from './storage.service';
 import { providerManager } from '../providers/ProviderManager';
 import supabaseService from './supabase.service';
 import * as Sentry from '../observability/sentry';
+import { withoutSecrets } from '../observability/scrub';
 import { HttpError } from '../utils/http.utils';
 import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 
@@ -216,6 +217,55 @@ describe('uploadFile', () => {
     );
     expect(r2.upload).toHaveBeenCalledTimes(1);
     expect(supabaseService.saveFileMetadata).not.toHaveBeenCalled();
+  });
+});
+
+/* A file's name is the owner's. Sentry is told whose upload went wrong and
+   which object it left, and what it was called by neither the report nor the
+   console, whose lines Sentry keeps as breadcrumbs. */
+describe('what an upload tells Sentry', () => {
+  const OWNER = '7d0b3e8a-2c4f-4b1e-9a6d-0f5e2c1b3a49';
+  const NAME = 'payslip-march.pdf';
+  const stored = {
+    url: `https://account.r2.example/files/users/${OWNER}/1760950000000_${NAME}`,
+    path: `users/${OWNER}/1760950000000_${NAME}`,
+    type: 'r2' as const,
+  };
+
+  it('reports a failed upload and the object it left without the name', async () => {
+    const r2 = provider({
+      upload: vi.fn(async () => stored),
+      delete: vi.fn(async () => Promise.reject(new Error('R2 unreachable'))),
+    });
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+    vi.mocked(supabaseService.saveFileMetadata).mockRejectedValue(new Error('duplicate key'));
+
+    await expect(storageService.uploadFile(OWNER, file(NAME))).rejects.toThrow('duplicate key');
+
+    // As it is sent: what the app hands Sentry goes through beforeSend first.
+    const reports = vi.mocked(Sentry.captureException).mock.calls.map(([, context]) => context);
+    expect(reports).toHaveLength(2);
+    const sent = JSON.stringify(withoutSecrets(reports));
+    expect(sent).not.toContain('payslip');
+    expect(sent).toContain(`users/${OWNER}/1760950000000_[name]`);
+  });
+
+  it('writes no name to the console when it tries again', async () => {
+    vi.useFakeTimers();
+    const r2 = provider({
+      upload: vi
+        .fn()
+        .mockRejectedValueOnce(new HttpError('Bad gateway', 502))
+        .mockResolvedValue(uploaded),
+    });
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+
+    const pending = storageService.uploadFile('user-1', file(NAME));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await pending;
+
+    expect(console.warn).toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('payslip');
   });
 });
 

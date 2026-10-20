@@ -5,6 +5,7 @@ import Dashboard from './Dashboard';
 import { renderWithProviders } from '../test/utils';
 import { overlay, overlays, press } from '../test/overlays';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 /**
  * The quota arithmetic, the delete path and what the screen says when a
@@ -281,5 +282,19 @@ describe('Dashboard and what Hotjar may record', () => {
     expect(screen.getByText('Medical letters')).toBeInTheDocument();
     expect(whereHotjarWouldRead('payslip-march')).toEqual([]);
     expect(whereHotjarWouldRead('Medical letters')).toEqual([]);
+  });
+});
+
+describe('Dashboard and what Sentry may be told', () => {
+  it('describes no tap on it by the name of a file or a folder', async () => {
+    getItems.mockResolvedValue({
+      files: [{ id: 'f1', name: 'payslip-march.pdf', size: 1024, type: 'application/pdf' }],
+      folders: [{ id: 'd1', name: 'Medical letters', parent_id: null, user_id: 'user-1' }],
+    });
+    show();
+
+    expect(await screen.findByText('payslip-march.pdf')).toBeInTheDocument();
+    expect(whereSentryWouldRead('payslip-march')).toEqual([]);
+    expect(whereSentryWouldRead('Medical letters')).toEqual([]);
   });
 });

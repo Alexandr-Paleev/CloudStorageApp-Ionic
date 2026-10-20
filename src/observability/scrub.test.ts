@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { withoutQuery, withoutSecrets } from './scrub';
+import { withoutName, withoutQuery, withoutSecrets } from './scrub';
 
 const SIGN_IN = 'https://app.example/dashboard#access_token=aaa.bbb.ccc&refresh_token=rrr';
 
@@ -169,5 +169,120 @@ describe('a Sentry event, before it is sent', () => {
     const event = eventAtASignIn();
 
     expect(withoutSecrets(event)).toBe(event);
+  });
+});
+
+/* An owner's id as Supabase writes one, and the time an upload is named by. */
+const OWNER = '7d0b3e8a-2c4f-4b1e-9a6d-0f5e2c1b3a49';
+const UPLOADED = '1760950000000';
+
+describe('a stored file, without its name', () => {
+  it.each([
+    [
+      'an upload to Supabase Storage, as Sentry describes the request',
+      `POST https://project.supabase.example/storage/v1/object/files/${OWNER}/${UPLOADED}_payslip-march.pdf`,
+      `POST https://project.supabase.example/storage/v1/object/files/${OWNER}/${UPLOADED}_[name]`,
+    ],
+    [
+      'the signing of one, which the page asks for to show it',
+      `https://project.supabase.example/storage/v1/object/sign/files/${OWNER}/${UPLOADED}_payslip-march.pdf`,
+      `https://project.supabase.example/storage/v1/object/sign/files/${OWNER}/${UPLOADED}_[name]`,
+    ],
+    [
+      'an upload to R2, its name escaped as an address escapes it',
+      `https://account.r2.example/files/users/${OWNER}/${UPLOADED}_payslip%20march%20(1).pdf`,
+      `https://account.r2.example/files/users/${OWNER}/${UPLOADED}_[name]`,
+    ],
+    [
+      'an R2 key by itself, as an error report holds it',
+      `users/${OWNER}/${UPLOADED}_payslip march (1).pdf`,
+      `users/${OWNER}/${UPLOADED}_[name]`,
+    ],
+    [
+      'a Supabase Storage path by itself',
+      `${OWNER}/${UPLOADED}_payslip-march.pdf`,
+      `${OWNER}/${UPLOADED}_[name]`,
+    ],
+    [
+      'a path that does not start with the time',
+      `${OWNER}/payslip-march.pdf_${UPLOADED}`,
+      `${OWNER}/[name]`,
+    ],
+    [
+      'a Cloudinary picture, whose id is Cloudinary’s own and goes as well',
+      `https://res.cloudinary.example/demo/image/upload/v1767872018/users/${OWNER}/k3j9x2`,
+      `https://res.cloudinary.example/demo/image/upload/v1767872018/users/${OWNER}/[name]`,
+    ],
+  ])('%s', (_what, text, cut) => {
+    expect(withoutName(text)).toBe(cut);
+  });
+
+  it.each([
+    ['a page of the app that ends at an id', `/file/${OWNER}`],
+    ['a folder on the dashboard', `https://app.example/dashboard/${OWNER}`],
+    ['the folder of an owner with nothing after it', `users/${OWNER}/`],
+    ['an id that is not a segment of its own', `https://app.example/x${OWNER}/a`],
+    ['an address with no owner in it', 'https://app.example/assets/index-abc123.js'],
+  ])('leaves %s as it is', (_what, text) => {
+    expect(withoutName(text)).toBe(text);
+  });
+
+  /* The same limit as for an address, said out loud. */
+  it('does not find a path inside a sentence', () => {
+    const sentence = `Could not delete users/${OWNER}/${UPLOADED}_payslip-march.pdf`;
+
+    expect(withoutName(sentence)).toBe(sentence);
+  });
+});
+
+/* An upload that failed after its bytes had gone, and whose object could not
+   be removed: the breadcrumbs of the two requests, the trace of the second,
+   and what storage.service.ts reports about the object left behind. */
+function eventOfAnUpload() {
+  const signed = `https://account.r2.example/files/users/${OWNER}/${UPLOADED}_payslip%20march.pdf?X-Amz-Signature=sss`;
+  return {
+    breadcrumbs: [
+      {
+        category: 'fetch',
+        data: {
+          method: 'POST',
+          url: `https://project.supabase.example/storage/v1/object/sign/files/${OWNER}/${UPLOADED}_payslip-march.pdf`,
+          status_code: 200,
+        },
+      },
+      { category: 'xhr', data: { method: 'PUT', url: signed, status_code: 0 } },
+    ],
+    spans: [
+      {
+        op: 'http.client',
+        description: `PUT ${signed}`,
+        data: { 'url.full': signed, 'server.address': 'account.r2.example' },
+      },
+    ],
+    exception: { values: [{ type: 'Error', value: 'R2 unreachable' }] },
+    tags: { context: 'storage.uploadFile.cleanup' },
+    extra: { path: `users/${OWNER}/${UPLOADED}_payslip march.pdf`, userId: OWNER },
+  };
+}
+
+describe('a Sentry event about an upload, before it is sent', () => {
+  it('carries no name of the file anywhere in it', () => {
+    const sent = JSON.stringify(withoutSecrets(eventOfAnUpload()));
+
+    expect(sent).not.toContain('payslip');
+    expect(sent).not.toContain('sss');
+  });
+
+  it('still says which object it was: whose, and when it was uploaded', () => {
+    const event = withoutSecrets(eventOfAnUpload());
+
+    expect(event.extra).toEqual({ path: `users/${OWNER}/${UPLOADED}_[name]`, userId: OWNER });
+    expect(event.breadcrumbs[1]?.data.url).toBe(
+      `https://account.r2.example/files/users/${OWNER}/${UPLOADED}_[name]`
+    );
+    expect(event.spans[0]?.description).toBe(
+      `PUT https://account.r2.example/files/users/${OWNER}/${UPLOADED}_[name]`
+    );
+    expect(event.exception.values[0]?.value).toBe('R2 unreachable');
   });
 });

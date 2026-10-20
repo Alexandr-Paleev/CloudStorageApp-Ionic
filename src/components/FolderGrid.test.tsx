@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import FolderGrid from './FolderGrid';
 import type { Folder } from '../services/storage.service';
 import { whereHotjarWouldRead } from '../test/hotjar';
+import { whereSentryWouldRead } from '../test/sentry';
 
 const folder = (id: string, name: string): Folder =>
   ({ id, name, parent_id: null, user_id: 'user-1' }) as Folder;
@@ -64,5 +65,15 @@ describe('FolderGrid and what Hotjar may record', () => {
     show([WORK, INVOICES]);
     expect(whereHotjarWouldRead('Work')).toEqual([]);
     expect(whereHotjarWouldRead('Invoices')).toEqual([]);
+  });
+});
+
+/* Sentry describes a tap by the element tapped, and the alt, title and label
+   of an element are part of that. */
+describe('FolderGrid and what Sentry may be told', () => {
+  it('describes no tap on a card by the folder’s name', () => {
+    show([WORK, INVOICES]);
+    expect(whereSentryWouldRead('Work')).toEqual([]);
+    expect(whereSentryWouldRead('Invoices')).toEqual([]);
   });
 });

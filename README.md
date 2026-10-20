@@ -463,12 +463,19 @@ Analytics are automatically enabled in production when environment variables are
 > of the sign-in form, and what is said back about them (the words of a search,
 > a sign-in's error) are marked `data-hj-suppress`. That hides text and
 > pictures and not attributes, which Hotjar records as they are, so no name is
-> written into one: a button is read out with text it holds, a progress bar is
-> named by the text beside it, and a PDF's frame is sent to the file rather
-> than given its address. A test reads the page with Hotjar's own rule
+> written into one: a button is read out with text it holds, a progress bar and
+> a picture are named by the text beside them, and a PDF's frame is sent to the
+> file rather than given its address. A test reads the page with Hotjar's own rule
 > (`src/test/hotjar.ts`). Both run in a production build that has their ids,
 > the iOS and Android builds included. Hotjar starts nothing over http or in a
 > headless browser, so `npm run smoke` sees it only against an https address.
+>
+> Sentry is told no file's name either. A stored file's path ends in it, and
+> `src/observability/scrub.ts` cuts what follows the owner's id out of every
+> address and path in a report, keeping the time of the upload. A tap is
+> described by the `alt`, `title` and `aria-label` of what was tapped, which
+> hold no name, and a test describes each element of the rendered pages with
+> Sentry's own function (`src/test/sentry.ts`).
 
 ### 4. Run Application
 
