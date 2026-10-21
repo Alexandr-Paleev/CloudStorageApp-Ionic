@@ -32,5 +32,15 @@ family so that `@aws-sdk`'s three packages move together.
   [`scripts/audit-production.mjs`](../../scripts/audit-production.mjs), which
   separates a verdict from an unreachable endpoint. The threshold, the
   `--omit=dev` and the reasoning above are unchanged.
+- *Amended in v4.11.1:* the other half of the old sentence, "minor and patch
+  still arrive weekly", was not true either. `open-pull-requests-limit` was 5,
+  a group counts as one pull request, and the groups are opened first, so an
+  update outside them got a slot only in a week when fewer than five groups had
+  something. The rest were dropped rather than queued, to lose to the same
+  groups the next Monday. On 2026-10-19 that was seventeen updates, vite 8.3
+  among them six weeks after its release, and two days later three advisories
+  against vite 8.2.2 had no pull request to carry the fix. Every update is in a
+  group now — the families, and `runtime` and `tooling` for the rest — and the
+  limit stays above the number of groups. The comment above the limit says why.
 - Majors are still owed a periodic manual pass. Nothing automates that, and this
   record does not pretend otherwise.

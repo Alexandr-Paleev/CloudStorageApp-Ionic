@@ -10,6 +10,20 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependabot opens a pull request for every update it finds.** Its limit
+  was five open pull requests, a group counts as one, and the groups are
+  opened first: an update outside them got a slot only in a week when fewer
+  than five groups had something, and what did not fit was dropped, not
+  queued. On October 19 the run found five groups and seventeen single
+  updates and opened the five. vite 8.3 had been out since September 10 and
+  was never proposed, so when three advisories against vite 8.2.2 arrived on
+  October 21 there was no pull request to carry the fix. Every update is in a
+  group now: Capacitor, the build and lint have one each, and what no family
+  claims goes to `runtime` or `tooling`, by whether it runs in production.
+  The limit is 15, above the 13 groups.
+
 ### Fixed
 
 - **Sentry was told the names of files.** A stored file's path ends in its
