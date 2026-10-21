@@ -8,7 +8,17 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    # Above the number of groups below, and it has to stay there. The limit
+    # counts pull requests, a group is one, and the groups are opened first.
+    # At 5, with eight groups, an update outside them got a slot only in a
+    # week when fewer than five groups had something, and the rest were not
+    # queued: they were dropped, to lose to the same groups the next Monday.
+    # On 2026-10-19 the run found five groups and seventeen single updates
+    # and opened the five. vite 8.3, out since 2026-09-10, was never
+    # proposed, and three advisories against vite 8.2.2 then found no pull
+    # request to carry the fix. Every update is in a group now, so a run
+    # opens at most one pull request per group, and all of them fit.
+    open-pull-requests-limit: 15
     groups:
       # One PR per family instead of a dozen: @aws-sdk alone ships three
       # packages that must move together.
@@ -23,9 +33,10 @@ updates:
       # React does not start unless react and react-dom are the same version.
       # An update that moved one without the other built an app that rendered
       # nothing; the smoke test and the end-to-end suite both said so, and the
-      # pull request could only be closed. Listed before `types`, because a
-      # dependency joins the first group it matches and these two have types
-      # of their own.
+      # pull request could only be closed. These two have types of their own,
+      # and the types stay here rather than in `types`: a dependency joins the
+      # most specific group that matches it ("belongs to more specific group
+      # 'react'", in Dependabot's own log).
       react:
         patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
       types:
@@ -37,6 +48,27 @@ updates:
       # Next and the lint plugin that knows its rules are released together.
       next:
         patterns: ['next', '@next/*']
+      # Core, cli and the two platforms are released together, and
+      # `npx cap sync` writes every plugin into both native projects. Six of
+      # the seventeen updates dropped on 2026-10-19 were these.
+      capacitor:
+        patterns: ['@capacitor/*']
+      # What turns the source into the bundle. A change here can move every
+      # chunk, so it comes on its own, to be measured with `npm run size` and
+      # `npm run smoke` rather than merged with whatever else was due.
+      build:
+        patterns: ['vite', '@vitejs/*', 'vite-plugin-pwa', 'workbox-*']
+      lint:
+        patterns: ['eslint', '@eslint/*', 'eslint-plugin-*', 'typescript-eslint', 'globals']
+      # Everything no family above claims, split by where it runs. `*` is the
+      # least specific pattern there is, so a dependency that a group above
+      # names stays in that group.
+      runtime:
+        dependency-type: production
+        patterns: ['*']
+      tooling:
+        dependency-type: development
+        patterns: ['*']
     ignore:
       # Majors are migrations, not updates: they need a changelog read and a
       # decision, which is exactly what an automated PR cannot supply. The
