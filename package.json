@@ -51,7 +51,7 @@
     "generate:demo-assets": "node scripts/generate-demo-assets.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/sdk": "^0.135.0",
     "@aws-sdk/client-s3": "^3.1152.0",
     "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@capacitor/android": "^8.5.1",
@@ -65,15 +65,15 @@
     "@capacitor/status-bar": "^8.0.3",
     "@ionic/react": "^9.0.8",
     "@sentry/react": "^10.76.2",
-    "@supabase/supabase-js": "^2.116.0",
-    "@tanstack/react-query": "^5.104.1",
+    "@supabase/supabase-js": "^2.118.0",
+    "@tanstack/react-query": "^5.104.4",
     "cloudinary": "^2.11.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-ga4": "^2.1.0",
     "react-router": "^7.18.4",
-    "stripe": "^22.6.1",
-    "zod": "^4.6.5"
+    "stripe": "^22.6.2",
+    "zod": "^4.6.7"
   },
   "overrides": {
     "@babel/plugin-transform-runtime": "^7.29.0"
