@@ -267,6 +267,28 @@ describe('what an upload tells Sentry', () => {
     expect(console.warn).toHaveBeenCalled();
     expect(JSON.stringify(vi.mocked(console.warn).mock.calls)).not.toContain('payslip');
   });
+
+  it('reports a row the database refused once, with whose upload it was', async () => {
+    // What supabase-js hands over is the body PostgREST answered with, not an
+    // Error (src/utils/postgrest-error.test.ts asks a real client).
+    const refusal = {
+      code: '42501',
+      details: null,
+      hint: null,
+      message: 'new row violates row-level security policy for table "files"',
+    };
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(provider());
+    vi.mocked(supabaseService.saveFileMetadata).mockRejectedValue(refusal);
+
+    await expect(storageService.uploadFile(OWNER, file())).rejects.toThrow(
+      `Failed to finalize upload: ${refusal.message}`
+    );
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(refusal, {
+      tags: { context: 'storage.uploadFile' },
+      extra: { userId: OWNER },
+    });
+  });
 });
 
 describe('canUploadToLocal', () => {
@@ -313,6 +335,27 @@ describe('deleteFile', () => {
       'Failed to delete file from storage: R2 unreachable'
     );
     expect(supabaseService.deleteFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it('says what the database said when the row could not be deleted', async () => {
+    vi.mocked(supabaseService.getFileMetadata).mockResolvedValue({
+      id: 'file-1',
+      name: 'report.pdf',
+      type: 'application/pdf',
+      storage_type: 'r2',
+      storage_path: 'user-1/abc',
+    } as unknown as Awaited<ReturnType<typeof supabaseService.getFileMetadata>>);
+    vi.mocked(providerManager.getProvider).mockReturnValue(provider());
+    vi.mocked(supabaseService.deleteFileMetadata).mockRejectedValue({
+      code: '57014',
+      details: null,
+      hint: null,
+      message: 'canceling statement due to statement timeout',
+    });
+
+    await expect(storageService.deleteFile('file-1', 'user-1')).rejects.toThrow(
+      'Failed to delete file metadata: canceling statement due to statement timeout'
+    );
   });
 });
 

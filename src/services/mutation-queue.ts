@@ -1,4 +1,5 @@
 import { idbRun, type DatabaseSpec } from './idb';
+import { messageOf } from '../utils/postgrest-error';
 
 /**
  * Changes made while the network was not there.
@@ -341,7 +342,7 @@ export async function flushQueue(
       }
 
       const attempts = entry.attempts + 1;
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = messageOf(error) ?? 'Unknown error';
 
       if (attempts >= MAX_ATTEMPTS) {
         await store.remove(entry.id);

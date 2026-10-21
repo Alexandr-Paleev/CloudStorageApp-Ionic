@@ -32,6 +32,23 @@ reasoning behind the larger decisions lives in
   were each caught by a test. The upload queue's test draws all five states
   of an upload now; it drew two, and a label on the icon of the other three
   would have gone unseen.
+- **Sentry told one database error from another by opening each.** A query
+  that fails does not throw in supabase-js: it resolves with the body
+  PostgREST answered with, parsed, which is not an Error. Sentry gave every
+  such object one title, "Object captured as exception with keys: code,
+  details, hint, message", so a policy refusing a row and a statement that
+  timed out were one issue. The facade now sends it as a `PostgrestError`,
+  titled by what the database said, with its code as a tag and in the
+  fingerprint and its details and hint as a context of their own, the fields
+  Sentry was sent before. A failed upload is reported with the user's id: the
+  service under it had reported the same object first, and Sentry drops a
+  second capture of an object, so the report with the id never arrived. Four
+  places turned the same object into "Unknown error" — the reason a queued
+  change was given up, which was then reported as that, the messages of a
+  failed upload and of a failed delete, and what Google Analytics was told
+  about a failed change — and read the database's message now. The tests ask
+  a real supabase-js client and the real Sentry, and fourteen deliberate
+  faults were each caught by one.
 
 ## [4.11.0] — 2026-10-20
 

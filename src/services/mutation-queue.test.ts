@@ -251,6 +251,21 @@ describe('flushQueue', () => {
     expect(rows()[0]).toMatchObject({ attempts: 1, lastError: 'File not found or access denied' });
   });
 
+  it('keeps what the database said about a change it refused', async () => {
+    // Not an Error: the body PostgREST answered with, as supabase-js hands it
+    // over. It used to be kept as "Unknown error", and reported as that.
+    const message = 'new row violates row-level security policy for table "folders"';
+    const { store, rows } = fakeStore([queued({ kind: 'deleteFile', fileId: 'f1' })]);
+
+    await flushQueue(
+      vi.fn().mockRejectedValue({ code: '42501', details: null, hint: null, message }),
+      OWNER,
+      store
+    );
+
+    expect(rows()[0]).toMatchObject({ attempts: 1, lastError: message });
+  });
+
   it('gives up on it eventually, so it cannot block the queue forever', async () => {
     const { store, rows } = fakeStore([
       queued({ kind: 'deleteFile', fileId: 'f1' }, { attempts: MAX_ATTEMPTS - 1 }),

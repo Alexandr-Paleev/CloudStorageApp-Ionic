@@ -13,6 +13,7 @@ import { initDarkMode } from './theme/dark-mode';
 import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
 import { movedShareLink } from './utils/share-link.utils';
+import { messageOf } from './utils/postgrest-error';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -67,7 +68,7 @@ function start(): void {
    * Handle query/mutation errors globally for analytics tracking
    */
   function handleQueryError(error: unknown, queryKey?: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = messageOf(error) ?? 'Unknown error';
     const queryKeyString = queryKey ? JSON.stringify(queryKey) : undefined;
 
     trackApiErrorStandalone({
