@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.11.1] — 2026-10-22
+
 ### Changed
 
 - **Dependabot opens a pull request for every update it finds.** Its limit
@@ -22,7 +26,11 @@ reasoning behind the larger decisions lives in
   October 21 there was no pull request to carry the fix. Every update is in a
   group now: Capacitor, the build and lint have one each, and what no family
   claims goes to `runtime` or `tooling`, by whether it runs in production.
-  The limit is 15, above the 13 groups.
+  The limit is 15, above the 13 groups. Within four minutes of the change
+  Dependabot opened the five groups that had something, vite 8.3.4 among
+  them. Merging them on October 22 closed those three advisories and three
+  more found against vite 8.2 that morning, all six about the dev server,
+  which production does not run.
 
 ### Fixed
 
@@ -45,7 +53,12 @@ reasoning behind the larger decisions lives in
   (`src/test/sentry.ts`), and eleven deliberate leaks and four other faults
   were each caught by a test. The upload queue's test draws all five states
   of an upload now; it drew two, and a label on the icon of the other three
-  would have gone unseen.
+  would have gone unseen. In production after the deploy, a demo account
+  opened a picture and uploaded a file whose insert the probe answered with
+  an error, and the event Sentry was sent, read and stopped on its way,
+  carried no name, of that file or of the demo's: its breadcrumbs read
+  `…/object/files/<id>/<time>_[name]`, and the tap was described as
+  `img.preview-image`, with no `alt`.
 - **Sentry told one database error from another by opening each.** A query
   that fails does not throw in supabase-js: it resolves with the body
   PostgREST answered with, parsed, which is not an Error. Sentry gave every
@@ -62,7 +75,27 @@ reasoning behind the larger decisions lives in
   failed upload and of a failed delete, and what Google Analytics was told
   about a failed change — and read the database's message now. The tests ask
   a real supabase-js client and the real Sentry, and fourteen deliberate
-  faults were each caught by one.
+  faults were each caught by one. In production after the deploy, a demo
+  account uploaded a file, its insert was answered with the body PostgREST
+  sends when a policy refuses a row, and Sentry was sent one event: a
+  `PostgrestError` titled by that message, with 42501 as `postgrest.code` and
+  in the fingerprint, the code, details and hint in the `postgrest` context,
+  and the user's id. It carried no name, and the object the upload had left
+  in Supabase Storage was deleted. The probe gave that answer itself and
+  stopped what was sent to Sentry, so the database and Sentry saw nothing.
+- **The iOS project would have built on Capacitor's native code of 8.5.1.**
+  The Capacitor group took `@capacitor/ios` and the rest to 8.5.3, but the
+  iOS project does not read Capacitor from `node_modules`: its native code
+  comes from a Swift package pinned to an exact version in
+  `ios/App/CapApp-SPM/Package.swift`, and only the Capacitor CLI rewrites
+  that line (`npx cap sync` or `npx cap update`), which Dependabot does not
+  run. The JavaScript of 8.5.3 would have run on the native code of 8.5.1,
+  without 8.5.2's fix for scene lifecycle events forwarded to the page
+  before it has loaded. The pin is 8.5.3, the line `npx cap sync ios` writes
+  itself. A build for the iPhone 17 simulator resolved the package at 8.5.3
+  and opened on the sign-in page; one for the Android emulator, which reads
+  Capacitor from `node_modules` and was never behind, opened there too.
+  Every update of the Capacitor group needs the same line.
 
 ## [4.11.0] — 2026-10-20
 
@@ -2187,7 +2220,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.1...HEAD
+[4.11.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.0...v4.11.1
 [4.11.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...v4.11.0
 [4.10.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...v4.10.4
 [4.10.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.2...v4.10.3

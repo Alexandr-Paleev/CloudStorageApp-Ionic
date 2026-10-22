@@ -700,18 +700,21 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 374.0 kB | 385 kB |
-| Largest chunk (Ionic) | 177.4 kB | 185 kB |
-| All assets, route chunks included | 462.5 kB | 480 kB |
+| First load (JS + CSS) | 374.9 kB | 385 kB |
+| Largest chunk (Ionic) | 177.5 kB | 185 kB |
+| All assets, route chunks included | 463.3 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.11.0, as CI measured them. The first load is 1.7 kB
-over 4.10.4's, for the consent banner and the answer it keeps, and 4.10.4's was
-3.0 kB over the 369.3 above because the login page is part of it now, so that a
-new visitor's first screen does not wait for a request of its own. When the check
+Those are the figures of 4.11.1, as CI measured them. The first load is 0.9 kB
+over 4.11.0's: 0.5 kB for what Sentry is told about a file and about a failed
+query, and 0.4 kB for the updates of October 22, most of it supabase-js,
+TanStack Query and zod. 4.11.0's was 1.7 kB over 4.10.4's, for the consent
+banner and the answer it keeps, and 4.10.4's was 3.0 kB over the 369.3 above
+because the login page is part of it now, so that a new visitor's first screen
+does not wait for a request of its own. When the check
 was written the three ceilings were 420, 250 and 520 kB, over a first load of
 401.0 kB. They have been raised once, for React 19 and Ionic 9, which cost
 22.4 kB between them, and lowered once, when the 37 components went.
