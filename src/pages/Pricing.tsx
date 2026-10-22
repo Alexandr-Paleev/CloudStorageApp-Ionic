@@ -11,7 +11,7 @@ import {
   IonText,
   IonIcon,
 } from '@ionic/react';
-import { checkmarkCircle, lockClosed, informationCircle } from 'ionicons/icons';
+import { checkmarkCircle, lockClosed, informationCircle, pauseCircle } from 'ionicons/icons';
 import { useState } from 'react';
 import { Navigate } from 'react-router';
 import { env } from '../env';
@@ -23,6 +23,29 @@ import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
 import { LEGAL_URL } from '../utils/legal.utils';
 import './Legal.css';
+
+/** A check beside what the plan gives. What is not switched on yet follows,
+ *  beside a grey pause sign: a check there would contradict "coming soon".
+ *  The sign is one the app already ships. Every icon lands in the `ionic`
+ *  chunk of the first load (vite.config.mts), so a new one costs every visitor. */
+const PlanFeatures: React.FC<{
+  plan: { features: readonly string[]; comingSoon: readonly string[] };
+}> = ({ plan }) => (
+  <ul className="pricing-card__features">
+    {plan.features.map((feature) => (
+      <li key={feature}>
+        <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" />
+        <span>{feature}</span>
+      </li>
+    ))}
+    {plan.comingSoon.map((name) => (
+      <li key={name}>
+        <IonIcon icon={pauseCircle} color="medium" aria-hidden="true" />
+        <span>{`${name} (coming soon)`}</span>
+      </li>
+    ))}
+  </ul>
+);
 
 const Pricing: React.FC = () => {
   const { profile, isLoading } = useProfile();
@@ -98,7 +121,7 @@ const Pricing: React.FC = () => {
         <div className="pricing-container">
           <IonText className="pricing-heading">
             <h1>Choose your plan</h1>
-            <p>Unlock more storage and premium providers</p>
+            <p>More storage, and a say in where each file is stored</p>
           </IonText>
 
           {env.VITE_BILLING_DEMO_MODE && (
@@ -124,14 +147,7 @@ const Pricing: React.FC = () => {
                   <span className="pricing-card__period">/month</span>
                 </div>
               </div>
-              <ul className="pricing-card__features">
-                {TIER_CONFIG.free.features.map((feature) => (
-                  <li key={feature}>
-                    <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              <PlanFeatures plan={TIER_CONFIG.free} />
               {!isPro && (
                 <IonButton expand="block" fill="outline" disabled>
                   Current Plan
@@ -153,14 +169,7 @@ const Pricing: React.FC = () => {
                   <span className="pricing-card__period">/month</span>
                 </div>
               </div>
-              <ul className="pricing-card__features">
-                {TIER_CONFIG.pro.features.map((feature) => (
-                  <li key={feature}>
-                    <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              <PlanFeatures plan={TIER_CONFIG.pro} />
               {isPro ? (
                 <IonButton
                   expand="block"

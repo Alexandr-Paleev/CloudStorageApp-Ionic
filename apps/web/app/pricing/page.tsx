@@ -67,6 +67,9 @@ export default function PricingPage() {
                   {plan.features.map((feature) => (
                     <li key={feature}>{feature}</li>
                   ))}
+                  {plan.comingSoon.map((name) => (
+                    <li key={name}>{`${name} (coming soon)`}</li>
+                  ))}
                 </ul>
                 <a
                   className={id === 'pro' ? layout.primary : layout.secondary}

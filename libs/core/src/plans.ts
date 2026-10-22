@@ -13,6 +13,11 @@ import { TIER_LIMITS } from './tiers';
  * The line about storage is made from the limit, so the sentence and the
  * check cannot say different things.
  *
+ * `features` is what a plan gives, and the app's plans page puts a check
+ * beside every line of it. `comingSoon` is what is written and tested and not
+ * switched on yet; both pages list it after the features, marked as coming
+ * soon. Kept among the features, it got a check that said the opposite.
+ *
  * The price is what the page shows. What a card is charged is the price
  * configured in Stripe, under `STRIPE_PRICE_ID_PRO_MONTHLY`, and nothing
  * in this repository can check that the two agree.
@@ -27,6 +32,7 @@ export const PLANS = {
       'Google Drive overflow',
       'Share links you can revoke',
     ],
+    comingSoon: [],
   },
   pro: {
     name: 'Pro',
@@ -35,8 +41,8 @@ export const PLANS = {
       `${formatStorage(TIER_LIMITS.pro.storage_limit)} storage`,
       'Everything in Free',
       'Choose upload provider',
-      'Dropbox (coming soon)',
     ],
+    comingSoon: ['Dropbox'],
   },
 } as const;
 

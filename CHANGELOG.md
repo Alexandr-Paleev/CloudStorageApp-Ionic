@@ -10,7 +10,38 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **The page where a payment starts has unit tests.** `src/pages/Pricing.tsx`
+  had none: 32 statements, not one reached. Twelve tests reach all of it:
+  which plan a free and a Pro account are offered, the check beside each
+  feature, the way to Stripe Checkout and, for a subscription Stripe already
+  holds, to the portal instead, what the page says when either fails, the
+  test card on the demo, the links to the terms, and the way back to the
+  dashboard where billing is switched off or inside the native shell. Three
+  of its decisions were broken on purpose, and each time a test failed: a
+  check beside Dropbox, a refused checkout that did not open the portal, and
+  the page shown with billing switched off.
+
+### Fixed
+
+- **The plans page offered what Pro does not give.** Its subtitle promised
+  "premium providers", and the one provider only Pro may use, Dropbox, is not
+  switched on. Its line said "(coming soon)" and had the same green check as
+  5 GB of storage. The subtitle now says what Pro adds: more storage, and a
+  say in where each file is stored. What is written and not switched on yet
+  is a list of its own in `libs/core/src/plans.ts`, and the app's page puts a
+  grey pause sign beside it instead of a check. The sign is one the app
+  already ships, because every icon goes into the first load, and the first
+  load is the same 374.9 kB. The site lists the line as it did. The README's
+  screenshot of the page, from August 29, still offered "Basic analytics",
+  "Priority support" and "All providers + Dropbox", which 4.11.0 took off the
+  plans; it is taken again.
+- **The README named the pages as the largest untested code.** By the
+  coverage report, `src/services` is: 382 statements the unit tests do not
+  reach, against 210 in the pages before this release and 178 after it. The
+  paragraph says so now, with figures measured again; the ones it gave had
+  aged, 494 statements in `src/pages` where there were 505.
 
 ## [4.11.2] — 2026-10-22
 
