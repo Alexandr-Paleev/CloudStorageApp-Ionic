@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.11.2] — 2026-10-22
+
 ### Added
 
 - **A Capacitor update that leaves the iOS pin behind fails CI.** The iOS
@@ -42,7 +46,9 @@ reasoning behind the larger decisions lives in
   it changes nothing: the catalogue shows the role holding all of that
   already. On a scratch Postgres given production's defaults and the
   notice's revoke, the six tables came out of 001 to 012 with none of the
-  four for the role, and out of 016 with the grants production has.
+  four for the role, and out of 016 with the grants production has. It was
+  applied to production on October 22, after the merge, and every table
+  there carried the same grants after it as before, character for character.
 
 ## [4.11.1] — 2026-10-22
 
@@ -2252,7 +2258,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.1...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.2...HEAD
+[4.11.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.1...v4.11.2
 [4.11.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.0...v4.11.1
 [4.11.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...v4.11.0
 [4.10.4]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.3...v4.10.4
