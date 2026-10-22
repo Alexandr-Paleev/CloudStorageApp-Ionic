@@ -6,6 +6,7 @@ import { isRetriableError } from '../utils/http.utils';
 import * as Sentry from '../observability/sentry';
 import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
+import { messageOf } from '../utils/postgrest-error';
 import r2Service from './r2.service';
 import type { PendingUpload } from './upload-store';
 import { isSearching, type FileQuery } from '../utils/file-query';
@@ -146,7 +147,7 @@ const storageService = {
       }
 
       throw new Error(
-        `Failed to finalize upload: ${dbError instanceof Error ? dbError.message : 'Unknown database error'}`
+        `Failed to finalize upload: ${messageOf(dbError) ?? 'Unknown database error'}`
       );
     }
   },
@@ -259,9 +260,7 @@ const storageService = {
         tags: { context: 'storage.deleteFile.metadata' },
         extra: { fileId, userId },
       });
-      throw new Error(
-        `Failed to delete file metadata: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`
-      );
+      throw new Error(`Failed to delete file metadata: ${messageOf(dbError) ?? 'Unknown error'}`);
     }
   },
 

@@ -1,7 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { FileMetadata, Folder, FileMetadataSchema, FolderSchema } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
-import { isQuotaRejection } from '../utils/quota.utils';
 import {
   DEFAULT_DIRECTION,
   DEFAULT_SORT,
@@ -184,12 +183,11 @@ const supabaseService = {
       .single();
 
     if (error) {
-      // An account that ran out of space is not a fault to report — the caller
-      // turns this into a sentence the user can act on. Reporting it here as
-      // well is what made the skip in storage.service.uploadFile ineffective.
-      if (!isQuotaRejection(error)) {
-        Sentry.captureException(error, { tags: { context: 'supabase.saveFileMetadata' } });
-      }
+      /* Not reported here. The one caller, in storage.service.ts, reports it
+         with whose upload it was and leaves a quota refusal out. Sentry drops
+         a second capture of an object it has already captured, so while this
+         reported it too, the caller's report, the one with the user's id,
+         never arrived. */
       throw error;
     }
 

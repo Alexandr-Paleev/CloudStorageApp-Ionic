@@ -1,6 +1,8 @@
+import type { ScopeContext } from '@sentry/core';
 import { env } from '../env';
 import { withoutSecrets } from './scrub';
 import { whenLoadedAndIdle } from '../utils/when-loaded';
+import { isPostgrestError, type PostgrestErrorBody } from '../utils/postgrest-error';
 
 /**
  * Sentry, loaded off the critical path.
@@ -110,9 +112,62 @@ function report(send: (module: SentryModule) => void, subject: unknown): void {
   void load();
 }
 
+class PostgrestError extends Error {
+  override name = 'PostgrestError';
+}
+
+/** One object is always the same Error — see `reportable`. */
+const asErrors = new WeakMap<PostgrestErrorBody, PostgrestError>();
+
+/**
+ * A failed query, as an Error Sentry can tell from the next one.
+ *
+ * Captured as it comes, a PostgREST error is an object, and Sentry gave every
+ * one the same title, "Object captured as exception with keys: code, details,
+ * hint, message", with the object serialised beside it: a policy refusing a
+ * row and a statement that timed out were one issue, told apart only by
+ * opening each event. As an Error named PostgrestError it is titled by what
+ * the database said, its code is a tag and a part of the fingerprint, so each
+ * kind of failure is an issue of its own, and the details and the hint are a
+ * context of their own. Those are the fields Sentry was sent before, in
+ * `__serialized__`, and scrub.ts reads them like every other string.
+ *
+ * One object is always the same Error. Sentry marks what it has captured and
+ * drops a second capture of it, and the app leans on that: a service reports
+ * a failed query and throws it, and the offline queue reports what reaches it
+ * again. A new Error for each capture would make that one event two.
+ *
+ * A context given as a Scope or as a function is passed on as it is.
+ */
+function reportable(error: unknown, context: CaptureContext): [unknown, CaptureContext] {
+  if (!isPostgrestError(error)) return [error, context];
+
+  let reported = asErrors.get(error);
+  if (!reported) {
+    reported = new PostgrestError(error.message);
+    asErrors.set(error, reported);
+  }
+
+  if (context !== undefined && !isScopeFields(context)) return [reported, context];
+
+  const { code, details, hint } = error;
+  const scope: Partial<ScopeContext> = {
+    ...context,
+    tags: { ...context?.tags, 'postgrest.code': code },
+    contexts: { ...context?.contexts, postgrest: { code, details, hint } },
+    fingerprint: context?.fingerprint ?? ['{{ default }}', code || 'no code'],
+  };
+  return [reported, scope];
+}
+
+function isScopeFields(context: NonNullable<CaptureContext>): context is Partial<ScopeContext> {
+  return typeof context === 'object' && Object.getPrototypeOf(context) === Object.prototype;
+}
+
 /** Same signature as the real one, so call sites read unchanged. */
 export function captureException(error: unknown, context?: CaptureContext): void {
-  report((module) => module.captureException(error, context), error);
+  const [reported, scope] = reportable(error, context);
+  report((module) => module.captureException(reported, scope), error);
 }
 
 export function captureMessage(message: string, context?: CaptureContext): void {

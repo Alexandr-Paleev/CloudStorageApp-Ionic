@@ -80,11 +80,15 @@ describe('saveFileMetadata', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
-  it('still reports a failure nobody expected', async () => {
-    insertFails(Object.assign(new Error('connection reset'), { code: '08006' }));
+  it('leaves any other failure to its caller to report, as it was', async () => {
+    // storage.service reports it with the user's id. Sentry drops a second
+    // capture of an object it has already captured, so a report from here
+    // was the one that arrived, and that one had no user.
+    const error = { code: '08006', details: null, hint: null, message: 'connection reset' };
+    insertFails(error);
 
-    await expect(supabaseService.saveFileMetadata(row)).rejects.toThrow(/connection reset/);
-    expect(Sentry.captureException).toHaveBeenCalled();
+    await expect(supabaseService.saveFileMetadata(row)).rejects.toBe(error);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
 
