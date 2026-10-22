@@ -137,7 +137,7 @@ const Pricing: React.FC = () => {
 
           <div className="pricing-cards">
             {/* Free Plan */}
-            <div className={`pricing-card ${!isPro ? 'pricing-card--active' : ''}`}>
+            <div className="pricing-card">
               <div className="pricing-card__header">
                 <h2>Free</h2>
                 <div className="pricing-card__price">
@@ -156,9 +156,7 @@ const Pricing: React.FC = () => {
             </div>
 
             {/* Pro Plan */}
-            <div
-              className={`pricing-card ${isPro ? 'pricing-card--active' : ''} pricing-card--pro`}
-            >
+            <div className="pricing-card pricing-card--pro">
               <div className="pricing-card__badge">Popular</div>
               <div className="pricing-card__header">
                 <h2>Pro</h2>

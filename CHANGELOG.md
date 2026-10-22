@@ -37,6 +37,12 @@ reasoning behind the larger decisions lives in
   screenshot of the page, from August 29, still offered "Basic analytics",
   "Priority support" and "All providers + Dropbox", which 4.11.0 took off the
   plans; it is taken again.
+- **For a free account, the plans page framed both plans alike.** The
+  account's own plan and Pro each had a border in the primary colour, and the
+  account's own plan had the shadow as well, so on a free account the plan on
+  offer was the one that stood out less. Pro stands out on every account now,
+  and the account's own plan is named by its button, "Current Plan" or
+  "Manage Subscription", as before.
 - **The README named the pages as the largest untested code.** By the
   coverage report, `src/services` is: 382 statements the unit tests do not
   reach, against 210 in the pages before this release and 178 after it. The
