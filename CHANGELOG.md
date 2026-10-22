@@ -10,7 +10,39 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **A Capacitor update that leaves the iOS pin behind fails CI.** The iOS
+  project takes Capacitor's native code from the version of
+  `capacitor-swift-pm` pinned in `ios/App/CapApp-SPM/Package.swift`, and
+  Dependabot moves `@capacitor/ios` without it: 4.11.1 found the pin at
+  8.5.1 under 8.5.3, by reading the diff. `src/native/capacitor-pin.test.ts`
+  reads the pin and the `@capacitor/ios` that `package-lock.json` installs,
+  and fails while they differ. The next Capacitor group from Dependabot stays
+  red until the line moves with it, and `npx cap update ios` moves it: in a
+  copy of the repository with the pin set back to 8.5.1, the test failed,
+  that command rewrote the one line and nothing else in `ios/`, and the test
+  passed.
+
+### Fixed
+
+- **A database built from the migrations after October 30 would have
+  refused every function.** Each of the twelve functions in `api/` reads or
+  writes at least one of the six tables in `public` with the service-role
+  key, and no migration granted that role anything: production has it
+  because Supabase's default privileges gave every new table in `public` to
+  `anon`, `authenticated` and `service_role`, and 012 wrote out only what the
+  first two keep. From October 30 that default goes, in existing projects
+  too. Tables that exist keep their grants, so production would not have
+  noticed, but a new project, a branch or a reset built from `migrations/`
+  would have come up with tables the service role cannot read or write, and
+  every function would have been answered with "permission denied".
+  `016_grant_tables_to_service_role.sql` grants it SELECT, INSERT, UPDATE
+  and DELETE on the six, in the form Supabase's notice gives. In production
+  it changes nothing: the catalogue shows the role holding all of that
+  already. On a scratch Postgres given production's defaults and the
+  notice's revoke, the six tables came out of 001 to 012 with none of the
+  four for the role, and out of 016 with the grants production has.
 
 ## [4.11.1] — 2026-10-22
 

@@ -342,8 +342,12 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      backslash, a percent sign, a control character
    - `015` — reads `auth.uid()` once per query, not once per row, in the five
      policies that compare a column with it
+   - `016` — grants `service_role` the six tables in writing. It held them
+     through Supabase's default privileges alone, which stop covering a new
+     table on 2026-10-30, and a project built from these files after that date
+     would have refused every function. Production holds them already
 
-   All sixteen are safe to re-run, so there is no need to track which ones have
+   All seventeen are safe to re-run, so there is no need to track which ones have
    already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
