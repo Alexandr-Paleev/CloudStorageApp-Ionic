@@ -88,9 +88,9 @@ Cloud Storage App is a full-featured cloud file storage that allows users to:
   <img src="docs/screenshots/dashboard.png" alt="Dashboard with the storage meter, the Pro badge, a search box, filters by type, folders and a list of files" width="820">
 </p>
 
-| Upload — several files at once, and Pro users pick the backend                                                                                                                              | Plans — Stripe in test mode                                                                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| <img src="docs/screenshots/upload.png" alt="Upload screen with a provider picker: Auto, Cloudinary, Cloudflare R2, Supabase, Google Drive, Dropbox" width="420"> | <img src="docs/screenshots/pricing.png" alt="Free and Pro plans with a demo mode notice" width="420"> |
+| Upload — several files at once, and Pro users pick the backend                                                                                                                              | Plans — Stripe in test mode                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/screenshots/upload.png" alt="Upload screen with a provider picker: Auto, Cloudinary, Cloudflare R2, Supabase, Google Drive, Dropbox" width="420"> | <img src="docs/screenshots/pricing.png" alt="The plans page under a demo mode notice: Free as the current plan, Pro with an upgrade button, and Dropbox listed as coming soon" width="420"> |
 
 | File view                                                                                                 | What a share link opens                                                                                                            |
 | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -1086,14 +1086,18 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be: the pages are where the untested code is. With
-the page a share link opens gone to the site, and the dashboard's dialogs, data
-and markup gone to components and hooks of their own, `src/pages` is 494
-statements and the unit tests reach 283 of them. `Upload.tsx` is the largest at 157, with
-101 reached, and `FileView.tsx` is next at 133, with 70. Five smaller pages
-have no unit test at all, the plans page among them. That is the largest
-untested thing in the repository, and it is named here rather than hidden
-behind one average that would sound fine.
+a long way, and it is meant to be. Of the 2,476 statements under `src/`, the
+unit tests do not reach 829. The largest share, 382, is in `src/services`, most
+of it in the code that talks to Supabase, Dropbox and Google Drive:
+`supabase.service.ts` and the four services of the other two hold 215. The
+pages come next. With the page a share link opens gone to the site, and the
+dashboard's dialogs, data and markup gone to components and hooks of their
+own, `src/pages` is 507 statements and the unit tests reach 329 of them.
+`Upload.tsx` is the largest at 167, with 111 reached, and `FileView.tsx` is
+next at 134, with 71. Four small pages have no unit test at all, 37 statements
+between them: the Dropbox callback, the page Stripe sends a buyer back to, the
+way on to the legal pages, and the 404. All of it is named here rather than
+hidden behind one average that would sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
 money and quota** has a test:

@@ -18,6 +18,14 @@ describe('the plans', () => {
     expect(PLANS.free.monthlyPriceCents).toBe(0);
     expect(PLANS.pro.monthlyPriceCents).toBeGreaterThan(0);
   });
+
+  it('keep what is not switched on yet apart from what they give', () => {
+    // Every feature gets a check on the app's plans page.
+    for (const plan of Object.values(PLANS)) {
+      for (const feature of plan.features) expect(feature).not.toMatch(/soon|dropbox/i);
+    }
+    expect(PLANS.pro.comingSoon).toEqual(['Dropbox']);
+  });
 });
 
 describe('formatMonthlyPrice', () => {

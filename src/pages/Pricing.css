@@ -41,13 +41,12 @@
     box-shadow 0.2s;
 }
 
-.pricing-card--active {
-  border-color: var(--ion-color-primary);
-  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
-}
-
+/* The plan on offer stands out on every account. Which plan is the account's
+   own, its button says. The same border for that too gave a free account two
+   framed cards, and the shadow went to Free. */
 .pricing-card--pro {
   border-color: var(--ion-color-primary);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15);
 }
 
 .pricing-card__badge {
