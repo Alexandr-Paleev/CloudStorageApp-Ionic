@@ -712,8 +712,9 @@ A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.11.1, as CI measured them. The first load is 0.9 kB
-over 4.11.0's: 0.5 kB for what Sentry is told about a file and about a failed
+Those are the figures of 4.11.2, as CI measured them, and they are 4.11.1's:
+4.11.2 changes nothing the browser loads. The first load is 0.9 kB over
+4.11.0's: 0.5 kB for what Sentry is told about a file and about a failed
 query, and 0.4 kB for the updates of October 22, most of it supabase-js,
 TanStack Query and zod. 4.11.0's was 1.7 kB over 4.10.4's, for the consent
 banner and the answer it keeps, and 4.10.4's was 3.0 kB over the 369.3 above

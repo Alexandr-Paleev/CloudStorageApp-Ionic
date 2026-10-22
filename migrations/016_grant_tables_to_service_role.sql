@@ -45,6 +45,11 @@
 -- production has, MAINTAIN aside, which Postgres 14 does not know. A second
 -- run changed nothing.
 --
+-- Applied to production on 2026-10-22. The pre-flight below showed
+-- `service_role=arwdDxtm/postgres` on all six tables, and afterwards every
+-- table carried the same grants as before, character for character, with the
+-- service role holding SELECT, INSERT, UPDATE and DELETE on each.
+--
 -- Safe to run twice: a GRANT of a privilege already held does nothing.
 --
 -- A table added after this one needs its grants in the migration that
