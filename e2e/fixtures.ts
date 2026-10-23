@@ -1,6 +1,5 @@
 import { test as base, expect, type Browser, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
 /**
  * A signed-in browser, and the throwaway account behind it.
@@ -15,26 +14,16 @@ import { readFileSync } from 'node:fs';
  * to a browser launch.
  */
 
-function readEnv(): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    for (const line of readFileSync('.env', 'utf8').split('\n')) {
-      const t = line.trim();
-      if (!t || t.startsWith('#') || !t.includes('=')) continue;
-      const i = t.indexOf('=');
-      out[t.slice(0, i).trim()] = t
-        .slice(i + 1)
-        .trim()
-        .replace(/^["']|["']$/g, '');
-    }
-  } catch {
-    /* no .env — fall through to process.env, which is how CI supplies these */
-  }
-  return out;
+/* The local secrets, when there is a .env. Node reads it into process.env and
+   leaves alone whatever is set already, which is how CI supplies these. It
+   used to be parsed here, line by line. */
+try {
+  process.loadEnvFile('.env');
+} catch {
+  /* no .env — CI sets the variables itself */
 }
 
-const fileEnv = readEnv();
-const read = (name: string) => process.env[name] || fileEnv[name] || '';
+const read = (name: string) => process.env[name] || '';
 
 /** Any variable from .env or the environment — CI supplies these through the latter. */
 export const env = read;
