@@ -22,6 +22,19 @@ reasoning behind the larger decisions lives in
   on October 23). A demo account is now recognised by the whole address the
   demo makes, on example.com, where no address can be confirmed and Google
   issues none, and the three demos in production have that shape.
+- **The app on a device took a session from any link to its callback.** Sign
+  in with Google leaves the native shell through the system browser and comes
+  back through `com.cloudstorage.app://auth/callback`, a custom scheme any app
+  on the device can claim. The client ran the implicit flow, which sends the
+  session itself, Google's refresh token among it, to whichever app answers;
+  and the listener took the tokens any link to the scheme carried, so a page
+  linking to it with someone else's session would have signed the app into
+  that account. The shell now runs the PKCE flow: the callback carries a code
+  that becomes a session only beside the verifier the app stored when the
+  sign-in began, and the listener reads nothing else. Neither app is
+  published, and Google sign-in in them waits on two settings outside this
+  repository, so this closes the hole before anyone could use it. The web
+  keeps its flow: its callback is the app's own address.
 
 ## [4.11.3] — 2026-10-23
 
