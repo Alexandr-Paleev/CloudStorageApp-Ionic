@@ -48,6 +48,22 @@ reasoning behind the larger decisions lives in
   reach, against 210 in the pages before this release and 178 after it. The
   paragraph says so now, with figures measured again; the ones it gave had
   aged, 494 statements in `src/pages` where there were 505.
+- **Google Analytics counted each move between pages twice.** The app
+  reports every page it shows, and Analytics sent a page view of its own
+  whenever the history changed as well, an option of the property that was
+  on. Measured on a production build, with every hit answered inside the
+  browser and none sent: a bare change of the history drew a page view from
+  Analytics alone, and a move through the router drew two. Analytics now
+  starts with `send_page_view: false`, the app reports the page it starts on
+  itself, and the property's option is off. That option is a setting in
+  Google Analytics, not in this repository, and `send_page_view: false` does
+  not reach it, which was measured too. The same visit now sends one page
+  view per page. Six tests hold the start (`src/hooks/useAnalytics.test.ts`),
+  and each of three ways of breaking it fails one.
+- **An option that does nothing went out with every event.** `anonymize_ip`
+  belongs to Universal Analytics. GA4 does not log or store IP addresses,
+  Google says, and the option arrived with every event as a parameter of its
+  own. It is gone.
 
 ## [4.11.2] — 2026-10-22
 
