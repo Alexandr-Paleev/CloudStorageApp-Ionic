@@ -6,7 +6,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<{ signedIn: boolean }>;
   logout: () => Promise<void>;
 };
 
@@ -43,9 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await authService.login(email, password);
   };
 
-  const register = async (email: string, password: string) => {
-    await authService.register(email, password);
-  };
+  const register = (email: string, password: string) => authService.register(email, password);
 
   const logout = async () => {
     await authService.logout();

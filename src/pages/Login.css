@@ -162,6 +162,26 @@ body.dark .switch-auth-button {
   --color: #94a3b8;
 }
 
+/* After a sign-up that has to be confirmed (Login.tsx). Measured as drawn,
+   over the glass card and the gradient behind it: 5.95:1, and 7.98:1 in the
+   dark theme. */
+.login-notice {
+  margin: 0 0 20px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(79, 70, 229, 0.08);
+  color: #3730a3;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+/* Its text there is body.dark p's #f8fafc, which theme/variables.css sets
+   with !important; only the tint is this rule's. */
+body.dark .login-notice {
+  background: rgba(165, 180, 252, 0.12);
+}
+
 /**
  * The card is 799px tall, and a laptop with a bookmarks bar has about 720 to
  * give it. Adding the demo entry — 78px of it — is what pushed the page over:

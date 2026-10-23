@@ -78,6 +78,14 @@ function submit() {
   fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 }
 
+/** What an Ionic input holds: its value is a property of the host. */
+function valueOf(placeholder: string) {
+  const host = [...document.querySelectorAll('ion-input')].find(
+    (i) => (i as HTMLElement & { placeholder?: string }).placeholder === placeholder
+  ) as HTMLElement & { value?: string };
+  return host.value;
+}
+
 function ionButtonByText(text: string): HTMLElement {
   return [...document.querySelectorAll('ion-button')].find((b) =>
     (b.textContent ?? '').includes(text)
@@ -88,7 +96,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   user.current = null;
   login.mockResolvedValue(undefined);
-  register.mockResolvedValue(undefined);
+  // As this project answers a sign-up: the address is to be confirmed first.
+  register.mockResolvedValue({ signedIn: false });
   demoStart.mockResolvedValue(undefined);
 });
 
@@ -127,6 +136,53 @@ describe('Login', () => {
 
     await waitFor(() => expect(register).toHaveBeenCalledWith('new@example.com', 'a new password'));
     expect(login).not.toHaveBeenCalled();
+  });
+
+  it('says where the link went after a sign-up, and turns to signing in', async () => {
+    show();
+    fireEvent.click(screen.getByText(/Sign up/i));
+    type('Email Address', 'new@example.com');
+    type('Password', 'a new password');
+    submit();
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('We have sent a link to new@example.com')
+    );
+    expect(navigate).not.toHaveBeenCalled();
+    expect(document.querySelector('ion-button[type="submit"]')).toHaveTextContent('Sign In');
+    expect(valueOf('Email Address')).toBe('new@example.com');
+    expect(valueOf('Password')).toBe('');
+    // It names the address, and Hotjar is not to record that.
+    expect(screen.getByRole('status')).toHaveAttribute('data-hj-suppress');
+  });
+
+  it('goes straight to the dashboard where a new account is signed in at once', async () => {
+    register.mockResolvedValue({ signedIn: true });
+    show();
+    fireEvent.click(screen.getByText(/Sign up/i));
+    type('Email Address', 'new@example.com');
+    type('Password', 'a new password');
+    submit();
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('says what to do when the address has not been confirmed yet', async () => {
+    login.mockRejectedValue(
+      Object.assign(new Error('Email not confirmed'), { code: 'email_not_confirmed' })
+    );
+    show();
+    type('Email Address', 'new@example.com');
+    type('Password', 'a new password');
+    submit();
+
+    expect(
+      await screen.findByText(
+        'This address is not confirmed yet. Open the link we emailed to it, then sign in.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Email not confirmed')).not.toBeInTheDocument();
   });
 
   /* Supabase quotes the address it refuses (internal/api/mail.go in
