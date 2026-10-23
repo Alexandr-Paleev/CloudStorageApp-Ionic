@@ -10,7 +10,19 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **One Cloudinary signature took any number of files.** `/api/cloudinary/sign`
+  checks the quota against the size the browser declares and signs the upload
+  for an hour. Cloudinary named each upload itself, so the signature took as
+  many files as were sent with it: two different files with one signature,
+  on production. The server now chooses the name and signs it, with
+  `overwrite` off, so a second upload with the same signature finds the first
+  and keeps it: one quota check buys one file. A raw file keeps its extension
+  in the name, as the names Cloudinary gives raw files do, so it is delivered
+  as what it is. A page still running the previous bundle when this deploys
+  has its next Cloudinary upload refused, once, until the service worker
+  loads the new one.
 
 ## [4.12.0] — 2026-10-23
 

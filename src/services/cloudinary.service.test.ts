@@ -14,6 +14,8 @@ const AUTHORIZATION = {
   timestamp: 1_700_000_000,
   signature: 'the-signature',
   folder: 'users/user-1',
+  public_id: '0123456789abcdef0123456789abcdef',
+  overwrite: false,
   tags: 'user_user-1',
   resourceType: 'image' as const,
 };
@@ -105,9 +107,21 @@ describe('uploadFile', () => {
     await cloudinaryService.uploadFile(file(), 'user-1');
 
     const fields = [...(sent!.body as FormData).keys()].sort();
-    expect(fields).toEqual(['api_key', 'file', 'folder', 'signature', 'tags', 'timestamp']);
+    expect(fields).toEqual([
+      'api_key',
+      'file',
+      'folder',
+      'overwrite',
+      'public_id',
+      'signature',
+      'tags',
+      'timestamp',
+    ]);
     expect(sent!.body.get('signature')).toBe('the-signature');
     expect(sent!.body.get('folder')).toBe('users/user-1');
+    // The name and the refusal to overwrite are what make the signature buy one file.
+    expect(sent!.body.get('public_id')).toBe('0123456789abcdef0123456789abcdef');
+    expect(sent!.body.get('overwrite')).toBe('false');
   });
 
   it('uploads where the server told it to, not where the client guessed', async () => {

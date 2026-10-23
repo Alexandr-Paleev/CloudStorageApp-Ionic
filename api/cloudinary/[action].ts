@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticateUser, AuthError } from '../../libs/server/src/auth';
 import { readQuota, quotaRejection } from '../../libs/server/src/quota';
@@ -58,6 +59,17 @@ function resourceTypeFor(fileName: string, contentType?: string): 'raw' | 'image
   return isImage ? 'image' : 'raw';
 }
 
+/**
+ * The name of a new asset: random, so that nobody else picks it. A raw file
+ * keeps its extension, as the names Cloudinary gives raw files do (seen on
+ * production): it is what the file is delivered as.
+ */
+function publicIdFor(fileName: string, resourceType: 'raw' | 'image'): string {
+  const id = randomUUID().replace(/-/g, '');
+  const extension = /\.([a-z0-9]{1,10})$/i.exec(fileName)?.[1]?.toLowerCase();
+  return resourceType === 'raw' && extension ? `${id}.${extension}` : id;
+}
+
 function configureCloudinary(cloudinary: { config: (options: Record<string, string>) => void }) {
   // Server-side names only: a VITE_ prefixed fallback would be inlined into
   // the public client bundle by Vite.
@@ -113,14 +125,21 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
   const cloudinary = (await import('cloudinary')).v2;
   configureCloudinary(cloudinary);
 
-  // No public_id: Cloudinary picks a unique one inside the folder, so an
-  // upload cannot land on top of an asset that already exists. The folder is
+  // The name is chosen here and signed, with overwrite off. Left to Cloudinary,
+  // every upload got a name of its own, so one signature, good for an hour,
+  // took as many files as were sent with it: two different files, measured on
+  // production on 2026-10-23. Named here, a second upload with the signature
+  // finds the first and keeps it, so one quota check buys one file, and no
+  // upload can land on top of an asset that already exists. The folder is
   // what binds the asset to its owner — /api/cloudinary/delete checks exactly
   // this prefix before destroying anything.
   const timestamp = Math.round(Date.now() / 1000);
+  const resourceType = resourceTypeFor(fileName, contentType);
   const params = {
     // The owner's prefix as Cloudinary wants a folder: without the slash.
     folder: ownerPrefix('cloudinary', userId).replace(/\/$/, ''),
+    public_id: publicIdFor(fileName, resourceType),
+    overwrite: false,
     tags: `user_${userId}`,
     timestamp,
   };
@@ -132,7 +151,7 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
     // secret never leaves this function.
     apiKey,
     signature: cloudinary.utils.api_sign_request(params, secret),
-    resourceType: resourceTypeFor(fileName, contentType),
+    resourceType,
   });
 }
 
