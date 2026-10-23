@@ -612,16 +612,22 @@ The interesting parts:
   `form-action 'self'`** — the four that cost nothing and buy the most:
   clickjacking, plugin content, a rewritten `<base>`, and a form posting
   credentials to somebody else's host.
-- **`script-src` still carries `'unsafe-inline'`**, and that is a real weakness
-  rather than an oversight. The build emits no inline `<script>` at all — gtag.js
-  and Hotjar are what need it. Removing it means per-request nonces, which need
-  a server rendering the HTML rather than a static bundle.
-- **`connect-src https:` is deliberately wide.** The Supabase project ref, the R2
-  account and the Sentry ingest host all differ per deployment, and `vercel.json`
-  is checked in, so a hardcoded list would break every fork.
+- **`script-src` carries no `'unsafe-inline'`.** The build emits no inline
+  `<script>`, and gtag.js and Hotjar, which this section used to say needed it,
+  run without: on production on 2026-10-23 a visitor's path (a yes to
+  analytics, a demo account, a PDF preview, two uploads, the account deleted)
+  drew no inline violation under the policy, with Hotjar's loader and its
+  modules fetched each time. A vendor that starts injecting inline script is
+  now refused rather than run.
+- **`connect-src` names vendors, not one deployment's hosts.**
+  `https://*.supabase.co`, `https://*.sentry.io`, `https://*.r2.cloudflarestorage.com`:
+  the project ref, the Sentry organisation and the R2 account differ per
+  deployment, and `vercel.json` is checked in, so naming this deployment's
+  hosts would break every fork. It used to be `https:`, which refused no host
+  a script could send data to.
 
 `libs/server/src/csp.test.ts` parses the header out of `vercel.json` and asserts that every
-origin the app injects a script from is allowed. The policy is a string inside a
+origin the app injects a script from, and every host it connects to, is allowed. The policy is a string inside a
 JSON file — nothing else in the toolchain can see it, and a mistake there shows
 up only in production, in whichever browser the visitor happened to bring.
 
