@@ -44,9 +44,22 @@ beforeEach(() => {
 });
 
 describe('email and password', () => {
-  it('returns the user on success', async () => {
-    await expect(authService.register('a@example.com', 'hunter2')).resolves.toEqual(USER);
+  it('returns the user it signed in', async () => {
     await expect(authService.login('a@example.com', 'hunter2')).resolves.toEqual(USER);
+  });
+
+  /* Supabase opens a session at sign-up only where an address needs no
+     confirming. This project's does, and the answer is the user alone. */
+  it('says whether a new account is signed in yet', async () => {
+    signUp.mockResolvedValue({ data: { user: USER, session: null }, error: null });
+    await expect(authService.register('a@example.com', 'hunter2')).resolves.toEqual({
+      signedIn: false,
+    });
+
+    signUp.mockResolvedValue({ data: { user: USER, session: { user: USER } }, error: null });
+    await expect(authService.register('a@example.com', 'hunter2')).resolves.toEqual({
+      signedIn: true,
+    });
   });
 
   it('throws what Supabase said rather than a generic failure', async () => {

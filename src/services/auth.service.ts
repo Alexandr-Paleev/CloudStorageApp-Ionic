@@ -8,16 +8,19 @@ export type AuthUser = User | null;
 
 export const authService = {
   /**
-   * Register a new user with email and password
+   * Create an account with email and password. Resolves to whether it is
+   * signed in: Supabase opens a session at once only where an address needs
+   * no confirming. This project's does (`mailer_autoconfirm` is off), so a
+   * new account stays signed out until the link sent to it has been opened.
    */
-  async register(email: string, password: string): Promise<User> {
+  async register(email: string, password: string): Promise<{ signedIn: boolean }> {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
     if (error) throw error;
     if (!data.user) throw new Error('Registration failed');
-    return data.user;
+    return { signedIn: Boolean(data.session) };
   },
 
   /**

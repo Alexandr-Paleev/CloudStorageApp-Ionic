@@ -64,6 +64,18 @@ reasoning behind the larger decisions lives in
   belongs to Universal Analytics. GA4 does not log or store IP addresses,
   Google says, and the option arrived with every event as a parameter of its
   own. It is gone.
+- **Signing up by e-mail ended on an empty sign-in form, with nothing said.**
+  This project wants an address confirmed before its account can sign in, so
+  a sign-up opens no session. The page left for the dashboard anyway, the
+  dashboard sent the visitor straight back, and the form came up empty: the
+  toast "Account created! Please sign in." went with the page that was left
+  and was never on screen. Signing in then answered "Email not confirmed".
+  Seen in a browser on a production build, with Supabase's two answers given
+  by the test itself. Now the page stays, turns to signing in with the
+  address kept, and says that a link has gone to it; a sign-in before the
+  link is opened says what to do. A sign-up that does open a session goes to
+  the dashboard, as before. The first load is 0.2 kB heavier for it, 375.1 kB:
+  the sign-in page is part of it.
 
 ## [4.11.2] — 2026-10-22
 

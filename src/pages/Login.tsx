@@ -6,7 +6,6 @@ import {
   IonButton,
   IonItem,
   IonInput,
-  IonToast,
   IonSpinner,
   IonIcon,
 } from '@ionic/react';
@@ -27,6 +26,15 @@ import { LEGAL_URL } from '../utils/legal.utils';
 import { askAgain, collectorsConfigured } from '../analytics/consent';
 import './Legal.css';
 
+/* Supabase's words for a password sign-in before the address is confirmed
+   are "Email not confirmed". What to do about it is more use. */
+function sayWhy(err: unknown): string {
+  if ((err as { code?: unknown } | null)?.code === 'email_not_confirmed') {
+    return 'This address is not confirmed yet. Open the link we emailed to it, then sign in.';
+  }
+  return err instanceof Error ? err.message : 'An error occurred';
+}
+
 const Login: React.FC = () => {
   /* This page is a deep indigo gradient in both themes, and on a device the
      status bar sits on top of it. Without this the clock follows body.dark and
@@ -45,7 +53,9 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showToast, setShowToast] = useState(false);
+  /* The address a confirmation link went to, after a sign-up that has to be
+     confirmed before it can sign in; empty otherwise. */
+  const [confirming, setConfirming] = useState('');
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
   const { login, register, user } = useAuth();
@@ -80,18 +90,28 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setConfirming('');
     setLoading(true);
 
     try {
       if (isRegister) {
-        await register(email, password);
-        setShowToast(true);
+        const { signedIn } = await register(email, password);
+        if (!signedIn) {
+          /* Signed out until the link is opened. This used to leave for the
+             dashboard, which sent the visitor straight back to an empty form
+             with nothing said: the toast went with the page it was on. What
+             comes next is signing in, and it is done here. */
+          setConfirming(email);
+          setIsRegister(false);
+          setPassword('');
+          return;
+        }
       } else {
         await login(email, password);
       }
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(sayWhy(err));
     } finally {
       setLoading(false);
     }
@@ -114,6 +134,17 @@ const Login: React.FC = () => {
 
           {/* Glass Card */}
           <div className="glass-card auth-form-card">
+            {/* It names the address, so that a mistyped one shows, and is kept
+                out of what Hotjar records, as the field is. A live region from
+                the start, so that a screen reader says it when it appears. */}
+            <div role="status" data-hj-suppress="">
+              {confirming && (
+                <p className="login-notice">
+                  We have sent a link to <strong>{confirming}</strong>. Open it to confirm the
+                  address, then sign in here. Already have an account? Just sign in.
+                </p>
+              )}
+            </div>
             <form onSubmit={handleSubmit}>
               <div className={`custom-input ${focusedInput === 'email' ? 'has-focus' : ''}`}>
                 <IonItem lines="none" className="ion-no-padding">
@@ -296,15 +327,6 @@ const Login: React.FC = () => {
             )}
           </div>
         </div>
-
-        <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={isRegister ? 'Account created! Please sign in.' : 'Signed in successfully!'}
-          duration={3000}
-          color="success"
-          position="top"
-        />
       </IonContent>
     </IonPage>
   );
