@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.11.3] — 2026-10-23
+
 ### Added
 
 - **The page where a payment starts has unit tests.** `src/pages/Pricing.tsx`
@@ -74,8 +78,8 @@ reasoning behind the larger decisions lives in
   by the test itself. Now the page stays, turns to signing in with the
   address kept, and says that a link has gone to it; a sign-in before the
   link is opened says what to do. A sign-up that does open a session goes to
-  the dashboard, as before. The first load is 0.2 kB heavier for it, 375.1 kB:
-  the sign-in page is part of it.
+  the dashboard, as before. The first load is 0.1 kB heavier for it, 375.0 kB
+  as CI measures it: the sign-in page is part of it.
 
 ## [4.11.2] — 2026-10-22
 
@@ -2323,7 +2327,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.2...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.3...HEAD
+[4.11.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.2...v4.11.3
 [4.11.2]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.1...v4.11.2
 [4.11.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.0...v4.11.1
 [4.11.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.10.4...v4.11.0
