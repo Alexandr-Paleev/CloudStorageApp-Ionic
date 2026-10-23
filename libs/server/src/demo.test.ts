@@ -56,8 +56,19 @@ describe('isDemoEmail', () => {
     ['e2e-123-abc@example.com', false],
     ['someone@example.com', false],
     [undefined, false],
+    // People. Sign-up is open by e-mail and through Google, and these are
+    // addresses their owners can confirm; the sweep erases what matches.
+    ['demo-anna@company.com', false],
+    ['demo-1700000000000-abc@gmail.com', false],
+    ['demo-1700000000000-abc@example.com.evil.io', false],
   ])('%s -> %s', (email, expected) => {
     expect(isDemoEmail(email as string | undefined)).toBe(expected);
+  });
+
+  it('recognises every address the demo makes', () => {
+    for (const random of [() => 0.5, () => 0.123456789, Math.random]) {
+      expect(isDemoEmail(demoEmail(Date.now(), random))).toBe(true);
+    }
   });
 });
 
@@ -66,12 +77,12 @@ describe('isExpiredDemoUser', () => {
   const ago = (ms: number) => new Date(now - ms).toISOString();
 
   it('sweeps a demo account past its lifetime', () => {
-    const user = { email: 'demo-1@example.com', created_at: ago(DEMO_TTL_MS + 1000) };
+    const user = { email: 'demo-1-a@example.com', created_at: ago(DEMO_TTL_MS + 1000) };
     expect(isExpiredDemoUser(user, now)).toBe(true);
   });
 
   it('leaves a demo account that is still young', () => {
-    const user = { email: 'demo-1@example.com', created_at: ago(DEMO_TTL_MS - 1000) };
+    const user = { email: 'demo-1-a@example.com', created_at: ago(DEMO_TTL_MS - 1000) };
     expect(isExpiredDemoUser(user, now)).toBe(false);
   });
 
@@ -80,9 +91,16 @@ describe('isExpiredDemoUser', () => {
     expect(isExpiredDemoUser(user, now)).toBe(false);
   });
 
+  it('never touches a real account whose name happens to begin like a demo', () => {
+    const user = { email: 'demo-anna@company.com', created_at: ago(DEMO_TTL_MS * 2) };
+    expect(isExpiredDemoUser(user, now)).toBe(false);
+  });
+
   it('leaves a row whose created_at is missing or unparsable', () => {
-    expect(isExpiredDemoUser({ email: 'demo-1@example.com' }, now)).toBe(false);
-    expect(isExpiredDemoUser({ email: 'demo-1@example.com', created_at: 'nope' }, now)).toBe(false);
+    expect(isExpiredDemoUser({ email: 'demo-1-a@example.com' }, now)).toBe(false);
+    expect(isExpiredDemoUser({ email: 'demo-1-a@example.com', created_at: 'nope' }, now)).toBe(
+      false
+    );
   });
 });
 
