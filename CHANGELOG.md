@@ -37,6 +37,18 @@ reasoning behind the larger decisions lives in
 
 ### Security
 
+- **The Security tab carried twelve CodeQL alerts and the workflows trusted
+  tags.** Eleven alerts were one finding: the end-to-end fixtures parsed `.env`
+  by hand, and the keys read from that file went into requests to Supabase.
+  The fixtures now let Node read it (`process.loadEnvFile`), which keeps what
+  CI sets in the environment and gave the same 22 values the parser did. The
+  twelfth was `scripts/audit-production.mjs` reading one past the end of its
+  list of waits to learn that the list was over; the loop walks the waits now,
+  and its output, with the registry reachable and with it refused, is what it
+  was. Every action in the workflows is pinned to a commit with its release
+  beside it, since a tag can be moved to other code; the keep-alive job, which
+  talks only to Supabase, gets no token from GitHub, and the end-to-end job
+  says that it only reads.
 - **The Security tab carried 22 dependency alerts, none in what ships.** All
   were in development tools, and most came through `@vercel/node`, which this
   repository installed for two type names: its newest release still pins

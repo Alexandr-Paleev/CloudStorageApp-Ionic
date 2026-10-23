@@ -27,6 +27,10 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+# No token of GitHub's: the job reads nothing from the repository and writes
+# nothing to it. It talks to Supabase, with a secret of its own.
+permissions: {}
+
 jobs:
   ping:
     name: Query the database

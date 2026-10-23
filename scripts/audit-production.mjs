@@ -69,20 +69,21 @@ function describeFailure(report) {
   ].join('\n');
 }
 
-let report = null;
-for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
-  report = attemptAudit();
+/* One try, and one more after each wait. The loop walks the waits themselves,
+   so nothing reads past the end of the list to find out it is over. */
+let report = attemptAudit();
+for (const wait of BACKOFF_MS) {
   if (report) break;
-
-  const wait = BACKOFF_MS[attempt];
-  if (wait === undefined) break;
   console.log(`The audit endpoint did not answer. Retrying in ${wait / 1000}s…`);
   await sleep(wait);
+  report = attemptAudit();
 }
 
 if (!report) {
   console.log('');
-  console.log('⚠️  Could not reach the npm audit endpoint after 3 attempts.');
+  console.log(
+    `⚠️  Could not reach the npm audit endpoint after ${BACKOFF_MS.length + 1} attempts.`
+  );
   console.log('    Production dependencies were NOT audited on this run.');
   console.log('    Not failing the build: an unreachable registry is not a vulnerability.');
   process.exit(0);

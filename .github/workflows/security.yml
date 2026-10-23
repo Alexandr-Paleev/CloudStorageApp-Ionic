@@ -40,10 +40,13 @@ jobs:
       contents: read
       actions: read
 
+    # Every action is pinned to a commit, with its release beside it: a tag can
+    # be moved to other code, a commit cannot. Dependabot (github-actions,
+    # monthly) moves the two together.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: javascript-typescript
           # security-and-quality over the default: the extra rules are the ones
@@ -54,7 +57,7 @@ jobs:
       # No build step. This project is TypeScript compiled by Vite, and CodeQL
       # reads the source directly for these languages — running `npm run build`
       # first would only give it the same files through a bundler.
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:javascript-typescript
 
@@ -66,7 +69,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The whole history, not the tip. A secret removed in the next commit
           # is still in the repository, and a shallow clone is exactly how that
