@@ -10,6 +10,31 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **What the content policy refuses is reported to Sentry.** The policy holds
+  in production only, where a refused PDF preview once went unnoticed for a
+  month. The page now listens for `securitypolicyviolation` and tells Sentry
+  each kind of refusal once a page, as a warning, by directive and origin
+  (`src/observability/csp-violations.ts`); what follows the origin in an
+  address is never sent, and a browser extension's refusals are its own. It
+  goes through the SDK the page already runs, under each deployment's DSN,
+  rather than a `report-uri` in the checked-in `vercel.json`, which would send
+  every fork's reports here. Checked in Chrome on a production build under the
+  production policy: a refused request was reported as `connect-src` and its
+  origin, without the token its address carried. It costs the first load
+  0.4 kB on a local build, 375.0 kB to 375.4.
+
+### Fixed
+
+- **Every page load drew refusals from the content policy that were zod's.**
+  zod 4 asks whether it may compile a parser with `new Function`, by calling
+  `Function('')`, and the policy refuses it, once on every load. It now runs
+  `jitless` (`src/zod-config.ts`), so it does not ask. The setting is imported
+  by `env.ts`, whose parse is the app's first: as the first import of
+  `main.tsx` it ran too late, because the build puts `env.ts` in a chunk that
+  runs before `main.tsx`'s own code.
+
 ### Security
 
 - **The demo's sweep could erase a real account.** Opening a demo also

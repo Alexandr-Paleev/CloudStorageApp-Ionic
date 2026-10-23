@@ -629,7 +629,14 @@ The interesting parts:
 `libs/server/src/csp.test.ts` parses the header out of `vercel.json` and asserts that every
 origin the app injects a script from, and every host it connects to, is allowed. The policy is a string inside a
 JSON file — nothing else in the toolchain can see it, and a mistake there shows
-up only in production, in whichever browser the visitor happened to bring.
+up only in production, in whichever browser the visitor happened to bring. So
+the page reports what the policy refuses to Sentry
+(`src/observability/csp-violations.ts`), each kind once a page, by directive
+and origin, and never what follows the origin in an address. That is how a
+refused PDF preview, which went unnoticed for a month in 4.x, would show the
+same day. It goes through the Sentry SDK the page already runs, under each
+deployment's own DSN, rather than a `report-uri` in this checked-in file, which
+would send every fork's reports here.
 
 ### What the browser downloads first
 
@@ -962,9 +969,9 @@ only ever read server-side.
 > Function and the Hobby plan allows twelve; `api/demo/session.ts` was the
 > twelfth. This is why `api/share.ts` routes three verbs through one file, and
 > why the next server-side route has to either share an existing file or wait
-> for a plan that allows more. It already cost one thing worth naming: a
-> collector for CSP violation reports, which would have let the policy run in
-> report-only mode first.
+> for a plan that allows more. It looked as if it had cost a collector for CSP
+> violation reports. It had not: the page sends them to Sentry itself (see
+> Security headers above), and no route is needed for that.
 
 ## 🔒 Limits and Restrictions
 
@@ -1094,7 +1101,7 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,476 statements under `src/`, the
+a long way, and it is meant to be. Of the 2,494 statements under `src/`, the
 unit tests do not reach 779. The largest share, 382, is in `src/services`, most
 of it in the code that talks to Supabase, Dropbox and Google Drive:
 `supabase.service.ts` and the four services of the other two hold 215. The
