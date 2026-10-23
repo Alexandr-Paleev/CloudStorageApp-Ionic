@@ -1299,6 +1299,19 @@ the browser downloads, and a step that fails over one trains people to skip
 reading it. The ignore rule stays — it was right about churn — but it is no
 longer the only thing standing between an advisory and this repository.
 
+**The overrides in `package.json`, and when each comes out.** JSON holds no
+comment, so here:
+
+- `@babel/plugin-transform-runtime` at `^7.29.0` keeps the React plugin's
+  optional chain on Babel 7, beside `workbox-build`, which pins `@babel/core@7`
+  (4.4.0). Out when `workbox-build` takes Babel 8.
+- `undici` under `nx` at `^7.29.1`: `nx` 23.3.0 pins undici at exactly 7.29.0,
+  which carries a high advisory, and no 23.x release moves it. Out when `nx`
+  ships a later undici of its own.
+- `uuid` under `xcode` at `^11.1.1`: `@capacitor/cli` reaches uuid 7 through
+  `xcode` 3.0.1, and the fix is in 11. `xcode` calls only `uuid.v4()`, and with
+  11 it still parses the iOS project. Out when either of the two moves on.
+
 The habit this adds to the [first postmortem](#-postmortem-the-anon-key-that-was-named-supabase_service_role_key)'s
 two: a policy that suppresses noise needs something else watching for what it
 suppresses, or the silence it produces is indistinguishable from safety.
