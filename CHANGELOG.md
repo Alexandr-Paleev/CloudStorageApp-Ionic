@@ -10,7 +10,18 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **The demo's sweep could erase a real account.** Opening a demo also
+  erases the demo accounts older than a day, with everything in them, and it
+  took for a demo account any whose address began with `demo-`. Sign-up is
+  open, by e-mail and through Google, and an address such as
+  `demo-anna@company.com` is one its owner can confirm: a day after signing
+  up, the next visitor to open a demo would have erased that account and its
+  files. Production had no such account (35 accounts, 3 of them demos, counted
+  on October 23). A demo account is now recognised by the whole address the
+  demo makes, on example.com, where no address can be confirmed and Google
+  issues none, and the three demos in production have that shape.
 
 ## [4.11.3] — 2026-10-23
 

@@ -202,10 +202,12 @@ describe('POST /api/demo/session', () => {
     admin.listUsers.mockResolvedValue({
       data: {
         users: [
-          { id: 'stale', email: 'demo-1@example.com', created_at: old },
-          { id: 'young', email: 'demo-2@example.com', created_at: fresh },
+          { id: 'stale', email: 'demo-1-a@example.com', created_at: old },
+          { id: 'young', email: 'demo-2-b@example.com', created_at: fresh },
           { id: 'real', email: 'someone@example.com', created_at: old },
           { id: 'e2e', email: 'e2e-1@example.com', created_at: old },
+          // A person whose address begins like a demo's, at a domain they can confirm.
+          { id: 'person', email: 'demo-anna@company.com', created_at: old },
         ],
       },
       error: null,
@@ -223,7 +225,7 @@ describe('POST /api/demo/session', () => {
         users: [
           {
             id: 'stale',
-            email: 'demo-1@example.com',
+            email: 'demo-1-a@example.com',
             created_at: new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString(),
           },
         ],
@@ -250,7 +252,7 @@ describe('POST /api/demo/session', () => {
         users: [
           {
             id: 'stale',
-            email: 'demo-1@example.com',
+            email: 'demo-1-a@example.com',
             created_at: new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString(),
           },
         ],
@@ -270,8 +272,8 @@ describe('POST /api/demo/session', () => {
     admin.listUsers.mockResolvedValue({
       data: {
         users: [
-          { id: 'stuck', email: 'demo-1@example.com', created_at: old },
-          { id: 'stale', email: 'demo-2@example.com', created_at: old },
+          { id: 'stuck', email: 'demo-1-a@example.com', created_at: old },
+          { id: 'stale', email: 'demo-2-b@example.com', created_at: old },
         ],
       },
       error: null,

@@ -65,10 +65,10 @@ export const DEMO_SEED: DemoSeedFile[] = [
 ];
 
 /** An address no real person can receive mail at, tagged so the sweep finds it.
- *  The `e2e-` accounts in e2e/fixtures.ts share this domain and are left alone —
- *  the prefix, not the domain, is what marks an account as disposable here.
- *  `Math.random` is enough for the suffix: all it does is keep apart two
- *  visitors who arrive in the same millisecond. */
+ *  The `e2e-` accounts in e2e/fixtures.ts share this domain and are left alone:
+ *  the whole address, prefix and domain, is what marks an account as
+ *  disposable here (`isDemoEmail`). `Math.random` is enough for the suffix:
+ *  all it does is keep apart two visitors who arrive in the same millisecond. */
 export function demoEmail(now: number = Date.now(), random: () => number = Math.random): string {
   const suffix = random().toString(36).slice(2, 8);
   return `${DEMO_EMAIL_PREFIX}${now}-${suffix}@example.com`;
@@ -84,8 +84,16 @@ export function demoPassword(uuid: () => string = randomUUID): string {
   return `Demo!${uuid()}`;
 }
 
+/* The whole address demoEmail() makes. The prefix alone used to be the test,
+   and it matched people: sign-up is open, by e-mail and through Google, and
+   `demo-anna@company.com` is an address its owner can confirm. The sweep
+   erases what this matches, files and all. example.com is reserved (RFC 2606):
+   no mail is delivered there, so no account on it can be confirmed, and
+   Google issues none. */
+const DEMO_ADDRESS = new RegExp(`^${DEMO_EMAIL_PREFIX}\\d+-[a-z0-9]*@example\\.com$`);
+
 export function isDemoEmail(email: string | undefined): boolean {
-  return typeof email === 'string' && email.startsWith(DEMO_EMAIL_PREFIX);
+  return typeof email === 'string' && DEMO_ADDRESS.test(email);
 }
 
 /** A demo account past its lifetime. Anything not created by this endpoint is
