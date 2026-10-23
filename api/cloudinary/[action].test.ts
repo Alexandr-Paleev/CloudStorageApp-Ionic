@@ -234,9 +234,59 @@ describe('cloudinary sign: authorizing an upload', () => {
     await handler(sign(), res);
 
     const [params, secret] = apiSignRequest.mock.calls[0]!;
-    expect(Object.keys(params).sort()).toEqual(['folder', 'tags', 'timestamp']);
+    expect(Object.keys(params).sort()).toEqual([
+      'folder',
+      'overwrite',
+      'public_id',
+      'tags',
+      'timestamp',
+    ]);
     expect(secret).toBe('test-secret');
-    expect(res.body).toMatchObject({ timestamp: params.timestamp });
+    expect(res.body).toMatchObject({
+      timestamp: params.timestamp,
+      public_id: params.public_id,
+      overwrite: false,
+    });
+  });
+
+  /* One signature took as many files as were sent with it while Cloudinary
+     named them: two different files, on production on 2026-10-23. Named here,
+     with overwrite off, a second upload with it finds the first and keeps it. */
+  it('names each upload, so that one signature buys one file', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const first = mockResponse();
+    const second = mockResponse();
+
+    await handler(sign(), first);
+    await handler(sign(), second);
+
+    const a = first.body as { public_id: string; overwrite: boolean };
+    const b = second.body as { public_id: string; overwrite: boolean };
+    expect(a.public_id).toMatch(/^[0-9a-f]{32}$/);
+    expect(b.public_id).not.toBe(a.public_id);
+    expect(a.overwrite).toBe(false);
+  });
+
+  it("keeps a raw file's extension in its name, as Cloudinary's own names do", async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const raw = mockResponse();
+    const image = mockResponse();
+
+    await handler(sign({ fileName: 'Notes.TXT', contentType: 'text/plain' }), raw);
+    await handler(sign({ fileName: 'photo.png', contentType: 'image/png' }), image);
+
+    expect((raw.body as { public_id: string }).public_id).toMatch(/^[0-9a-f]{32}\.txt$/);
+    expect((image.body as { public_id: string }).public_id).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('never lets the caller name the file, or overwrite one', async () => {
+    account(TIER_LIMITS.free.storage_limit, 0);
+    const res = mockResponse();
+
+    await handler(sign({ public_id: 'somebody-elses', overwrite: true }), res);
+
+    expect(res.body).toMatchObject({ overwrite: false });
+    expect((res.body as { public_id: string }).public_id).not.toBe('somebody-elses');
   });
 
   it('never lets the caller name the folder it uploads into', async () => {

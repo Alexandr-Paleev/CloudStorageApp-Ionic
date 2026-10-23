@@ -22,6 +22,9 @@ type UploadAuthorization = {
   timestamp: number;
   signature: string;
   folder: string;
+  /** Chosen and signed by the server, so that the signature buys one file. */
+  public_id: string;
+  overwrite: boolean;
   tags: string;
   resourceType: 'raw' | 'image';
 };
@@ -112,6 +115,8 @@ const cloudinaryService = {
     formData.append('timestamp', String(auth.timestamp));
     formData.append('signature', auth.signature);
     formData.append('folder', auth.folder);
+    formData.append('public_id', auth.public_id);
+    formData.append('overwrite', String(auth.overwrite));
     formData.append('tags', auth.tags);
 
     return new Promise((resolve, reject) => {
