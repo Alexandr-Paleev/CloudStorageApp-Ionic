@@ -1258,7 +1258,10 @@ count was measuring the wrong thing:
 - `@vercel/node` is imported for `VercelRequest` and `VercelResponse` and
   nothing else — Vercel supplies the runtime itself. It belonged in
   `devDependencies` all along, where its transitive tree never reaches
-  production.
+  production. It is not installed at all any more: the two types are
+  written out in `libs/server/src/vercel.ts`, and the 60 packages it brought
+  went with it, an undici 5 that not even its newest release had left among
+  them.
 - `ajv` was a direct dependency that no file in this repository imports. It came
   in transitively through `vite-plugin-pwa` and `eslint` regardless.
 - `cloudinary` was the one genuine production high, and the only real migration:

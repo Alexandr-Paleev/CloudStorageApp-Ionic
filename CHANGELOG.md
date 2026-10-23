@@ -37,6 +37,20 @@ reasoning behind the larger decisions lives in
 
 ### Security
 
+- **The Security tab carried 22 dependency alerts, none in what ships.** All
+  were in development tools, and most came through `@vercel/node`, which this
+  repository installed for two type names: its newest release still pins
+  undici 5 and an old esbuild. It is not installed any more; `VercelRequest`
+  and `VercelResponse` are written out in `libs/server/src/vercel.ts`, with the
+  body `unknown`, and 60 packages left with it. undici, fast-uri, esbuild and
+  tsx moved within their ranges. Two moved by an override, each where nothing
+  else could: the undici that `nx` pins exactly, 7.29.0 to 7.30.1, and the uuid
+  under `@capacitor/cli`'s `xcode`, 7 to 11 — `xcode` calls only `uuid.v4()`,
+  and it still parses the iOS project and makes unique identifiers. The build
+  that ships is the same, byte for byte, under the old dependencies and the
+  new. What `npm audit` still names, `braces` through `lint-staged` and
+  `eslint-plugin-next`, has no fixed release yet, and its patterns come from
+  configuration, not from anyone's input.
 - **The demo's sweep could erase a real account.** Opening a demo also
   erases the demo accounts older than a day, with everything in them, and it
   took for a demo account any whose address began with `demo-`. Sign-up is

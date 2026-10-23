@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
 import { applyCors } from '../../libs/server/src/cors';
 

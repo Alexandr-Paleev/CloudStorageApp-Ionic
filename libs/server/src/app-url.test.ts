@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { VercelRequest } from '@vercel/node';
+import type { VercelRequest } from './vercel';
 import { getAppUrl } from './app-url';
 
 const requestWith = (origin?: string) =>

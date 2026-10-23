@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticateUser, AuthError } from '../../libs/server/src/auth';
 import { readQuota, quotaRejection } from '../../libs/server/src/quota';
 import {

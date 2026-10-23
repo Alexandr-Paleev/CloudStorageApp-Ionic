@@ -1,4 +1,4 @@
-import type { VercelResponse } from '@vercel/node';
+import type { VercelResponse } from './vercel';
 
 /**
  * The ceiling on how often a caller may reach a route.

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { assertSameOrigin, exchangeCode } from '../../libs/server/src/dropbox';
