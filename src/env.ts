@@ -1,3 +1,5 @@
+// Before the parse below, which is the first in the app: see zod-config.ts.
+import './zod-config';
 import { z } from 'zod';
 
 const envSchema = z.object({

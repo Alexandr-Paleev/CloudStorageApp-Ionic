@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './observability/sentry';
+import { reportPolicyViolations } from './observability/csp-violations';
 import { trackApiErrorStandalone } from './hooks/useAnalytics';
 import {
   followAnswersFromOtherTabs,
@@ -34,6 +35,9 @@ function start(): void {
   // piece of the initial download, and crash reports plus tracing cover what this
   // app actually needs. Add replayIntegration() back if session playback is wanted.
   initSentry();
+
+  // And what the content policy refuses, which nothing else would tell anyone.
+  reportPolicyViolations();
 
   // Syncs body.dark with the OS. Before render, so the first paint is already in
   // the right theme rather than flashing the light one.
