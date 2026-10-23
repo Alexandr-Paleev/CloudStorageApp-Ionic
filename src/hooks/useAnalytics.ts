@@ -31,9 +31,16 @@ function safeAnalyticsCall<T>(fn: () => T, fallback?: T): T | undefined {
 }
 
 /**
- * Initialize GA4 tracking
- * Only runs in production mode
- * Should be called once at app startup in main.tsx
+ * Starts GA4, in production only, and reports the page it starts on. Called
+ * by `analytics/collectors.ts` once the visitor has said yes and the address
+ * is bare (decision 0015).
+ *
+ * GA4 sends no page view of its own. Left to itself it sends one as it
+ * starts and another on every change of the history, and beside
+ * PageViewTracker's that counted each move between pages twice. The app
+ * sends one per page: this one, for the page GA4 starts on, whose report
+ * from PageViewTracker came before GA4 was running and went nowhere, and
+ * PageViewTracker's on every change of route after it.
  */
 export function initializeGA4(): void {
   if (ga4Initialized) return;
@@ -50,14 +57,14 @@ export function initializeGA4(): void {
   }
 
   safeAnalyticsCall(() => {
-    ReactGA.initialize(measurementId, {
-      gaOptions: {
-        // Anonymize IP for GDPR compliance
-        anonymize_ip: true,
-      },
-    });
+    // No `anonymize_ip`: that was Universal Analytics. GA4 does not log or
+    // store IP addresses, and the option reached it with every event as a
+    // parameter of its own.
+    ReactGA.initialize(measurementId, { gtagOptions: { send_page_view: false } });
     ga4Initialized = true;
   });
+
+  trackPageView(window.location.pathname);
 }
 
 /**

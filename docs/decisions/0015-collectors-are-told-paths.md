@@ -217,3 +217,23 @@ begins with it. A tap is described by the `alt`, `title` and `aria-label` of
 what was tapped, so a picture is named by the text beside it or through
 `aria-labelledby`, and `src/test/sentry.ts` describes each element of a
 rendered page with Sentry's own `htmlTreeAsString`.
+
+## Update — 2026-10-22
+
+Google Analytics sends no page view of its own any more, and the app sends
+one for each page. Measured on a production build, with every hit answered
+inside the browser and none sent, a move between two pages of the app
+arrived twice: as the app's report, and as the page view Analytics sends by
+itself whenever the history changes, an option of the property ("page
+changes based on browser history events") that was on. The page a visit
+began on was counted by Analytics' own page view alone, as the update of
+2026-10-15 says.
+
+`initializeGA4` now starts Analytics with `send_page_view: false` and reports
+the page it starts on itself, by its path; PageViewTracker reports every
+change of route after it, as before. That stops only the page view at the
+start. The one on a change of the history is the property's option, and it
+is off now: a setting in Google Analytics, which no line here can switch.
+With both, the same visit sends one page view per page. A route that only
+redirects is still reported on its way through, `/dashboard` on the way to
+`/login` for a visitor who is not signed in.
