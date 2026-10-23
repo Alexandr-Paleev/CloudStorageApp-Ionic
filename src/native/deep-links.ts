@@ -21,31 +21,22 @@ import { supabase } from '../supabase/supabase.config';
 export const NATIVE_AUTH_CALLBACK = 'com.cloudstorage.app://auth/callback';
 
 /**
- * Reads whatever the callback carried and signs the app in with it.
+ * Signs the app in with the code the callback carried, and with nothing else.
  *
- * Both shapes are handled on purpose. The client's default flow is implicit,
- * which puts the tokens in the fragment; switching it to PKCE — which a native
- * app should eventually do — moves them to a `code` query parameter instead,
- * and this keeps working across that change rather than failing at the one
- * moment nobody is watching.
+ * The client runs the PKCE flow here (supabase/supabase.config.ts): a code
+ * becomes a session only beside the verifier this app stored when the sign-in
+ * began, so one that did not start here is refused — whether another app on
+ * the device claimed the scheme and caught it, or a page linked to the scheme
+ * with a code of its own. Tokens in the fragment were what the implicit flow
+ * sent, and they were taken as they came: a link carrying someone else's
+ * session would have signed the app into that account.
  */
 async function adoptSessionFrom(url: string): Promise<void> {
-  const parsed = new URL(url);
+  const code = new URL(url).searchParams.get('code');
+  if (!code) return;
 
-  const code = parsed.searchParams.get('code');
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
-    return;
-  }
-
-  const fragment = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-  const access_token = fragment.get('access_token');
-  const refresh_token = fragment.get('refresh_token');
-  if (access_token && refresh_token) {
-    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-    if (error) throw error;
-  }
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) throw error;
 }
 
 /**

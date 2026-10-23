@@ -100,3 +100,27 @@ URL and the branch URL, all three as Vercel provides them — or a dev server on
 this machine. Anything else gets the production URL. That closes a quieter
 problem too: a request that merely claimed an Origin could point the demo's
 seeding fetch at any host.
+
+## Update — 2026-10-23
+
+**The shell signs in with PKCE, and takes a code and nothing else from its
+callback.** A custom scheme is anyone's to claim: on Android any installed app
+can register `com.cloudstorage.app` as well. The implicit flow sent the session
+itself to whichever app answered, Google's refresh token among it. And the
+listener took whatever tokens a link to the scheme carried, so a page that
+linked to it with someone else's session would have signed the app into that
+account.
+
+The client now runs the PKCE flow in the shell (`src/supabase/supabase.config.ts`).
+The callback brings a code, which becomes a session only beside the verifier
+this app stored when the sign-in began; `exchangeCodeForSession` refuses a code
+that did not start here (`AuthPKCECodeVerifierMissingError`). The listener no
+longer reads the fragment, and the WebView's own address is not read for a
+session in the shell either (`detectSessionInUrl: false`). So "both callback
+shapes are handled", above, no longer holds: one is, on purpose.
+
+The web keeps the implicit flow for now. Its callback is the app's own https
+origin, which nothing else can claim. Moving it as well touches the Dropbox
+callback, whose `?code=` the client would take for its own, the moment the
+collectors start (decision 0015), and a confirmation link opened on another
+device, and it is left for a change of its own.

@@ -1088,8 +1088,8 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,484 statements under `src/`, the
-unit tests do not reach 800. The largest share, 382, is in `src/services`, most
+a long way, and it is meant to be. Of the 2,476 statements under `src/`, the
+unit tests do not reach 779. The largest share, 382, is in `src/services`, most
 of it in the code that talks to Supabase, Dropbox and Google Drive:
 `supabase.service.ts` and the four services of the other two hold 215. The
 pages come next. With the page a share link opens gone to the site, and the
