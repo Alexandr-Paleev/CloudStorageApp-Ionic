@@ -1,4 +1,4 @@
-import type { VercelRequest } from '@vercel/node';
+import type { VercelRequest } from './vercel';
 
 /**
  * This deployment's own addresses, as Vercel describes them to the function:

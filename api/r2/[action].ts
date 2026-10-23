@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,

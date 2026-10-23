@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import Stripe from 'stripe';
 import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
 import { getAppUrl } from '../../libs/server/src/app-url';

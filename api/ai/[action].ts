@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
 import {

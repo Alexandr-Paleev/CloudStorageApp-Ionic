@@ -1,4 +1,4 @@
-import type { VercelRequest } from '@vercel/node';
+import type { VercelRequest } from './vercel';
 import { createClient } from '@supabase/supabase-js';
 import { assertServiceRoleKey } from './supabase-key';
 

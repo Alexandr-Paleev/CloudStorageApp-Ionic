@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import Stripe from 'stripe';
 /* The client the other functions use. It is built once, and building it
    refuses a key that is not service_role (libs/server/src/supabase-key.ts).
