@@ -108,13 +108,49 @@ describe('the shipped policy', () => {
     expect(directives['form-action']).toEqual(["'self'"]);
   });
 
-  /* Honest about the weak spot: gtag.js and Hotjar both evaluate inline script,
-     so 'unsafe-inline' has to stay until the app can emit a per-request nonce —
-     which needs a server rendering the HTML, not a static bundle. The app's own
-     build emits no inline <script> at all, so this is entirely the price of the
-     two analytics vendors. */
-  it("documents that script-src still carries 'unsafe-inline'", () => {
-    expect(directives['script-src']).toContain("'unsafe-inline'");
+  /* The build emits no inline <script>, and gtag.js and Hotjar, which this test
+     used to say needed one, run without: on production on 2026-10-23, a yes to
+     analytics, a demo account, a PDF preview, two uploads and the account's
+     deletion drew no inline violation under this policy, with Hotjar's loader
+     and its modules fetched each time. A vendor that starts injecting inline
+     script will be refused, which is the point. */
+  it('runs no inline script, and evaluates none', () => {
+    expect(directives['script-src']).not.toContain("'unsafe-inline'");
+    expect(directives['script-src']).not.toContain("'unsafe-eval'");
+  });
+
+  it('loads scripts from no Google host the app does not use', () => {
+    // gapi was loaded from here once; nothing has injected it since.
+    expect(allows(directives, 'script-src', 'https://apis.google.com')).toBe(false);
+  });
+
+  /* Each a host the browser sends requests to. Named by vendor, with a wildcard
+     where the host differs per deployment (the Supabase project, the R2
+     account, the Sentry organisation): vercel.json is checked in, and a fork
+     with its own project must not have its uploads refused. */
+  it.each([
+    ['https://fhcpgsenptnwimwimjka.supabase.co', 'Supabase: data, auth and Storage'],
+    ['https://api.cloudinary.com', 'Cloudinary uploads (cloudinary.service.ts)'],
+    ['https://mybucket.0123456789abcdef.r2.cloudflarestorage.com', 'R2 presigned uploads'],
+    ['https://www.googleapis.com', 'Google Drive (googledrive.service.ts)'],
+    ['https://accounts.google.com', 'Google Identity Services'],
+    ['https://api.dropboxapi.com', 'Dropbox'],
+    ['https://content.dropboxapi.com', 'Dropbox uploads'],
+    ['https://o4510651572748288.ingest.de.sentry.io', 'Sentry'],
+    ['https://region1.google-analytics.com', 'Google Analytics hits'],
+    ['https://www.googletagmanager.com', 'gtag.js'],
+    ['https://vc.hotjar.io', 'Hotjar'],
+    ['wss://ws.hotjar.com', 'Hotjar recordings'],
+  ])('lets the app connect to %s (%s)', (origin) => {
+    expect(allows(directives, 'connect-src', origin)).toBe(true);
+  });
+
+  /* It was `https: wss:`, which refused nothing: a script injected into the
+     page could have sent what it read to any host on the internet. */
+  it('connects to no host nobody asked for', () => {
+    expect(directives['connect-src']).not.toContain('https:');
+    expect(directives['connect-src']).not.toContain('wss:');
+    expect(allows(directives, 'connect-src', 'https://evil.example')).toBe(false);
   });
 });
 

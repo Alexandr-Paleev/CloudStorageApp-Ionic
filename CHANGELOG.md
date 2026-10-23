@@ -35,6 +35,17 @@ reasoning behind the larger decisions lives in
   published, and Google sign-in in them waits on two settings outside this
   repository, so this closes the hole before anyone could use it. The web
   keeps its flow: its callback is the app's own address.
+- **The app's content policy let a script send anything anywhere.** Its
+  `connect-src` was `https: wss:`, which refuses no host, and `script-src`
+  allowed inline script, which gtag.js and Hotjar were said to need. Measured
+  on production with the new policy enforced in the browser (a yes to
+  analytics, a demo account, a PDF preview, an image and a text file uploaded,
+  the account deleted): neither runs inline script, and every request went to
+  a host the policy now names. `connect-src` lists the vendors the app talks
+  to, with a wildcard where the host differs per deployment, so that a fork
+  keeps working; `frame-src` names Supabase the same way rather than this
+  project; `script-src` drops `'unsafe-inline'` and `apis.google.com`, which
+  nothing loads any more.
 
 ## [4.11.3] — 2026-10-23
 
