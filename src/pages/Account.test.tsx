@@ -235,6 +235,23 @@ describe('Account', () => {
     expect(deleteButton().disabled).toBe(false);
   });
 
+  /* The deletion ends the subscription at once, without a refund, and a person
+     has to know that before typing the word, not from their next statement. */
+  it('tells a Pro account that its subscription ends with it', () => {
+    profileMock.current = { tier: 'pro', storage_limit: 5 * 1024 * 1024 * 1024 };
+    show();
+    openDangerZone();
+
+    expect(screen.getByText(/Your Pro subscription ends with it/)).toBeInTheDocument();
+  });
+
+  it('says nothing about a subscription to a free account', () => {
+    show();
+    openDangerZone();
+
+    expect(screen.queryByText(/subscription ends/)).not.toBeInTheDocument();
+  });
+
   it('deletes the account and leaves for the login page', async () => {
     show();
     openDangerZone();

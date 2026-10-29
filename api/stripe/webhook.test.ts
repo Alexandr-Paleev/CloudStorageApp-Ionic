@@ -177,6 +177,8 @@ describe('webhook: checkout completed', () => {
 
   it('reports failure when no profile matches the customer', async () => {
     // Returning 200 here would let Stripe consider a lost upgrade delivered.
+    // A downgrade with no profile is acknowledged instead: see the events an
+    // account deletion sets off, below.
     withProfiles({ data: [] });
     const res = mockResponse();
     await handler(post(), res);
@@ -269,6 +271,37 @@ describe('webhook: subscription cancelled', () => {
     await handler(post(), mockResponse());
 
     expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_subscription_id: 'sub_new' });
+  });
+});
+
+/* Deleting an account deletes its Stripe customer first (api/account/delete.ts),
+   and that sends events about a customer whose profile is already gone. They
+   are done, not failed: answered with a 500, Stripe would deliver each again
+   for three days, and no delivery could ever succeed. */
+describe('webhook: the events an account deletion sets off', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    deliver('customer.subscription.deleted', subscription({ status: 'canceled' }));
+  });
+
+  it('acknowledges the end of a subscription whose profile is gone', async () => {
+    stripeHolds(subscription({ status: 'canceled' }));
+    withProfiles({ data: [] });
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('acknowledges an event about a customer Stripe no longer has', async () => {
+    stripe.listSubscriptions.mockRejectedValue(
+      Object.assign(new Error('No such customer'), { code: 'resource_missing' })
+    );
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(db.calls).toHaveLength(0);
   });
 });
 

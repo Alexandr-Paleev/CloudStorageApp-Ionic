@@ -6,7 +6,7 @@ import Stripe from 'stripe';
    key and failed at every event, in the one function that writes what a
    customer paid for. */
 import { supabase } from '../../libs/server/src/auth';
-import { getPeriodEnd } from '../../libs/server/src/stripe';
+import { getPeriodEnd, isMissingInStripe } from '../../libs/server/src/stripe';
 import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -52,7 +52,14 @@ async function downgradeToFree(customerId: string) {
     .select('id');
 
   if (error) throw new Error(`Failed to downgrade: ${error.message}`);
-  if (!data?.length) throw new Error(`No profile found for customer ${customerId}`);
+
+  /* Unlike an upgrade, nothing is lost here. An account deleted from inside
+     the app has no profile left — the deletion closed its Stripe customer,
+     and this event is its subscription ending — so there is no Pro to take
+     away. A 500 would only have Stripe deliver it again for three days. */
+  if (!data?.length) {
+    console.warn(`Webhook: no profile for customer ${customerId}, so nothing to downgrade`);
+  }
 }
 
 async function markPastDue(customerId: string) {
@@ -97,12 +104,23 @@ const ENDED = new Set<Stripe.Subscription.Status>([
  * changes nothing.
  */
 async function syncCustomer(customerId: string) {
-  // Newest first, as Stripe lists them; `all` so that cancelled ones count.
-  const { data } = await stripe.subscriptions.list({
-    customer: customerId,
-    status: 'all',
-    limit: 10,
-  });
+  let data: Stripe.Subscription[];
+  try {
+    // Newest first, as Stripe lists them; `all` so that cancelled ones count.
+    ({ data } = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'all',
+      limit: 10,
+    }));
+  } catch (error) {
+    /* A customer that is no longer there was deleted with its account
+       (api/account/delete.ts), and so was the profile this would write to. */
+    if (isMissingInStripe(error)) {
+      console.warn(`Webhook: customer ${customerId} no longer exists, so nothing to sync`);
+      return;
+    }
+    throw error;
+  }
 
   const active = data.find((subscription) => subscription.status === 'active');
 

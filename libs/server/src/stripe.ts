@@ -13,3 +13,14 @@ export function getPeriodEnd(subscription: Stripe.Subscription): Date {
   }
   return new Date(periodEnd * 1000);
 }
+
+/**
+ * Whether Stripe answered that the object is not there.
+ *
+ * For a customer that means deleted, which is what deleting an account does
+ * to one. The deletion, asked a second time, and the webhook, for the events
+ * the first one set off, both take it as done rather than as a failure.
+ */
+export function isMissingInStripe(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === 'resource_missing';
+}

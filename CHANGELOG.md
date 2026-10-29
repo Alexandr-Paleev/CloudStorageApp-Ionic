@@ -10,7 +10,20 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Deleting an account left its subscription running.** The erase removed
+  the profile, the only link between an account and its Stripe customer, and
+  left the customer and its subscription as they were. A Pro account deleted
+  from inside the app went on renewing every month, with nothing left in the
+  app to cancel it from, and each renewal reached the webhook for an account
+  that was not there. The deletion now deletes the Stripe customer first,
+  which cancels its subscriptions at once, refunds nothing and removes the
+  card details Stripe held; when Stripe cannot be reached, nothing is deleted
+  and the person is told so. The deletion dialog says this to a Pro account
+  before the word is typed, and the webhook acknowledges the events the
+  deletion sets off instead of failing them for three days of retries.
+  Production bills in Stripe's test mode, so no real payment was involved.
 
 ## [4.12.1] — 2026-10-29
 
