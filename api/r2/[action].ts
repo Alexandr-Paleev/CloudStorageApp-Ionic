@@ -117,15 +117,16 @@ async function presignUpload(req: VercelRequest, res: VercelResponse, userId: st
 }
 
 async function presignDownload(req: VercelRequest, res: VercelResponse, userId: string) {
-  const { key, expiresIn } = req.body as { key?: string; expiresIn?: number };
+  const { key } = req.body as { key?: string };
 
   if (!key) return bad(res, 'key is required');
   if (!ownsKey(userId, key)) return res.status(403).json({ message: 'Access denied' });
 
+  /* An hour, and not the caller's to choose. Nothing in the app asks for
+     another lifetime, and taking one from the request let a caller ask for the
+     longest SigV4 allows, a week, for an address nothing can take back. */
   const command = new GetObjectCommand({ Bucket: getR2BucketName(), Key: key });
-  const url = await getSignedUrl(getS3Client(), command, {
-    expiresIn: expiresIn || DEFAULT_DOWNLOAD_TTL,
-  });
+  const url = await getSignedUrl(getS3Client(), command, { expiresIn: DEFAULT_DOWNLOAD_TTL });
 
   return res.status(200).json({ url });
 }

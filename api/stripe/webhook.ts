@@ -64,6 +64,18 @@ async function markPastDue(customerId: string) {
   if (error) throw new Error(`Failed to update status: ${error.message}`);
 }
 
+/* Ended is more than cancelled. When the retries of a card run out, Stripe
+   cancels the subscription or marks it `unpaid`, as its account is set; a
+   subscription can be `paused`; and a first payment that never came ends as
+   `incomplete_expired`. Only `canceled` used to count, and the others kept
+   Pro for good. */
+const ENDED = new Set<Stripe.Subscription.Status>([
+  'canceled',
+  'unpaid',
+  'paused',
+  'incomplete_expired',
+]);
+
 /**
  * Brings one customer's profile in line with what Stripe holds now.
  *
@@ -80,7 +92,7 @@ async function markPastDue(customerId: string) {
  *
  * The rules are the ones the handlers applied to the snapshot, applied to the
  * current state instead: an active subscription is Pro; past_due is recorded
- * and the tier left alone; a cancelled one, with nothing live beside it, is
+ * and the tier left alone; one that has ended, with nothing live beside it, is
  * Free; anything else — an `incomplete` checkout still being paid, say —
  * changes nothing.
  */
@@ -98,7 +110,7 @@ async function syncCustomer(customerId: string) {
     await upgradeToPro(customerId, active.id, getPeriodEnd(active));
   } else if (data.some((subscription) => subscription.status === 'past_due')) {
     await markPastDue(customerId);
-  } else if (data.some((subscription) => subscription.status === 'canceled')) {
+  } else if (data.some((subscription) => ENDED.has(subscription.status))) {
     await downgradeToFree(customerId);
   }
 }

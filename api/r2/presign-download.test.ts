@@ -79,19 +79,17 @@ describe('r2 presign-download', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('honours a requested lifetime', async () => {
-    await handler(ask({ key: 'users/user-1/a.pdf', expiresIn: 60 }), mockResponse());
-    expect(signedUrl).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
-      expiresIn: 60,
-    });
-  });
-
-  it('falls back to an hour when none is given', async () => {
-    await handler(ask({ key: 'users/user-1/a.pdf' }), mockResponse());
-    expect(signedUrl).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
-      expiresIn: 3600,
-    });
-  });
+  /* Nothing in the app asked for another lifetime, and one taken from the
+     request let a caller ask for a week, the longest SigV4 allows. */
+  it.each([undefined, 60, 604800])(
+    'signs for an hour, whatever the caller asks (%s)',
+    async (asked) => {
+      await handler(ask({ key: 'users/user-1/a.pdf', expiresIn: asked }), mockResponse());
+      expect(signedUrl).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+        expiresIn: 3600,
+      });
+    }
+  );
 
   it('reports a signing failure as 500', async () => {
     signedUrl.mockRejectedValue(new Error('credentials missing'));

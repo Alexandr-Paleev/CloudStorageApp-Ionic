@@ -10,8 +10,23 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Fixed
+
+- **A subscription that ended without being cancelled kept Pro.** When the
+  retries of a card run out, Stripe either cancels the subscription or marks
+  it `unpaid`, as its account is set; a subscription can also be `paused`, and
+  a first payment that never came ends as `incomplete_expired`. The webhook
+  took only `canceled` for the end, so the other three left an account on Pro
+  for good. All four end it now, unless another subscription beside them is
+  live; an `incomplete` checkout still being paid changes nothing, as before.
+
 ### Security
 
+- **An R2 download address could be asked for a week.** `/api/r2/presign-download`
+  took its lifetime from the request, and so would sign for as long as
+  SigV4 allows, a week, an address that nothing can take back. Nothing in the
+  app asked for anything but the default hour, which is now all it signs; the
+  client no longer sends a lifetime. R2 is switched off in production.
 - **One Cloudinary signature took any number of files.** `/api/cloudinary/sign`
   checks the quota against the size the browser declares and signs the upload
   for an hour. Cloudinary named each upload itself, so the signature took as
