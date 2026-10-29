@@ -246,14 +246,14 @@ describe('deleting and reading', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt');
   });
 
-  it('asks for a signed URL with the lifetime it was given', async () => {
+  it('asks for a signed URL by its key alone: the server sets how long it lasts', async () => {
     fetchMock.mockResolvedValue(jsonOk({ url: 'https://r2.test/signed' }));
 
-    await expect(r2Service.getSignedDownloadUrl('users/u1/a.bin', 60)).resolves.toBe(
+    await expect(r2Service.getSignedDownloadUrl('users/u1/a.bin')).resolves.toBe(
       'https://r2.test/signed'
     );
     const [, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual({ key: 'users/u1/a.bin', expiresIn: 60 });
+    expect(JSON.parse(init.body as string)).toEqual({ key: 'users/u1/a.bin' });
   });
 
   it('is configured, since the suite supplies a bucket name', () => {

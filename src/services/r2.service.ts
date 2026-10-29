@@ -198,12 +198,13 @@ const r2Service = {
     await callApi('delete', { key });
   },
 
-  async getSignedDownloadUrl(key: string, expiresIn: number = 3600): Promise<string> {
+  /** An hour's address for one of the account's own objects; the server sets the hour. */
+  async getSignedDownloadUrl(key: string): Promise<string> {
     if (!this.isConfigured()) {
       throw new Error('Cloudflare R2 is not configured.');
     }
 
-    const { url } = (await callApi('presign-download', { key, expiresIn })) as { url: string };
+    const { url } = (await callApi('presign-download', { key })) as { url: string };
     return url;
   },
 };

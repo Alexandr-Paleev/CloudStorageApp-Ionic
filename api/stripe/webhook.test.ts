@@ -272,6 +272,28 @@ describe('webhook: subscription cancelled', () => {
   });
 });
 
+describe('webhook: a subscription that ended without being cancelled', () => {
+  /* Out of card retries, Stripe cancels or marks `unpaid`, as the account is
+     set; a subscription can be paused; a first payment that never came ends
+     as `incomplete_expired`. Only `canceled` used to count. */
+  it.each(['unpaid', 'paused', 'incomplete_expired'])(
+    'drops the account back to Free when Stripe says %s',
+    async (status) => {
+      stripeHolds(subscription({ status }));
+      deliver('customer.subscription.updated', subscription({ status }));
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(200);
+      expect(lastUpdate()).toMatchObject({
+        tier: 'free',
+        storage_limit: TIER_LIMITS.free.storage_limit,
+        stripe_subscription_id: null,
+      });
+    }
+  );
+});
+
 describe('webhook: payment failed', () => {
   it('marks the subscription past_due', async () => {
     stripeHolds(subscription({ status: 'past_due' }));
