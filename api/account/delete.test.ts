@@ -1,22 +1,42 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
+import {
+  mockRequest,
+  mockResponse,
+  mockSupabase,
+  type TableAnswer,
+} from '../../libs/server/src/test-utils';
 import type { EraseDeps } from '../../libs/server/src/account-erase';
 
-const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, config } = vi.hoisted(
-  () => ({
-    FakeAuthError: class FakeAuthError extends Error {},
-    authenticateUser: vi.fn(),
-    eraseAccount: vi.fn(),
-    send: vi.fn(),
-    deleteByPrefix: vi.fn(),
-    config: vi.fn(),
-  })
-);
+const {
+  FakeAuthError,
+  authenticateUser,
+  eraseAccount,
+  send,
+  deleteByPrefix,
+  config,
+  deleteCustomer,
+  db,
+} = vi.hoisted(() => ({
+  FakeAuthError: class FakeAuthError extends Error {},
+  authenticateUser: vi.fn(),
+  eraseAccount: vi.fn(),
+  send: vi.fn(),
+  deleteByPrefix: vi.fn(),
+  config: vi.fn(),
+  deleteCustomer: vi.fn(),
+  db: { client: null as { from: (table: string) => unknown } | null },
+}));
 
 vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
-  supabase: {},
+  supabase: { from: (table: string) => db.client!.from(table) },
+}));
+
+vi.mock('stripe', () => ({
+  default: class {
+    customers = { del: deleteCustomer };
+  },
 }));
 
 vi.mock('../../libs/server/src/account-erase', () => ({
@@ -66,6 +86,17 @@ function withCloudinary() {
   vi.stubEnv('CLOUDINARY_API_SECRET', 'secret');
 }
 
+/** What profiles answers. By default an account that never opened a checkout. */
+function withProfile(answer: TableAnswer = { data: [{ stripe_customer_id: null }] }) {
+  db.client = mockSupabase({ profiles: answer }).client;
+}
+
+/** An account that pays, on a deployment that can reach Stripe. */
+function withCustomer(id = 'cus_123') {
+  withProfile({ data: [{ stripe_customer_id: id }] });
+  vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_key');
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -73,6 +104,8 @@ beforeEach(() => {
   eraseAccount.mockResolvedValue({ failures: [] });
   send.mockResolvedValue({ Contents: [], IsTruncated: false });
   deleteByPrefix.mockResolvedValue({});
+  deleteCustomer.mockResolvedValue({ id: 'cus_123', deleted: true });
+  withProfile();
 });
 
 afterEach(() => {
@@ -132,6 +165,79 @@ describe('account deletion', () => {
 
     expect(res.statusCode).toBe(429);
     expect(eraseAccount).toHaveBeenCalledTimes(5);
+  });
+});
+
+/* The profile is the only link between an account and its Stripe customer,
+   and the erase deletes it. A subscription left behind renewed every month
+   with nothing in the app able to cancel it. */
+describe('what the account pays for', () => {
+  it('closes the Stripe customer before anything is erased', async () => {
+    withCustomer('cus_123');
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(deleteCustomer).toHaveBeenCalledWith('cus_123');
+    expect(deleteCustomer.mock.invocationCallOrder[0]!).toBeLessThan(
+      eraseAccount.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('erases nothing when Stripe cannot close the customer', async () => {
+    withCustomer();
+    deleteCustomer.mockRejectedValue(new Error('api.stripe.com unreachable'));
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.body).toMatchObject({ message: expect.stringMatching(/nothing was deleted/) });
+    expect(eraseAccount).not.toHaveBeenCalled();
+  });
+
+  /* An erase that failed after Stripe had answered leaves an account with no
+     customer behind it. Asking again has to get through. */
+  it('carries on when the customer is already gone', async () => {
+    withCustomer();
+    deleteCustomer.mockRejectedValue(
+      Object.assign(new Error('No such customer'), { code: 'resource_missing' })
+    );
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(eraseAccount).toHaveBeenCalled();
+  });
+
+  it('does not ask Stripe about an account that never opened a checkout', async () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_key');
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(deleteCustomer).not.toHaveBeenCalled();
+  });
+
+  /* The subscription goes on renewing whether or not this deployment holds
+     the key that could end it. */
+  it('erases nothing when there is a customer and no key to reach Stripe', async () => {
+    withProfile({ data: [{ stripe_customer_id: 'cus_123' }] });
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(503);
+    expect(deleteCustomer).not.toHaveBeenCalled();
+    expect(eraseAccount).not.toHaveBeenCalled();
+  });
+
+  it('erases nothing when the profile cannot be read', async () => {
+    withProfile({ error: { message: 'connection reset' } });
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(eraseAccount).not.toHaveBeenCalled();
   });
 });
 

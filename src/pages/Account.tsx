@@ -240,6 +240,15 @@ const Account: React.FC = () => {
                     This deletes your account, every file you uploaded, your folders and every share
                     link you created. It cannot be undone, and support cannot restore it.
                   </p>
+                  {/* Said before the word is typed, not discovered on the
+                      next statement: the deletion ends the subscription at
+                      once, and what is left of the period is not refunded. */}
+                  {tier === 'pro' && (
+                    <p>
+                      Your Pro subscription ends with it, straight away. The rest of the period you
+                      paid for is not refunded.
+                    </p>
+                  )}
                 </IonText>
 
                 <label className="account-label" htmlFor="delete-confirm">

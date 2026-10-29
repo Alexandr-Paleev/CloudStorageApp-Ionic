@@ -125,7 +125,9 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Protected routes (authorized users only)
 - ✅ **Account deletion from inside the app**, at `/account`. Files, folders,
   share links, profile and login, in the order the missing foreign keys demand —
-  bytes first, rows second, the user last
+  bytes first, rows second, the user last. A Pro subscription ends first, with
+  the Stripe customer that held it; if Stripe cannot be reached, nothing is
+  deleted
 
 > **What account deletion does not reach.** Files the app placed in *your own*
 > Google Drive or Dropbox stay where they are. They live in a storage account
