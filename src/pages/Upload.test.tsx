@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Upload from './Upload';
+import storageService from '../services/storage.service';
+import googleDriveAuthService from '../services/googledrive-auth.service';
 import { renderWithProviders } from '../test/utils';
 
 /**
@@ -88,6 +90,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   profile.profile = { tier: 'free', storage_limit: 500 * 1024 * 1024, allowed_providers: ['r2'] };
   uploadFile.mockResolvedValue(landed());
+  vi.mocked(storageService.getUserStorageSize).mockResolvedValue(0);
+  vi.mocked(googleDriveAuthService.isAuthorized).mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -95,6 +99,29 @@ afterEach(() => {
 });
 
 describe('Upload', () => {
+  /* Asked when Upload is pressed. A cached "connected" outlived the token
+     behind it, and a full account was sent on to uploads that could only
+     fail, with nothing offering to connect Drive again. */
+  it('stops to offer Drive when the files do not fit and Drive has no token now', async () => {
+    let tokenAlive = true;
+    vi.mocked(googleDriveAuthService.isAuthorized).mockImplementation(async () => tokenAlive);
+    vi.mocked(storageService.getUserStorageSize).mockResolvedValue(500 * 1024 * 1024);
+    show();
+    choose('a.txt');
+    await screen.findByTestId('upload-queue');
+    await waitFor(() => expect(storageService.getUserStorageSize).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The hour is up while the page is open.
+    tokenAlive = false;
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(googleDriveAuthService.isAuthorized).toHaveBeenCalled());
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
   it('queues every file the picker hands it, and says how many will go', async () => {
     show();
     choose('a.txt', 'b.txt', 'c.txt');

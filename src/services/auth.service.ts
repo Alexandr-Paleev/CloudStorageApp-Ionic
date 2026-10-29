@@ -1,5 +1,5 @@
 import { supabase } from '../supabase/supabase.config';
-import { User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, User } from '@supabase/supabase-js';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { NATIVE_AUTH_CALLBACK } from '../native/deep-links';
@@ -55,13 +55,14 @@ export const authService = {
   },
 
   /**
-   * Subscribe to auth state changes
+   * Subscribe to auth state changes. The event comes second, for whoever has
+   * to tell signing out from never having signed in.
    */
-  onAuthStateChanged(callback: (user: User | null) => void): () => void {
+  onAuthStateChanged(callback: (user: User | null, event: AuthChangeEvent) => void): () => void {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      callback(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      callback(session?.user ?? null, event);
     });
 
     return () => {
@@ -81,13 +82,15 @@ export const authService = {
        and Google refuses to sign anyone in inside an embedded WebView anyway. */
     const native = Capacitor.isNativePlatform();
 
+    /* No `access_type: 'offline'` and no `prompt: 'consent'`. Together they
+       had Google issue a refresh token on every sign-in — a credential to the
+       person's Drive that lasts until revoked — which Supabase handed to the
+       browser and nothing here ever used; and they put the full consent
+       screen in front of every sign-in, not only the first. The access token
+       that comes with the session is all Drive is used with. */
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
         scopes: 'openid email profile https://www.googleapis.com/auth/drive.file',
         redirectTo: native ? NATIVE_AUTH_CALLBACK : window.location.origin + '/dashboard',
         skipBrowserRedirect: native,

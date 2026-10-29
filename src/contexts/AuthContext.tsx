@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { authService } from '../services/auth.service';
+import { forgetToken as forgetDriveToken } from '../services/googledrive-token';
 
 type AuthContextType = {
   user: User | null;
@@ -31,7 +32,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Subscribe to auth state changes - this will also trigger immediately with current state
-    const unsubscribe = authService.onAuthStateChanged((currentUser) => {
+    const unsubscribe = authService.onAuthStateChanged((currentUser, event) => {
+      /* However it happened — the button, an account deletion, a session
+         ended elsewhere. The Drive token was this browser's copy of the
+         person's grant, and it outlived them: the next account to sign in
+         here was handed it. */
+      if (event === 'SIGNED_OUT') forgetDriveToken();
       setUser(currentUser);
       setLoading(false);
     });

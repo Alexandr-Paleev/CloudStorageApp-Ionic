@@ -27,6 +27,11 @@ export function isRetriableError(error: unknown): boolean {
   if (error instanceof Error && (error.name === 'AbortError' || error.name === 'UploadPausedError'))
     return false;
 
+  /* Drive asking to be connected again answers the same until someone
+     connects it, and a retry would only replace the reason with "not
+     connected". */
+  if (error instanceof Error && error.name === 'GoogleDriveAuthError') return false;
+
   if (error instanceof HttpError) {
     if (error.status === 501) return false;
     return error.status >= 500 || error.status === 429;

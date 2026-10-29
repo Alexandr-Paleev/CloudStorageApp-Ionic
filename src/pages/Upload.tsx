@@ -102,12 +102,6 @@ const Upload: React.FC = () => {
     enabled: !!user?.id,
   });
 
-  const { data: isGoogleDriveConnected } = useQuery({
-    queryKey: ['googleDriveConnected'],
-    queryFn: () => googleDriveAuthService.isAuthorized(),
-    staleTime: 1000 * 60 * 5,
-  });
-
   /**
    * Sends the queue, one file at a time.
    *
@@ -319,7 +313,11 @@ const Upload: React.FC = () => {
     const incoming = waiting.reduce((sum, item) => sum + item.file.size, 0);
     const wouldExceedLimit = storageSize !== undefined && storageSize + incoming > storageLimit;
 
-    if (wouldExceedLimit && !isGoogleDriveConnected && !useGoogleDrive) {
+    /* Asked now, not read from a cache five minutes old, and asked even when
+       Drive was chosen earlier: a token runs out in an hour, and a choice of
+       Drive without a token behind it sent a full account on to uploads that
+       could only fail, with nothing on screen offering to connect again. */
+    if (wouldExceedLimit && !(await googleDriveAuthService.isAuthorized())) {
       setShowGoogleDriveAlert(true);
       return;
     }
@@ -339,7 +337,6 @@ const Upload: React.FC = () => {
   const handleConnectGoogleDrive = async () => {
     try {
       await googleDriveAuthService.authorize();
-      queryClient.invalidateQueries({ queryKey: ['googleDriveConnected'] });
       setUseGoogleDrive(true);
       setPreferredProvider(undefined);
       setShowGoogleDriveAlert(false);

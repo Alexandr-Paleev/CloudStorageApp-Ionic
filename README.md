@@ -921,6 +921,7 @@ cloud-storage-app/
 │   │   ├── storage.service.ts     # Main file service
 │   │   ├── cloudinary.service.ts  # Cloudinary service
 │   │   ├── googledrive-auth.service.ts  # Google Drive OAuth
+│   │   ├── googledrive-token.ts   # The Drive token, with its owner and its end
 │   │   └── googledrive.service.ts # Google Drive service
 │   ├── providers/
 │   │   ├── storage.provider.ts    # Storage Provider architecture

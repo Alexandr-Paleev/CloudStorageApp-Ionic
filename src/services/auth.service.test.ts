@@ -113,6 +113,26 @@ describe('watching the session', () => {
     release();
     expect(unsubscribe).toHaveBeenCalled();
   });
+
+  /* Nobody signed in is what the page starts with, too. Only the event tells
+     signing out apart, and signing out is when the Drive token has to go. */
+  it('says which event it was', () => {
+    let emit: (event: string, session: unknown) => void = () => undefined;
+    onAuthStateChange.mockImplementation((cb: typeof emit) => {
+      emit = cb;
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+
+    const seen: unknown[] = [];
+    authService.onAuthStateChanged((u, event) => seen.push([u, event]));
+
+    emit('INITIAL_SESSION', null);
+    emit('SIGNED_OUT', null);
+    expect(seen).toEqual([
+      [null, 'INITIAL_SESSION'],
+      [null, 'SIGNED_OUT'],
+    ]);
+  });
 });
 
 /**
@@ -162,6 +182,17 @@ describe('signing in with Google', () => {
   it('asks for the Drive scope, since uploads go there for connected accounts', async () => {
     await authService.signInWithGoogle();
     expect(optionsUsed().scopes).toContain('drive.file');
+  });
+
+  /* `access_type: 'offline'` had Google issue a refresh token on every sign-in,
+     which reached the browser and was never used, and `prompt: 'consent'`
+     showed the full consent screen every time. */
+  it('asks neither for offline access nor for the consent screen every time', async () => {
+    await authService.signInWithGoogle();
+
+    const params = (optionsUsed().queryParams ?? {}) as Record<string, string>;
+    expect(params.access_type).toBeUndefined();
+    expect(params.prompt).toBeUndefined();
   });
 
   it('does not try to open a browser when Supabase returned no URL', async () => {

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, User } from '@supabase/supabase-js';
 import { AuthProvider, useAuth } from './AuthContext';
 import { authService } from '../services/auth.service';
+import { forgetToken } from '../services/googledrive-token';
 
 vi.mock('../services/auth.service', () => ({
   authService: {
@@ -13,8 +14,10 @@ vi.mock('../services/auth.service', () => ({
   },
 }));
 
+vi.mock('../services/googledrive-token', () => ({ forgetToken: vi.fn() }));
+
 const unsubscribe = vi.fn();
-let emit: (user: User | null) => void;
+let emit: (user: User | null, event: AuthChangeEvent) => void;
 
 function Probe() {
   const { user, loading, login, logout } = useAuth();
@@ -60,11 +63,30 @@ describe('AuthProvider', () => {
       </AuthProvider>
     );
 
-    act(() => emit({ id: 'user-1' } as User));
+    act(() => emit({ id: 'user-1' } as User, 'SIGNED_IN'));
     expect(state()).toBe('user-1');
 
-    act(() => emit(null));
+    act(() => emit(null, 'SIGNED_OUT'));
     expect(state()).toBe('anonymous');
+  });
+
+  /* However the session ends: the button, an account deletion, a session
+     ended elsewhere. The token outlived its owner, and the next account to
+     sign in on the browser was handed it. */
+  it('lets go of the Drive token when the session ends, and not before', () => {
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+    act(() => emit(null, 'INITIAL_SESSION'));
+    act(() => emit({ id: 'user-1' } as User, 'SIGNED_IN'));
+    act(() => emit({ id: 'user-1' } as User, 'TOKEN_REFRESHED'));
+    expect(forgetToken).not.toHaveBeenCalled();
+
+    act(() => emit(null, 'SIGNED_OUT'));
+    expect(forgetToken).toHaveBeenCalledTimes(1);
   });
 
   it('lets go of the subscription when it unmounts', () => {
