@@ -93,7 +93,7 @@ describe('saveFileMetadata', () => {
 });
 
 describe('getFiles: the query the dashboard asks for', () => {
-  /** The chain getFiles walks, ending on .order(), which it awaits. */
+  /** The chain getFiles walks, awaited once it has been ordered. */
   function listing(rows: unknown[] = []) {
     const chain = {
       select: vi.fn(() => chain),
@@ -103,7 +103,9 @@ describe('getFiles: the query the dashboard asks for', () => {
       or: vi.fn(() => chain),
       not: vi.fn(() => chain),
       range: vi.fn(() => chain),
-      order: vi.fn(async () => ({ data: rows, error: null })),
+      order: vi.fn(() => chain),
+      then: (...args: Parameters<Promise<unknown>['then']>) =>
+        Promise.resolve({ data: rows, error: null }).then(...args),
     };
     from.mockReturnValue(chain);
     return chain;
@@ -209,6 +211,23 @@ describe('getFiles: the query the dashboard asks for', () => {
 
     expect(chain.order).toHaveBeenCalledWith(sort, { ascending });
   });
+
+  /* Rows that compare equal come back in no promised order, and a page is a
+     slice by position: sorted by size alone, a file could be listed on two
+     pages and another on none. */
+  it.each(['created_at', 'name', 'size'] as const)(
+    'breaks ties in %s by id, so no page repeats or skips a file',
+    async (sort) => {
+      const chain = listing();
+      await supabaseService.getFiles('user-1', { sort, page: 1, pageSize: 15 });
+
+      // Newest, largest, Z first by default; the tie-break is the same either way.
+      expect(chain.order.mock.calls).toEqual([
+        [sort, { ascending: false }],
+        ['id', { ascending: true }],
+      ]);
+    }
+  );
 
   it('asks for one page at a time', async () => {
     const chain = listing();

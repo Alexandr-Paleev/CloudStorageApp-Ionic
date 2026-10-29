@@ -36,6 +36,22 @@ reasoning behind the larger decisions lives in
   Google's window, or a pop-up blocker, no longer leaves Connect waiting for
   good, a script that cannot load no longer hangs it, and reconnecting no
   longer puts the full consent screen in front of the person every time.
+- **Sorted by size or by name, the file list could show a file twice and
+  another never.** The list arrives in pages of 15, and nothing broke a tie
+  between files that compare equal, an order Postgres does not promise to
+  keep from one page to the next. Measured on production's Postgres: 60 rows
+  of three sizes, read in pages of 15 ordered by size alone, came back as 57
+  different rows. Every sort now ends on the file's id.
+- **A picture the browser could not show was asked for again for as long as
+  its page was open.** A failed preview fetched the file's details again, and
+  on R2 and Supabase Storage that signs a new address, which the browser
+  downloaded in full and failed on once more: a HEIC photo in a browser that
+  cannot show one, or a broken file, cost a signature and a full download
+  every round. A preview is now asked for once more, for an address that ran
+  out while the page stood open, and then shows "No preview".
+- **The hint under an empty search by meaning promised that files are indexed
+  after upload.** Nothing is indexed until someone asks for it (ADR 0013); it
+  now says that only indexed files are searched by meaning.
 
 ### Security
 

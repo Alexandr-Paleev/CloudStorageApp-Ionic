@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -105,6 +105,22 @@ const FileView: React.FC = () => {
     },
     enabled: !!fileId && !!user?.id,
   });
+
+  /* One more address for a picture that will not load: a signed one may have
+     run out while the page stood open. A second failure is the picture
+     itself — a HEIC photo in a browser that cannot show one, a broken file —
+     and asking again signed a new address, which the browser downloaded in
+     full and failed on again, for as long as the page was open. */
+  const previewRetried = useRef<string | null>(null);
+  const [previewBroken, setPreviewBroken] = useState<string | null>(null);
+  const handlePreviewError = () => {
+    if (previewRetried.current === fileId) {
+      setPreviewBroken(fileId ?? null);
+      return;
+    }
+    previewRetried.current = fileId ?? null;
+    void refetch();
+  };
 
   const deleteMutation = useMutation({
     mutationFn: () => {
@@ -361,7 +377,7 @@ const FileView: React.FC = () => {
                   <p className="preview-type">It opens in {openedIn} itself.</p>
                 </IonText>
               </div>
-            ) : isImage && downloadUrl ? (
+            ) : isImage && downloadUrl && previewBroken !== fileId ? (
               /* Named by the title above, which is the file's name: an alt
                  holding it would be what Sentry reads when the picture is
                  tapped. */
@@ -369,7 +385,7 @@ const FileView: React.FC = () => {
                 src={downloadUrl}
                 aria-labelledby={titleId}
                 className="preview-image"
-                onError={() => refetch()}
+                onError={handlePreviewError}
               />
             ) : isPDF && downloadUrl ? (
               <div className="preview-pdf-container">

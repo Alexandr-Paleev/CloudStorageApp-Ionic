@@ -143,7 +143,14 @@ describe('FileFilters', () => {
     // invisible to this mode, and saying so is the difference between a
     // feature that looks broken and one that looks honest.
     show({ search: 'hotel', mode: 'smart' }, 0);
-    expect(screen.getByText(/files are indexed after upload/)).toBeInTheDocument();
+    expect(screen.getByText(/only indexed files are searched by meaning/)).toBeInTheDocument();
+  });
+
+  /* Indexing happens when someone asks for it (ADR 0013), never on upload: a
+     promise that it does sends people to wait for nothing. */
+  it('does not promise an index that upload never makes', () => {
+    show({ search: 'hotel', mode: 'smart' }, 0);
+    expect(screen.queryByText(/after upload/)).not.toBeInTheDocument();
   });
 
   it('says that a smart search crosses folders too', () => {
