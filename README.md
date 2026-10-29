@@ -725,9 +725,10 @@ A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.12.0, as CI measured them. The first load is 0.3 kB
-over 4.11.3's, for the listener that tells Sentry what the content policy
-refuses, which the first chunk carries so that a refusal at startup is not
+Those are the figures of 4.12.1 and of 4.12.0, as CI measured them: the fixes
+between the two moved none of them by a tenth of a kB. 4.12.0's first load was
+0.3 kB over 4.11.3's, for the listener that tells Sentry what the content
+policy refuses, which the first chunk carries so that a refusal at startup is not
 missed. 4.11.3's was 0.1 kB over 4.11.2's, for the sign-in page saying where a
 confirmation link went. 4.11.2's figures were 4.11.1's, and 4.11.1's first load was 0.9 kB over 4.11.0's: 0.5 kB
 for what Sentry is told about a file and about a failed
