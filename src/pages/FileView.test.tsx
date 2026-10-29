@@ -337,6 +337,28 @@ describe('FileView and what Sentry may be told', () => {
     expect(whereSentryWouldRead('report.pdf')).toEqual([]);
   });
 
+  /* A HEIC photo in a browser that cannot show one, or a broken file: every
+     new signature was a full download of a picture that would not load, for
+     as long as the page stayed open. One more try is for a signature that ran
+     out; the second failure is the picture. */
+  it('asks once more for a picture that will not load, then shows no preview', async () => {
+    getFileMetadata.mockResolvedValue({
+      ...FILE,
+      name: 'photo.heic',
+      type: 'image/heic',
+      download_url: 'https://cdn.example.com/photo.heic',
+    });
+    show();
+
+    fireEvent.error(await screen.findByRole('img', { name: 'photo.heic' }));
+    await waitFor(() => expect(getFileMetadata).toHaveBeenCalledTimes(2));
+
+    fireEvent.error(await screen.findByRole('img', { name: 'photo.heic' }));
+    expect(await screen.findByText('No preview')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'photo.heic' })).not.toBeInTheDocument();
+    expect(getFileMetadata).toHaveBeenCalledTimes(2);
+  });
+
   it('describes no tap on a picture by its name, which still names the picture', async () => {
     getFileMetadata.mockResolvedValue({
       ...FILE,

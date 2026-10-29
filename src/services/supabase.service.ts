@@ -60,7 +60,15 @@ const supabaseService = {
       query = query.range(from, to);
     }
 
-    const { data, error } = await query.order(sort, { ascending: direction === 'asc' });
+    /* Ties broken by id, always. A page is a slice by position, and Postgres
+       promises no order among rows that compare equal — the plan it picks
+       for one LIMIT and OFFSET can sort them differently from the next.
+       Sorted by size alone, files of the same size were listed on two pages
+       and others on none: 60 rows of three sizes, in pages of 15, came back
+       as 57 different ones. */
+    const { data, error } = await query
+      .order(sort, { ascending: direction === 'asc' })
+      .order('id', { ascending: true });
 
     if (error) {
       Sentry.captureException(error, { tags: { context: 'supabase.getFiles' } });

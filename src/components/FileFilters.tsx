@@ -139,7 +139,10 @@ const FileFilters: React.FC<FileFiltersProps> = ({
         <IonLabel className="file-filters-note" color="medium">
           {value.mode === 'smart' ? (
             resultCount === 0 ? (
-              <>Nothing indexed matches “{searched}” — files are indexed after upload</>
+              /* Not "after upload": nothing is indexed until someone asks for
+                 it (ADR 0013), and the promise sent people to wait for an
+                 index that was never coming. */
+              <>Nothing indexed matches “{searched}” — only indexed files are searched by meaning</>
             ) : (
               `Closest in meaning, every folder${resultCount === undefined ? '' : ` — ${resultCount}`}`
             )
