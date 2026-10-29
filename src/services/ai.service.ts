@@ -23,6 +23,13 @@ export interface SmartResult extends FileMetadata {
   similarity: number;
 }
 
+export interface SmartMatches {
+  files: SmartResult[];
+  /** The model that embedded the query, and so the only one whose rows it
+   *  was compared with. Absent when nothing was asked. */
+  model?: string;
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const {
     data: { session },
@@ -52,16 +59,25 @@ const aiService = {
   },
 
   /**
-   * Files this account has that the index does not.
+   * Files this account has that the index does not, as `model` sees it.
    *
    * Two reads and a subtraction in the browser rather than a view or an RPC:
    * an account holds tens of files, both tables are already readable by their
    * owner, and a database object exists forever once it is written.
+   *
+   * A row another model made counts as missing. `match_files` compares only
+   * rows of the query's own model, so after the server changes backend such a
+   * file is one the search cannot return, and offering it again is the only
+   * way it comes back: the index route replaces the row, keyed by the file.
    */
-  async unindexedFileIds(userId: string): Promise<string[]> {
+  async unindexedFileIds(userId: string, model: string): Promise<string[]> {
     const [files, indexed] = await Promise.all([
       supabase.from('files').select('id').eq('user_id', userId),
-      supabase.from('file_embeddings').select('file_id').eq('user_id', userId),
+      supabase
+        .from('file_embeddings')
+        .select('file_id')
+        .eq('user_id', userId)
+        .eq('embedding_model', model),
     ]);
 
     if (files.error) throw files.error;
@@ -103,11 +119,12 @@ const aiService = {
   },
 
   /**
-   * Files that mean what the query means, nearest first.
+   * Files that mean what the query means, nearest first, and the model that
+   * found them.
    */
-  async smartSearch(query: string): Promise<SmartResult[]> {
+  async smartSearch(query: string): Promise<SmartMatches> {
     const text = query.trim();
-    if (!text) return [];
+    if (!text) return { files: [] };
 
     const response = await fetch(apiUrl('/api/ai/embed'), {
       method: 'POST',
@@ -144,7 +161,7 @@ const aiService = {
       throw error;
     }
 
-    return (data || []) as SmartResult[];
+    return { files: (data || []) as SmartResult[], model };
   },
 };
 

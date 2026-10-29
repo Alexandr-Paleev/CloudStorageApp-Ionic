@@ -115,8 +115,8 @@ async function sourceFor(
  * Describes one file and keeps the result.
  *
  * Idempotent by design: the row is keyed by the file, so re-indexing after a
- * prompt change overwrites rather than accumulates, and a backfill can be run
- * twice without thinking about it.
+ * prompt change, or under another model, overwrites rather than accumulates,
+ * and a run can be repeated without thinking about it.
  */
 async function indexFile(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
   const { fileId } = req.body as { fileId?: string };

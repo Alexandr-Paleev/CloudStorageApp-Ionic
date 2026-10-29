@@ -56,7 +56,7 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
    * list, it is noise with a worse score.
    */
   const {
-    data: smartFiles,
+    data: smart,
     isLoading: smartLoading,
     error: smartError,
   } = useQuery({
@@ -75,7 +75,7 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
      otherwise come back from the database as a perfectly good match. */
   const items = applyPending(
     smartSearching
-      ? { files: smartFiles ?? [], folders: [] }
+      ? { files: smart?.files ?? [], folders: [] }
       : {
           files: data?.pages.flatMap((page) => page.files) || [],
           folders: data?.pages[0]?.folders || [],
@@ -87,6 +87,8 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
     items,
     searching,
     smartSearching,
+    /** The model the matches were found with: what "indexed" means for them. */
+    smartModel: smartSearching ? smart?.model : undefined,
     loading: smartSearching ? smartLoading : isLoading,
     error: smartSearching ? smartError : error,
     hasNextPage,

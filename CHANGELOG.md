@@ -19,6 +19,20 @@ reasoning behind the larger decisions lives in
   took only `canceled` for the end, so the other three left an account on Pro
   for good. All four end it now, unless another subscription beside them is
   live; an `incomplete` checkout still being paid changes nothing, as before.
+- **After a change of model, search by meaning lost the files indexed before
+  it, and offered none of them again.** The models are chosen by which keys a
+  deployment has, and `match_files` compares only rows made by the query's
+  model, on purpose: whether a distance between two models' vectors means
+  anything cannot be read from the vectors, even when both are 1024 numbers
+  long, as those of `voyage-4` and of the free `bge-large-en-v1.5` are (ADR
+  0013 has the measurement). But the count of files not indexed yet asked only
+  whether a file had a row, not whose. After a key was added or removed,
+  it counted every file the old model had indexed as done, so the button that
+  re-indexes them never appeared, and a search by meaning found none of them
+  for good. It now asks about the model the search on screen was made with;
+  those files are offered again, and indexing one replaces its row. Three
+  comments promised a backfill script this repository never had; they now say
+  what re-indexes. Search by meaning is switched off in production.
 
 ### Security
 
