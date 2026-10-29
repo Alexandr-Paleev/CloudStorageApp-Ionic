@@ -24,6 +24,31 @@ reasoning behind the larger decisions lives in
   before the word is typed, and the webhook acknowledges the events the
   deletion sets off instead of failing them for three days of retries.
   Production bills in Stripe's test mode, so no real payment was involved.
+- **Google Drive stayed "connected" after its token ran out, and a file
+  already gone from Drive could not be deleted.** The token Connect obtained
+  was kept with no end. After its hour Drive still looked connected and every
+  upload was refused, with Google's JSON for a message and nothing on screen
+  offering to connect again. A file deleted in Drive itself, or any Drive file
+  once the token had ended, could never be deleted from the app: the row goes
+  only after the provider says yes, and Drive said 404 or 401 every time. The
+  token is now kept with its end; a token Google refuses is let go of and the
+  upload page offers to connect Drive again; a 404 counts as deleted. Closing
+  Google's window, or a pop-up blocker, no longer leaves Connect waiting for
+  good, a script that cannot load no longer hangs it, and reconnecting no
+  longer puts the full consent screen in front of the person every time.
+
+### Security
+
+- **The Drive token outlived signing out.** Nothing let go of it, so on a
+  shared browser the next account to sign in within the token's hour was
+  handed the previous one's, and its uploads went into the previous person's
+  Drive. The token is now kept with the account that connected Drive, handed
+  to no other, and dropped when the session ends, however it ends.
+- **Signing in with Google asked for offline access that nothing used.**
+  `access_type: 'offline'` with `prompt: 'consent'` had Google issue a refresh
+  token on every sign-in, a credential to the person's Drive that lasts until
+  revoked, which reached the browser and was never used; and it showed the
+  full consent screen every time. Neither is asked for now.
 
 ## [4.12.1] — 2026-10-29
 

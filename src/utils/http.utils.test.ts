@@ -21,6 +21,13 @@ describe('isRetriableError', () => {
     expect(isRetriableError(new HttpError('Cloudinary is not configured', 501))).toBe(false);
   });
 
+  /* A retry would only swap "connect Drive again" for "Drive is not connected". */
+  it('gives up when Google Drive asks to be connected again', () => {
+    const error = new Error('Google Drive needs to be connected again');
+    error.name = 'GoogleDriveAuthError';
+    expect(isRetriableError(error)).toBe(false);
+  });
+
   it('retries errors with no status, such as a dropped connection', () => {
     expect(isRetriableError(new Error('network error'))).toBe(true);
   });
