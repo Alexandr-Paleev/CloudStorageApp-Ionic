@@ -54,7 +54,7 @@ beforeEach(() => {
   queue.ops = [];
   deployment.offersSmartSearch = true;
   getItems.mockResolvedValue({ files: [], folders: [] });
-  smartSearch.mockResolvedValue([]);
+  smartSearch.mockResolvedValue({ files: [], model: 'voyage-4' });
 });
 
 describe('useFileListing', () => {
@@ -141,7 +141,10 @@ describe('useFileListing', () => {
 
   describe('searching by meaning', () => {
     it('asks the index instead of the file names', async () => {
-      smartSearch.mockResolvedValue([{ ...file('s1', 'hotel.pdf'), summary: 'A hotel bill' }]);
+      smartSearch.mockResolvedValue({
+        files: [{ ...file('s1', 'hotel.pdf'), summary: 'A hotel bill' }],
+        model: 'voyage-4',
+      });
       const { result } = show(undefined, BY_MEANING);
 
       await waitFor(() => expect(result.current.items.files).toHaveLength(1));
@@ -155,11 +158,25 @@ describe('useFileListing', () => {
     /* Otherwise a file deleted offline comes back from the database as a
        perfectly good match. */
     it('keeps a file deleted offline out of the matches', async () => {
-      smartSearch.mockResolvedValue([file('s1'), file('s2')]);
+      smartSearch.mockResolvedValue({ files: [file('s1'), file('s2')], model: 'voyage-4' });
       queue.ops = [{ kind: 'deleteFile', fileId: 's1' }];
       const { result } = show(undefined, BY_MEANING);
 
       await waitFor(() => expect(result.current.items.files).toEqual([file('s2')]));
+    });
+
+    /* For the count of files not indexed yet, which has to ask about the
+       same model: a row another one made is a file this search cannot
+       return. */
+    it('says which model the matches were found with, and none for the list', async () => {
+      const { result, rerender } = show(undefined, BY_MEANING);
+      await waitFor(() => expect(result.current.smartModel).toBe('voyage-4'));
+
+      // The same words, asked of the names: the matches are still cached.
+      rerender({ filters: { ...BY_MEANING, mode: 'name' } });
+
+      await waitFor(() => expect(getItems).toHaveBeenCalledTimes(1));
+      expect(result.current.smartModel).toBeUndefined();
     });
 
     it('reports the search’s failure and its loading, not the list’s', async () => {

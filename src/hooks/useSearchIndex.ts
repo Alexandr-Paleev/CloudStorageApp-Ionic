@@ -6,22 +6,27 @@ import aiService from '../services/ai.service';
 interface SearchIndexOptions {
   /** True while a search by meaning is on screen, and only then. */
   enabled: boolean;
+  /** The model that search was made with, once it has answered. */
+  model: string | undefined;
   /** Given a sentence for the person when a run did not do all it was asked. */
   onProblem: (message: string) => void;
 }
 
 /** The files a search by meaning cannot find yet, and the act of indexing them. */
-export function useSearchIndex({ enabled, onProblem }: SearchIndexOptions) {
+export function useSearchIndex({ enabled, model, onProblem }: SearchIndexOptions) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   /* Only asked while a smart search is on screen: it is the one moment the
      answer matters, and the answer is two reads the dashboard need not make
-     on every visit. */
+     on every visit. And only once that search has answered, because indexed
+     means indexed by the model it was made with — the server picks the
+     models by which keys it has, and after a change the files the old one
+     indexed are missing again. */
   const { data: unindexed } = useQuery({
-    queryKey: ['unindexed', user?.id],
-    queryFn: () => aiService.unindexedFileIds(user!.id),
-    enabled: !!user?.id && enabled,
+    queryKey: ['unindexed', user?.id, model],
+    queryFn: () => aiService.unindexedFileIds(user!.id, model!),
+    enabled: !!user?.id && enabled && !!model,
   });
 
   const [indexing, setIndexing] = useState<{ done: number; total: number } | null>(null);

@@ -80,3 +80,34 @@ forward a token.
   wrote it and the model that embedded it, which is what makes the eval
   possible to write later and attributable when it moves — it is the next
   piece of work on this feature, not a nice-to-have.
+
+## Update — 2026-10-29
+
+**Every read of these rows asks by model, not only the search.** Hiding the
+old rows after a change of backend was half of the rule above. The count of
+files not indexed yet read `file_embeddings` without the model, so it called
+every file the old model had indexed done: the dashboard never offered those
+files again, and a search by meaning found none of them, for good and without
+a word about why. The count now asks about the model the search on screen was
+made with (`src/services/ai.service.ts`), and the re-index this record leans
+on is that button. There is no backfill script, whatever three comments said.
+
+**What a distance across two models is, measured.** Locally, on open weights:
+ten file descriptions written the way `embeddingInput` writes them, embedded
+by `bge-large-en-v1.5`, this deployment's free model, and fifteen queries,
+seven of which share no keyword with the file they should find, embedded by
+other models of the same width. The right file came first in 15 of 15 with
+`bge-large-en-v1.5` itself; in 14 with `gte-large`, from another lab; in 15
+with `mxbai-embed-large-v1`, from a third; in 2 with `e5-large-v2`, the same
+architecture and vocabulary; in 0 with `bge-m3`, from BAAI as well. Chance
+gives 1.5. Every similarity of the last two lay between −0.11 and 0.05, under
+the 0.25 floor, so those searches would have come back empty rather than
+wrong.
+
+So the decision above says too much: a distance across two models is
+sometimes as good as one within a model. But neither the lab, nor the
+architecture, nor the width told which pairs those were, and that is the
+reason for the filter. `bge-m3` ran quantized to eight bits; the same
+quantization of `bge-large-en-v1.5` changed none of its answers. Measured with
+Transformers.js 4.3.0 on each model's ONNX export; the paid model this
+deployment can switch to, `voyage-4`, was not measured.

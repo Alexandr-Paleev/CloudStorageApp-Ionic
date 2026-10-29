@@ -11,7 +11,8 @@ import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from '..
  * Deliberately not retried. This runs inside a serverless function that the
  * browser is waiting on, and a retry loop here turns one slow request into
  * three before anyone is told anything; the caller retries a failed search by
- * typing it again, and a failed index is picked up by the backfill.
+ * typing it again, and a file that failed to index stays in the dashboard's
+ * count of files not indexed yet.
  */
 
 const ENDPOINT = 'https://api.voyageai.com/v1/embeddings';

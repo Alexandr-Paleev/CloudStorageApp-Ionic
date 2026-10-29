@@ -59,6 +59,7 @@ const Dashboard: React.FC = () => {
     items,
     searching,
     smartSearching,
+    smartModel,
     loading: listLoading,
     error: listError,
     hasNextPage,
@@ -66,6 +67,7 @@ const Dashboard: React.FC = () => {
   } = listing;
   const { unindexed, indexing, indexMissing } = useSearchIndex({
     enabled: smartSearching,
+    model: smartModel,
     onProblem: setErrorToast,
   });
   const { folder: currentFolder, path: folderPath, parentId } = useFolderTrail(folderId);

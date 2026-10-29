@@ -31,7 +31,8 @@ import {
  * not comparable, so `embeddingModel` is written on every row and
  * `match_files` filters by it (migrations/011). Switching backends therefore
  * hides the old rows rather than mixing them into the ranking, and the fix is
- * a re-index — which is what the backfill script is for.
+ * a re-index: the dashboard counts a file whose row another model made as not
+ * indexed yet, and offers it again.
  */
 
 export interface AiBackend {

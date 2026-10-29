@@ -16,13 +16,15 @@ vi.mock('../contexts/AuthContext', () => ({
 
 vi.mock('../services/ai.service', () => ({ default: { unindexedFileIds, indexMany } }));
 
-function show(enabled = true) {
+type Shown = { enabled: boolean; model?: string };
+
+function show(initialProps: Shown = { enabled: true, model: 'voyage-4' }) {
   const onProblem = vi.fn();
   const { queryClient, wrapper } = withQueryClient();
-  const view = renderHook(({ enabled }) => useSearchIndex({ enabled, onProblem }), {
-    wrapper,
-    initialProps: { enabled },
-  });
+  const view = renderHook(
+    ({ enabled, model }: Shown) => useSearchIndex({ enabled, model, onProblem }),
+    { wrapper, initialProps }
+  );
   return { ...view, onProblem, queryClient };
 }
 
@@ -50,14 +52,41 @@ describe('useSearchIndex', () => {
   /* Two reads the dashboard need not make on every visit: the answer only
      matters while a search by meaning is on screen. */
   it('asks which files are missing only while a search by meaning is on screen', async () => {
-    const { result, rerender } = show(false);
+    const { result, rerender } = show({ enabled: false, model: 'voyage-4' });
     await act(() => Promise.resolve());
     expect(unindexedFileIds).not.toHaveBeenCalled();
 
-    rerender({ enabled: true });
+    rerender({ enabled: true, model: 'voyage-4' });
 
     await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2']));
-    expect(unindexedFileIds).toHaveBeenCalledWith('user-1');
+    expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
+  });
+
+  /* Indexed means indexed by the model the search was made with: match_files
+     compares no other rows, so until the search has answered there is no
+     question to ask. */
+  it('waits for the search to say which model it was made with', async () => {
+    const { result, rerender } = show({ enabled: true });
+    await act(() => Promise.resolve());
+    expect(unindexedFileIds).not.toHaveBeenCalled();
+
+    rerender({ enabled: true, model: 'voyage-4' });
+
+    await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2']));
+    expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
+  });
+
+  /* The server picks the models by which keys it has. After a change, the
+     rows the old one made are hidden from the search on purpose, and this
+     count is the only thing that offers those files again. */
+  it('asks again when the search comes back from another model', async () => {
+    const { result, rerender } = await ready();
+    unindexedFileIds.mockResolvedValue(['f1', 'f2', 'f3']);
+
+    rerender({ enabled: true, model: '@cf/baai/bge-large-en-v1.5' });
+
+    await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2', 'f3']));
+    expect(unindexedFileIds).toHaveBeenLastCalledWith('user-1', '@cf/baai/bge-large-en-v1.5');
   });
 
   it('indexes the files that were missing, and no others', async () => {

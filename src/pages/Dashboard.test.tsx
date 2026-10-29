@@ -32,6 +32,12 @@ const { getItems, deleteFile, createFolder, getUserStorageSize, profile, runOrQu
     ops: [] as unknown[],
   }));
 
+const { smartSearch, unindexedFileIds, deployment } = vi.hoisted(() => ({
+  smartSearch: vi.fn(),
+  unindexedFileIds: vi.fn(),
+  deployment: { offersSmartSearch: false },
+}));
+
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', email: 'someone@example.com' } }),
 }));
@@ -71,6 +77,12 @@ vi.mock('../services/mutation-queue', async () => {
 
 vi.mock('../hooks/useProfile', () => ({ useProfile: () => profile }));
 vi.mock('../services/auth.service', () => ({ authService: { logout: vi.fn() } }));
+vi.mock('../services/ai.service', () => ({
+  default: { smartSearch, unindexedFileIds, indexMany: vi.fn() },
+}));
+vi.mock('../utils/smart-search.utils', () => ({
+  smartSearchIsOffered: () => deployment.offersSmartSearch,
+}));
 
 const MB = 1024 * 1024;
 
@@ -83,6 +95,10 @@ function show(route = '/') {
     { route }
   );
 }
+
+/** Ionic controls report through their own events, not through the DOM ones. */
+const ionEvent = (element: Element, name: string, value: unknown) =>
+  fireEvent(element, new CustomEvent(name, { detail: { value } }));
 
 function ionButtonByText(text: string): HTMLElement {
   return [...document.querySelectorAll('ion-button')].find((b) =>
@@ -99,6 +115,7 @@ function storageStats(): string {
 beforeEach(() => {
   vi.clearAllMocks();
   ops.length = 0;
+  deployment.offersSmartSearch = false;
   profile.profile = { tier: 'free', storage_limit: 500 * MB, allowed_providers: ['r2'] };
   getItems.mockResolvedValue({ files: [], folders: [] });
   getUserStorageSize.mockResolvedValue(0);
@@ -263,6 +280,25 @@ describe('Dashboard', () => {
 
       await waitFor(() => expect(getItems).toHaveBeenCalled());
       expect(getItems.mock.calls[0]![1]).toMatchObject({ page: 0, pageSize: 15 });
+    });
+
+    /* Indexed means indexed by the model the search on screen was made with,
+       and the page is what carries that name from the one to the other. A
+       count asked without it called the files another model had indexed done,
+       and never offered them again. */
+    it('counts what is not indexed by the model the search was made with', async () => {
+      deployment.offersSmartSearch = true;
+      smartSearch.mockResolvedValue({ files: [], model: 'voyage-4' });
+      unindexedFileIds.mockResolvedValue(['f1', 'f2']);
+      show();
+
+      // The switch between the two searches appears once there is a term.
+      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'hotel receipt');
+      ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
+
+      expect(await screen.findByText('2 files not indexed yet')).toBeInTheDocument();
+      expect(smartSearch).toHaveBeenCalledWith('hotel receipt');
+      expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
     });
   });
 });
