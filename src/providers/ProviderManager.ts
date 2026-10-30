@@ -34,6 +34,14 @@ class ProviderManager {
     return provider;
   }
 
+  /** The providers this deployment has set up, which are the only ones a
+   *  person can be offered: a plan does not make the others work. */
+  configuredNames(): string[] {
+    return [...this.providers.values()]
+      .filter((provider) => provider.isConfigured())
+      .map((provider) => provider.name);
+  }
+
   /**
    * Logic to choose best provider for a specific file and user state
    */

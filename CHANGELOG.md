@@ -36,6 +36,24 @@ reasoning behind the larger decisions lives in
   Google's window, or a pop-up blocker, no longer leaves Connect waiting for
   good, a script that cannot load no longer hangs it, and reconnecting no
   longer puts the full consent screen in front of the person every time.
+- **Coming back from paying could leave the account on Free for five
+  minutes.** Stripe sends the person back to the app and the event to the
+  webhook separately, and only the webhook writes the plan. The page they
+  came back to said "Your subscription is active" either way, and three
+  seconds later the dashboard read the profile and kept what it found for
+  five minutes: Free, with Free's limit, if the webhook had not written it
+  yet. The page now reads the profile every two seconds until it says Pro, says
+  nothing about the subscription before that, and after half a minute says
+  Stripe has not confirmed it yet and keeps asking.
+- **A Pro account could choose storage this deployment does not have.** The
+  upload page offered every provider the plan names, and production has R2
+  switched off and Dropbox never set up: choosing one failed every upload
+  with "Provider "r2" is not configured. Check your settings." Only what is
+  set up is offered now. Choosing Google Drive connects it, where it used to
+  fail every upload with "Please authorize it first" and nothing on the page
+  to do that with. The choices are buttons that say which one is pressed:
+  they were chips with a click handler, which a keyboard could not reach and
+  a screen reader did not announce.
 - **Sorted by size or by name, the file list could show a file twice and
   another never.** The list arrives in pages of 15, and nothing broke a tie
   between files that compare equal, an order Postgres does not promise to
