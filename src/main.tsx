@@ -14,6 +14,7 @@ import { initDarkMode } from './theme/dark-mode';
 import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
 import { movedShareLink } from './utils/share-link.utils';
+import { misplacedResetLink } from './utils/password-reset.utils';
 import { messageOf } from './utils/postgrest-error';
 
 import '@ionic/react/css/core.css';
@@ -28,6 +29,12 @@ import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
 
 function start(): void {
+  // A password-reset link that Supabase sent to the root rather than to the
+  // page that finishes it. Moved there before the router or anything else
+  // reads the address, fragment and all: see misplacedResetLink.
+  const resetLink = misplacedResetLink(window.location.pathname, window.location.hash);
+  if (resetLink) window.history.replaceState(window.history.state, '', resetLink);
+
   // Sentry, once the browser is idle — see observability/sentry.ts for why it is
   // no longer imported here directly, and what that costs.
   //

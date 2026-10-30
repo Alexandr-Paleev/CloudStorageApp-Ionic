@@ -10,6 +10,7 @@ import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { ConsentBanner } from './components/ConsentBanner';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
+import { NEW_PASSWORD_PATH } from './utils/password-reset.utils';
 /* Not lazy, unlike every other page. It is the page a new visitor sees
    first, and a lazy page is fetched only once the app has started: one more
    round trip, after all the others, before the page that matters most draws
@@ -47,6 +48,7 @@ const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
 const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Legal = lazy(() => import('./pages/Legal'));
+const PasswordReset = lazy(() => import('./pages/PasswordReset'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -71,6 +73,10 @@ const App: React.FC = () => (
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
+                {/* Not private: the first is for someone who cannot sign in,
+                  and the second reads the session the link brought itself. */}
+                <Route path="/forgot-password" element={<PasswordReset step="ask" />} />
+                <Route path={NEW_PASSWORD_PATH} element={<PasswordReset step="choose" />} />
                 {/* The two documents are pages of the site now. These addresses
                   are kept for whoever still has them, and lead there. */}
                 <Route path="/terms" element={<Legal document="terms" />} />

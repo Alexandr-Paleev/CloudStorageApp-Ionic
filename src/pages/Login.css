@@ -182,6 +182,49 @@ body.dark .login-notice {
   background: rgba(165, 180, 252, 0.12);
 }
 
+/* What went wrong, here and on the password-reset page (PasswordReset.tsx).
+   It was #ef4444, inline: 2.3:1 as drawn over the card, and 2.5:1 in the dark
+   theme, where text this size needs 4.5. These are 5.0:1 and 4.9:1. axe
+   passed the old one, because a background behind a backdrop filter is one it
+   cannot work out; all four were read off screenshots. */
+.login-error {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #991b1b;
+  font-size: 14px;
+  text-align: center;
+}
+
+body.dark .login-error {
+  color: #fca5a5;
+}
+
+/* "Forgot?", inside the password field rather than on a line of its own: at
+   1440×720 the card has 21px to spare (see the media query below), and a line
+   of its own would take about 32. */
+.forgot-password-button {
+  --color: #4338ca;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+body.dark .forgot-password-button {
+  --color: #a5b4fc;
+}
+
+/* While the session a reset link brought is being read. */
+.password-reset-waiting {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
 /**
  * The card is 799px tall, and a laptop with a bookmarks bar has about 720 to
  * give it. Adding the demo entry — 78px of it — is what pushed the page over:

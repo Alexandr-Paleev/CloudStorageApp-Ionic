@@ -192,6 +192,22 @@ const Login: React.FC = () => {
                     className="login-input-field"
                     data-hj-suppress
                   />
+                  {/* In the field rather than under it: see Login.css. The
+                      address goes along in the router's state, not in the
+                      address bar, where the collectors would read it. */}
+                  {!isRegister && (
+                    <IonButton
+                      slot="end"
+                      fill="clear"
+                      size="small"
+                      className="forgot-password-button"
+                      aria-label="Forgot password?"
+                      onClick={() => navigate('/forgot-password', { state: { email } })}
+                      disabled={busy}
+                    >
+                      Forgot?
+                    </IonButton>
+                  )}
                 </IonItem>
               </div>
 
@@ -310,18 +326,7 @@ const Login: React.FC = () => {
                 toast's message is written onto its element as an attribute
                 as well, which no mark hides (analytics/hotjar.ts). */}
             {error && (
-              <div
-                data-hj-suppress=""
-                style={{
-                  marginTop: '16px',
-                  padding: '12px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  color: '#ef4444',
-                  borderRadius: '8px',
-                  textAlign: 'center',
-                  fontSize: '14px',
-                }}
-              >
+              <div className="login-error" data-hj-suppress="">
                 {error}
               </div>
             )}

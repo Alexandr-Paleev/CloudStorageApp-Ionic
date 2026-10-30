@@ -120,6 +120,9 @@ render — and the banner says the deletion has not reached the server yet:
 ### 🔐 Authentication
 
 - ✅ Email/Password registration and login
+- ✅ **A way back from a forgotten password** — "Forgot?" mails a link to
+  `/new-password`, which works in any browser; from the native shells it is
+  finished on the web app
 - ✅ Google Account sign-in
 - ✅ **One-click demo** — a throwaway account, seeded and signed in, no sign-up
 - ✅ Protected routes (authorized users only)

@@ -412,6 +412,51 @@ export async function seedFile(
 }
 
 /**
+ * The fragment a password-reset mail's link would bring the app, without a
+ * mail.
+ *
+ * The admin API makes the link and sends nothing, so the suite neither spends
+ * the project's allowance of mail nor writes to example.com. Following the link
+ * as a browser would is what turns it into a session. Only the fragment is
+ * kept: the address in front of it is whichever one the auth server chose to
+ * come back to, and where the link is opened is the test's to decide.
+ */
+export async function resetLinkFragment(email: string): Promise<string> {
+  const generated = await admin('/auth/v1/admin/generate_link', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'recovery', email }),
+  });
+  const body = (await generated.json()) as {
+    action_link?: string;
+    properties?: { action_link?: string };
+    msg?: string;
+  };
+  const link = body.action_link ?? body.properties?.action_link;
+  // Not the body itself: a successful one carries the link's one-time code.
+  if (!generated.ok || !link) {
+    throw new Error(`could not make a reset link: ${generated.status} ${body.msg ?? ''}`);
+  }
+
+  const followed = await fetch(link, { redirect: 'manual' });
+  const location = followed.headers.get('location') ?? '';
+  const fragment = location ? new URL(location).hash : '';
+  if (!fragment.includes('type=recovery')) {
+    throw new Error(`the reset link did not come back with a session: ${followed.status}`);
+  }
+  return fragment;
+}
+
+/** Whether an address and a password sign in, as the token endpoint answers. */
+export async function signInStatus(email: string, password: string): Promise<number> {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return response.status;
+}
+
+/**
  * A second browser context with no session at all — for testing what a
  * recipient sees. Cookies and localStorage are separate from `page`.
  */
