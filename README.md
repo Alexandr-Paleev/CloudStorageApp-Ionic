@@ -1110,6 +1110,11 @@ It also holds the two halves of the page a share link opens: what the site
 asks the functions about a link and how long it keeps the answer, and what the
 browser does with the address it is handed for the file.
 
+How well search by meaning finds the file a person means is a different kind
+of question, and it is answered in Python, in [`evals/`](evals/README.md):
+recall, MRR and nDCG over labelled queries in three languages, scored from
+vectors kept in the repository so that CI runs it without a key.
+
 That page cannot be tried against the real functions from a laptop or from CI:
 `/api/share` answers a browser on the production site's origin and no other.
 So the site's smoke test brings a stand-in for them,
