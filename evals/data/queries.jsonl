@@ -1,0 +1,15 @@
+{"id": "q01", "lang": "en", "text": "electricity bill", "relevant": {"f01": 3, "f02": 1}}
+{"id": "q02", "lang": "en", "text": "photo of my dog on the beach", "relevant": {"f04": 3}}
+{"id": "q03", "lang": "en", "text": "taxi receipt for expenses", "relevant": {"f09": 3, "f10": 1}}
+{"id": "q04", "lang": "en", "text": "apartment lease", "relevant": {"f03": 3}}
+{"id": "q05", "lang": "en", "text": "my CV", "relevant": {"f06": 3}}
+{"id": "q06", "lang": "es", "text": "factura de la luz", "relevant": {"f01": 3, "f02": 1}}
+{"id": "q07", "lang": "es", "text": "receta de tortilla", "relevant": {"f07": 3}}
+{"id": "q08", "lang": "es", "text": "billete de avión a Madrid", "relevant": {"f10": 3, "f09": 1}}
+{"id": "q09", "lang": "es", "text": "foto de paella", "relevant": {"f05": 3}}
+{"id": "q10", "lang": "es", "text": "contrato de alquiler", "relevant": {"f03": 3}}
+{"id": "q11", "lang": "ru", "text": "договор аренды", "relevant": {"f03": 3}}
+{"id": "q12", "lang": "ru", "text": "список покупок", "relevant": {"f08": 3}}
+{"id": "q13", "lang": "ru", "text": "счёт за электричество", "relevant": {"f01": 3, "f02": 1}}
+{"id": "q14", "lang": "ru", "text": "фото собаки", "relevant": {"f04": 3}}
+{"id": "q15", "lang": "ru", "text": "скан паспорта", "relevant": {"f12": 3}}

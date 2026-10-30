@@ -1,0 +1,44 @@
+{
+  "description": "What the search eval in evals/ must agree with the app on. ai.test.ts holds libs/core/src/ai.ts to these values and evals/tests/test_contract.py holds the Python side to them, so a change on one side fails a test on the other.",
+  "constants": {
+    "EMBEDDING_MODEL": "voyage-4",
+    "EMBEDDING_DIMENSIONS": 1024,
+    "MAX_SUMMARY_CHARS": 500,
+    "MAX_TAGS": 12,
+    "MAX_TAG_CHARS": 40,
+    "SEARCH_RESULTS": 15,
+    "SEARCH_MIN_SIMILARITY": 0.25
+  },
+  "embeddingInput": [
+    {
+      "name": "holiday-prague.jpg",
+      "summary": "Two people on a bridge.",
+      "tags": ["prague", "bridge"],
+      "expected": "holiday-prague.jpg\nTwo people on a bridge.\nprague, bridge"
+    },
+    {
+      "name": "notes.txt",
+      "summary": "A shopping list.",
+      "tags": [],
+      "expected": "notes.txt\nA shopping list."
+    },
+    {
+      "name": "  report.pdf  ",
+      "summary": "  Quarterly figures.  ",
+      "tags": ["finance"],
+      "expected": "report.pdf\nQuarterly figures.\nfinance"
+    },
+    {
+      "name": "scan.png",
+      "summary": "   ",
+      "tags": ["receipt", "taxi"],
+      "expected": "scan.png\nreceipt, taxi"
+    },
+    {
+      "name": "factura-marzo.pdf",
+      "summary": "Factura de la luz de marzo.",
+      "tags": [" ", "factura"],
+      "expected": "factura-marzo.pdf\nFactura de la luz de marzo.\n, factura"
+    }
+  ]
+}

@@ -10,6 +10,23 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **A first eval of search by meaning, in Python.** `evals/` measures the
+  retrieval half of the feature as the app runs it: a file embedded as the
+  text `embeddingInput` builds, a query embedded as a query, and the ranking
+  `match_files` does, at most 15 results and none below the floor. It reports
+  recall@5, MRR, nDCG@10 and the queries that got nothing, per language. It
+  scores offline from vectors kept in the repository, so CI needs no key;
+  fetching them is a separate command that does. What the eval must agree
+  with the app on, from the model to the cases of `embeddingInput`, is written
+  once in `libs/core/src/ai.eval-contract.json`, and a test on each side holds
+  it to that file. The seed set is 12 files and 15 queries in English, Spanish
+  and Russian, several asked across languages. The metrics and the ranking are
+  left to write: their specifications are tests, worked out by hand, that skip
+  until the code exists, and nine typical mistakes were checked to fail them.
+  There is no number yet; the first comes with the vectors.
+
 ### Changed
 
 - **The functions run in Frankfurt, beside the database.** Both Vercel

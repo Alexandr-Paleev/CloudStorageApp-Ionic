@@ -369,3 +369,29 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  evals:
+    name: Search evals
+    runs-on: ubuntu-latest
+    # The same rule as the two jobs above: a fork's pull request, or a push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # It reads the repository and writes nothing to it.
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: evals
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.13.1'
+          working-directory: evals
+
+      # Offline: the Python in evals/.python-version and the locked
+      # dependencies. The specification tests of what is still to be written
+      # are skipped, not failed, and say so in the summary.
+      - run: uv run --locked pytest -rs
+
+      - run: uv run --locked search-evals check

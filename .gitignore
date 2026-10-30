@@ -97,3 +97,8 @@ CLAUDE.md
 # Next.js (apps/web): the build, and a file Next writes on every run
 .next/
 next-env.d.ts
+
+# The search eval (evals/): uv's environment and Python's caches
+evals/.venv/
+__pycache__/
+.pytest_cache/

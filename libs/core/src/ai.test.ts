@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
   MAX_SUMMARY_CHARS,
   MAX_TAGS,
   MAX_TAG_CHARS,
+  SEARCH_MIN_SIMILARITY,
+  SEARCH_RESULTS,
   clampSummary,
   embeddingInput,
   normalizeTags,
@@ -152,6 +157,38 @@ describe('embeddingInput', () => {
   it('leaves out the tag line when there are no tags', () => {
     expect(embeddingInput({ name: 'a.txt' }, 'A note.', [])).toBe('a.txt\nA note.');
   });
+});
+
+/* The search eval in evals/ is Python and cannot import this file. What it has
+   to agree with the app on is written once, in ai.eval-contract.json, and each
+   side holds itself to it: here the constants and embeddingInput, in
+   evals/tests/test_contract.py the Python copies. */
+const contract = JSON.parse(
+  readFileSync(new URL('./ai.eval-contract.json', import.meta.url), 'utf8')
+) as {
+  constants: Record<string, string | number>;
+  embeddingInput: { name: string; summary: string; tags: string[]; expected: string }[];
+};
+
+describe('the contract with the search eval', () => {
+  it('names the constants this file exports', () => {
+    expect(contract.constants).toEqual({
+      EMBEDDING_MODEL,
+      EMBEDDING_DIMENSIONS,
+      MAX_SUMMARY_CHARS,
+      MAX_TAGS,
+      MAX_TAG_CHARS,
+      SEARCH_RESULTS,
+      SEARCH_MIN_SIMILARITY,
+    });
+  });
+
+  it.each(contract.embeddingInput)(
+    'embeds $name as the eval does',
+    ({ name, summary, tags, expected }) => {
+      expect(embeddingInput({ name }, summary, tags)).toBe(expected);
+    }
+  );
 });
 
 describe('toVectorLiteral', () => {
