@@ -36,12 +36,15 @@ A grade of 3 is the file the person means, 2 a file they would be glad to see,
 Summaries are in the language of the file and English for pictures, as the
 describe prompt asks (`libs/server/src/describe.ts`).
 
-The seed is 12 files and 15 queries in English, Spanish and Russian, and
-several are asked across languages, such as a Spanish question about an English
-invoice. That is the hypothesis the first run tests: `bge-large-en-v1.5`, the
-Workers AI model, is English-only. The set grows to about 60 files and 120
-queries before any number from it is quoted. Every label is a claim a reviewer
-can read in the diff.
+There are 60 files and 120 queries, 40 queries in each of English, Spanish
+and Russian. In 65 of the queries the file meant is in another language than
+the question, such as a Spanish question about an English invoice. Most of
+those are pictures, which the model describes in English whatever the person
+speaks. That is the hypothesis the first run tests: `bge-large-en-v1.5`, the
+Workers AI model, is English-only. Some files are near misses on purpose, such
+as the electricity bills of March and April, or a car insurance policy beside
+a home one. Every query has a file graded 3, and every file is asked about.
+Every label is a claim a reviewer can read in the diff.
 
 ## Running it
 

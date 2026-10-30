@@ -94,6 +94,8 @@ def problems(files: list[File], queries: list[Query]) -> list[str]:
             found.append(f"query {q.id}: language {q.lang!r} is not one of {LANGUAGES}")
         if not q.relevant:
             found.append(f"query {q.id}: no relevant file, so nothing can be scored")
+        elif 3 not in q.relevant.values():
+            found.append(f"query {q.id}: no file is graded 3, the one the person means")
         for file_id, grade in q.relevant.items():
             if file_id not in known:
                 found.append(f"query {q.id}: file {file_id} is not in the corpus")

@@ -63,7 +63,9 @@ def _score(model: str, limit: int, min_similarity: float) -> int:
     ids = [f.id for f in files]
     doc_vectors = [cache.get(embedding_input(f.name, f.summary, f.tags), "document") for f in files]
     query_vectors = [cache.get(q.text, "query") for q in queries]
-    missing = doc_vectors.count(None) + query_vectors.count(None)
+    # `is None`, not `list.count(None)`: count compares with ==, and a numpy
+    # array compared with None is an array, whose truth value is an error.
+    missing = sum(v is None for v in doc_vectors) + sum(v is None for v in query_vectors)
     if missing:
         print(f"{model}: {missing} vectors are not cached; run `search-evals embed --model {model}`", file=sys.stderr)
         return 2

@@ -18,12 +18,14 @@ def test_a_label_for_a_file_that_is_not_there_is_found() -> None:
         Query(id="q1", text="note", lang="en", relevant={"f9": 3}),
         Query(id="q2", text="note", lang="de", relevant={}),
         Query(id="q3", text="note", lang="en", relevant={"f1": 5}),
+        Query(id="q4", text="note", lang="en", relevant={"f1": 1}),
     ]
     found = problems(files, queries)
     assert "query q1: file f9 is not in the corpus" in found
     assert "query q2: language 'de' is not one of ('en', 'es', 'ru')" in found
     assert "query q2: no relevant file, so nothing can be scored" in found
     assert "query q3: grade 5 for f1 is not one of (1, 2, 3)" in found
+    assert "query q4: no file is graded 3, the one the person means" in found
 
 
 def test_a_summary_or_a_tag_the_table_would_refuse_is_found() -> None:

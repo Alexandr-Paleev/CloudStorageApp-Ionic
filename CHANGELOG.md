@@ -21,10 +21,12 @@ reasoning behind the larger decisions lives in
   fetching them is a separate command that does. What the eval must agree
   with the app on, from the model to the cases of `embeddingInput`, is written
   once in `libs/core/src/ai.eval-contract.json`, and a test on each side holds
-  it to that file. The seed set is 12 files and 15 queries in English, Spanish
-  and Russian, several asked across languages. The metrics and the ranking are
-  left to write: their specifications are tests, worked out by hand, that skip
-  until the code exists, and nine typical mistakes were checked to fail them.
+  it to that file. The set is 60 files and 120 queries, 40 in each of
+  English, Spanish and Russian; in 65 the file meant is in another language
+  than the question, mostly pictures, which are described in English. The
+  metrics and the ranking are left to write: their specifications are tests,
+  worked out by hand, that skip until the code exists, and nine typical
+  mistakes were checked to fail them.
   There is no number yet; the first comes with the vectors.
 
 ### Changed

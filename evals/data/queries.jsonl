@@ -13,3 +13,108 @@
 {"id": "q13", "lang": "ru", "text": "счёт за электричество", "relevant": {"f01": 3, "f02": 1}}
 {"id": "q14", "lang": "ru", "text": "фото собаки", "relevant": {"f04": 3}}
 {"id": "q15", "lang": "ru", "text": "скан паспорта", "relevant": {"f12": 3}}
+{"id": "q16", "lang": "en", "text": "cat sleeping", "relevant": {"f13": 3}}
+{"id": "q17", "lang": "en", "text": "Sagrada Familia photo", "relevant": {"f14": 3}}
+{"id": "q18", "lang": "en", "text": "birthday party pictures", "relevant": {"f15": 3}}
+{"id": "q19", "lang": "en", "text": "winter landscape", "relevant": {"f16": 3}}
+{"id": "q20", "lang": "en", "text": "architecture diagram from the meeting", "relevant": {"f17": 3, "f11": 1}}
+{"id": "q21", "lang": "en", "text": "rent payment screenshot", "relevant": {"f18": 3, "f36": 1}}
+{"id": "q22", "lang": "en", "text": "all photos of dogs", "relevant": {"f04": 3, "f19": 3}}
+{"id": "q23", "lang": "en", "text": "seafood dishes", "relevant": {"f05": 3, "f20": 3}}
+{"id": "q24", "lang": "en", "text": "boarding pass to Kyiv", "relevant": {"f21": 3, "f59": 1}}
+{"id": "q25", "lang": "en", "text": "pharmacy receipt", "relevant": {"f22": 3}}
+{"id": "q26", "lang": "en", "text": "receipts from the Madrid trip", "relevant": {"f09": 3, "f23": 3, "f10": 1}}
+{"id": "q27", "lang": "en", "text": "grocery receipt", "relevant": {"f24": 3, "f08": 1}}
+{"id": "q28", "lang": "en", "text": "driving licence", "relevant": {"f25": 3, "f12": 1}}
+{"id": "q29", "lang": "en", "text": "parking fine", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q30", "lang": "en", "text": "photo of my desk", "relevant": {"f27": 3}}
+{"id": "q31", "lang": "en", "text": "Eiffel Tower at night", "relevant": {"f28": 3}}
+{"id": "q32", "lang": "en", "text": "electricity bill for April", "relevant": {"f29": 3, "f01": 2}}
+{"id": "q33", "lang": "en", "text": "internet invoice", "relevant": {"f30": 3}}
+{"id": "q34", "lang": "en", "text": "cover letter", "relevant": {"f31": 3, "f06": 1}}
+{"id": "q35", "lang": "en", "text": "Q4 roadmap meeting notes", "relevant": {"f11": 3, "f56": 1}}
+{"id": "q36", "lang": "en", "text": "blood test results", "relevant": {"f33": 3, "f58": 1}}
+{"id": "q37", "lang": "en", "text": "home insurance", "relevant": {"f34": 3, "f47": 1}}
+{"id": "q38", "lang": "en", "text": "2025 tax return", "relevant": {"f35": 3}}
+{"id": "q39", "lang": "en", "text": "bank statement for September", "relevant": {"f36": 3, "f52": 1}}
+{"id": "q40", "lang": "en", "text": "washing machine manual", "relevant": {"f37": 3, "f57": 1}}
+{"id": "q41", "lang": "en", "text": "conference ticket for Amsterdam", "relevant": {"f38": 3}}
+{"id": "q42", "lang": "en", "text": "parking space rental", "relevant": {"f39": 3}}
+{"id": "q43", "lang": "en", "text": "quarterly sales spreadsheet", "relevant": {"f40": 3}}
+{"id": "q44", "lang": "en", "text": "gas bill", "relevant": {"f41": 3, "f01": 1, "f02": 1, "f29": 1}}
+{"id": "q45", "lang": "en", "text": "payslip", "relevant": {"f42": 3, "f53": 1}}
+{"id": "q46", "lang": "en", "text": "property tax receipt", "relevant": {"f43": 3}}
+{"id": "q47", "lang": "en", "text": "doctor's appointment", "relevant": {"f44": 3}}
+{"id": "q48", "lang": "en", "text": "proof of address certificate", "relevant": {"f45": 3}}
+{"id": "q49", "lang": "en", "text": "borscht recipe", "relevant": {"f51": 3}}
+{"id": "q50", "lang": "en", "text": "train tickets to Lviv", "relevant": {"f59": 3}}
+{"id": "q51", "lang": "es", "text": "foto del gato", "relevant": {"f13": 3}}
+{"id": "q52", "lang": "es", "text": "fotos de Barcelona", "relevant": {"f14": 3}}
+{"id": "q53", "lang": "es", "text": "tarta de cumpleaños", "relevant": {"f15": 3}}
+{"id": "q54", "lang": "es", "text": "montañas nevadas", "relevant": {"f16": 3}}
+{"id": "q55", "lang": "es", "text": "diagrama de la pizarra", "relevant": {"f17": 3}}
+{"id": "q56", "lang": "es", "text": "captura de la transferencia del alquiler", "relevant": {"f18": 3, "f36": 1}}
+{"id": "q57", "lang": "es", "text": "perro jugando en el parque", "relevant": {"f19": 3, "f04": 1}}
+{"id": "q58", "lang": "es", "text": "pulpo a la gallega", "relevant": {"f20": 3}}
+{"id": "q59", "lang": "es", "text": "tarjeta de embarque", "relevant": {"f21": 3, "f10": 1}}
+{"id": "q60", "lang": "es", "text": "ticket de la farmacia", "relevant": {"f22": 3}}
+{"id": "q61", "lang": "es", "text": "cuenta del restaurante", "relevant": {"f23": 3}}
+{"id": "q62", "lang": "es", "text": "ticket de Mercadona", "relevant": {"f24": 3}}
+{"id": "q63", "lang": "es", "text": "carnet de conducir", "relevant": {"f25": 3, "f12": 1}}
+{"id": "q64", "lang": "es", "text": "multa de aparcamiento", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q65", "lang": "es", "text": "factura de internet", "relevant": {"f30": 3}}
+{"id": "q66", "lang": "es", "text": "carta de presentación", "relevant": {"f31": 3, "f06": 1}}
+{"id": "q67", "lang": "es", "text": "análisis de sangre", "relevant": {"f33": 3, "f58": 1}}
+{"id": "q68", "lang": "es", "text": "seguro del piso", "relevant": {"f34": 3, "f47": 1}}
+{"id": "q69", "lang": "es", "text": "declaración de la renta 2025", "relevant": {"f35": 3}}
+{"id": "q70", "lang": "es", "text": "extracto bancario", "relevant": {"f36": 3, "f52": 3}}
+{"id": "q71", "lang": "es", "text": "manual de la lavadora", "relevant": {"f37": 3, "f57": 1}}
+{"id": "q72", "lang": "es", "text": "entrada para la conferencia", "relevant": {"f38": 3}}
+{"id": "q73", "lang": "es", "text": "factura del gas", "relevant": {"f41": 3, "f01": 1, "f02": 1, "f29": 1}}
+{"id": "q74", "lang": "es", "text": "nómina de septiembre", "relevant": {"f42": 3}}
+{"id": "q75", "lang": "es", "text": "recibo del IBI", "relevant": {"f43": 3}}
+{"id": "q76", "lang": "es", "text": "cita en el centro de salud", "relevant": {"f44": 3}}
+{"id": "q77", "lang": "es", "text": "certificado de empadronamiento", "relevant": {"f45": 3}}
+{"id": "q78", "lang": "es", "text": "multa por exceso de velocidad", "relevant": {"f46": 3, "f26": 1}}
+{"id": "q79", "lang": "es", "text": "seguro del coche", "relevant": {"f47": 3, "f34": 1}}
+{"id": "q80", "lang": "es", "text": "matrícula del colegio", "relevant": {"f48": 3}}
+{"id": "q81", "lang": "es", "text": "receta de gazpacho", "relevant": {"f49": 3, "f07": 1}}
+{"id": "q82", "lang": "es", "text": "presupuesto de la reforma de la cocina", "relevant": {"f50": 3}}
+{"id": "q83", "lang": "es", "text": "receta de borscht", "relevant": {"f51": 3}}
+{"id": "q84", "lang": "es", "text": "billetes de tren a Lviv", "relevant": {"f59": 3}}
+{"id": "q85", "lang": "es", "text": "plan del proyecto de búsqueda semántica", "relevant": {"f32": 3}}
+{"id": "q86", "lang": "ru", "text": "кот на подоконнике", "relevant": {"f13": 3}}
+{"id": "q87", "lang": "ru", "text": "фото Барселоны", "relevant": {"f14": 3}}
+{"id": "q88", "lang": "ru", "text": "торт на день рождения", "relevant": {"f15": 3}}
+{"id": "q89", "lang": "ru", "text": "зимний пейзаж с горами", "relevant": {"f16": 3}}
+{"id": "q90", "lang": "ru", "text": "схема архитектуры на доске", "relevant": {"f17": 3}}
+{"id": "q91", "lang": "ru", "text": "скриншот перевода за аренду", "relevant": {"f18": 3, "f36": 1}}
+{"id": "q92", "lang": "ru", "text": "все фото собак", "relevant": {"f04": 3, "f19": 3}}
+{"id": "q93", "lang": "ru", "text": "блюда из морепродуктов", "relevant": {"f05": 3, "f20": 3}}
+{"id": "q94", "lang": "ru", "text": "посадочный талон", "relevant": {"f21": 3}}
+{"id": "q95", "lang": "ru", "text": "чек из аптеки", "relevant": {"f22": 3}}
+{"id": "q96", "lang": "ru", "text": "чеки из поездки в Мадрид", "relevant": {"f09": 3, "f23": 3, "f10": 1}}
+{"id": "q97", "lang": "ru", "text": "чек из супермаркета", "relevant": {"f24": 3, "f08": 1}}
+{"id": "q98", "lang": "ru", "text": "водительские права", "relevant": {"f25": 3, "f12": 1}}
+{"id": "q99", "lang": "ru", "text": "штраф за парковку", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q100", "lang": "ru", "text": "фото рабочего места", "relevant": {"f27": 3}}
+{"id": "q101", "lang": "ru", "text": "Эйфелева башня ночью", "relevant": {"f28": 3}}
+{"id": "q102", "lang": "ru", "text": "счёт за электричество за апрель", "relevant": {"f29": 3, "f01": 2}}
+{"id": "q103", "lang": "ru", "text": "счёт за интернет", "relevant": {"f30": 3}}
+{"id": "q104", "lang": "ru", "text": "сопроводительное письмо", "relevant": {"f31": 3, "f06": 1}}
+{"id": "q105", "lang": "ru", "text": "анализ крови", "relevant": {"f33": 3, "f58": 1}}
+{"id": "q106", "lang": "ru", "text": "страховка квартиры", "relevant": {"f34": 3, "f47": 1}}
+{"id": "q107", "lang": "ru", "text": "налоговая декларация", "relevant": {"f35": 3}}
+{"id": "q108", "lang": "ru", "text": "выписка из банка", "relevant": {"f52": 3, "f36": 3}}
+{"id": "q109", "lang": "ru", "text": "инструкция к стиральной машине", "relevant": {"f37": 3, "f57": 1}}
+{"id": "q110", "lang": "ru", "text": "рецепт борща", "relevant": {"f51": 3}}
+{"id": "q111", "lang": "ru", "text": "справка с работы", "relevant": {"f53": 3, "f42": 1}}
+{"id": "q112", "lang": "ru", "text": "расписание занятий по английскому", "relevant": {"f54": 3}}
+{"id": "q113", "lang": "ru", "text": "письмо бабушке", "relevant": {"f55": 3}}
+{"id": "q114", "lang": "ru", "text": "заметки со встречи", "relevant": {"f56": 3, "f11": 2}}
+{"id": "q115", "lang": "ru", "text": "инструкция к пылесосу", "relevant": {"f57": 3, "f37": 1}}
+{"id": "q116", "lang": "ru", "text": "справка для бассейна", "relevant": {"f58": 3}}
+{"id": "q117", "lang": "ru", "text": "билеты на поезд", "relevant": {"f59": 3}}
+{"id": "q118", "lang": "ru", "text": "квитанция за коммуналку", "relevant": {"f60": 3, "f41": 1, "f01": 1, "f02": 1, "f29": 1}}
+{"id": "q119", "lang": "ru", "text": "рецепт гаспачо", "relevant": {"f49": 3, "f51": 1}}
+{"id": "q120", "lang": "ru", "text": "резюме", "relevant": {"f06": 3, "f31": 1}}
