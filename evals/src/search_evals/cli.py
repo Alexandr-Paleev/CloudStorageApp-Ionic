@@ -17,7 +17,7 @@ import numpy as np
 from . import metrics
 from .backends import MissingKey, embedder
 from .contract import EMBEDDING_MODEL, SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, embedding_input
-from .data import LANGUAGES, load_files, load_queries, problems
+from .data import LANGUAGES, load_files, load_queries, only_across_languages, problems
 from .rank import rank
 from .vectors import VectorCache
 
@@ -59,28 +59,38 @@ def _embed(model: str) -> int:
 
 def _score(model: str, limit: int, min_similarity: float) -> int:
     files, queries = load_files(), load_queries()
+    found = problems(files, queries)
+    if found:
+        # A score of data with a dangling label or an unknown language is a
+        # number about a mistake; `check` names them.
+        print(f"data/ has {len(found)} problems; run `search-evals check`", file=sys.stderr)
+        return 1
+    by_id = {f.id: f for f in files}
     cache = VectorCache(model)
     ids = [f.id for f in files]
     doc_vectors = [cache.get(embedding_input(f.name, f.summary, f.tags), "document") for f in files]
     query_vectors = [cache.get(q.text, "query") for q in queries]
-    missing = doc_vectors.count(None) + query_vectors.count(None)
+    # `is None`, not `list.count(None)`: count compares with ==, and a numpy
+    # array compared with None is an array, whose truth value is an error.
+    missing = sum(v is None for v in doc_vectors) + sum(v is None for v in query_vectors)
     if missing:
         print(f"{model}: {missing} vectors are not cached; run `search-evals embed --model {model}`", file=sys.stderr)
         return 2
     documents = np.stack(doc_vectors)
 
-    rows: dict[str, list[tuple[float, float, float, bool]]] = {lang: [] for lang in LANGUAGES}
+    groups = (*LANGUAGES, "same", "across")
+    rows: dict[str, list[tuple[float, float, float, bool]]] = {group: [] for group in groups}
     try:
         for q, vector in zip(queries, query_vectors, strict=True):
             ranked = [file_id for file_id, _ in rank(vector, documents, ids, limit=limit, min_similarity=min_similarity)]
-            rows[q.lang].append(
-                (
-                    metrics.recall_at_k(ranked, q.relevant, 5),
-                    metrics.reciprocal_rank(ranked, q.relevant),
-                    metrics.ndcg_at_k(ranked, q.relevant, 10),
-                    not ranked,
-                )
+            row = (
+                metrics.recall_at_k(ranked, q.relevant, 5),
+                metrics.reciprocal_rank(ranked, q.relevant),
+                metrics.ndcg_at_k(ranked, q.relevant, 10),
+                not ranked,
             )
+            rows[q.lang].append(row)
+            rows["across" if only_across_languages(q, by_id) else "same"].append(row)
     except NotImplementedError as error:
         print(f"Not written yet — {error}", file=sys.stderr)
         return 3
@@ -88,7 +98,7 @@ def _score(model: str, limit: int, min_similarity: float) -> int:
     print(f"{model}, limit {limit}, min similarity {min_similarity}")
     print(f"{'':6}{'queries':>8}{'recall@5':>10}{'MRR':>8}{'nDCG@10':>9}{'empty':>7}")
     everything = [row for lang in LANGUAGES for row in rows[lang]]
-    for label, group in [*((lang, rows[lang]) for lang in LANGUAGES), ("all", everything)]:
+    for label, group in [*((g, rows[g]) for g in groups), ("all", everything)]:
         if group:
             recall, rr, ndcg = (statistics.fmean(row[i] for row in group) for i in range(3))
             empty = sum(row[3] for row in group)

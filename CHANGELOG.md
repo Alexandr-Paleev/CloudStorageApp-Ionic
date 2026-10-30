@@ -21,8 +21,12 @@ reasoning behind the larger decisions lives in
   fetching them is a separate command that does. What the eval must agree
   with the app on, from the model to the cases of `embeddingInput`, is written
   once in `libs/core/src/ai.eval-contract.json`, and a test on each side holds
-  it to that file. The seed set is 12 files and 15 queries in English, Spanish
-  and Russian, several asked across languages. The metrics and the ranking are
+  it to that file. The set is 60 files and 120 queries, 40 in each of English,
+  Spanish and Russian, each file described in the language the describe prompt
+  would use. 65 of the queries can only be answered across languages, and the
+  report shows those apart from the rest. The grades follow a rule written in
+  `evals/README.md`, under which a file that only shares a broad category is a
+  hard negative rather than a "related" one. The metrics and the ranking are
   left to write: their specifications are tests, worked out by hand, that skip
   until the code exists, and nine typical mistakes were checked to fail them.
   There is no number yet; the first comes with the vectors.

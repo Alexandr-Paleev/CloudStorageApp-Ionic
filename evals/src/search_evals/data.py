@@ -64,6 +64,18 @@ def load_queries(path: Path = DATA / "queries.jsonl") -> list[Query]:
     ]
 
 
+def only_across_languages(query: Query, files: Mapping[str, File]) -> bool:
+    """Whether no file the query means (grade 3) is in the language it is asked in.
+
+    Such a query can only be answered across languages, which is the case an
+    English-only model is expected to fail. The report shows these apart from
+    the rest, since a query's language alone does not say it: a Russian
+    question about a Russian contract is not the same test as one about a
+    photograph, which the model describes in English.
+    """
+    return all(files[file_id].lang != query.lang for file_id, grade in query.relevant.items() if grade == 3)
+
+
 def problems(files: list[File], queries: list[Query]) -> list[str]:
     """Everything wrong with the data, as sentences; an empty list when nothing is.
 
@@ -94,6 +106,8 @@ def problems(files: list[File], queries: list[Query]) -> list[str]:
             found.append(f"query {q.id}: language {q.lang!r} is not one of {LANGUAGES}")
         if not q.relevant:
             found.append(f"query {q.id}: no relevant file, so nothing can be scored")
+        elif 3 not in q.relevant.values():
+            found.append(f"query {q.id}: no file is graded 3, the one the person means")
         for file_id, grade in q.relevant.items():
             if file_id not in known:
                 found.append(f"query {q.id}: file {file_id} is not in the corpus")
