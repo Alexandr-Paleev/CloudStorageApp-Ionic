@@ -42,6 +42,12 @@ reasoning behind the larger decisions lives in
   keep from one page to the next. Measured on production's Postgres: 60 rows
   of three sizes, read in pages of 15 ordered by size alone, came back as 57
   different rows. Every sort now ends on the file's id.
+- **Two paragraphs of the privacy policy were printed a line at a time.** The
+  site's reader made every line of a document a paragraph of its own, and the
+  two paragraphs about search by meaning are wrapped at eighty columns, so the
+  page showed them as fourteen, cut mid-sentence. A paragraph is now every
+  line up to the next blank line or block, as markdown has it; a line that
+  ends in two spaces still ends one.
 - **A picture the browser could not show was asked for again for as long as
   its page was open.** A failed preview fetched the file's details again, and
   on R2 and Supabase Storage that signs a new address, which the browser
