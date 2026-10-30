@@ -19,8 +19,8 @@ queries for which nothing cleared the floor, which is what a person sees as "no
 results". It gives each per language; for the queries that can only be
 answered across languages (`across`) and for the rest (`same`); and for all
 queries together. A query's language alone does not say which test it is: a
-Russian question about a Russian contract and one about a picture, which the
-model describes in English, are different tests.
+Russian question about a Russian contract and one about a photograph, which
+the model describes in English, are different tests.
 
 Forty queries per language are enough to see a model fail a language, but not
 to rank two models that are close: a share measured on 40 queries moves by
@@ -37,26 +37,27 @@ JSON object per line:
 
 ```json
 {"id": "f01", "lang": "en", "name": "invoice-2026-03-electricity.pdf", "summary": "An electricity invoice…", "tags": ["invoice", "electricity"]}
-{"id": "q06", "lang": "es", "text": "factura de la luz", "relevant": {"f01": 3, "f02": 1}}
+{"id": "q06", "lang": "es", "text": "factura de la luz", "relevant": {"f01": 3, "f29": 3, "f60": 2}}
 ```
 
-A grade of 3 is the file the person means, 2 a file they would be glad to see,
-1 one that is related. A file a query does not list is not relevant to it.
-Summaries are in the language of the file and English for pictures, as the
-describe prompt asks (`libs/server/src/describe.ts`).
+A file a query does not list is not relevant to it; how the grades are given
+is below. A summary is in the language of the writing in the file, and in
+English where there is none, as the describe prompt asks
+(`libs/server/src/describe.ts`): a scanned Spanish receipt is described in
+Spanish, a photograph of a dog in English.
 
 There are 60 files and 120 queries, 40 queries in each of English, Spanish
-and Russian. 64 of the queries can only be answered across languages: no file
+and Russian. 65 of the queries can only be answered across languages: no file
 they mean is in the language they are asked in, such as a Spanish question
-about an English invoice. Half of those, 33, are about pictures, which the
-model describes in English whatever the person speaks. That is the hypothesis
-the first run tests: `bge-large-en-v1.5`, the Workers AI model, is
+about an English invoice. 34 of those are about pictures: 25 about ones
+described in English and 9 about pictures of Spanish papers. That is the
+hypothesis the first run tests: `bge-large-en-v1.5`, the Workers AI model, is
 English-only.
 
 How the grades are given:
 
 - **3:** what the query asks for. A query that names a kind rather than one
-  file ("bank statement", "all photos of dogs") can have several.
+  file ("extracto bancario", "all photos of dogs") can have several.
 - **2:** a near miss the person would still take. That is the same document for
   another period (the March bill for "April"), or the same thing in another
   form (an e-ticket for "boarding pass").
@@ -64,12 +65,14 @@ How the grades are given:
   whose taxi receipt is asked for, or the bank statement that holds the rent
   transfer.
 - **Nothing:** a file that only shares a broad category. A car insurance
-  policy is not labelled for "home insurance", nor the vacuum cleaner's manual
-  for the washing machine's. Those are the hard negatives, and labelling them 1
-  would let recall count them as found.
+  policy is not labelled for "home insurance", a speeding fine for "parking
+  fine", nor the vacuum cleaner's manual for the washing machine's. Those are
+  the hard negatives: recall and MRR count a file of any grade as found, so
+  labelling them at all would score a miss as a hit.
 
-Every query has a file graded 3, and every file is asked about. Every label is
-a claim a reviewer can read in the diff.
+Every query has a file graded 3, and every file is labelled for some query. All
+but one are what some query asks for; the water bill is only ever a near miss.
+Every label is a claim a reviewer can read in the diff.
 
 ## Running it
 

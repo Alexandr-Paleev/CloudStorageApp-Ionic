@@ -71,7 +71,7 @@ def only_across_languages(query: Query, files: Mapping[str, File]) -> bool:
     English-only model is expected to fail. The report shows these apart from
     the rest, since a query's language alone does not say it: a Russian
     question about a Russian contract is not the same test as one about a
-    picture, which the model describes in English.
+    photograph, which the model describes in English.
     """
     return all(files[file_id].lang != query.lang for file_id, grade in query.relevant.items() if grade == 3)
 

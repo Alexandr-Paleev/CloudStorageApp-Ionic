@@ -26,7 +26,7 @@
 {"id": "q26", "lang": "en", "text": "receipts from the Madrid trip", "relevant": {"f09": 3, "f23": 3, "f10": 1}}
 {"id": "q27", "lang": "en", "text": "grocery receipt", "relevant": {"f24": 3}}
 {"id": "q28", "lang": "en", "text": "driving licence", "relevant": {"f25": 3}}
-{"id": "q29", "lang": "en", "text": "parking fine", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q29", "lang": "en", "text": "parking fine", "relevant": {"f26": 3}}
 {"id": "q30", "lang": "en", "text": "photo of my desk", "relevant": {"f27": 3}}
 {"id": "q31", "lang": "en", "text": "Eiffel Tower at night", "relevant": {"f28": 3}}
 {"id": "q32", "lang": "en", "text": "electricity bill for April", "relevant": {"f29": 3, "f01": 2}}
@@ -61,7 +61,7 @@
 {"id": "q61", "lang": "es", "text": "cuenta del restaurante", "relevant": {"f23": 3}}
 {"id": "q62", "lang": "es", "text": "ticket de Mercadona", "relevant": {"f24": 3}}
 {"id": "q63", "lang": "es", "text": "carnet de conducir", "relevant": {"f25": 3}}
-{"id": "q64", "lang": "es", "text": "multa de aparcamiento", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q64", "lang": "es", "text": "multa de aparcamiento", "relevant": {"f26": 3}}
 {"id": "q65", "lang": "es", "text": "factura de internet", "relevant": {"f30": 3}}
 {"id": "q66", "lang": "es", "text": "carta de presentación", "relevant": {"f31": 3, "f06": 1}}
 {"id": "q67", "lang": "es", "text": "análisis de sangre", "relevant": {"f33": 3}}
@@ -75,7 +75,7 @@
 {"id": "q75", "lang": "es", "text": "recibo del IBI", "relevant": {"f43": 3}}
 {"id": "q76", "lang": "es", "text": "cita en el centro de salud", "relevant": {"f44": 3}}
 {"id": "q77", "lang": "es", "text": "certificado de empadronamiento", "relevant": {"f45": 3}}
-{"id": "q78", "lang": "es", "text": "multa por exceso de velocidad", "relevant": {"f46": 3, "f26": 2}}
+{"id": "q78", "lang": "es", "text": "multa por exceso de velocidad", "relevant": {"f46": 3}}
 {"id": "q79", "lang": "es", "text": "seguro del coche", "relevant": {"f47": 3}}
 {"id": "q80", "lang": "es", "text": "matrícula del colegio", "relevant": {"f48": 3}}
 {"id": "q81", "lang": "es", "text": "receta de gazpacho", "relevant": {"f49": 3}}
@@ -96,7 +96,7 @@
 {"id": "q96", "lang": "ru", "text": "чеки из поездки в Мадрид", "relevant": {"f09": 3, "f23": 3, "f10": 1}}
 {"id": "q97", "lang": "ru", "text": "чек из супермаркета", "relevant": {"f24": 3}}
 {"id": "q98", "lang": "ru", "text": "водительские права", "relevant": {"f25": 3}}
-{"id": "q99", "lang": "ru", "text": "штраф за парковку", "relevant": {"f26": 3, "f46": 2}}
+{"id": "q99", "lang": "ru", "text": "штраф за парковку", "relevant": {"f26": 3}}
 {"id": "q100", "lang": "ru", "text": "фото рабочего места", "relevant": {"f27": 3}}
 {"id": "q101", "lang": "ru", "text": "Эйфелева башня ночью", "relevant": {"f28": 3}}
 {"id": "q102", "lang": "ru", "text": "счёт за электричество за апрель", "relevant": {"f29": 3, "f01": 2}}

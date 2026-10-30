@@ -3,10 +3,10 @@
 {"id": "f03", "lang": "ru", "name": "договор-аренды-2026.pdf", "summary": "Договор аренды квартиры в Валенсии на 12 месяцев с ежемесячной платой 950 евро.", "tags": ["договор", "аренда", "квартира", "валенсия"]}
 {"id": "f04", "lang": "en", "name": "IMG_2041.jpg", "summary": "A photograph of a golden retriever lying on a beach at sunset.", "tags": ["dog", "golden retriever", "beach", "sunset", "photo"]}
 {"id": "f05", "lang": "en", "name": "IMG_2077.jpg", "summary": "A photograph of a pan of seafood paella on a restaurant table.", "tags": ["paella", "seafood", "food", "restaurant", "photo"]}
-{"id": "f06", "lang": "en", "name": "resume-alex-2026.pdf", "summary": "A resume of a senior frontend engineer listing React, TypeScript and Next.js work.", "tags": ["resume", "cv", "frontend engineer", "react", "typescript"]}
+{"id": "f06", "lang": "en", "name": "resume-2026.pdf", "summary": "A resume of a senior frontend engineer listing React, TypeScript and Next.js work.", "tags": ["resume", "cv", "frontend engineer", "react", "typescript"]}
 {"id": "f07", "lang": "es", "name": "receta-tortilla.txt", "summary": "Receta de tortilla de patatas con cebolla para cuatro personas.", "tags": ["receta", "tortilla", "patatas", "cocina"]}
 {"id": "f08", "lang": "ru", "name": "список-покупок.txt", "summary": "Список покупок на неделю: молоко, хлеб, яйца, овощи и фрукты.", "tags": ["список покупок", "продукты", "неделя"]}
-{"id": "f09", "lang": "en", "name": "scan_0012.png", "summary": "A scanned taxi receipt from Madrid airport for 33 euros, dated 12 October 2026.", "tags": ["receipt", "taxi", "madrid", "airport", "expense"]}
+{"id": "f09", "lang": "es", "name": "scan_0012.png", "summary": "Recibo escaneado de un taxi desde el aeropuerto de Madrid por 33 euros, con fecha 12 de octubre de 2026.", "tags": ["recibo", "taxi", "madrid", "aeropuerto", "gastos"]}
 {"id": "f10", "lang": "es", "name": "billete-avion-madrid.pdf", "summary": "Billete electrónico de avión de Valencia a Madrid para el 12 de octubre de 2026.", "tags": ["billete", "vuelo", "valencia", "madrid"]}
 {"id": "f11", "lang": "en", "name": "meeting-notes-q4.txt", "summary": "Meeting notes on the fourth-quarter roadmap, with three decisions and an owner for each.", "tags": ["meeting notes", "roadmap", "q4", "decisions"]}
 {"id": "f12", "lang": "en", "name": "паспорт-скан.jpg", "summary": "A scan of the identity page of a passport.", "tags": ["passport", "identity document", "scan"]}
@@ -19,16 +19,16 @@
 {"id": "f19", "lang": "en", "name": "IMG_3355.jpg", "summary": "A photograph of a dog chasing a ball in a city park.", "tags": ["dog", "park", "ball", "pet", "photo"]}
 {"id": "f20", "lang": "en", "name": "IMG_3401.jpg", "summary": "A photograph of a plate of octopus on boiled potatoes, with olive oil and paprika.", "tags": ["octopus", "seafood", "food", "galician cuisine"]}
 {"id": "f21", "lang": "en", "name": "boarding-pass.png", "summary": "A screenshot of a mobile boarding pass for a flight from Madrid to Warsaw.", "tags": ["boarding pass", "flight", "madrid", "warsaw"]}
-{"id": "f22", "lang": "en", "name": "scan_0040.png", "summary": "A scanned pharmacy receipt for ibuprofen and cough syrup, 14.70 euros.", "tags": ["receipt", "pharmacy", "medicine", "expense"]}
-{"id": "f23", "lang": "en", "name": "scan_0041.png", "summary": "A scanned restaurant bill from Madrid for a dinner for four, 126 euros.", "tags": ["receipt", "restaurant", "madrid", "dinner", "expense"]}
-{"id": "f24", "lang": "en", "name": "scan_0045.png", "summary": "A scanned Mercadona supermarket receipt with groceries totalling 58.30 euros.", "tags": ["receipt", "supermarket", "mercadona", "groceries"]}
-{"id": "f25", "lang": "en", "name": "permiso-conducir.jpg", "summary": "A photograph of the front of a Spanish driving licence card.", "tags": ["driving licence", "identity document", "spain"]}
+{"id": "f22", "lang": "es", "name": "scan_0040.png", "summary": "Ticket escaneado de una farmacia con ibuprofeno y jarabe para la tos, 14,70 euros.", "tags": ["ticket", "farmacia", "medicamentos", "gastos"]}
+{"id": "f23", "lang": "es", "name": "scan_0041.png", "summary": "Cuenta escaneada de un restaurante de Madrid por una cena para cuatro, 126 euros.", "tags": ["cuenta", "restaurante", "madrid", "cena", "gastos"]}
+{"id": "f24", "lang": "es", "name": "scan_0045.png", "summary": "Ticket escaneado de Mercadona con la compra del supermercado, 58,30 euros en total.", "tags": ["ticket", "supermercado", "mercadona", "compra"]}
+{"id": "f25", "lang": "es", "name": "permiso-conducir.jpg", "summary": "Fotografía del anverso de un permiso de conducción español.", "tags": ["permiso de conducción", "documento de identidad", "españa"]}
 {"id": "f26", "lang": "en", "name": "IMG_3477.jpg", "summary": "A photograph of a parking ticket tucked under a car windscreen wiper.", "tags": ["parking ticket", "fine", "car"]}
 {"id": "f27", "lang": "en", "name": "IMG_3502.jpg", "summary": "A photograph of a laptop on a desk beside a cup of coffee and a notebook.", "tags": ["laptop", "desk", "workspace", "coffee"]}
 {"id": "f28", "lang": "en", "name": "IMG_3550.jpg", "summary": "A photograph of the Eiffel Tower lit up at night.", "tags": ["eiffel tower", "paris", "night", "travel"]}
 {"id": "f29", "lang": "en", "name": "electricity-2026-04.pdf", "summary": "An electricity invoice from Iberdrola for April 2026, with 91.10 euros due on 15 May.", "tags": ["invoice", "electricity", "utility bill", "iberdrola", "april 2026"]}
 {"id": "f30", "lang": "en", "name": "internet-invoice-october.pdf", "summary": "An internet and mobile invoice from Movistar for October 2026, 45 euros.", "tags": ["invoice", "internet", "mobile", "movistar", "october 2026"]}
-{"id": "f31", "lang": "en", "name": "cover-letter-ai-engineer.pdf", "summary": "A cover letter applying for a senior AI engineer role, highlighting semantic search and evals.", "tags": ["cover letter", "job application", "ai engineer"]}
+{"id": "f31", "lang": "en", "name": "cover-letter.pdf", "summary": "A cover letter applying for a senior frontend engineer role, highlighting React and TypeScript work.", "tags": ["cover letter", "job application", "frontend engineer"]}
 {"id": "f32", "lang": "en", "name": "project-plan-search.md", "summary": "A project plan for adding semantic search to a file storage app, in six stages.", "tags": ["project plan", "semantic search", "roadmap"]}
 {"id": "f33", "lang": "en", "name": "blood-test-results.pdf", "summary": "A blood test report from a clinic with cholesterol, glucose and vitamin D results.", "tags": ["medical report", "blood test", "cholesterol", "health"]}
 {"id": "f34", "lang": "en", "name": "home-insurance-policy.pdf", "summary": "A home insurance policy for an apartment in Valencia covering fire, theft and water damage.", "tags": ["insurance policy", "home insurance", "valencia"]}

@@ -14,6 +14,20 @@ def test_score_says_which_command_fetches_what_is_missing(capsys: pytest.Capture
     assert "run `search-evals embed --model voyage-none`" in capsys.readouterr().err
 
 
+def test_score_refuses_data_that_check_rejects(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A label for a file that is not there. Without the refusal the run would
+    # go on to the cache and end in "not cached" (2) instead.
+    from search_evals import cli
+    from search_evals.data import Query
+
+    monkeypatch.setattr(cli, "load_queries", lambda: [Query(id="q1", text="note", lang="en", relevant={"f99": 3})])
+
+    assert main(["score", "--model", "voyage-none"]) == 1
+    assert "run `search-evals check`" in capsys.readouterr().err
+
+
 def test_score_reads_a_full_cache_without_tripping_over_numpy(
     tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
