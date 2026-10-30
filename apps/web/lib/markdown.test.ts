@@ -74,6 +74,48 @@ describe('parseMarkdown', () => {
       'paragraph',
     ]);
   });
+
+  /* As markdown has it. Two paragraphs of the privacy policy are wrapped, and
+     each of their lines used to be printed as a paragraph of its own. */
+  it('reads the lines of one paragraph as one paragraph', () => {
+    expect(parseMarkdown('one line\nand the next\n\nanother')).toEqual([
+      { kind: 'paragraph', content: [{ kind: 'text', text: 'one line and the next' }] },
+      { kind: 'paragraph', content: [{ kind: 'text', text: 'another' }] },
+    ]);
+  });
+
+  it('ends a paragraph at a heading, a list or a rule, as at a blank line', () => {
+    expect(parseMarkdown('a\n# H\nb\n- item\nc\n---\nd').map((block) => block.kind)).toEqual([
+      'paragraph',
+      'heading',
+      'paragraph',
+      'list',
+      'paragraph',
+      'rule',
+      'paragraph',
+    ]);
+  });
+
+  it('keeps a mark that wraps onto the next line', () => {
+    expect(parseMarkdown('sends **the name and\ncontents** of it')).toEqual([
+      {
+        kind: 'paragraph',
+        content: [
+          { kind: 'text', text: 'sends ' },
+          { kind: 'strong', text: 'the name and contents' },
+          { kind: 'text', text: ' of it' },
+        ],
+      },
+    ]);
+  });
+
+  /* Markdown's line break, which the privacy policy ends on. */
+  it('ends a paragraph at a line that ends in two spaces', () => {
+    expect(parseMarkdown('first  \nsecond').map((block) => block.kind)).toEqual([
+      'paragraph',
+      'paragraph',
+    ]);
+  });
 });
 
 /* The reader knows a few constructs and the documents are written by hand.
@@ -107,6 +149,15 @@ describe.each(Object.entries(DOCUMENTS))('%s', (_file, markdown) => {
         /\*\*|\]\(|\]\[|`|~~|(^|\s)[*_]+\S|\S[*_]+([\s.,;:!?)]|$)/.test(inline.text)
     );
     expect(leftovers).toEqual([]);
+  });
+
+  /* What a line of a wrapped paragraph looks like once it is printed as a
+     paragraph of its own. The privacy policy had ten of them. */
+  it('starts no paragraph in the middle of a sentence', () => {
+    const paragraphs = blocks.flatMap((block) =>
+      block.kind === 'paragraph' ? [block.content.map((inline) => inline.text).join('')] : []
+    );
+    expect(paragraphs.filter((text) => /^\p{Ll}/u.test(text))).toEqual([]);
   });
 
   it('links only to pages, to its sibling document, or by mail', () => {

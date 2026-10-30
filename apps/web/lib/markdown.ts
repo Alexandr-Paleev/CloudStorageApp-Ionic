@@ -66,10 +66,23 @@ export function parseInline(text: string): Inline[] {
 export function parseMarkdown(markdown: string): Block[] {
   const blocks: Block[] = [];
   let list: { ordered: boolean; items: Inline[][] } | null = null;
+  /* The lines of the paragraph being read. A paragraph is every line up to
+     the next blank one or the next block, as markdown has it, so a paragraph
+     wrapped at eighty columns stays one paragraph. This reader used to make
+     each line a paragraph of its own: two paragraphs of the privacy policy
+     are wrapped, and the page showed them as fourteen, broken mid-sentence. */
+  let paragraph: string[] = [];
 
   const closeList = () => {
     if (list) blocks.push({ kind: 'list', ...list });
     list = null;
+  };
+
+  const closeParagraph = () => {
+    if (paragraph.length > 0) {
+      blocks.push({ kind: 'paragraph', content: parseInline(paragraph.join(' ')) });
+    }
+    paragraph = [];
   };
 
   for (const rawLine of markdown.split('\n')) {
@@ -77,6 +90,7 @@ export function parseMarkdown(markdown: string): Block[] {
 
     const ordered = NUMBERED.test(line);
     if (ordered || BULLET.test(line)) {
+      closeParagraph();
       /* A numbered line after bullets is a new list, and the other way round. */
       if (list && list.ordered !== ordered) closeList();
       list ??= { ordered, items: [] };
@@ -85,9 +99,13 @@ export function parseMarkdown(markdown: string): Block[] {
     }
     closeList();
 
-    if (!line.trim()) continue;
+    if (!line.trim()) {
+      closeParagraph();
+      continue;
+    }
 
     if (RULE.test(line.trim())) {
+      closeParagraph();
       blocks.push({ kind: 'rule' });
       continue;
     }
@@ -98,6 +116,7 @@ export function parseMarkdown(markdown: string): Block[] {
     /* Both groups are checked, rather than the match as a whole, for the
        compiler: with unchecked indexes neither is known to be there. */
     if (hashes !== undefined && headingText !== undefined) {
+      closeParagraph();
       blocks.push({
         kind: 'heading',
         level: hashes.length as 1 | 2 | 3 | 4,
@@ -106,9 +125,13 @@ export function parseMarkdown(markdown: string): Block[] {
       continue;
     }
 
-    blocks.push({ kind: 'paragraph', content: parseInline(line) });
+    paragraph.push(line.trim());
+    /* Two spaces at the end are markdown's line break. The privacy policy
+       ends on two such lines, which were two paragraphs here and stay so. */
+    if (/ {2,}$/.test(rawLine)) closeParagraph();
   }
 
+  closeParagraph();
   closeList();
   return blocks;
 }
