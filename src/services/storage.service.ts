@@ -158,8 +158,14 @@ const storageService = {
    * Only R2 has them: it is the only provider here that uploads in parts, and
    * therefore the only one where "half an upload" is a thing that exists.
    */
-  async resumableUploads(): Promise<PendingUpload[]> {
-    return r2Service.resumableUploads();
+  async resumableUploads(userId: string): Promise<PendingUpload[]> {
+    return r2Service.resumableUploads(userId);
+  },
+
+  /** Takes the account's interrupted uploads, and the files they hold, off this
+   *  device. For when the account is gone and nobody can finish them. */
+  async forgetUploads(userId: string): Promise<void> {
+    await r2Service.forgetUploads(userId);
   },
 
   /**

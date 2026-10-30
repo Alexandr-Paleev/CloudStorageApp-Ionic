@@ -15,9 +15,9 @@
  * of decision 0014 it was a page of the app, and the value was the href of
  * its Download button. A `javascript:` value written into one's own row and
  * then shared is script running on that page's origin, in someone else's
- * browser; the CSP does not stop it, because `script-src` carries
- * `'unsafe-inline'` on both origins and that is what governs `javascript:`
- * URLs.
+ * browser; the CSP does not stop it, because the site's `script-src` carries
+ * `'unsafe-inline'` and that is what governs `javascript:` URLs. The app's
+ * dropped it in 4.12.0, and the app's native shell has no CSP at all.
  *
  * So: an allowlist of two schemes, asked before the value is stored and again
  * before a browser is sent to it. Deliberately narrower than "is this a URL"

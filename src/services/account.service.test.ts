@@ -3,9 +3,14 @@ import accountService from './account.service';
 
 const getSession = vi.fn();
 const signOut = vi.fn();
+const forgetUploads = vi.fn();
 
 vi.mock('../supabase/supabase.config', () => ({
   supabase: { auth: { getSession: () => getSession(), signOut: () => signOut() } },
+}));
+
+vi.mock('./storage.service', () => ({
+  default: { forgetUploads: (userId: string) => forgetUploads(userId) },
 }));
 
 const fetchMock = vi.fn();
@@ -17,7 +22,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   order = [];
   vi.stubGlobal('fetch', fetchMock);
-  getSession.mockResolvedValue({ data: { session: { access_token: 'jwt' } } });
+  getSession.mockResolvedValue({
+    data: { session: { access_token: 'jwt', user: { id: 'user-1' } } },
+  });
+  forgetUploads.mockResolvedValue(undefined);
   signOut.mockImplementation(async () => {
     order.push('signOut');
     return { error: null };
@@ -91,5 +99,33 @@ describe('deleting the account', () => {
   it('reads a response with no failures list as none', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ deleted: true }) });
     await expect(accountService.deleteAccount()).resolves.toEqual({ failures: [] });
+  });
+
+  /* An upload interrupted on this device keeps its file in IndexedDB so it can
+     be finished later. Nobody can finish it now, and the file is the deleted
+     account's. */
+  it("takes the account's interrupted uploads off the device once the account is gone", async () => {
+    forgetUploads.mockImplementation(async () => {
+      order.push('forgetUploads');
+    });
+
+    await accountService.deleteAccount();
+
+    expect(forgetUploads).toHaveBeenCalledWith('user-1');
+    expect(order).toEqual(['delete', 'forgetUploads', 'signOut']);
+  });
+
+  it('keeps them while the account still exists', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({ message: 'Access denied' }) });
+
+    await expect(accountService.deleteAccount()).rejects.toThrow('Access denied');
+    expect(forgetUploads).not.toHaveBeenCalled();
+  });
+
+  it('still reports success, and signs out, when they cannot be cleared', async () => {
+    forgetUploads.mockRejectedValue(new Error('IndexedDB is blocked'));
+
+    await expect(accountService.deleteAccount()).resolves.toEqual({ failures: [] });
+    expect(signOut).toHaveBeenCalled();
   });
 });

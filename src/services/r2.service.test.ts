@@ -5,11 +5,12 @@ import { MULTIPART_THRESHOLD } from '@cloud-storage/core/multipart';
 
 /* Hoisted: `vi.mock` factories run before the module body, so a plain `const`
    here is still in its temporal dead zone when the uploader is built. */
-const { start, run, abort, list } = vi.hoisted(() => ({
+const { start, run, abort, list, remove } = vi.hoisted(() => ({
   start: vi.fn(),
   run: vi.fn(),
   abort: vi.fn(),
   list: vi.fn(),
+  remove: vi.fn(),
 }));
 
 vi.mock('../supabase/supabase.config', () => ({
@@ -20,7 +21,9 @@ vi.mock('./multipart.upload', () => ({
   createMultipartUploader: () => ({ start, run, abort }),
 }));
 
-vi.mock('./upload-store', () => ({ uploadStore: { list: () => list() } }));
+vi.mock('./upload-store', () => ({
+  uploadStore: { list: () => list(), remove: (key: string) => remove(key) },
+}));
 
 const fetchMock = vi.fn();
 
@@ -209,9 +212,28 @@ describe('the single PUT itself', () => {
 });
 
 describe('interrupted uploads', () => {
-  it('lists what is still resumable', async () => {
-    list.mockResolvedValue([{ key: 'users/u1/movie.mp4' }]);
-    await expect(r2Service.resumableUploads()).resolves.toEqual([{ key: 'users/u1/movie.mp4' }]);
+  /* IndexedDB is the browser's, so on a shared device it holds the last
+     person's unfinished uploads too, and their names are not this account's
+     to see. */
+  it("lists this account's interrupted uploads and nobody else's", async () => {
+    list.mockResolvedValue([
+      { key: 'users/u1/1_movie.mp4' },
+      { key: 'users/u2/2_tax-return.pdf' },
+      // Matching the prefix without its slash would hand u1 this one as well.
+      { key: 'users/u10/3_photo.png' },
+    ]);
+
+    await expect(r2Service.resumableUploads('u1')).resolves.toEqual([
+      { key: 'users/u1/1_movie.mp4' },
+    ]);
+  });
+
+  it("takes this account's interrupted uploads off the device, and only those", async () => {
+    list.mockResolvedValue([{ key: 'users/u1/1_movie.mp4' }, { key: 'users/u2/2_tax-return.pdf' }]);
+
+    await r2Service.forgetUploads('u1');
+
+    expect(remove.mock.calls).toEqual([['users/u1/1_movie.mp4']]);
   });
 
   it('picks one up and signs a URL for the finished object', async () => {

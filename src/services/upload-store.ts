@@ -74,30 +74,6 @@ function withoutFile(record: PendingUpload): StoredRecord {
   return copy as StoredRecord;
 }
 
-export interface CompletedPart {
-  partNumber: number;
-  etag: string;
-}
-
-export interface PendingUpload {
-  /** The object key, which is also this record's primary key: R2 hands it out
-   *  once and it is unique per upload by construction (it carries a timestamp
-   *  and the user id). */
-  key: string;
-  uploadId: string;
-  fileName: string;
-  size: number;
-  contentType: string;
-  partSize: number;
-  partCount: number;
-  /** Parts R2 has acknowledged, with the ETags the completion needs. */
-  completed: CompletedPart[];
-  file: File;
-  folderId: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
 /** Records older than this are rubbish: R2's own lifecycle rule sweeps
  *  abandoned parts, and a week-old File reference is usually stale anyway. */
 export const PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;

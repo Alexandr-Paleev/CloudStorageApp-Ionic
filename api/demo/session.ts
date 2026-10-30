@@ -7,6 +7,8 @@ import {
   DEMO_RATE_WINDOW_MS,
   DEMO_SEED,
   DEMO_SWEEP_LIMIT,
+  DEMO_SWEEP_PAGE_SIZE,
+  DEMO_SWEEP_PAGES,
   demoEmail,
   demoPassword,
   demoStoragePath,
@@ -45,6 +47,37 @@ interface AdminUser {
 }
 
 /**
+ * Demo accounts that have aged out, no more than DEMO_SWEEP_LIMIT of them.
+ *
+ * The admin API hands accounts out a page at a time, newest first, and this
+ * used to read the first page only: once two hundred accounts were newer than a
+ * demo, it was never looked at again and never went. A page shorter than asked
+ * for is the last one. The answer's `nextPage` is not used, because supabase-js
+ * reads only the first digit of it: page 12 comes back as page 1.
+ *
+ * Bounded by DEMO_SWEEP_PAGES, because a visitor is waiting. Newest first means
+ * an account expires near the front, so the bound misses one only if two
+ * thousand accounts were made in the day it lived.
+ */
+async function expiredDemoUsers(): Promise<AdminUser[]> {
+  const expired: AdminUser[] = [];
+
+  for (let page = 1; page <= DEMO_SWEEP_PAGES && expired.length < DEMO_SWEEP_LIMIT; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: DEMO_SWEEP_PAGE_SIZE,
+    });
+    if (error || !data) break;
+
+    const users = data.users as AdminUser[];
+    expired.push(...users.filter((u) => isExpiredDemoUser(u)));
+    if (users.length < DEMO_SWEEP_PAGE_SIZE) break;
+  }
+
+  return expired.slice(0, DEMO_SWEEP_LIMIT);
+}
+
+/**
  * Removes demo accounts that have aged out.
  *
  * Runs before the new account rather than after the response: work scheduled
@@ -53,13 +86,10 @@ interface AdminUser {
  * be turned away because yesterday's rubbish would not go.
  */
 async function sweepExpired(): Promise<void> {
-  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
-  if (error || !data) return;
-
-  const expired = (data.users as AdminUser[]).filter((u) => isExpiredDemoUser(u));
+  const expired = await expiredDemoUsers();
   const providers = configuredProviders();
 
-  for (const user of expired.slice(0, DEMO_SWEEP_LIMIT)) {
+  for (const user of expired) {
     /* The same erase an account deletion runs: every provider by prefix, then
        the rows, then the user. This used to remove the first 200 Supabase
        Storage objects and the rows, and nothing else. Images go to Cloudinary

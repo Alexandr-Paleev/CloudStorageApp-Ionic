@@ -57,12 +57,23 @@ async function eraseR2(userId: string): Promise<void> {
  * By prefix, and for both resource types: images and raw files are separate
  * namespaces there, and `api/cloudinary/[action].ts` already carries the scar
  * of assuming otherwise. Videos are not a thing this app uploads.
+ *
+ * One call deletes at most 1000 assets. When there were more, the answer says
+ * `partial` and carries a `next_cursor` for the call that continues; stopping
+ * at the first answer left everything past the first thousand in place.
  */
 async function eraseCloudinary(userId: string): Promise<void> {
   for (const resource_type of ['image', 'raw'] as const) {
-    await cloudinary.api.delete_resources_by_prefix(ownerPrefix('cloudinary', userId), {
-      resource_type,
-    });
+    let next_cursor: string | undefined;
+
+    do {
+      const answer = (await cloudinary.api.delete_resources_by_prefix(
+        ownerPrefix('cloudinary', userId),
+        { resource_type, next_cursor }
+      )) as { partial?: boolean; next_cursor?: string };
+
+      next_cursor = answer.partial ? answer.next_cursor : undefined;
+    } while (next_cursor);
   }
 }
 
