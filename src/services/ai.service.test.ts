@@ -20,13 +20,31 @@ vi.mock('../observability/sentry', () => ({ captureException: vi.fn() }));
 const fetchMock = vi.fn();
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5);
 
-/** A table that answers `.select().eq()…` with its rows, filtered as asked —
- *  thenable, as the Supabase builder is. */
-const table = (rows: Record<string, unknown>[]) => {
-  const query = (kept: Record<string, unknown>[]) => ({
-    eq: (column: string, value: unknown) => query(kept.filter((row) => row[column] === value)),
-    then: (settle: (answer: { data: unknown[]; error: null }) => void) =>
-      settle({ data: kept, error: null }),
+/** A table that answers `.select().eq().order().range()` with its rows,
+ *  filtered, ordered and cut as asked, and with how many matched — thenable,
+ *  as the Supabase builder is. `maxRows` is PostgREST's cap on one answer,
+ *  whatever range was asked for. */
+const table = (rows: Record<string, unknown>[], { maxRows = 1000 } = {}) => {
+  const query = (kept: Record<string, unknown>[], window?: [number, number]) => ({
+    eq: (column: string, value: unknown) =>
+      query(
+        kept.filter((row) => row[column] === value),
+        window
+      ),
+    order: (column: string) =>
+      query(
+        [...kept].sort((a, b) => String(a[column]).localeCompare(String(b[column]))),
+        window
+      ),
+    range: (from: number, to: number) => query(kept, [from, to]),
+    then: (settle: (answer: { data: unknown[]; error: null; count: number }) => void) => {
+      const [from, to] = window ?? [0, kept.length - 1];
+      settle({
+        data: kept.slice(from, Math.min(to + 1, from + maxRows)),
+        error: null,
+        count: kept.length,
+      });
+    },
   });
   return { select: () => query(rows) };
 };
@@ -164,5 +182,47 @@ describe('unindexedFileIds', () => {
     );
 
     await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+  });
+
+  /* One answer used to be taken as all there was, and PostgREST stops at a
+     thousand rows: past that, indexed files read as missing and were offered
+     again, each a paid request at a model provider. */
+  describe('past a thousand files', () => {
+    const id = (n: number) => `file-${String(n).padStart(5, '0')}`;
+    const many = (count: number) =>
+      Array.from({ length: count }, (_, n) => ({ id: id(n), user_id: 'user-1' }));
+    const indexedUpTo = (count: number) =>
+      Array.from({ length: count }, (_, n) => row(id(n), 'voyage-4'));
+
+    it('compares every file with every row of the index', async () => {
+      from.mockImplementation((name: string) =>
+        name === 'files' ? table(many(1500)) : table(indexedUpTo(1400))
+      );
+
+      const missing = await aiService.unindexedFileIds('user-1', 'voyage-4');
+
+      expect(missing).toHaveLength(100);
+      expect(missing[0]).toBe(id(1400));
+    });
+
+    it('reads through a project whose cap on one answer is lower than asked for', async () => {
+      from.mockImplementation((name: string) =>
+        name === 'files'
+          ? table(many(1200), { maxRows: 500 })
+          : table(indexedUpTo(1100), { maxRows: 500 })
+      );
+
+      await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toHaveLength(100);
+    });
+
+    it('asks each table once for an account of a few files', async () => {
+      from.mockImplementation((name: string) =>
+        name === 'files' ? table(many(30)) : table(indexedUpTo(10))
+      );
+
+      await aiService.unindexedFileIds('user-1', 'voyage-4');
+
+      expect(from.mock.calls.map(([name]) => name).sort()).toEqual(['file_embeddings', 'files']);
+    });
   });
 });

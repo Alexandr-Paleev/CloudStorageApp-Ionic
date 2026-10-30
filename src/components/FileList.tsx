@@ -9,6 +9,7 @@ import {
   IonSpinner,
   IonText,
 } from '@ionic/react';
+import { useRef, useState } from 'react';
 import { cloud, documentTextOutline, trashOutline } from 'ionicons/icons';
 import type { FileMetadata } from '../services/storage.service';
 import { formatDateTime, formatFileSize } from '../utils/format.utils';
@@ -35,6 +36,79 @@ interface FileListProps {
   onOpen: (file: FileMetadata) => void;
   /** The bin was pressed. Whether anything is deleted is DeleteFileDialog's question. */
   onDelete: (file: FileMetadata) => void;
+  /** A fresh address for a picture whose stored one no longer opens, or null
+   *  for none. Asked at most once for each picture, when it fails. */
+  refreshPicture?: (file: FileMetadata) => Promise<string | null>;
+}
+
+/* An image is drawn as itself, by Picture, so every file that gets this is
+   drawn as a document. */
+const DocumentIcon = () => (
+  <div className="file-icon-box">
+    <IonIcon icon={documentTextOutline} className="file-icon" aria-hidden="true" />
+  </div>
+);
+
+/**
+ * A file's picture in its row, or the document icon once there is none to
+ * show.
+ *
+ * The row keeps the address made at upload, and Supabase Storage and R2 sign
+ * theirs for an hour: a list opened later asked for pictures that had run out
+ * and drew empty squares, which every demo account's three pictures did an
+ * hour in. A picture that fails is given a fresh address once, as FileView
+ * does; one that fails again is drawn as a document.
+ */
+function Picture({
+  file,
+  refresh,
+}: {
+  file: FileMetadata;
+  refresh: FileListProps['refreshPicture'];
+}) {
+  const [src, setSrc] = useState(() =>
+    getThumbnailUrl(file.download_url, file.storage_type, 100, 100)
+  );
+  const [broken, setBroken] = useState(false);
+  const retried = useRef(false);
+
+  const retry = async () => {
+    if (retried.current || !refresh) {
+      setBroken(true);
+      return;
+    }
+    retried.current = true;
+    const fresh = await refresh(file).catch(() => null);
+    if (fresh && fresh !== file.download_url) {
+      setSrc(getThumbnailUrl(fresh, file.storage_type, 100, 100));
+    } else {
+      setBroken(true);
+    }
+  };
+
+  if (broken) return <DocumentIcon />;
+
+  return (
+    <div className="file-thumbnail-img-box">
+      {/* getThumbnailUrl only resizes on Cloudinary — the other backends hand
+          back the original, so a long list would otherwise fetch every
+          full-size image at once. lazy + async decoding keeps the ones below
+          the fold out of the way; the dimensions reserve the box so the list
+          does not jump. No alt: the name is beside it as text, and a screen
+          reader would read it twice. Sentry also describes a tap by the alt
+          of what was tapped. */}
+      <img
+        src={src}
+        alt=""
+        className="file-thumbnail-img"
+        loading="lazy"
+        decoding="async"
+        width={100}
+        height={100}
+        onError={() => void retry()}
+      />
+    </div>
+  );
 }
 
 /**
@@ -53,6 +127,7 @@ const FileList: React.FC<FileListProps> = ({
   onLoadMore,
   onOpen,
   onDelete,
+  refreshPicture,
 }) => (
   <div>
     <IonText color="dark" className="section-title">
@@ -120,32 +195,9 @@ const FileList: React.FC<FileListProps> = ({
         >
           <div slot="start" className="file-thumbnail-container">
             {file.type?.startsWith('image/') ? (
-              <div className="file-thumbnail-img-box">
-                {/* getThumbnailUrl only resizes on Cloudinary — the
-                      other backends hand back the original, so a long
-                      list would otherwise fetch every full-size image
-                      at once. lazy + async decoding keeps the ones
-                      below the fold out of the way; the dimensions
-                      reserve the box so the list does not jump.
-                      No alt: the name is beside it as text, and a
-                      screen reader would read it twice. Sentry also
-                      describes a tap by the alt of what was tapped. */}
-                <img
-                  src={getThumbnailUrl(file.download_url, file.storage_type, 100, 100)}
-                  alt=""
-                  className="file-thumbnail-img"
-                  loading="lazy"
-                  decoding="async"
-                  width={100}
-                  height={100}
-                />
-              </div>
+              <Picture file={file} refresh={refreshPicture} />
             ) : (
-              /* An image is drawn as itself, above, so every file that
-                 reaches this branch gets the document icon. */
-              <div className="file-icon-box">
-                <IonIcon icon={documentTextOutline} className="file-icon" aria-hidden="true" />
-              </div>
+              <DocumentIcon />
             )}
           </div>
 

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { FileFiltersValue } from '../components/FileFilters';
 import aiService from '../services/ai.service';
 import { applyPending } from '../services/mutation-queue';
-import storageService from '../services/storage.service';
+import storageService, { type FileMetadata } from '../services/storage.service';
 import { smartSearchIsOffered } from '../utils/smart-search.utils';
 import { useOfflineQueue } from './useOfflineQueue';
 
@@ -95,5 +95,12 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
     fetchNextPage,
     /** Asks again for every folder and every filter this account has listed. */
     refresh: () => queryClient.invalidateQueries({ queryKey: ['items', user?.id] }),
+    /** A fresh address for a file's picture: the listing hands back the one
+     *  stored at upload, and on Supabase Storage and R2 that runs out. */
+    refreshPicture: async (file: FileMetadata): Promise<string | null> => {
+      if (!user?.id || !file.id) return null;
+      const fresh = await storageService.getFileMetadata(file.id, user.id);
+      return fresh?.download_url ?? null;
+    },
   };
 }

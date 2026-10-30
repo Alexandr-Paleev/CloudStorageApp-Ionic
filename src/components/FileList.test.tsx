@@ -101,6 +101,61 @@ describe('FileList', () => {
       expect(document.querySelector('.file-icon-box ion-icon')).not.toBeNull();
     });
 
+    /* Supabase Storage and R2 sign their addresses for an hour, and the row
+       keeps the one made at upload: an hour on, the square stayed empty. */
+    describe('a picture whose address has run out', () => {
+      const SIGNED = {
+        ...PHOTO,
+        id: 'f3',
+        download_url:
+          'https://project.supabase.co/storage/v1/object/sign/files/user-1/1_sky.jpg?token=old',
+        storage_path: 'user-1/1_sky.jpg',
+        storage_type: 'supabase_storage',
+      } as FileMetadata;
+      const FRESH =
+        'https://project.supabase.co/storage/v1/object/sign/files/user-1/1_sky.jpg?token=new';
+      const picture = () => document.querySelector('img.file-thumbnail-img') as HTMLImageElement;
+
+      it('is given a fresh address once, and drawn with it', async () => {
+        const refreshPicture = vi.fn().mockResolvedValue(FRESH);
+        show({ files: [SIGNED], refreshPicture });
+
+        await act(async () => {
+          fireEvent.error(picture());
+        });
+
+        expect(refreshPicture).toHaveBeenCalledWith(SIGNED);
+        expect(picture().getAttribute('src')).toBe(FRESH);
+      });
+
+      it('is drawn as a document when the fresh address fails as well', async () => {
+        const refreshPicture = vi.fn().mockResolvedValue(FRESH);
+        show({ files: [SIGNED], refreshPicture });
+
+        await act(async () => {
+          fireEvent.error(picture());
+        });
+        await act(async () => {
+          fireEvent.error(picture());
+        });
+
+        expect(refreshPicture).toHaveBeenCalledTimes(1);
+        expect(picture()).toBeNull();
+        expect(document.querySelector('.file-icon-box ion-icon')).not.toBeNull();
+      });
+
+      it('is drawn as a document when there is no other address to be had', async () => {
+        show({ files: [SIGNED], refreshPicture: vi.fn().mockResolvedValue(SIGNED.download_url) });
+
+        await act(async () => {
+          fireEvent.error(picture());
+        });
+
+        expect(picture()).toBeNull();
+        expect(document.querySelector('.file-icon-box ion-icon')).not.toBeNull();
+      });
+    });
+
     /* A ranked list with no reason attached is indistinguishable from a wrong
        one. */
     it('says why a search by meaning returned it, when it did', () => {

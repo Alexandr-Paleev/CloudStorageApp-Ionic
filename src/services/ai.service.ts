@@ -30,6 +30,33 @@ export interface SmartMatches {
   model?: string;
 }
 
+/** Rows asked for at a time. PostgREST answers with at most its max-rows
+ *  setting, 1000 unless the project changed it, whatever range is asked. */
+const PAGE = 1000;
+
+type Page<T> = PromiseLike<{ data: T[] | null; error: unknown; count: number | null }>;
+
+/**
+ * Every row of a query, a page at a time.
+ *
+ * Both reads above used to take one answer as all there was: past a thousand
+ * files, the rest were never compared, and indexed files read as missing and
+ * were offered again, each one a paid request at a model provider. Each page
+ * starts after the rows that came, rather than after the rows asked for, so a
+ * project with a smaller max-rows is read through all the same; the count
+ * says when to stop, and an account of a few files is one request. The query
+ * is ordered, because pages of an unordered query can repeat and skip rows.
+ */
+async function readAll<T>(page: (from: number, to: number) => Page<T>): Promise<T[]> {
+  const rows: T[] = [];
+  for (;;) {
+    const { data, error, count } = await page(rows.length, rows.length + PAGE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data?.length || count === null || rows.length >= count) return rows;
+  }
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const {
     data: { session },
@@ -72,21 +99,27 @@ const aiService = {
    */
   async unindexedFileIds(userId: string, model: string): Promise<string[]> {
     const [files, indexed] = await Promise.all([
-      supabase.from('files').select('id').eq('user_id', userId),
-      supabase
-        .from('file_embeddings')
-        .select('file_id')
-        .eq('user_id', userId)
-        .eq('embedding_model', model),
+      readAll<{ id: string }>((from, to) =>
+        supabase
+          .from('files')
+          .select('id', { count: 'exact' })
+          .eq('user_id', userId)
+          .order('id')
+          .range(from, to)
+      ),
+      readAll<{ file_id: string }>((from, to) =>
+        supabase
+          .from('file_embeddings')
+          .select('file_id', { count: 'exact' })
+          .eq('user_id', userId)
+          .eq('embedding_model', model)
+          .order('file_id')
+          .range(from, to)
+      ),
     ]);
 
-    if (files.error) throw files.error;
-    if (indexed.error) throw indexed.error;
-
-    const done = new Set((indexed.data ?? []).map((row) => (row as { file_id: string }).file_id));
-    return (files.data ?? [])
-      .map((row) => (row as { id: string }).id)
-      .filter((id) => !done.has(id));
+    const done = new Set(indexed.map((row) => row.file_id));
+    return files.map((row) => row.id).filter((id) => !done.has(id));
   },
 
   /**
