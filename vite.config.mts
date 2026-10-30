@@ -130,6 +130,14 @@ export default defineConfig({
     port: 8100,
     strictPort: true,
   },
+  optimizeDeps: {
+    /* Found by no crawl: only vite-plugin-pwa's virtual register module
+       imports it, and the first page to start asks for that. Found then, it
+       is optimized late and the dev server reloads every page it has open,
+       which the e2e suite caught in the middle of an axe scan. Named here, it
+       is optimized with the rest before the first page loads. */
+    include: ['workbox-window'],
+  },
   build: {
     rollupOptions: {
       /**

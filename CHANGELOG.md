@@ -182,6 +182,16 @@ reasoning behind the larger decisions lives in
   which postgrest-js could not parse, typed the rows as an error that
   `noUncheckedIndexedAccess` hid from the stricter config. The select is now
   a literal in each branch, and `npm run typecheck:vercel` runs in CI.
+- **The dev server reloaded every page it had open when the first one
+  started.** The end-to-end suite runs against `npm run dev`, which finds the
+  app's dependencies by crawling it before the first page loads, all but
+  `workbox-window`: only vite-plugin-pwa's virtual register module imports
+  it, and the first page to start asks for that. Found then, it was optimized
+  late, and the server reloaded every open page, four tests at a time in CI.
+  On 30.10.2026 the reload landed in the middle of an axe scan of the login
+  page ("Execution context was destroyed") and a retry passed it; a cold
+  start reproduced it each of three times. It is now optimized with the rest
+  at start, and three cold starts reloaded nothing.
 
 ## [4.12.1] — 2026-10-29
 
