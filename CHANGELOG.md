@@ -10,7 +10,19 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **The functions run in Frankfurt, beside the database.** Both Vercel
+  projects ran theirs in `iad1`, Washington, Vercel's default, while the
+  database is in Supabase's `eu-central-1`, Frankfurt: every query a function
+  made crossed the Atlantic and back. Measured from Europe on 30.10.2026, a
+  call to `/api/share` that makes one query took 967 ms (median of 15) against
+  678 ms for one that makes none, so that one query cost about 290 ms; a
+  signed-in call makes at least two, the session check included, and erasing
+  an account or opening a demo many more. Both `vercel.json` files now say
+  `fra1`; a Hobby project may choose one region. The share page on the site
+  moves too, since it is rendered on demand and asks `/api/share` about the
+  link.
 
 ## [4.13.0] — 2026-10-30
 
