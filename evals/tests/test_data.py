@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from search_evals.data import LANGUAGES, File, Query, load_files, load_queries, problems
+from search_evals.data import LANGUAGES, File, Query, load_files, load_queries, only_across_languages, problems
 
 
 def test_the_data_in_the_repository_has_nothing_wrong_with_it() -> None:
@@ -38,3 +38,14 @@ def test_a_summary_or_a_tag_the_table_would_refuse_is_found() -> None:
     assert "file f1: the summary is 501 characters" in found
     assert "file f1: tag 'Upper' is not a short lowercase word" in found
     assert "file f1: 13 tags, the table holds 12" in found
+
+
+def test_a_query_is_across_languages_only_when_no_file_it_means_shares_its_language() -> None:
+    files = {
+        "en": File(id="en", name="a.pdf", lang="en", summary="An invoice.", tags=()),
+        "ru": File(id="ru", name="b.pdf", lang="ru", summary="Счёт.", tags=()),
+    }
+    assert only_across_languages(Query(id="q", text="счёт", lang="ru", relevant={"en": 3}), files)
+    assert not only_across_languages(Query(id="q", text="счёт", lang="ru", relevant={"ru": 3, "en": 3}), files)
+    # A related file in the query's language does not make it answerable: only grade 3 counts.
+    assert only_across_languages(Query(id="q", text="счёт", lang="ru", relevant={"en": 3, "ru": 1}), files)
