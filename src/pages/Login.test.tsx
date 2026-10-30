@@ -276,6 +276,29 @@ describe('Login', () => {
     show();
     expect(document.querySelector('form')).toBeNull();
   });
+
+  /* There was no way back in for an account whose password was forgotten. The
+     address goes along in the router's state, never in the address bar. */
+  it('offers a forgotten password a way back, carrying the address typed', () => {
+    show();
+    type('Email Address', 'a@example.com');
+    fireEvent.click(ionButtonByText('Forgot?'));
+
+    expect(navigate).toHaveBeenCalledWith('/forgot-password', {
+      state: { email: 'a@example.com' },
+    });
+  });
+
+  it('names it in full for whoever cannot see the field it sits in', () => {
+    show();
+    expect(ionButtonByText('Forgot?')).toHaveAttribute('aria-label', 'Forgot password?');
+  });
+
+  it('does not offer it while an account is being created', () => {
+    show();
+    fireEvent.click(ionButtonByText("Don't have an account? Sign up"));
+    expect(ionButtonByText('Forgot?')).toBeUndefined();
+  });
 });
 
 describe('Login: the answer about analytics cookies', () => {

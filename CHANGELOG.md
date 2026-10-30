@@ -10,8 +10,29 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Added
+
+- **A forgotten password has a way back.** There was none: an account made
+  with an address and a password could not get in again once the password was
+  forgotten. "Forgot?", in the login page's password field, leads to a page
+  that asks Supabase to mail a link, and says only that one is on its way if
+  the address has an account, since Supabase answers the same for an address
+  that has none. The link opens `/new-password` in whatever browser the mail
+  is read in, which asks for the new password twice and goes on to the
+  dashboard; a spent link is told so and offered another. A link the auth
+  server sends to the app's root instead, as it does for an address not on
+  its list, is moved there before anything reads the address. From the native
+  shells the link is asked for without PKCE and finished on the web app: a
+  PKCE link becomes a session only beside the verifier the app kept, and the
+  mail opens in a browser.
+
 ### Fixed
 
+- **What the login page said had gone wrong was hard to read.** Its red was
+  2.3:1 against the card, and 2.5:1 in the dark theme, where text of its size
+  needs 4.5. axe let it through, because it cannot work out a background
+  behind a backdrop filter. Read off screenshots, it is 5.0:1 now, and 4.9:1
+  in the dark.
 - **Deleting an account left its subscription running.** The erase removed
   the profile, the only link between an account and its Stripe customer, and
   left the customer and its subscription as they were. A Pro account deleted

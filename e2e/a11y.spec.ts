@@ -54,6 +54,23 @@ test.describe('Accessibility', () => {
     }
   });
 
+  /* Pages for someone who is not signed in, like the login page. The second
+     is scanned as it looks without a link that works: the link spent. */
+  test('the two pages of a forgotten password', async ({ browser }) => {
+    const { page, close } = await anonymousPage(browser);
+    try {
+      await page.goto('/forgot-password');
+      await expect(page.locator('input[type="email"]')).toBeVisible();
+      expect(summarise((await scan(page)).violations)).toBe('');
+
+      await page.goto('/new-password');
+      await expect(page.getByText(/This link has run out/)).toBeVisible();
+      expect(summarise((await scan(page)).violations)).toBe('');
+    } finally {
+      await close();
+    }
+  });
+
   test('the dashboard, with folders and files on it', async ({ page, user }) => {
     await seedFolder(user.id, 'Invoices');
     await seedFile(user.id, { name: 'quarterly-report.pdf' });
