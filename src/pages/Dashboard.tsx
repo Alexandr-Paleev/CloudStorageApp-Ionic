@@ -64,6 +64,7 @@ const Dashboard: React.FC = () => {
     error: listError,
     hasNextPage,
     fetchNextPage,
+    refreshPicture,
   } = listing;
   const { unindexed, indexing, indexMissing } = useSearchIndex({
     enabled: smartSearching,
@@ -181,6 +182,7 @@ const Dashboard: React.FC = () => {
             onLoadMore={fetchNextPage}
             onOpen={(file) => navigate(`/file/${file.id}`)}
             onDelete={(file) => setFileToDelete(file.id!)}
+            refreshPicture={refreshPicture}
           />
         </div>
 

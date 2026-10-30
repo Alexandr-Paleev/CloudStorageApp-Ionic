@@ -170,6 +170,7 @@ describe('useStorageMutations', () => {
         anotherFoldersListing: ['items', 'user-1', 'folder-9', FILTERS],
         meter: ['storageSize', 'user-1'],
         breadcrumbs: ['folderPath', 'user-1', 'work'],
+        smartSearch: ['smart-search', 'user-1', 'invoice'],
       };
       for (const key of Object.values(entries)) queryClient.setQueryData(key, {});
       return () =>
@@ -193,6 +194,7 @@ describe('useStorageMutations', () => {
         anotherFoldersListing: true,
         meter: false,
         breadcrumbs: true,
+        smartSearch: false,
       });
     });
 
@@ -222,10 +224,13 @@ describe('useStorageMutations', () => {
         thisListing: true,
         anotherFoldersListing: true,
         meter: true,
+        smartSearch: true,
       });
     });
 
-    it('a deleted file: every listing, and the meter', async () => {
+    /* And the answer to a search by meaning, which is kept for a minute: the
+       deleted file stayed in it for that long, leading nowhere. */
+    it('a deleted file: every listing, the meter, and a search by meaning', async () => {
       const { result, queryClient } = show();
       const stale = seed(queryClient);
 
@@ -236,6 +241,7 @@ describe('useStorageMutations', () => {
         thisListing: true,
         anotherFoldersListing: true,
         meter: true,
+        smartSearch: true,
       });
     });
 

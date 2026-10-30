@@ -67,6 +67,7 @@ export function useStorageMutations({ folderId, onProblem }: StorageMutationsOpt
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       // Deleting a folder deletes its files, so the meter moves too.
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['smart-search', user?.id] });
     },
     onError: (err: Error) => onProblem(err.message),
   });
@@ -88,6 +89,9 @@ export function useStorageMutations({ folderId, onProblem }: StorageMutationsOpt
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['storageSize', user?.id] });
+      /* A search by meaning keeps its answer for a minute (useFileListing),
+         and a deleted file stayed in it for that long, leading nowhere. */
+      queryClient.invalidateQueries({ queryKey: ['smart-search', user?.id] });
     },
   });
 

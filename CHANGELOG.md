@@ -49,6 +49,22 @@ reasoning behind the larger decisions lives in
   cannot show one, or a broken file, cost a signature and a full download
   every round. A preview is now asked for once more, for an address that ran
   out while the page stood open, and then shows "No preview".
+- **Pictures in the file list went blank an hour after they were uploaded to
+  Supabase Storage or R2.** The list draws each picture from the address
+  stored with the file, and those two sign theirs for an hour: every demo
+  account's three pictures were empty squares an hour in. A picture that
+  fails is now given a fresh address once, as the file's own page does, and
+  drawn as a document if that fails too.
+- **A file deleted during a search by meaning stayed among its results for up
+  to a minute, leading nowhere.** The answer is kept for a minute, and
+  deleting a file or a folder now drops it. Search by meaning is off in
+  production.
+- **Past a thousand files, the index offered again files it already had.**
+  The two reads it compares took one answer as all there was, and PostgREST
+  answers with at most a thousand rows by default: indexed files beyond that
+  read as missing, and indexing each again was a paid request. Both are read
+  a page at a time now, in order, until the count says they are done. Search
+  by meaning is off in production.
 - **The hint under an empty search by meaning promised that files are indexed
   after upload.** Nothing is indexed until someone asks for it (ADR 0013); it
   now says that only indexed files are searched by meaning.
