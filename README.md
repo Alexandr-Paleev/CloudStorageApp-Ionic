@@ -799,6 +799,13 @@ Its framework, install command, build command and output directory are stated
 in `apps/web/vercel.json`, because a project rooted in a folder that has no
 such file is built with the one at the root, and that one is the app's.
 
+Both files also say where the functions run: `fra1`, Frankfurt, where the
+database is (Supabase's `eu-central-1`). Vercel's default is `iad1`,
+Washington, and from there each query cost about 290 ms, measured as the
+difference between a call to `/api/share` that queries once and one that does
+not. A fork with its database elsewhere sets the region nearest to it; a
+Hobby project may choose one.
+
 ## 📱 Mobile app
 
 The iOS project is in `ios/` and the app runs: built with Capacitor 8 against
