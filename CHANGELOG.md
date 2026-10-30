@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.13.0] — 2026-10-30
+
 ### Added
 
 - **A forgotten password has a way back.** There was none: an account made
@@ -2643,7 +2647,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.12.1...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.13.0...HEAD
+[4.13.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.12.1...v4.13.0
 [4.12.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.12.0...v4.12.1
 [4.12.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.3...v4.12.0
 [4.11.3]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.2...v4.11.3
