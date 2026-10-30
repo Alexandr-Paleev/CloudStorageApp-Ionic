@@ -722,19 +722,24 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 375.3 kB | 385 kB |
-| Largest chunk (Ionic) | 177.5 kB | 185 kB |
-| All assets, route chunks included | 463.8 kB | 480 kB |
+| First load (JS + CSS) | 376.3 kB | 385 kB |
+| Largest chunk (Ionic) | 178.0 kB | 185 kB |
+| All assets, route chunks included | 468.5 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.12.1 and of 4.12.0, as CI measured them: the fixes
-between the two moved none of them by a tenth of a kB. 4.12.0's first load was
-0.3 kB over 4.11.3's, for the listener that tells Sentry what the content
-policy refuses, which the first chunk carries so that a refusal at startup is not
-missed. 4.11.3's was 0.1 kB over 4.11.2's, for the sign-in page saying where a
+Those are the figures of 4.13.0, as CI measured them. Its first load is 1.0 kB
+over 4.12.1's: 0.5 kB for Ionic 9.0.9, which is also what the largest chunk
+grew by, 0.2 kB for keeping the Google Drive token with its owner, and 0.3 kB
+for the sign-in page's way back from a forgotten password, with the first lines
+that send a reset link opened at the wrong address on to its page. All assets
+grew 4.7 kB, 2.3 of them the page that asks for that link and takes the new
+password. 4.12.1's figures were 4.12.0's, whose first load was 0.3 kB over
+4.11.3's, for the listener that tells Sentry what the content policy refuses,
+which the first chunk carries so that a refusal at startup is not missed.
+4.11.3's was 0.1 kB over 4.11.2's, for the sign-in page saying where a
 confirmation link went. 4.11.2's figures were 4.11.1's, and 4.11.1's first load was 0.9 kB over 4.11.0's: 0.5 kB
 for what Sentry is told about a file and about a failed
 query, and 0.4 kB for the updates of October 22, most of it supabase-js,
@@ -752,7 +757,7 @@ likely to have anything cached: the page a share link opens, which moved there
 from the app
 ([decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md),
 step 5). The site's smoke test loads it in a browser and adds up the scripts
-and styles that arrived, gzipped the same way: 142.0 kB, under a ceiling of
+and styles that arrived, gzipped the same way: 142.1 kB, under a ceiling of
 148, where the app's first load is three times that. 1.0 kB of it is the
 page's own. The rest is React and Next.js, which every page of the site
 carries, the four that do nothing in a browser included.
@@ -1109,17 +1114,17 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,496 statements under `src/`, the
-unit tests do not reach 779. The largest share, 382, is in `src/services`, most
-of it in the code that talks to Supabase, Dropbox and Google Drive:
-`supabase.service.ts` and the four services of the other two hold 215. The
-pages come next. With the page a share link opens gone to the site, and the
-dashboard's dialogs, data and markup gone to components and hooks of their
-own, `src/pages` is 514 statements and the unit tests reach 337 of them.
-`Upload.tsx` is the largest at 167, with 111 reached, and `FileView.tsx` is
-next at 134, with 71. Four small pages have no unit test at all, 37 statements
-between them: the Dropbox callback, the page Stripe sends a buyer back to, the
-way on to the legal pages, and the 404. All of it is named here rather than
+a long way, and it is meant to be. Of the 2,710 statements under `src/`, the
+unit tests do not reach 719. The largest share, 327, is in `src/services`, most
+of it in the code that talks to Supabase and Dropbox and in what keeps state in
+IndexedDB: `supabase.service.ts` and the two Dropbox services hold 146,
+`upload-store.ts` and `idb.ts` 69. The pages come next. With the page a share
+link opens gone to the site, and the dashboard's dialogs, data and markup gone
+to components and hooks of their own, `src/pages` is 598 statements and the
+unit tests reach 432 of them. `Upload.tsx` is the largest at 171, with 118
+reached, and `FileView.tsx` is next at 141, with 79. Three small pages have no
+unit test at all, 27 statements between them: the Dropbox callback, the way on
+to the legal pages, and the 404. All of it is named here rather than
 hidden behind one average that would sound fine.
 
 The target is not a percentage. It is that everything deciding **access,
