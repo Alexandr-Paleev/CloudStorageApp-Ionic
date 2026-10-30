@@ -158,6 +158,50 @@ export async function deleteUser(userId: string): Promise<void> {
   }
 }
 
+/** The addresses createUser makes, and nothing else: example.com takes no mail. */
+const SUITE_ADDRESS = /^e2e-\d+-[a-z0-9]*@example\.com$/;
+
+/** Older than this, an account cannot belong to a run still going: a whole
+ *  run takes minutes, and a run on another branch may be going right now. */
+const ABANDONED_AFTER_MS = 60 * 60 * 1000;
+
+/** Users per page of the admin listing. */
+const PAGE = 200;
+
+/**
+ * Deletes the accounts earlier runs left behind, and says how many.
+ *
+ * Teardown is careful, and it runs only in a run that gets to the end. CI
+ * cancels a run on main the moment a newer merge supersedes it, and the browser
+ * goes down in the middle of its tests with no teardown at all: one account per
+ * worker stays in the real project, with its files. By 29.10.2026 there were 23,
+ * and every batch matched a cancelled run to the minute. Swept before each run,
+ * the project ends up the same however the last one ended.
+ *
+ * Listed in full before anything is deleted, because deleting while paging
+ * moves accounts from one page to the one already read.
+ */
+export async function sweepAbandonedAccounts(now = Date.now()): Promise<number> {
+  const abandoned: string[] = [];
+
+  for (let page = 1; ; page += 1) {
+    const listed = await admin(`/auth/v1/admin/users?page=${page}&per_page=${PAGE}`);
+    if (!listed.ok) throw new Error(`could not list accounts: ${listed.status}`);
+
+    const { users = [] } = (await listed.json()) as {
+      users?: { id: string; email?: string; created_at?: string }[];
+    };
+    for (const user of users) {
+      const age = now - Date.parse(user.created_at ?? '');
+      if (SUITE_ADDRESS.test(user.email ?? '') && age > ABANDONED_AFTER_MS) abandoned.push(user.id);
+    }
+    if (users.length < PAGE) break;
+  }
+
+  for (const id of abandoned) await deleteUser(id);
+  return abandoned.length;
+}
+
 interface Fixtures {
   /** The throwaway account this test owns. Created before, removed after. */
   user: TestUser;
@@ -277,6 +321,17 @@ export async function submitUpload(page: Page, name: string, folderId?: string):
   });
   await page.locator('ion-button', { hasText: 'Upload' }).click();
 }
+
+/**
+ * How long an upload is given to land, where an assertion waits for it.
+ *
+ * Five seconds, an assertion's default, was once not enough for 32 bytes: in
+ * run 40820507674 the upload stood at 10% with no error when the wait ran out,
+ * and on the retry the same request waited 1.9 s for its answer. The storage is
+ * a live, shared service. What a test asks is that the file lands, not how fast
+ * that service is that minute.
+ */
+export const UPLOAD_LANDS = { timeout: 20_000 };
 
 /** Submits and waits for the file to land, returning the id the app gave it. */
 export async function uploadFile(page: Page, name: string): Promise<string> {
