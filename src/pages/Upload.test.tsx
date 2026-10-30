@@ -92,10 +92,71 @@ beforeEach(() => {
   uploadFile.mockResolvedValue(landed());
   vi.mocked(storageService.getUserStorageSize).mockResolvedValue(0);
   vi.mocked(googleDriveAuthService.isAuthorized).mockResolvedValue(false);
+  vi.mocked(googleDriveAuthService.authorize).mockResolvedValue('granted');
+  /* Added here rather than in the mock above: a Pro account's page asks it,
+     and production has R2 switched off and Dropbox never set up. */
+  Object.assign(storageService, {
+    configuredProviders: () => ['cloudinary', 'supabase_storage', 'googledrive'],
+  });
 });
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+/* Where a Pro account's files go. R2 and Dropbox were offered here although
+   production has neither, and choosing one failed every upload; Drive, chosen
+   without being connected, failed them with "Please authorize it first" and
+   nowhere on the page to do that. */
+describe('Upload: choosing where the files go', () => {
+  const option = (name: string) => screen.getByRole('button', { name });
+  const toast = () => document.querySelector('ion-toast') as HTMLElement & { message?: string };
+
+  beforeEach(() => {
+    profile.profile = {
+      tier: 'pro',
+      storage_limit: 5 * 1024 ** 3,
+      allowed_providers: ['cloudinary', 'r2', 'supabase_storage', 'googledrive', 'dropbox'],
+    };
+  });
+
+  it('offers only what this deployment has set up', async () => {
+    show();
+
+    expect(await screen.findByRole('group', { name: 'Upload to:' })).toBeInTheDocument();
+    expect(option('Google Drive')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cloudflare R2' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dropbox' })).toBeNull();
+  });
+
+  it('connects Google Drive when it is chosen and not connected yet', async () => {
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Google Drive' }));
+
+    await waitFor(() => expect(option('Google Drive')).toHaveAttribute('aria-pressed', 'true'));
+    expect(googleDriveAuthService.authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the choice it had when connecting fails, and says why', async () => {
+    vi.mocked(googleDriveAuthService.authorize).mockRejectedValue(
+      new Error('Google Drive was not connected')
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Google Drive' }));
+
+    await waitFor(() => expect(toast().message).toBe('Google Drive was not connected'));
+    expect(option('Google Drive')).toHaveAttribute('aria-pressed', 'false');
+    expect(option('Auto')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not ask to connect a Drive that is connected', async () => {
+    vi.mocked(googleDriveAuthService.isAuthorized).mockResolvedValue(true);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Google Drive' }));
+
+    await waitFor(() => expect(option('Google Drive')).toHaveAttribute('aria-pressed', 'true'));
+    expect(googleDriveAuthService.authorize).not.toHaveBeenCalled();
+  });
 });
 
 describe('Upload', () => {

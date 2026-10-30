@@ -223,3 +223,16 @@ describe('getProvider', () => {
     );
   });
 });
+
+/* What the upload page may offer. It offered every provider the plan named,
+   and production has R2 switched off and Dropbox never set up. */
+describe('configuredNames', () => {
+  it('names only the providers this deployment has set up', () => {
+    install({ r2: { configured: false }, dropbox: { configured: false } });
+    expect(providerManager.configuredNames()).toEqual([
+      'cloudinary',
+      'supabase_storage',
+      'googledrive',
+    ]);
+  });
+});

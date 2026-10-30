@@ -42,6 +42,11 @@ const storageService = {
     return currentSize + fileSize <= limit;
   },
 
+  /** The providers this deployment has set up: the ones a person may choose. */
+  configuredProviders(): string[] {
+    return providerManager.configuredNames();
+  },
+
   /**
    * Upload file and save metadata
    */

@@ -1,0 +1,36 @@
+.provider-selector {
+  margin-top: 12px;
+}
+
+.provider-selector__label {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  margin-bottom: 8px;
+}
+
+.provider-selector__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A bare button around the chip: it is the control, the chip is how it looks. */
+.provider-option {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 16px;
+}
+
+.provider-option:disabled {
+  cursor: default;
+}
+
+.provider-option:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}

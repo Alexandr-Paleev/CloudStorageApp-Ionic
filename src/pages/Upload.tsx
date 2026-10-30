@@ -347,6 +347,22 @@ const Upload: React.FC = () => {
     }
   };
 
+  /* Choosing Drive is the moment to connect it. This page has no other place
+     to, and a choice left unconnected failed every upload with "Please
+     authorize it first". Asked in the press itself, so the window Google
+     opens is not taken for a pop-up nobody asked for. */
+  const chooseProvider = async (provider: string | undefined) => {
+    if (provider === 'googledrive' && !(await googleDriveAuthService.isAuthorized())) {
+      try {
+        await googleDriveAuthService.authorize();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to connect Google Drive');
+        return;
+      }
+    }
+    setPreferredProvider(provider);
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -424,7 +440,8 @@ const Upload: React.FC = () => {
               <ProviderSelector
                 selectedProvider={preferredProvider}
                 allowedProviders={profile.allowed_providers}
-                onSelect={setPreferredProvider}
+                configuredProviders={storageService.configuredProviders()}
+                onSelect={chooseProvider}
               />
             )}
 
