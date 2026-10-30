@@ -1,3 +1,13 @@
+/* What Vercel's builder compiles the functions with. It reads the tsconfig.json
+   nearest to each function, which is this one, while the build and the editor
+   use tsconfig.api.json. This one is laxer in places (no
+   noUncheckedIndexedAccess), so a type error can show here alone: one in
+   api/share.ts was printed on every deployment for weeks while CI was green.
+   `npm run typecheck:vercel` checks the functions against this file in CI.
+
+   It also decides how the functions are emitted (CommonJS). Removing it, or
+   pointing it at tsconfig.api.json, is not a tidy-up: try it on a preview
+   deployment first. */
 {
   "compilerOptions": {
     "target": "ES2020",

@@ -18,6 +18,9 @@ const r2BaseURL = `http://localhost:${R2_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
+  /* Deletes the accounts a cancelled run left in the real project before this
+     one makes its own. */
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

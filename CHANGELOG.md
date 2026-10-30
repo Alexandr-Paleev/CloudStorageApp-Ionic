@@ -66,6 +66,32 @@ reasoning behind the larger decisions lives in
   revoked, which reached the browser and was never used; and it showed the
   full consent screen every time. Neither is asked for now.
 
+### Tests
+
+- **A cancelled CI run left its accounts in the real project.** The
+  end-to-end suite makes an account per test in the live database and deletes
+  it in teardown, and a run CI cancels, because a newer merge supersedes it,
+  never gets there. By 29.10.2026 there were 23 such accounts, with their
+  files, and every batch matched a cancelled run on `main` to the minute.
+  Before each run the suite now deletes the accounts of its own address shape
+  that are more than an hour old, listed in full first; a sweep that fails is
+  an annotation on the run, not a failed run. Checked against production
+  before merging with every write intercepted: it picks exactly those 23.
+- **Tags no longer start CI.** A release tag names a commit its branch has
+  already been through CI for, and each tag ran the whole suite again, about
+  forty accounts made and deleted in the real project included.
+- **An upload gets 20 seconds to land, where a test waits for it.** Five, an
+  assertion's default, was once not enough for 32 bytes sent to the live
+  storage: the one failure in 26 runs stood at 10% with no error when the wait
+  ran out.
+- **CI checks the functions the way Vercel builds them.** Vercel compiles each
+  function with the nearest `tsconfig.json`, `api/tsconfig.json`, which the
+  build never read, and every deployment's log carried a type error in
+  `api/share.ts` while CI was green: a select of one of two column lists,
+  which postgrest-js could not parse, typed the rows as an error that
+  `noUncheckedIndexedAccess` hid from the stricter config. The select is now
+  a literal in each branch, and `npm run typecheck:vercel` runs in CI.
+
 ## [4.12.1] — 2026-10-29
 
 ### Fixed

@@ -6,6 +6,7 @@ import {
   supabaseReady,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
+  UPLOAD_LANDS,
   type TestUser,
 } from './fixtures';
 
@@ -51,7 +52,7 @@ test.describe('Storage quota', () => {
     await setStorageLimit(user.id, 5 * 1024 * 1024);
     await submitUpload(page, name);
 
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/dashboard$/, UPLOAD_LANDS);
     await expect(page.locator('.file-list-item', { hasText: name })).toBeVisible();
   });
 });

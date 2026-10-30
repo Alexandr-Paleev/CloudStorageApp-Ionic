@@ -215,20 +215,24 @@ async function openLink(req: VercelRequest, res: VercelResponse) {
 
   /* A description is made from three columns, and asks the database for no
      others. Where the file is kept and whose it is are not read here at all,
-     so no later edit of the answer below can hand them out. */
-  const { data: files, error: fileError } = await supabase
-    .from('files')
-    .select(
-      describeOnly
-        ? 'id, name, size, type'
-        : 'id, name, size, type, storage_path, storage_type, download_url, user_id'
-    )
-    .eq('id', link.file_id)
-    .limit(1);
+     so no later edit of the answer below can hand them out.
+
+     Two literal selects rather than one select of either string: postgrest-js
+     types the rows by parsing the column list, and a string that may be one
+     of two lists parses as neither. The rows came out as a ParserError, which
+     noUncheckedIndexedAccess hid from CI and Vercel's builder reported on
+     every deployment (see `npm run typecheck:vercel`). */
+  const files = supabase.from('files');
+  const { data: rows, error: fileError } = describeOnly
+    ? await files.select('id, name, size, type').eq('id', link.file_id).limit(1)
+    : await files
+        .select('id, name, size, type, storage_path, storage_type, download_url, user_id')
+        .eq('id', link.file_id)
+        .limit(1);
 
   if (fileError) throw new Error(`Failed to read file: ${fileError.message}`);
 
-  const file = (files || [])[0] as FileRow | undefined;
+  const file = (rows || [])[0] as FileRow | undefined;
   if (!file) return res.status(404).json({ message: 'The shared file no longer exists' });
 
   if (describeOnly) {

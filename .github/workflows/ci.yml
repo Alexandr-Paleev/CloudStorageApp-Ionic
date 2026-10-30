@@ -1,9 +1,15 @@
 name: CI
 
-# Every push is checked, not only pushes to main: a branch waiting for its
-# pull request to be opened was previously not verified at all.
+# Every push to a branch is checked, not only pushes to main: a branch waiting
+# for its pull request to be opened was previously not verified at all.
+#
+# Branches, and not tags. A release tag names a commit its branch has already
+# been through CI for, and the run a tag started was the same suite again,
+# end-to-end tests included: some forty accounts made and deleted in the real
+# project to say what was already known.
 on:
   push:
+    branches: ['**']
   # For forks, whose pushes cannot run against this repository. Opening a pull
   # request from a branch of this repository fires it too, for a commit its push
   # has already checked. Both jobs skip that case (`if:` below) rather than run
@@ -104,6 +110,14 @@ jobs:
       # Type-checks src (tsconfig.build.json) and api (tsconfig.api.json), then builds.
       - run: npm run build
         if: env.AFFECTED_APP == 'true'
+
+      # The functions once more, the way Vercel's builder sees them: with
+      # api/tsconfig.json, the nearest to each function, which the build above
+      # never reads. A type error that showed only there was printed in every
+      # deployment's log for weeks while this job was green.
+      - name: Type-check the functions as Vercel builds them
+        if: env.AFFECTED_APP == 'true'
+        run: npm run typecheck:vercel
 
       # The build checks what ships. This checks what does not: the unit tests,
       # the Playwright specs and playwright.config.ts, none of which any earlier

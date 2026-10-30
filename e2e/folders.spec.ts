@@ -1,4 +1,4 @@
-import { test, expect, submitUpload, supabaseReady } from './fixtures';
+import { test, expect, submitUpload, supabaseReady, UPLOAD_LANDS } from './fixtures';
 
 /**
  * A folder keeps its files to itself.
@@ -67,7 +67,7 @@ test.describe('Folders', () => {
     await submitUpload(page, inside, folderId);
 
     // Uploading from inside a folder returns to that folder, not to the root.
-    await expect(page).toHaveURL(new RegExp(`/dashboard/${folderId}$`));
+    await expect(page).toHaveURL(new RegExp(`/dashboard/${folderId}$`), UPLOAD_LANDS);
     await expect(page.locator('.file-list-item', { hasText: inside })).toBeVisible();
 
     await page.goto('/dashboard');

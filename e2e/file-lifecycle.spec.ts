@@ -1,4 +1,4 @@
-import { test, expect, supabaseReady } from './fixtures';
+import { test, expect, supabaseReady, UPLOAD_LANDS } from './fixtures';
 
 /**
  * The one path the whole application exists for, and until now the only one no
@@ -36,7 +36,7 @@ test.describe('A file, end to end', () => {
 
       // A successful upload navigates back by itself. Waiting for the URL keeps
       // the assertion honest: a failed upload leaves us on /upload with a toast.
-      await expect(page).toHaveURL(/\/dashboard$/);
+      await expect(page).toHaveURL(/\/dashboard$/, UPLOAD_LANDS);
     });
 
     const row = page.locator('.file-list-item', { hasText: original });
