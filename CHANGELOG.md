@@ -52,9 +52,39 @@ reasoning behind the larger decisions lives in
 - **The hint under an empty search by meaning promised that files are indexed
   after upload.** Nothing is indexed until someone asks for it (ADR 0013); it
   now says that only indexed files are searched by meaning.
+- **A presigned upload to R2 asked R2 to check the CRC32 of an empty body.**
+  Since 3.729 the AWS SDK adds a checksum of the body to every PutObject and
+  UploadPart, and a presigned one is signed before there is a body: the
+  address carried `x-amz-checksum-crc32=AAAAAA==`, the CRC32 of nothing,
+  which the file the browser then sends cannot match. The client now computes
+  a checksum only where an operation requires one, and a test signs both
+  kinds of address and fails on any checksum in them. R2 is off in
+  production; this was found by signing, and the live bucket was not tried.
+- **The demo sweep looked at the first 200 accounts only.** The admin API
+  hands accounts out a page at a time, newest first, and the sweep read one
+  page: once two hundred accounts were newer than an expired demo account, it
+  was never looked at again, and neither were its files. The sweep now reads
+  on until it has the five it erases per visit or the accounts run out, ten
+  pages at most, since a visitor waits while it reads. Production has fewer
+  than 200 accounts, so it had not happened.
+- **Erasing an account left everything in Cloudinary past its first 1000
+  files.** One delete-by-prefix call removes at most 1000 assets and answers
+  `partial` when more are left, and the erase made one call per type. It now
+  goes on from the cursor each answer carries until one is not partial. The
+  same erase runs when an account is deleted and when a demo account
+  expires; no account in production holds more than nine files there.
 
 ### Security
 
+- **On a shared device, the upload page listed the last person's unfinished
+  uploads.** An interrupted R2 upload is kept in the browser's IndexedDB,
+  file included, so it can be finished later, and the list was read without
+  asking whose: the next account to sign in saw the previous one's file
+  names. It could not finish them, since the API refuses a key outside the
+  caller's prefix. The list now holds the signed-in account's uploads only,
+  told apart by the owner's prefix their keys already carry, and deleting an
+  account takes its unfinished uploads off the device. R2 is off in
+  production.
 - **The Drive token outlived signing out.** Nothing let go of it, so on a
   shared browser the next account to sign in within the token's hour was
   handed the previous one's, and its uploads went into the previous person's

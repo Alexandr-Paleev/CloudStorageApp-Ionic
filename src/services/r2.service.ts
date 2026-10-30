@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { shouldUseMultipart } from '@cloud-storage/core/multipart';
+import { ownerPrefix } from '@cloud-storage/core/stored-path';
 import { createMultipartUploader, type PartUploadOptions } from './multipart.upload';
 import { uploadStore, type PendingUpload } from './upload-store';
 import { apiUrl } from '../utils/api.utils';
@@ -161,12 +162,26 @@ const r2Service = {
   },
 
   /**
-   * Uploads that were interrupted and can still be finished.
+   * This account's uploads that were interrupted and can still be finished.
    *
-   * Read from IndexedDB, so this survives the reload that produced them.
+   * Read from IndexedDB, so this survives the reload that produced them. The
+   * database is the browser's, not the account's: on a shared device it also
+   * holds what the last person left unfinished. Nobody else could finish those,
+   * since the API refuses a key outside the caller's prefix, but the list showed
+   * them, names and all. A record's key is its object key, which starts with its
+   * owner's prefix, so it says whose it is without a field of its own, records
+   * written before this included.
    */
-  async resumableUploads(): Promise<PendingUpload[]> {
-    return uploadStore.list();
+  async resumableUploads(userId: string): Promise<PendingUpload[]> {
+    const mine = ownerPrefix('r2', userId);
+    return (await uploadStore.list()).filter((record) => record.key.startsWith(mine));
+  },
+
+  /** Takes this account's interrupted uploads off the device, files included. */
+  async forgetUploads(userId: string): Promise<void> {
+    for (const record of await this.resumableUploads(userId)) {
+      await uploadStore.remove(record.key);
+    }
   },
 
   /** Picks an interrupted upload back up where it stopped. */

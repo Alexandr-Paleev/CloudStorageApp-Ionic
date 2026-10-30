@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
-import { DEMO_RATE_LIMIT, DEMO_TTL_MS } from '../../libs/server/src/demo';
+import {
+  DEMO_RATE_LIMIT,
+  DEMO_SWEEP_LIMIT,
+  DEMO_SWEEP_PAGE_SIZE,
+  DEMO_SWEEP_PAGES,
+  DEMO_TTL_MS,
+} from '../../libs/server/src/demo';
 
 const APP_URL = 'https://app.example';
 
@@ -289,6 +295,96 @@ describe('POST /api/demo/session', () => {
     expect(admin.deleteUser).toHaveBeenCalledWith('stuck');
     expect(admin.deleteUser).toHaveBeenCalledWith('stale');
     expect(res.statusCode).toBe(201);
+  });
+
+  describe('reading the accounts a page at a time', () => {
+    const old = () => new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString();
+
+    /** A full page of accounts the sweep must leave alone. */
+    const people = (page: number) =>
+      Array.from({ length: DEMO_SWEEP_PAGE_SIZE }, (_, i) => ({
+        id: `person-${page}-${i}`,
+        email: `person-${page}-${i}@company.com`,
+        created_at: new Date().toISOString(),
+      }));
+
+    /* The admin API answers newest first. The sweep read the first page only,
+       so a demo account with two hundred newer accounts in front of it was
+       never looked at again. */
+    it('finds an expired account past the first page', async () => {
+      admin.listUsers.mockImplementation(async ({ page }: { page: number }) => ({
+        data: {
+          users:
+            page < 3
+              ? people(page)
+              : [{ id: 'stale', email: 'demo-1-a@example.com', created_at: old() }],
+        },
+        error: null,
+      }));
+
+      await handler(post(), mockResponse());
+
+      expect(admin.listUsers.mock.calls.map(([args]) => args)).toEqual([
+        { page: 1, perPage: DEMO_SWEEP_PAGE_SIZE },
+        { page: 2, perPage: DEMO_SWEEP_PAGE_SIZE },
+        { page: 3, perPage: DEMO_SWEEP_PAGE_SIZE },
+      ]);
+      expect(admin.deleteUser).toHaveBeenCalledWith('stale');
+    });
+
+    it('stops reading once it has as many as it will erase', async () => {
+      admin.listUsers.mockImplementation(async ({ page }: { page: number }) => ({
+        data: {
+          users: Array.from({ length: DEMO_SWEEP_PAGE_SIZE }, (_, i) => ({
+            id: `stale-${page}-${i}`,
+            email: `demo-${page}${i}-a@example.com`,
+            created_at: old(),
+          })),
+        },
+        error: null,
+      }));
+
+      await handler(post(), mockResponse());
+
+      expect(admin.listUsers).toHaveBeenCalledTimes(1);
+      expect(admin.deleteUser).toHaveBeenCalledTimes(DEMO_SWEEP_LIMIT);
+    });
+
+    /* A visitor is waiting while it reads. Newest first, an account expires near
+       the front, so the bound costs nothing until two thousand accounts are made
+       in a day. */
+    it('gives up after DEMO_SWEEP_PAGES full pages', async () => {
+      admin.listUsers.mockImplementation(async ({ page }: { page: number }) => ({
+        data: { users: people(page) },
+        error: null,
+      }));
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(admin.listUsers).toHaveBeenCalledTimes(DEMO_SWEEP_PAGES);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('erases what it found before a page failed', async () => {
+      admin.listUsers
+        .mockResolvedValueOnce({
+          data: {
+            users: [
+              ...people(1).slice(1),
+              { id: 'stale', email: 'demo-1-a@example.com', created_at: old() },
+            ],
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({ data: { users: [] }, error: { message: 'admin API hiccup' } });
+
+      await handler(post(), mockResponse());
+
+      expect(admin.listUsers).toHaveBeenCalledTimes(2);
+      expect(admin.deleteUser).toHaveBeenCalledWith('stale');
+    });
   });
 
   it('serves the visitor even when the sweep fails', async () => {

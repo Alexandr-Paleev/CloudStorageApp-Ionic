@@ -32,9 +32,9 @@ vi.mock('../services/storage.service', () => ({
   default: {
     uploadFile: (...args: unknown[]) => uploadFile(...args),
     getUserStorageSize: vi.fn().mockResolvedValue(0),
-    listPendingUploads: vi.fn().mockResolvedValue([]),
+    resumableUploads: vi.fn().mockResolvedValue([]),
     resumeUpload: vi.fn(),
-    discardPendingUpload: vi.fn(),
+    discardUpload: vi.fn(),
   },
 }));
 
@@ -287,5 +287,13 @@ describe('Upload', () => {
 
     await waitFor(() => expect(screen.queryByText('drop.txt')).not.toBeInTheDocument());
     expect(screen.getByText('keep.txt')).toBeInTheDocument();
+  });
+
+  /* The unfinished uploads are kept by the browser, not by the account, so on a
+     shared device the page has to say whose it wants, or it is shown the last
+     person's file names too. */
+  it("asks for the signed-in account's interrupted uploads", async () => {
+    show();
+    await waitFor(() => expect(storageService.resumableUploads).toHaveBeenCalledWith('user-1'));
   });
 });

@@ -25,6 +25,14 @@ export function getS3Client(): S3Client {
     region: 'auto',
     endpoint,
     credentials: { accessKeyId, secretAccessKey },
+    /* Since 3.729 the SDK puts a CRC32 of the body into every PutObject and
+       UploadPart, and a presigned one is signed before there is a body: the
+       address carried `x-amz-checksum-crc32=AAAAAA==`, the CRC32 of nothing,
+       and the file the browser sends to it cannot match that. Every upload
+       here is presigned. Off unless an operation requires one, which is how
+       the SDK behaved before. */
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 
   return _client;

@@ -98,7 +98,7 @@ const Upload: React.FC = () => {
      again when the page comes back. */
   const { data: resumable = [] } = useQuery({
     queryKey: ['resumableUploads', user?.id],
-    queryFn: () => storageService.resumableUploads(),
+    queryFn: () => storageService.resumableUploads(user!.id),
     enabled: !!user?.id,
   });
 

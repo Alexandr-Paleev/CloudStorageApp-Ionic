@@ -24,6 +24,11 @@ export const DEMO_TTL_MS = 24 * 60 * 60 * 1000;
  *  latency of a backlog that built up while nobody was looking. */
 export const DEMO_SWEEP_LIMIT = 5;
 
+/** How the sweep reads the accounts: this many to a page, and no more than this
+ *  many pages, two thousand accounts, because a visitor waits while it reads. */
+export const DEMO_SWEEP_PAGE_SIZE = 200;
+export const DEMO_SWEEP_PAGES = 10;
+
 export const DEMO_FOLDER_NAME = 'Design assets';
 
 /**

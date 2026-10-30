@@ -10,8 +10,9 @@ interface PdfFrameProps {
 
 /* http(s) or nowhere. The frame starts as about:blank, which is of the page's
    own origin, and a `javascript:` address sent there would run as the app.
-   React refuses one in `src`; nothing refuses it here but this, since the
-   page's CSP allows inline script (see safe-url). */
+   React refuses one in `src`; here only this is sure to. The deployed app's
+   CSP has refused inline script since 4.12.0, but the native shell and the
+   dev server send no CSP at all (see safe-url). */
 const navigate = (frame: HTMLIFrameElement, url: string) => {
   if (isSafeHttpUrl(url)) frame.contentWindow?.location.replace(url);
 };
