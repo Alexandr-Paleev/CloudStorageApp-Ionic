@@ -41,7 +41,7 @@ beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = 'test-key';
   parse.mockResolvedValue({
     parsed_output: { summary: 'A hotel invoice from Prague.', tags: ['Invoice', 'invoice'] },
-    model: 'claude-opus-5-some-build',
+    model: 'claude-opus-5-5-some-build',
     stop_reason: 'end_turn',
   });
 });
@@ -117,7 +117,7 @@ describe('describeFile', () => {
     // The row is the only place this is written down, and it is the first
     // suspect when the eval drops after a model changes underneath.
     const result = await describeFile('a.txt', { kind: 'text', text: 'x' });
-    expect(result.model).toBe('claude-opus-5-some-build');
+    expect(result.model).toBe('claude-opus-5-5-some-build');
   });
 
   it('says why when the answer did not fit the schema', async () => {
@@ -129,7 +129,7 @@ describe('describeFile', () => {
   it('refuses an empty description rather than storing one', async () => {
     parse.mockResolvedValue({
       parsed_output: { summary: '   ', tags: [] },
-      model: 'claude-opus-5',
+      model: 'claude-opus-5-5',
       stop_reason: 'end_turn',
     });
 

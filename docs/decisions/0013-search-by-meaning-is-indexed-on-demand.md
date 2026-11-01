@@ -111,3 +111,28 @@ reason for the filter. `bge-m3` ran quantized to eight bits; the same
 quantization of `bge-large-en-v1.5` changed none of its answers. Measured with
 Transformers.js 4.3.0 on each model's ONNX export; the paid model this
 deployment can switch to, `voyage-4`, was not measured.
+
+## Update — 2026-11-01
+
+**What a stranger can cost is now a number.** This record kept the feature
+switched on by two means: demo accounts are not indexed, and the routes have
+per-minute limits. Neither bounded a total. The limits live in a function's
+memory, per instance, and reset on a cold start; and describing a file again
+paid again, so any signed-in account could spend thirty descriptions a minute
+on one file, all day.
+
+Now a file this embedding model has indexed is answered from its row, without
+a model being asked. Every call that is paid for first claims one unit of a
+daily budget, counted in the database by `claim_ai_call`
+([`017`](../../migrations/017_bound_ai_spend.sql)) so that every instance
+counts the same thing: one counter for the account and one for the whole
+deployment. The deployment's is the one that bounds the bill, because
+accounts cost nothing to make. Its limit is an environment variable
+(`AI_INDEX_DAILY_LIMIT`, `AI_EMBED_DAILY_LIMIT`), and `0` stops the spending
+while the keys stay where they are. A counter that cannot be read refuses the
+call: a ceiling that gives way whenever the database has trouble is not one.
+
+One consequence: describing a file again under the same model is no longer
+something a caller can ask for. After a change of prompt or of the model that
+writes the sentences, the rows to redo are deleted on purpose, with the
+service role, and the dashboard offers those files again.

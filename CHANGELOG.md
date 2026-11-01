@@ -44,6 +44,30 @@ reasoning behind the larger decisions lives in
   `fra1`; a Hobby project may choose one region. The share page on the site
   moves too, since it is rendered on demand and asks `/api/share` about the
   link.
+- **Files are described by Claude Opus 5.5 rather than Opus 5.** It succeeds
+  Opus 5 and costs less per token. Effort stays low and is now asked for by
+  name, since this model's default is medium. Nothing in production was
+  described by the old one: search by meaning has never had its keys there.
+
+### Security
+
+- **Search by meaning had no ceiling on what it could spend.** Describing a
+  file is a paid call to Claude and one to Voyage, and the only limits were
+  per minute and held in a function's memory: thirty a minute per account,
+  per instance, all day. Describing a file again paid again, so one file was
+  enough to spend without end, and the comment that said the storage quota
+  bounded the total was wrong. Now a file this embedding model has indexed
+  gets its stored description back without a model being asked, and every
+  paid call first claims one unit of a daily budget counted in the database
+  (`migrations/017_bound_ai_spend.sql`): 100 descriptions and 300 searches a
+  day per account, 300 and 5,000 for the whole deployment, which
+  `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT` change and `0` turns off
+  without taking the keys away. A spent budget is answered 429 until midnight
+  UTC; a budget that cannot be read is answered 500 rather than waved
+  through. The dashboard stops a run of indexing at the first such refusal
+  and says what the server said, instead of asking about every file left.
+  Production has no keys yet, so nothing was spent; the migration has to be
+  applied before they are added.
 
 ## [4.13.0] — 2026-10-30
 

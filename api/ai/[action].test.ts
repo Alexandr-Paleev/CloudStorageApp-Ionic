@@ -6,6 +6,7 @@ import {
   type TableAnswer,
 } from '../../libs/server/src/test-utils';
 import { AI_INDEX_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit';
+import { AI_DAILY_LIMITS } from '../../libs/server/src/ai-budget';
 import { EMBEDDING_MODEL, ProviderNotConfigured, TEXT_SAMPLE_BYTES } from '../../libs/core/src/ai';
 
 const {
@@ -18,6 +19,7 @@ const {
   activeBackend,
   createSignedUrl,
   presign,
+  rpc,
 } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticate: vi.fn(),
@@ -31,6 +33,7 @@ const {
   activeBackend: vi.fn(),
   createSignedUrl: vi.fn(),
   presign: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock('../../libs/server/src/auth', () => ({
@@ -38,6 +41,8 @@ vi.mock('../../libs/server/src/auth', () => ({
   authenticate: (...args: unknown[]) => authenticate(...args),
   supabase: {
     from: (table: string) => db.client!.from(table),
+    // The day's budget, from migrations/017 (libs/server/src/ai-budget.ts).
+    rpc: (...args: unknown[]) => rpc(...args),
     storage: {
       from: () => ({ createSignedUrl: (...args: unknown[]) => createSignedUrl(...args) }),
     },
@@ -103,9 +108,10 @@ beforeEach(() => {
   describeFile.mockResolvedValue({
     summary: 'Two people on a bridge in Prague.',
     tags: ['prague', 'bridge'],
-    model: 'claude-opus-5',
+    model: 'claude-opus-5-5',
   });
   embed.mockResolvedValue(VECTOR);
+  rpc.mockResolvedValue({ data: 'ok', error: null });
   supports.mockReturnValue(true);
   activeBackend.mockReturnValue({
     embeddingModel: EMBEDDING_MODEL,
@@ -207,7 +213,7 @@ describe('index', () => {
       summary: 'Two people on a bridge in Prague.',
       tags: ['prague', 'bridge'],
       embedding: JSON.stringify(VECTOR),
-      summary_model: 'claude-opus-5',
+      summary_model: 'claude-opus-5-5',
       embedding_model: EMBEDDING_MODEL,
     });
   });
@@ -289,9 +295,11 @@ describe('index', () => {
       indexed: false,
       reason: expect.stringContaining('own cloud'),
     });
-    // Nothing was paid for: no description, no embedding.
+    // Nothing was paid for: no description, no embedding, and no claim on
+    // the day's budget for either.
     expect(describeFile).not.toHaveBeenCalled();
     expect(embed).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('does not spend a model call on a demo account', async () => {
@@ -305,6 +313,7 @@ describe('index', () => {
     expect(res.body).toMatchObject({ indexed: false, reason: expect.stringContaining('demo') });
     expect(describeFile).not.toHaveBeenCalled();
     expect(embed).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('names the migration when the table is not there yet', async () => {
@@ -327,6 +336,7 @@ describe('index', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ indexed: false, reason: expect.stringContaining('pdf') });
     expect(describeFile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('answers 501 when no provider is configured at all', async () => {
@@ -337,6 +347,86 @@ describe('index', () => {
     await handler(index('file-1'), res);
 
     expect(res.statusCode).toBe(501);
+  });
+
+  /* The dashboard offers only the files the model on screen has not indexed,
+     but the route can be called without it, and before this every call was a
+     description paid for again: one file was enough to spend without end. */
+  it('gives a file this model has indexed its stored description, and pays for nothing', async () => {
+    withFile(
+      {},
+      {
+        data: [{ summary: 'Said before.', tags: ['earlier'], summary_model: 'claude-opus-5-5' }],
+      }
+    );
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      indexed: true,
+      summary: 'Said before.',
+      tags: ['earlier'],
+      model: 'claude-opus-5-5',
+    });
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(embed).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(db.calls.some((c) => c.op === 'upsert')).toBe(false);
+  });
+
+  it('claims a call from the day\u2019s budget before it pays for one', async () => {
+    await handler(index('file-1'), mockResponse());
+
+    expect(rpc).toHaveBeenCalledWith('claim_ai_call', {
+      p_user: 'user-1',
+      p_action: 'index',
+      p_user_limit: AI_DAILY_LIMITS.index.perAccount,
+      p_total_limit: AI_DAILY_LIMITS.index.total,
+    });
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(
+      describeFile.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it.each(['account', 'deployment'])(
+    'answers 429 until midnight UTC when the %s budget is spent, and pays for nothing',
+    async (scope) => {
+      rpc.mockResolvedValue({ data: scope, error: null });
+      const res = mockResponse();
+      await handler(index('file-1'), res);
+
+      expect(res.statusCode).toBe(429);
+      expect(res.body).toMatchObject({ message: expect.stringContaining('tomorrow') });
+      const retryAfter = Number(
+        vi.mocked(res.setHeader).mock.calls.find(([name]) => name === 'Retry-After')?.[1]
+      );
+      expect(retryAfter).toBeGreaterThan(0);
+      expect(retryAfter).toBeLessThanOrEqual(86_400);
+      expect(describeFile).not.toHaveBeenCalled();
+      expect(embed).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses to pay when the budget cannot be checked', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'connection reset' } });
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(describeFile).not.toHaveBeenCalled();
+  });
+
+  it('names the migration when the budget is not set up', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'PGRST202', message: 'Could not find the function public.claim_ai_call' },
+    });
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('migrations/017') });
   });
 
   it('stops a caller who indexes in a loop', async () => {
@@ -382,5 +472,37 @@ describe('embed', () => {
     // Not 500: the client cannot see the server's variables and would retry
     // twice on the way to the same answer.
     expect(res.statusCode).toBe(501);
+  });
+
+  it('claims a search from the day\u2019s budget', async () => {
+    await handler(search('hotel invoice'), mockResponse());
+
+    expect(rpc).toHaveBeenCalledWith(
+      'claim_ai_call',
+      expect.objectContaining({ p_user: 'user-1', p_action: 'embed' })
+    );
+  });
+
+  it('answers 429 when the day\u2019s searches are spent, and embeds nothing', async () => {
+    rpc.mockResolvedValue({ data: 'deployment', error: null });
+    const res = mockResponse();
+    await handler(search('hotel invoice'), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('by name') });
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  /* Production has no keys yet, and the table arrives with migrations/017: a
+     deployment without either must go on answering 501, not 500. */
+  it('asks the budget nothing when no provider is configured', async () => {
+    activeBackend.mockImplementation(() => {
+      throw new ProviderNotConfigured('No AI provider is configured');
+    });
+    const res = mockResponse();
+    await handler(search('hotel invoice'), res);
+
+    expect(res.statusCode).toBe(501);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { supabase } from '../supabase/supabase.config';
 import { apiUrl } from '../utils/api.utils';
-import { httpErrorFrom } from '../utils/http.utils';
+import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '@cloud-storage/core/ai';
 import type { FileMetadata } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
@@ -129,11 +129,16 @@ const aiService = {
    * with a rate limit of its own, and a `Promise.all` over a folder of
    * photographs is the shape of request that gets an account throttled. A
    * file that fails is counted and skipped rather than stopping the run.
+   *
+   * A refusal to go on is the exception, and it does stop the run: the
+   * route's 429 says that the day's budget, or the minute's, is spent, and
+   * every file after this one would be told the same. `stopped` is what the
+   * route said.
    */
   async indexMany(
     fileIds: string[],
     onProgress?: (done: number, total: number) => void
-  ): Promise<{ indexed: number; skipped: number; failed: number }> {
+  ): Promise<{ indexed: number; skipped: number; failed: number; stopped?: string }> {
     const result = { indexed: 0, skipped: 0, failed: 0 };
 
     for (const [i, fileId] of fileIds.entries()) {
@@ -142,6 +147,9 @@ const aiService = {
         if (outcome.indexed) result.indexed += 1;
         else result.skipped += 1;
       } catch (error) {
+        if (error instanceof HttpError && error.status === 429) {
+          return { ...result, stopped: error.message };
+        }
         result.failed += 1;
         Sentry.captureException(error, { tags: { context: 'ai.indexMany' } });
       }

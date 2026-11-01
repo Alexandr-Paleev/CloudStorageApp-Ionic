@@ -16,6 +16,7 @@ import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
 import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
 import { activeBackend } from '../../libs/server/src/ai-provider';
+import { BudgetSpent, claimAiCall, secondsUntilTomorrow } from '../../libs/server/src/ai-budget';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
   AI_EMBED_LIMIT,
@@ -112,11 +113,27 @@ async function sourceFor(
 }
 
 /**
+ * A failure to read or write `file_embeddings`, naming the migration when the
+ * table is not there. Deploy order, as in libs/server/src/quota.ts: the table
+ * arrives with migrations/011, and "relation does not exist" points at nothing
+ * on its own.
+ */
+function indexTableError(doing: string, error: { message: string }): Error {
+  if (/file_embeddings/.test(error.message)) {
+    return new Error(
+      `${doing}: ${error.message} — has migrations/011_add_file_embeddings.sql been run?`
+    );
+  }
+  return new Error(`${doing}: ${error.message}`);
+}
+
+/**
  * Describes one file and keeps the result.
  *
- * Idempotent by design: the row is keyed by the file, so re-indexing after a
- * prompt change, or under another model, overwrites rather than accumulates,
- * and a run can be repeated without thinking about it.
+ * Idempotent by design, in rows and in money. A file this embedding model has
+ * indexed gets its stored description back without a model being asked again;
+ * under another model the row, keyed by the file, is overwritten rather than
+ * added to. A run can be repeated without thinking about it.
  */
 async function indexFile(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
   const { fileId } = req.body as { fileId?: string };
@@ -182,6 +199,38 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
     return;
   }
 
+  /* Once per embedding model. The dashboard offers only the files the model
+     on screen has not indexed, but this route can be called without it, and
+     every description is paid for: a row that is already here is the answer
+     to give again, not a reason to ask a model again. A row another model
+     made is not, because the search cannot compare it (migrations/011). */
+  const { data: rows, error: readError } = await supabase
+    .from('file_embeddings')
+    .select('summary, tags, summary_model')
+    .eq('file_id', file.id)
+    .eq('user_id', userId)
+    .eq('embedding_model', backend.embeddingModel)
+    .limit(1);
+
+  if (readError) throw indexTableError('Could not read the index', readError);
+
+  const indexed = (
+    rows as { summary: string; tags: string[]; summary_model: string }[] | null
+  )?.[0];
+  if (indexed) {
+    res.status(200).json({
+      indexed: true,
+      summary: indexed.summary,
+      tags: indexed.tags,
+      model: indexed.summary_model,
+    });
+    return;
+  }
+
+  /* The last check before the money, after every refusal that costs nothing
+     (libs/server/src/ai-budget.ts). */
+  await claimAiCall(userId, 'index');
+
   const description = await backend.describe(file.name, await sourceFor(file, plan, userId));
   const vector = await backend.embed(
     embeddingInput(file, description.summary, description.tags),
@@ -202,16 +251,7 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
     { onConflict: 'file_id' }
   );
 
-  if (writeError) {
-    // Deploy order, as in libs/server/src/quota.ts: the table arrives with migrations/011,
-    // and "relation does not exist" points at nothing on its own.
-    if (/file_embeddings/.test(writeError.message)) {
-      throw new Error(
-        `Could not store the index: ${writeError.message} — has migrations/011_add_file_embeddings.sql been run?`
-      );
-    }
-    throw new Error(`Could not store the index: ${writeError.message}`);
-  }
+  if (writeError) throw indexTableError('Could not store the index', writeError);
 
   res.status(200).json({
     indexed: true,
@@ -222,7 +262,7 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
 }
 
 /** Turns what someone typed into the vector the database can compare. */
-async function embedQuery(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function embedQuery(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
   const { text } = req.body as { text?: string };
   const query = typeof text === 'string' ? text.trim() : '';
 
@@ -238,6 +278,10 @@ async function embedQuery(req: VercelRequest, res: VercelResponse): Promise<void
   }
 
   const backend = activeBackend();
+
+  /* After the backend: a deployment with no keys answers 501 without asking
+     the database anything (libs/server/src/ai-budget.ts). */
+  await claimAiCall(userId, 'embed');
 
   res.status(200).json({
     embedding: await backend.embed(query, 'query'),
@@ -310,8 +354,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       );
       return;
     }
-    await embedQuery(req, res);
+    await embedQuery(req, res, userId);
   } catch (error) {
+    /* Not a failure: the day's budget doing its job. Said with Retry-After, so
+       a client that reads it comes back after midnight UTC rather than in a
+       second. */
+    if (error instanceof BudgetSpent) {
+      if (error.scope === 'deployment') console.warn('[ai]', error.message);
+      tooManyRequests(res, secondsUntilTomorrow(), error.message);
+      return;
+    }
+
     console.error('[ai]', error);
 
     if (error instanceof AccessError) {

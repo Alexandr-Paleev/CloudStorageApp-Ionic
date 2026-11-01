@@ -415,7 +415,12 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      free path (only for semantic search). Pair them with
      `VITE_SMART_SEARCH_ENABLED=true`, which is what puts the mode on screen:
      without it the dashboard offers the search it always had, and `/api/ai/*`
-     answers `501` to anything that asks anyway
+     answers `501` to anything that asks anyway. Apply
+     `migrations/017_bound_ai_spend.sql` before adding the keys: every paid call
+     claims a unit of a daily budget there, and a deployment without the table
+     refuses them. `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT` (optional)
+     set the deployment's daily limits, 300 descriptions and 5,000 searches by
+     default; `0` stops the spending without removing the keys
 4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 
@@ -599,6 +604,7 @@ uploads first, to save the round trip — but it is the pre-flight, not the gate
 | The storage quota is enforced by a trigger on `files`, not only in `/api`             | uploads go from the browser straight to the provider, so no handler sees them; the row is the one thing every path must reach, and a row lock there also closes the check-then-act race the API check had on its own                                                                                  |
 | Cloudinary uploads are signed per request and named by the server                     | an unsigned preset is writable by anyone holding the cloud name, which ships in the client bundle — and it was the path production used for every image. The name is signed too, with overwrite off: left to Cloudinary, one signature took as many files as were sent with it (two, on production, 2026-10-23) |
 | The quota trusts the size on the row, and this says so rather than implying otherwise | uploads never pass through a server, so nothing server-side can weigh them; the trigger makes the limit unskippable and the race impossible, and the declared size is the honest boundary of what that buys                                                                                           |
+| Search by meaning spends at most a daily budget, counted in the database              | the per-minute limits live in a function's memory and reset on a cold start, and describing a file again paid again; a bill is bounded only by a count every instance shares, and accounts are free to make, so the deployment has a budget of its own besides each account's                         |
 | The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag        | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
 | Demo accounts are swept by the whole address the demo makes, never by age alone       | the sweep erases with the service-role key. Age alone would reach a real account, and so did the `demo-` prefix alone: sign-up is open, and `demo-anna@company.com` is an address its owner can confirm. Demo addresses are on example.com, where nobody can confirm one                              |
 | The demo rate limit is 20/hour per address, and per instance                          | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what all of these limits still want |
@@ -1010,6 +1016,10 @@ only ever read server-side.
   caps a function request body at 4.5 MB, which is why R2 uploads are presigned.
 - Cancelling Pro drops the limit back to 500 MB. Files already stored stay
   readable; only new uploads are refused until the account is back under quota.
+- **Search by meaning**: an account indexes up to 100 files and runs up to 300
+  searches a day (UTC); the deployment as a whole, 300 and 5,000, set by
+  `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT`. A file is described once
+  per embedding model. Demo accounts can search but are never indexed.
 
 ### Cloudinary (Free Plan)
 

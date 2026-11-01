@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { useSearchIndex } from './useSearchIndex';
 import { withQueryClient } from '../test/utils';
 
-type Outcome = { indexed: number; skipped: number; failed: number };
+type Outcome = { indexed: number; skipped: number; failed: number; stopped?: string };
 
 const { unindexedFileIds, indexMany } = vi.hoisted(() => ({
   unindexedFileIds: vi.fn(),
@@ -151,6 +151,20 @@ describe('useSearchIndex', () => {
       const { onProblem } = await runWith({ indexed: 0, skipped: 1, failed: 0 });
 
       expect(onProblem).toHaveBeenCalledWith('Nothing to index: 1 file cannot be read.');
+    });
+
+    it('what the route said when it stopped the run', async () => {
+      const { onProblem } = await runWith({
+        indexed: 1,
+        skipped: 0,
+        failed: 0,
+        stopped:
+          'This site has indexed as many files today as it allows in a day. Try again tomorrow.',
+      });
+
+      expect(onProblem).toHaveBeenCalledWith(
+        'Indexed 1 of 2. This site has indexed as many files today as it allows in a day. Try again tomorrow.'
+      );
     });
 
     it('nothing, when every file was indexed or could not be read', async () => {
