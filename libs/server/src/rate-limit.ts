@@ -126,9 +126,11 @@ export const CLOUDINARY_IP_LIMIT = 120;
  *
  * The first limit in this file that guards a bill rather than a resource:
  * every call is a request to Claude and one to Voyage, and both are paid per
- * token. What bounds the total is not this number but the storage quota — a
- * file has to exist before it can be indexed, and indexing it twice overwrites
- * one row. This bounds the rate at which someone can spend that ceiling, and
+ * token. What bounds the total is not this number. It said the storage quota
+ * did, because a file has to exist before it can be indexed — but describing a
+ * file again paid for a new description each time, so one file was enough to
+ * spend without end. The total is bounded by the daily budget counted in the
+ * database (ai-budget.ts); this bounds how fast someone can reach it, and
  * thirty a minute still lets a folder of photographs finish while the person
  * is watching.
  */

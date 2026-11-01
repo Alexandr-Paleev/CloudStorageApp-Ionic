@@ -42,11 +42,13 @@ export function useSearchIndex({ enabled, model, onProblem }: SearchIndexOptions
          minutes of a spinner, and a run where every one of them failed — no
          key on this deployment, say — used to end exactly like a run where
          every one succeeded. */
-      const { indexed, skipped, failed } = await aiService.indexMany(ids, (done, total) =>
+      const { indexed, skipped, failed, stopped } = await aiService.indexMany(ids, (done, total) =>
         setIndexing({ done, total })
       );
 
-      if (failed > 0) {
+      if (stopped) {
+        onProblem(`Indexed ${indexed} of ${ids.length}. ${stopped}`);
+      } else if (failed > 0) {
         onProblem(
           `Indexed ${indexed} of ${ids.length}. ${failed} failed — smart search will not find those yet.`
         );

@@ -114,9 +114,9 @@ export async function describeFile(name: string, source: DescribeSource): Promis
     messages: [{ role: 'user', content: contentFor(name, source) }],
     output_config: {
       /* Low, because this is recognition rather than reasoning, and because it
-         runs once per uploaded file. Thinking itself stays on — it is on by
-         default on this model, and turning it off has failure modes of its own
-         that cost more than the tokens save. */
+         runs once per indexed file. Said by name: on this model the default is
+         medium, and thinking cannot be turned off, so effort is the only lever
+         there is. */
       effort: 'low',
       format: zodOutputFormat(DescriptionSchema),
     },

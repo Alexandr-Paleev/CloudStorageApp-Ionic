@@ -16,11 +16,16 @@
  * What writes the sentence.
  *
  * A caption is a short, literal task, so it runs at low effort — the model is
- * being asked what is in a picture, not to reason about it. Thinking stays on
- * (it is on by default on this model, and turning it off has its own failure
- * modes); effort is the lever that makes it cheap.
+ * being asked what is in a picture, not to reason about it. On this model
+ * thinking cannot be turned off at all; effort is the lever that makes it
+ * cheap, and its default here is medium, so describe.ts asks for low by name.
+ *
+ * Opus 5.5 rather than Opus 5, which it succeeds: newer, and cheaper per token
+ * ($4 and $20 per million in and out, against $5 and $25, as Anthropic listed
+ * them on 2026-10-06). Whether a smaller model writes sentences that search as
+ * well is a question for the eval, not for this file.
  */
-export const SUMMARY_MODEL = 'claude-opus-5';
+export const SUMMARY_MODEL = 'claude-opus-5-5';
 
 /**
  * What turns the sentence into a vector.

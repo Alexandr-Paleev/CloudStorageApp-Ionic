@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import aiService from './ai.service';
 import { HttpError } from '../utils/http.utils';
 import { EMBEDDING_DIMENSIONS } from '@cloud-storage/core/ai';
+import * as Sentry from '../observability/sentry';
 
 const getSession = vi.fn();
 const rpc = vi.fn();
@@ -152,6 +153,22 @@ describe('indexMany', () => {
     // Sequential on purpose: a folder of photographs sent at once is how an
     // account gets throttled by the provider.
     expect(progress).toEqual([1, 2, 3]);
+  });
+
+  /* A 429 says the day's budget, or the minute's, is spent, and every file
+     after this one would be told the same: a request each to hear it, and a
+     report each in Sentry. */
+  it('stops at a refusal to go on, and says what the route said', async () => {
+    const said = 'You have indexed as many files today as a day allows.';
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ indexed: true }) })
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ message: said }) });
+
+    const result = await aiService.indexMany(['a', 'b', 'c']);
+
+    expect(result).toEqual({ indexed: 1, skipped: 0, failed: 0, stopped: said });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
 
