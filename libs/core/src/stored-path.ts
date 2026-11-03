@@ -17,10 +17,16 @@
  *  ids, so they have no prefix here. */
 export type HostedProvider = 'cloudinary' | 'r2' | 'supabase_storage';
 
-const HOSTED: readonly string[] = ['cloudinary', 'r2', 'supabase_storage'];
+/**
+ * The same three as a list, for every side that asks "is this one of ours":
+ * the quota in the browser, the indexer, the routes. The trigger from
+ * migrations/007 counts the same three, and `file-rules.test.ts` holds that
+ * copy to this one.
+ */
+export const HOSTED_PROVIDERS: readonly HostedProvider[] = ['cloudinary', 'r2', 'supabase_storage'];
 
-function isHosted(storageType: string): storageType is HostedProvider {
-  return HOSTED.includes(storageType);
+export function isHostedProvider(storageType: string): storageType is HostedProvider {
+  return (HOSTED_PROVIDERS as readonly string[]).includes(storageType);
 }
 
 /**
@@ -77,7 +83,7 @@ export function ownsStoredPath(
   userId: string
 ): boolean {
   return (
-    isHosted(file.storage_type) &&
+    isHostedProvider(file.storage_type) &&
     file.storage_path.startsWith(ownerPrefix(file.storage_type, userId)) &&
     !rewritable(file.storage_path)
   );

@@ -44,3 +44,26 @@ The API check stays, as a pre-flight that refuses before the bytes travel.
   ([0002](0002-billing-is-server-write-only.md)). It writes one column of one
   row, derived from the file being inserted rather than from anything the caller
   supplies.
+
+## Update — 2026-11-01
+
+**A row could be rewritten after the check, and the check let it.** The
+consequence above says a client that lies about a size at upload stores more
+than it should. A lie told later did more. `authenticated` held `UPDATE` on
+every column of its own rows, so the counter could be taken back down without
+a byte leaving the bucket. Measured on production in a transaction that rolled
+back: a row of 300 MB made `bytes_used` 300 MB; setting its `size` to 0 made it
+0, and so did moving the row to `googledrive`. A row of −5 GB was accepted,
+and a row could be filed under another account's folder.
+
+[`018`](../../migrations/018_constrain_file_rows.sql) closes what a written row
+can turn into:
+- a signed-in account may change a row's name and nothing else, by column
+  grants: RLS has no column granularity, but `GRANT` does;
+- a size is not negative, and a provider is one the app has;
+- a folder's parent, and a file's folder, belong to the row's own account;
+- a Storage upload lands directly in the owner's folder, and the bucket
+  refuses a file over 50 MB.
+
+The size stated at upload is still the browser's. The step that closes it is
+the server confirming an upload with the provider before the row is written.

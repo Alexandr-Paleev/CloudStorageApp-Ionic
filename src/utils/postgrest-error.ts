@@ -27,8 +27,22 @@ export function isPostgrestError(value: unknown): value is PostgrestErrorBody {
   );
 }
 
-/** What a failure said about itself: an Error's message or the database's, and nothing for anything else. */
+/** A schema's refusal: an Error whose message is the list of its issues, as JSON. */
+function isZodError(value: unknown): value is Error & { issues: { message: string }[] } {
+  return (
+    value instanceof Error &&
+    value.name === 'ZodError' &&
+    Array.isArray((value as { issues?: unknown }).issues)
+  );
+}
+
+/**
+ * What a failure said about itself: an Error's message or the database's, and
+ * nothing for anything else. For a schema's refusal, the sentence of its first
+ * issue: its message is that list as JSON, and a toast showed it as it was.
+ */
 export function messageOf(error: unknown): string | undefined {
+  if (isZodError(error)) return error.issues[0]?.message ?? error.message;
   if (error instanceof Error || isPostgrestError(error)) return error.message;
   return undefined;
 }

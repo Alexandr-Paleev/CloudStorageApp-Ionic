@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isPostgrestError, messageOf } from './postgrest-error';
 import { failedQuery, refused } from '../test/postgrest';
+import { z } from 'zod';
 
 const RLS = 'new row violates row-level security policy for table "files"';
 
@@ -33,6 +34,14 @@ describe('a failed query, as supabase-js hands it over', () => {
 });
 
 describe('messageOf', () => {
+  /* A ZodError's message is its list of issues as JSON, and an upload whose row
+     the schema refused showed that list in a toast as it was. */
+  it("reads a schema's refusal by its first issue, not its JSON", () => {
+    const refusal = z.object({ size: z.number().nonnegative() }).safeParse({ size: -1 }).error;
+
+    expect(messageOf(refusal)).toBe('Too small: expected number to be >=0');
+  });
+
   it("reads an Error's message, with a code or without one", () => {
     const quota = Object.assign(new Error('Storage limit exceeded'), {
       code: 'PT413',

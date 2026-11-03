@@ -12,6 +12,8 @@
  * is the part worth testing without a network.
  */
 
+import { isHostedProvider } from './stored-path';
+
 /**
  * What writes the sentence.
  *
@@ -85,9 +87,6 @@ export const TEXT_SAMPLE_BYTES = 8 * 1024;
  */
 export class ProviderNotConfigured extends Error {}
 
-/** Providers whose bytes this deployment can reach with its own credentials. */
-const OWN_STORAGE = ['cloudinary', 'r2', 'supabase_storage'];
-
 export interface IndexableFile {
   name: string;
   /** MIME type as recorded on the row. The browser sends '' when it cannot tell. */
@@ -107,7 +106,9 @@ export type IndexPlan = { kind: 'image' | 'pdf' | 'text' } | { kind: 'skip'; rea
  * PowerPoint not found" deserves an answer better than silence.
  */
 export function planFor(file: IndexableFile): IndexPlan {
-  if (!OWN_STORAGE.includes(file.storage_type)) {
+  /* The providers whose bytes this deployment holds, and so can reach with its
+     own credentials (stored-path.ts). */
+  if (!isHostedProvider(file.storage_type)) {
     // Google Drive and Dropbox files live in the user's own cloud, reached
     // with their OAuth grant while they are connected. This app holds no
     // standing authority to read them later, which is the same reason

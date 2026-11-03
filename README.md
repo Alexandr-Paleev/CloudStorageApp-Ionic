@@ -603,7 +603,7 @@ uploads first, to save the round trip — but it is the pre-flight, not the gate
 | Ownership is checked in `/api`, never trusted from the client                         | the presigned URL writes straight to the bucket, so the client check is advisory                                                                                                                                                                                                                      |
 | The storage quota is enforced by a trigger on `files`, not only in `/api`             | uploads go from the browser straight to the provider, so no handler sees them; the row is the one thing every path must reach, and a row lock there also closes the check-then-act race the API check had on its own                                                                                  |
 | Cloudinary uploads are signed per request and named by the server                     | an unsigned preset is writable by anyone holding the cloud name, which ships in the client bundle — and it was the path production used for every image. The name is signed too, with overwrite off: left to Cloudinary, one signature took as many files as were sent with it (two, on production, 2026-10-23) |
-| The quota trusts the size on the row, and this says so rather than implying otherwise | uploads never pass through a server, so nothing server-side can weigh them; the trigger makes the limit unskippable and the race impossible, and the declared size is the honest boundary of what that buys                                                                                           |
+| The quota trusts the size an upload states, and only that                             | uploads never pass through a server, so nothing server-side weighs them yet; since migrations/018 a row cannot be changed afterwards except for its name, cannot state a negative size, and cannot be filed under another account’s folder                                                            |
 | Search by meaning spends at most a daily budget, counted in the database              | the per-minute limits live in a function's memory and reset on a cold start, and describing a file again paid again; a bill is bounded only by a count every instance shares, and accounts are free to make, so the deployment has a budget of its own besides each account's                         |
 | The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag        | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
 | Demo accounts are swept by the whole address the demo makes, never by age alone       | the sweep erases with the service-role key. Age alone would reach a real account, and so did the `demo-` prefix alone: sign-up is open, and `demo-anna@company.com` is an address its owner can confirm. Demo addresses are on example.com, where nobody can confirm one                              |
@@ -1010,10 +1010,13 @@ only ever read server-side.
 | Provider selection | automatic                                      | manual, per upload |
 
 - **Extra storage**: Google Drive (15 GB free) — auto-connects when limit is reached
-- **Max single file size**: not enforced. The figure of 50 MB appeared here before
-  anything implemented it; no check exists in the client, in `/api`, or on the
-  bucket (`file_size_limit` is null). Providers impose their own ceilings — Vercel
-  caps a function request body at 4.5 MB, which is why R2 uploads are presigned.
+- **Max single file size**: 50 MB for a file kept in Supabase Storage, where the
+  bucket refuses more (`file_size_limit`, migrations/018), which is also the most
+  Supabase's Free plan accepts. Other providers impose their own ceilings, and the
+  app checks none of them before an upload. Vercel caps a function request body at
+  4.5 MB, which is why R2 uploads are presigned.
+- **Names**: up to 255 characters for files and folders, checked before an upload
+  and by the database.
 - Cancelling Pro drops the limit back to 500 MB. Files already stored stay
   readable; only new uploads are refused until the account is back under quota.
 - **Search by meaning**: an account indexes up to 100 files and runs up to 300
