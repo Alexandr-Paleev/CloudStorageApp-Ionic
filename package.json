@@ -64,7 +64,7 @@
     "@capacitor/keyboard": "^8.0.6",
     "@capacitor/share": "^8.0.3",
     "@capacitor/status-bar": "^8.0.4",
-    "@ionic/react": "^9.0.9",
+    "@ionic/react": "^9.0.10",
     "@sentry/react": "^10.78.0",
     "@supabase/supabase-js": "^2.118.0",
     "@tanstack/react-query": "^5.104.5",
