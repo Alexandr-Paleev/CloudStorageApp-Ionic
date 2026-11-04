@@ -49,6 +49,17 @@ reasoning behind the larger decisions lives in
   name, since this model's default is medium. Nothing in production was
   described by the old one: search by meaning has never had its keys there.
 
+### Fixed
+
+- **An empty file could not be uploaded, and said so in JSON.** The row's
+  schema required a size above zero, so an empty file went to its provider,
+  was deleted again, and the toast read `Failed to finalize upload: [{"origin":
+  "number","code":"too_small",…}]`. Zero is a size now. A refusal from the
+  schema is told by its own sentence rather than its JSON, and the name is
+  checked before an upload starts rather than after the bytes have arrived,
+  so a name the row would refuse, such as `nul.pdf` or one of three hundred
+  characters, no longer travels to the provider first.
+
 ### Security
 
 - **Search by meaning had no ceiling on what it could spend.** Describing a
@@ -68,6 +79,23 @@ reasoning behind the larger decisions lives in
   and says what the server said, instead of asking about every file left.
   Production has no keys yet, so nothing was spent; the migration has to be
   applied before they are added.
+- **A file row could be rewritten to undo the storage quota.** Rows of
+  `files` are written by the browser, and the quota trigger believes the size
+  on them. A signed-in account could also change any column of its own rows
+  afterwards. Measured on production in a transaction that rolled back, a row
+  of 300 MB brought the counter to 300 MB, and setting its size to 0, or
+  moving it to Google Drive, brought it back to 0 while the bytes stayed in
+  the bucket. A row of −5 GB was accepted, and a folder or a file could be
+  filed under another account's folder, where deleting that folder would
+  have cascaded into this account's rows. `migrations/018_constrain_file_rows.sql`
+  lets an account change a row's name and nothing else, by column grants;
+  refuses a negative size, an unknown provider and a name over 255
+  characters; keeps a folder's parent and a file's folder within the row's
+  own account; and has Storage refuse an upload below the owner's folder,
+  which the account erase never reached, and a file over 50 MB. The rules the
+  browser checks are now written once, in `libs/core/src/file-rules.ts`, and a
+  test holds the migration to them. The size an upload states is still the
+  browser's to give; confirming uploads on the server is the next step.
 
 ## [4.13.0] — 2026-10-30
 

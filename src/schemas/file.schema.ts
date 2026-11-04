@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isSafeHttpUrl } from '@cloud-storage/core/safe-url';
+import { MAX_NAME_LENGTH, STORAGE_TYPES } from '@cloud-storage/core/file-rules';
 
 const sanitizeFileName = (name: string): string => {
   // eslint-disable-next-line no-control-regex
@@ -46,7 +47,7 @@ export const FolderSchema = z.object({
   name: z
     .string()
     .min(1, 'Folder name is required')
-    .max(255, 'Folder name must be less than 255 characters')
+    .max(MAX_NAME_LENGTH, `A folder name can be at most ${MAX_NAME_LENGTH} characters`)
     .refine(
       (name) => {
         const sanitized = sanitizeFileName(name);
@@ -64,7 +65,7 @@ export const FileMetadataSchema = z.object({
   name: z
     .string()
     .min(1, 'File name is required')
-    .max(255, 'File name must be less than 255 characters')
+    .max(MAX_NAME_LENGTH, `A file name can be at most ${MAX_NAME_LENGTH} characters`)
     .refine(
       (name) => {
         const sanitized = sanitizeFileName(name);
@@ -72,7 +73,10 @@ export const FileMetadataSchema = z.object({
       },
       { message: 'File name contains invalid characters' }
     ),
-  size: z.number().positive(),
+  /* Zero is a size: an empty file is still a file, and `positive()` refused it
+     only after its upload, with the schema's own JSON as the message. The
+     database holds the same line (migrations/018). */
+  size: z.number().int().nonnegative(),
   type: z.string(),
   /* A scheme allowlist rather than `.url()`. The full check was removed
      because it rejected the long signed URLs R2 and Supabase Storage hand back;
@@ -82,10 +86,10 @@ export const FileMetadataSchema = z.object({
     .string()
     .refine(isSafeHttpUrl, { message: 'download_url must be an http(s) URL' }),
   storage_path: z.string(),
-  // Must stay in step with StorageUploadResult['type'] and the providers
-  // registered in ProviderManager: a value here that no provider implements
-  // makes every read of such a row throw "Storage provider not found".
-  storage_type: z.enum(['cloudinary', 'googledrive', 'r2', 'supabase_storage', 'dropbox']),
+  // The providers registered in ProviderManager, and the ones migrations/018
+  // allows: a value no provider implements makes every read of such a row
+  // throw "Storage provider not found".
+  storage_type: z.enum(STORAGE_TYPES),
   folder_id: z.string().uuid().nullable().optional(),
   user_id: z.string().optional(),
   created_at: z.string().optional(),
@@ -95,6 +99,11 @@ export const validateAndSanitizeName = (name: string): string => {
   const sanitized = sanitizeFileName(name);
   if (!validateFileName(sanitized) || sanitized.length === 0) {
     throw new Error('Invalid file or folder name');
+  }
+  /* The schemas above say the same, but only when a row is written: a rename
+     passed a name of any length to the database. */
+  if (sanitized.length > MAX_NAME_LENGTH) {
+    throw new Error(`A name can be at most ${MAX_NAME_LENGTH} characters`);
   }
   return sanitized;
 };

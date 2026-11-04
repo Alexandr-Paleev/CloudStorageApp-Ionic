@@ -6,6 +6,7 @@ import * as Sentry from '../observability/sentry';
 import { withoutSecrets } from '../observability/scrub';
 import { HttpError } from '../utils/http.utils';
 import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
+import { z } from 'zod';
 
 vi.mock('../providers/ProviderManager', () => ({
   providerManager: {
@@ -116,17 +117,41 @@ describe('uploadFile', () => {
     expect(metadata.name).toBe('.._.._etc_passwd');
   });
 
-  it('cleans up after a name the schema refuses', async () => {
-    // The name is validated after the bytes are already uploaded, so a
-    // rejection has to take the same rollback path as a failed insert.
+  it('refuses a name the row would refuse before a byte travels', async () => {
+    // The name used to be asked only once the upload was done, so a file the
+    // row refused went to the provider in full and was deleted again.
     const r2 = provider();
     vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
 
     await expect(storageService.uploadFile('user-1', file('NUL.txt'))).rejects.toThrow(
-      'Failed to finalize upload: Invalid file or folder name'
+      'Invalid file or folder name'
     );
 
+    expect(providerManager.selectProvider).not.toHaveBeenCalled();
+    expect(r2.upload).not.toHaveBeenCalled();
     expect(supabaseService.saveFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it('refuses a name past the limit before a byte travels', async () => {
+    const r2 = provider();
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+
+    await expect(
+      storageService.uploadFile('user-1', file(`${'a'.repeat(300)}.pdf`))
+    ).rejects.toThrow(/at most 255 characters/);
+
+    expect(r2.upload).not.toHaveBeenCalled();
+  });
+
+  it('says what the schema said when the row is refused, not its JSON', async () => {
+    const r2 = provider();
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+    const refusal = z.object({ size: z.number().nonnegative() }).safeParse({ size: -1 }).error;
+    vi.mocked(supabaseService.saveFileMetadata).mockRejectedValue(refusal);
+
+    await expect(storageService.uploadFile('user-1', file())).rejects.toThrow(
+      /^Failed to finalize upload: Too small: expected number to be >=0$/
+    );
     expect(r2.delete).toHaveBeenCalledWith(uploaded.path);
   });
 

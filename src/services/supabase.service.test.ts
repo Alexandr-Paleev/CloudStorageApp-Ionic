@@ -70,6 +70,22 @@ describe('saveFileMetadata', () => {
     user_id: 'user-1',
   };
 
+  /* `positive()` used to refuse 0 here, after the upload, and the toast
+     showed the schema's JSON. */
+  it('keeps an empty file', async () => {
+    const chain = {
+      insert: vi.fn(() => chain),
+      select: vi.fn(() => chain),
+      single: vi.fn(async () => ({ data: { id: 'file-1', ...row, size: 0 }, error: null })),
+    };
+    from.mockReturnValue(chain);
+
+    await expect(supabaseService.saveFileMetadata({ ...row, size: 0 })).resolves.toMatchObject({
+      size: 0,
+    });
+    expect(chain.insert).toHaveBeenCalledWith(expect.objectContaining({ size: 0 }));
+  });
+
   it('does not report a full account to Sentry', async () => {
     // The caller turns PT413 into a sentence the user can act on. Reporting it
     // here as well is what made that skip ineffective: every user running out

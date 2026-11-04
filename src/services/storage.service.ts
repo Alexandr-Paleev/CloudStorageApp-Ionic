@@ -66,6 +66,13 @@ const storageService = {
       signal?: AbortSignal;
     }
   ): Promise<FileMetadata> {
+    /* The name first, before a byte travels. It used to be asked only once the
+       upload was done, when the row was written, so a name the row refuses —
+       "nul.pdf", three hundred characters — went to the provider in full and
+       was deleted again. */
+    const { validateAndSanitizeName } = await import('../schemas/file.schema');
+    validateAndSanitizeName(file.name);
+
     const provider = await providerManager.selectProvider(file, userId, {
       canUploadToLocal: (size) => this.canUploadToLocal(userId, size, options?.storageLimit),
       useGoogleDrive,
