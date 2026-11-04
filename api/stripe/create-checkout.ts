@@ -37,10 +37,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    /* A demo account is erased a day after it was made, and nobody can sign in
-       to it again, so a subscription it bought would go on renewing for no
-       one. In test mode a checkout costs nothing, and paying with a test card
-       is part of what the demo is there to show: only a live key refuses it. */
+    /* A demo account is erased a day after it was made, and the erase ends
+       its subscription at once and refunds nothing: on a live key, whoever
+       paid would get a day of the month they paid for. In test mode a
+       checkout costs nothing, and paying with a test card is part of what the
+       demo is there to show: only a live key refuses it. */
     if (isDemoEmail(user.email) && isLiveKey(process.env.STRIPE_SECRET_KEY)) {
       return res
         .status(403)

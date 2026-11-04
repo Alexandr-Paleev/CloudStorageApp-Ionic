@@ -31,7 +31,8 @@ import { configuredProviders } from '../../libs/server/src/erase-providers';
  * sweeps it. It is a real account in every other respect — same RLS, same
  * quota, same Stripe test-mode checkout — because a demo that takes a
  * different code path stops proving anything. On a live Stripe key the
- * checkout refuses it: a subscription would outlive the account by a month.
+ * checkout refuses it: the erase ends a subscription with no refund, and a
+ * month would be paid for a day.
  */
 
 const BUCKET = 'files';
