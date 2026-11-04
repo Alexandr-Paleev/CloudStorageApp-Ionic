@@ -24,3 +24,11 @@ export function getPeriodEnd(subscription: Stripe.Subscription): Date {
 export function isMissingInStripe(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === 'resource_missing';
 }
+
+/**
+ * Whether a key moves real money: a secret or a restricted key of live mode.
+ * Test-mode keys start `sk_test_` and `rk_test_`.
+ */
+export function isLiveKey(key: string | undefined): boolean {
+  return /^(sk|rk)_live_/.test(key ?? '');
+}

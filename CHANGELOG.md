@@ -96,6 +96,25 @@ reasoning behind the larger decisions lives in
   browser checks are now written once, in `libs/core/src/file-rules.ts`, and a
   test holds the migration to them. The size an upload states is still the
   browser's to give; confirming uploads on the server is the next step.
+- **An erased account could leave things behind.** Three ways, each found in
+  the third audit:
+  - The sweep that clears demo accounts after a day erased the ones that had
+    opened a checkout and left their Stripe customers in place. Closing the
+    customer lived in `DELETE /api/account` alone, not in the erase both of
+    them call. `eraseAccount` now closes it first, and erases nothing when it
+    cannot. In test mode this left test customers; on a live key a demo
+    account could have paid and gone on paying after the sweep. The sweep
+    now ends that subscription and refunds nothing, so a live key refuses
+    demo accounts a checkout: a month would be paid for a day.
+  - Supabase Storage was listed one level deep, so an object in a folder
+    inside the account's folder outlived the account, and a page of such
+    folders kept the erase listing them until the function timed out. The
+    erase now goes down into folders and stops with an error when a pass
+    removes nothing. Production had none, and migration 018 refuses new
+    ones.
+  - Cloudinary was erased for images and raw files, not videos. The app sends
+    nothing to the video endpoint, but the endpoint is in the address an
+    upload goes to, not in its signature.
 
 ## [4.13.0] — 2026-10-30
 

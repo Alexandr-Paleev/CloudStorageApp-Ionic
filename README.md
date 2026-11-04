@@ -130,7 +130,8 @@ render — and the banner says the deletion has not reached the server yet:
   share links, profile and login, in the order the missing foreign keys demand —
   bytes first, rows second, the user last. A Pro subscription ends first, with
   the Stripe customer that held it; if Stripe cannot be reached, nothing is
-  deleted
+  deleted. Demo accounts, cleared a day after they are made, are erased the
+  same way, Stripe included
 
 > **What account deletion does not reach.** Files the app placed in *your own*
 > Google Drive or Dropbox stay where they are. They live in a storage account

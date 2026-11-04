@@ -28,6 +28,9 @@ const { admin, storage, table, providers } = vi.hoisted(() => ({
   table: {
     calls: [] as { table: string; op: string; args?: unknown[] }[],
     folderId: 'folder-1' as string | null,
+    /* The Stripe customer on every profile the erase reads: by default, an
+       account that never opened a checkout. */
+    customer: null as string | null,
   },
 }));
 
@@ -50,6 +53,12 @@ vi.mock('../../libs/server/src/auth', () => ({
           table.calls.push({ table: name, op: 'delete', args: [column, value] });
           return Promise.resolve({ data: null, error: null });
         },
+      }),
+      select: () => ({
+        eq: () => ({
+          limit: () =>
+            Promise.resolve({ data: [{ stripe_customer_id: table.customer }], error: null }),
+        }),
       }),
     }),
   },
@@ -95,6 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   table.calls = [];
   table.folderId = 'folder-1';
+  table.customer = null;
   providers.current = {};
 
   process.env.DEMO_ENABLED = 'true';
@@ -271,6 +281,34 @@ describe('POST /api/demo/session', () => {
     expect(eraseR2).toHaveBeenCalledWith('stale');
     expect(eraseCloudinary).toHaveBeenCalledWith('stale');
     expect(admin.deleteUser).toHaveBeenCalledWith('stale');
+  });
+
+  /* The demo hands every visitor a test-mode checkout. Closing the customer
+     lived in DELETE /api/account alone, so the sweep erased accounts that had
+     opened one and left their customers in Stripe. */
+  it('closes an expired account\u2019s Stripe customer before erasing it', async () => {
+    const closeBilling = vi.fn().mockResolvedValue(undefined);
+    providers.current = { closeBilling };
+    table.customer = 'cus_demo';
+    admin.listUsers.mockResolvedValue({
+      data: {
+        users: [
+          {
+            id: 'stale',
+            email: 'demo-1-a@example.com',
+            created_at: new Date(Date.now() - DEMO_TTL_MS - 1000).toISOString(),
+          },
+        ],
+      },
+      error: null,
+    });
+
+    await handler(post(), mockResponse());
+
+    expect(closeBilling).toHaveBeenCalledWith('cus_demo');
+    expect(closeBilling.mock.invocationCallOrder[0]!).toBeLessThan(
+      admin.deleteUser.mock.invocationCallOrder[0]!
+    );
   });
 
   it('keeps sweeping when one expired account will not go', async () => {
