@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   mockRequest,
   mockResponse,
@@ -8,9 +8,9 @@ import {
 
 const APP_URL = 'https://app.example';
 
-const { FakeAuthError, authenticateUser, db, stripe } = vi.hoisted(() => ({
+const { FakeAuthError, authenticate, db, stripe } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
-  authenticateUser: vi.fn(),
+  authenticate: vi.fn(),
   db: { client: null as { from: (table: string) => unknown } | null },
   stripe: {
     listSubscriptions: vi.fn(),
@@ -21,7 +21,7 @@ const { FakeAuthError, authenticateUser, db, stripe } = vi.hoisted(() => ({
 
 vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
-  authenticateUser: (...args: unknown[]) => authenticateUser(...args),
+  authenticate: (...args: unknown[]) => authenticate(...args),
   supabase: { from: (table: string) => db.client!.from(table) },
 }));
 
@@ -62,7 +62,7 @@ beforeEach(() => {
   process.env.VERCEL_PROJECT_PRODUCTION_URL = 'app.example';
   callers += 1;
   signedIn = `user-${callers}`;
-  authenticateUser.mockResolvedValue(signedIn);
+  authenticate.mockResolvedValue({ id: signedIn, email: 'person@company.com' });
   withProfile(KNOWN_CUSTOMER);
   stripe.listSubscriptions.mockResolvedValue({ data: [] });
   stripe.createSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' });
@@ -94,7 +94,7 @@ describe('create-checkout: access', () => {
   });
 
   it('answers 401 when the caller is not authenticated', async () => {
-    authenticateUser.mockRejectedValue(new FakeAuthError('Invalid or expired token'));
+    authenticate.mockRejectedValue(new FakeAuthError('Invalid or expired token'));
     const res = mockResponse();
     await handler(request(), res);
     expect(res.statusCode).toBe(401);
@@ -203,5 +203,40 @@ describe('create-checkout: the session', () => {
     expect(stripe.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: { supabase_user_id: signedIn } })
     );
+  });
+});
+
+/* A demo account is erased a day after it was made, and nobody can sign in to
+   it again: a subscription it bought would renew for no one. */
+describe('create-checkout: demo accounts', () => {
+  const demo = () =>
+    authenticate.mockResolvedValue({ id: signedIn, email: 'demo-1700000000-ab12@example.com' });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('are refused where the key moves real money, before Stripe is asked anything', async () => {
+    demo();
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_key');
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('demo account') });
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createSession).not.toHaveBeenCalled();
+  });
+
+  /* In test mode a checkout costs nothing, and paying with a test card is
+     part of what the demo is there to show. */
+  it('may pay with a test card where the key is a test key', async () => {
+    demo();
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_key');
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(stripe.createSession).toHaveBeenCalled();
   });
 });

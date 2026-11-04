@@ -22,6 +22,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * Dropbox refresh token is erased along with the row that held it. Leaving a
  * person's files in a storage account they control is the right outcome, but
  * the interface has to say so rather than imply a clean sweep.
+ *
+ * Everything an erase must do lives here, and not in a route that calls it.
+ * Closing the Stripe customer lived in `DELETE /api/account` alone, and the
+ * other caller, the demo sweep, erased accounts that had opened a checkout
+ * and left their customers behind.
  */
 
 export interface EraseDeps {
@@ -30,6 +35,12 @@ export interface EraseDeps {
   eraseR2?: (userId: string) => Promise<void>;
   /** Removes every Cloudinary asset for the user. Absent where Cloudinary is not configured. */
   eraseCloudinary?: (userId: string) => Promise<void>;
+  /**
+   * Deletes a Stripe customer, which cancels its subscriptions at once. Throws
+   * BillingNotClosed when Stripe would not; a customer already gone counts as
+   * closed. Absent where billing is not configured.
+   */
+  closeBilling?: (customerId: string) => Promise<void>;
 }
 
 export interface EraseResult {
@@ -37,35 +48,102 @@ export interface EraseResult {
   failures: string[];
 }
 
+/**
+ * The account pays for something that could not be ended, so nothing of it
+ * was erased. `status` is the answer a route gives: 503 when this deployment
+ * holds no key to reach Stripe, 502 when Stripe did not do it.
+ */
+export class BillingNotClosed extends Error {
+  constructor(
+    message: string,
+    readonly status: 502 | 503
+  ) {
+    super(message);
+  }
+}
+
 const BUCKET = 'files';
 
 /** One page is 100; a full account can hold more than that. */
 const LIST_PAGE = 100;
 
-async function eraseSupabaseStorage(supabase: SupabaseClient, userId: string): Promise<void> {
-  /* Paged rather than a single list() with a large limit: the API caps what it
-     returns, and an account over that cap would be reported as fully erased
-     while keeping everything past the first page. */
+/** Folders inside an account's folder, at most. The app writes none, and
+ *  migrations/018 refuses one; this bounds an erase of what came before. */
+const MAX_DEPTH = 8;
+
+/** The account's Stripe customer, if it ever opened a checkout. */
+async function stripeCustomerOf(supabase: SupabaseClient, userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .limit(1);
+
+  if (error) throw new Error(`Failed to read the profile: ${error.message}`);
+
+  const rows = (data || []) as { stripe_customer_id: string | null }[];
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
+/**
+ * Removes every object under `folder`, the folders in it included.
+ *
+ * Storage lists one level at a time, and an entry with no id is a folder:
+ * the list of the account's folder alone left anything deeper in place, and
+ * with a hundred folders at the top of a page, `remove` was handed folder
+ * names, removed nothing, and the next pass listed the same page until the
+ * function timed out.
+ */
+async function eraseFolder(supabase: SupabaseClient, folder: string, depth = 0): Promise<void> {
+  if (depth > MAX_DEPTH) {
+    throw new Error(`${folder} is nested more than ${MAX_DEPTH} folders deep`);
+  }
+
+  let previous = '';
   for (;;) {
+    /* Paged rather than a single list() with a large limit: the API caps what
+       it returns, and an account over that cap would be reported as fully
+       erased while keeping everything past the first page. */
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .list(userId, { limit: LIST_PAGE, offset: 0 });
+      .list(folder, { limit: LIST_PAGE, offset: 0 });
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) return;
 
-    const { error: removeError } = await supabase.storage
-      .from(BUCKET)
-      .remove(data.map((o) => `${userId}/${o.name}`));
-    if (removeError) throw new Error(removeError.message);
-
     /* The offset stays at 0 on purpose — each pass removes what it listed, so
-       the next page is whatever moved up into its place. */
+       the next page is whatever moved up into its place. A pass that comes
+       back with the same page made no progress, and asking again would not
+       either. */
+    const page = data.map((entry) => entry.name).join('/');
+    if (page === previous) throw new Error(`could not empty ${folder}`);
+    previous = page;
+
+    for (const entry of data) {
+      if (entry.id === null) await eraseFolder(supabase, `${folder}/${entry.name}`, depth + 1);
+    }
+
+    const objects = data.filter((entry) => entry.id !== null);
+    if (objects.length > 0) {
+      const { error: removeError } = await supabase.storage
+        .from(BUCKET)
+        .remove(objects.map((o) => `${folder}/${o.name}`));
+      if (removeError) throw new Error(removeError.message);
+    }
+
     if (data.length < LIST_PAGE) return;
   }
 }
 
 /**
  * Deletes the account and everything under it.
+ *
+ * Billing first, and on its own terms. What the account pays for ends before
+ * anything of it is erased: the profile is the only link between the account
+ * and its Stripe customer, the erase deletes it, and a subscription left
+ * behind went on renewing with nothing in the app left to cancel it from. So
+ * a customer that cannot be closed stops the erase, with nothing erased; an
+ * account that is gone and still paying is worse than a deletion that has to
+ * be asked for again.
  *
  * Storage failures are collected rather than thrown. A person who has asked to
  * be deleted must not be left with an account because one bucket was briefly
@@ -74,11 +152,22 @@ async function eraseSupabaseStorage(supabase: SupabaseClient, userId: string): P
  * is different, and does throw: that is the part the request was actually for.
  */
 export async function eraseAccount(userId: string, deps: EraseDeps): Promise<EraseResult> {
-  const { supabase, eraseR2, eraseCloudinary } = deps;
+  const { supabase, eraseR2, eraseCloudinary, closeBilling } = deps;
   const failures: string[] = [];
 
+  const customerId = await stripeCustomerOf(supabase, userId);
+  if (customerId) {
+    if (!closeBilling) {
+      throw new BillingNotClosed(
+        'Billing is not configured here, so it cannot be closed. Nothing was deleted.',
+        503
+      );
+    }
+    await closeBilling(customerId);
+  }
+
   const providers: Array<[string, () => Promise<void>]> = [
-    ['supabase_storage', () => eraseSupabaseStorage(supabase, userId)],
+    ['supabase_storage', () => eraseFolder(supabase, userId)],
   ];
   if (eraseR2) providers.push(['r2', () => eraseR2(userId)]);
   if (eraseCloudinary) providers.push(['cloudinary', () => eraseCloudinary(userId)]);

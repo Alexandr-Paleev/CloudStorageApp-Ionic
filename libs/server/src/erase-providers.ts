@@ -1,7 +1,8 @@
 import { DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { v2 as cloudinary } from 'cloudinary';
-import type { EraseDeps } from './account-erase';
+import { BillingNotClosed, type EraseDeps } from './account-erase';
 import { getS3Client, getR2BucketName } from './r2';
+import { isMissingInStripe } from './stripe';
 import { ownerPrefix } from '../../core/src/stored-path';
 
 /**
@@ -54,16 +55,19 @@ async function eraseR2(userId: string): Promise<void> {
 /**
  * Removes every Cloudinary asset the user owns.
  *
- * By prefix, and for both resource types: images and raw files are separate
- * namespaces there, and `api/cloudinary/[action].ts` already carries the scar
- * of assuming otherwise. Videos are not a thing this app uploads.
+ * By prefix, and for every resource type: images, raw files and videos are
+ * separate namespaces there, and `api/cloudinary/[action].ts` already carries
+ * the scar of assuming otherwise. The app sends nothing to the video endpoint,
+ * but the endpoint is a choice the browser makes — it is in the address, not
+ * in the signature — so an upload signed for a raw file can arrive as a video,
+ * and an erase of two types left it there.
  *
  * One call deletes at most 1000 assets. When there were more, the answer says
  * `partial` and carries a `next_cursor` for the call that continues; stopping
  * at the first answer left everything past the first thousand in place.
  */
 async function eraseCloudinary(userId: string): Promise<void> {
-  for (const resource_type of ['image', 'raw'] as const) {
+  for (const resource_type of ['image', 'raw', 'video'] as const) {
     let next_cursor: string | undefined;
 
     do {
@@ -75,6 +79,34 @@ async function eraseCloudinary(userId: string): Promise<void> {
       next_cursor = answer.partial ? answer.next_cursor : undefined;
     } while (next_cursor);
   }
+}
+
+/**
+ * Deletes the account's Stripe customer.
+ *
+ * Deleting a customer cancels its subscriptions at once, refunds nothing, and
+ * removes the card details Stripe held for it; its history, invoices
+ * included, stays in Stripe. Already deleted counts as done, so a second
+ * attempt after an erase that failed halfway gets through.
+ *
+ * The SDK is loaded here and not at the top of the file: the demo sweep erases
+ * through this module, and it would otherwise load Stripe on every cold start
+ * for the one account in a hundred that opened a checkout.
+ */
+function closeBillingWith(key: string): (customerId: string) => Promise<void> {
+  return async (customerId) => {
+    const { default: Stripe } = await import('stripe');
+    try {
+      await new Stripe(key).customers.del(customerId);
+    } catch (error) {
+      if (isMissingInStripe(error)) return;
+      console.error('Account erase: Stripe did not delete the customer:', error);
+      throw new BillingNotClosed(
+        'Your billing could not be closed with Stripe, so nothing was deleted. Try again in a moment.',
+        502
+      );
+    }
+  };
 }
 
 /** Absent rather than failing where a provider is not configured: a deployment
@@ -93,6 +125,9 @@ export function configuredProviders(): Omit<EraseDeps, 'supabase'> {
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
     deps.eraseCloudinary = eraseCloudinary;
   }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (stripeKey) deps.closeBilling = closeBillingWith(stripeKey);
 
   return deps;
 }

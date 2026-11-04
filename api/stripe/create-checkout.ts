@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import Stripe from 'stripe';
-import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
+import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
+import { isDemoEmail } from '../../libs/server/src/demo';
+import { isLiveKey } from '../../libs/server/src/stripe';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
 import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../libs/server/src/rate-limit';
@@ -21,7 +23,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const userId = await authenticateUser(req);
+    const user = await authenticate(req);
+    const userId = user.id;
 
     /* Keyed on the user rather than the address: the route is authenticated, so
        there is a better key than an IP, and a shared office should not share a
@@ -33,6 +36,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Too many billing requests. Try again in a minute.'
       );
     }
+
+    /* A demo account is erased a day after it was made, and nobody can sign in
+       to it again, so a subscription it bought would go on renewing for no
+       one. In test mode a checkout costs nothing, and paying with a test card
+       is part of what the demo is there to show: only a live key refuses it. */
+    if (isDemoEmail(user.email) && isLiveKey(process.env.STRIPE_SECRET_KEY)) {
+      return res
+        .status(403)
+        .json({ message: 'A demo account cannot subscribe. Create an account to buy Pro.' });
+    }
+
     const appUrl = getAppUrl(req);
 
     // Get or create Stripe customer

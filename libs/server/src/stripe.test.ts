@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type Stripe from 'stripe';
-import { getPeriodEnd, isMissingInStripe } from './stripe';
+import { getPeriodEnd, isLiveKey, isMissingInStripe } from './stripe';
 
 function subscriptionWith(items: { current_period_end: number }[]): Stripe.Subscription {
   return { id: 'sub_test', items: { data: items } } as unknown as Stripe.Subscription;
@@ -38,5 +38,15 @@ describe('isMissingInStripe', () => {
     ['nothing at all', null],
   ])('does not take %s for a missing object', (_, error) => {
     expect(isMissingInStripe(error)).toBe(false);
+  });
+});
+
+describe('isLiveKey', () => {
+  it.each(['sk_live_abc', 'rk_live_abc'])('takes %s for a key that moves money', (key) => {
+    expect(isLiveKey(key)).toBe(true);
+  });
+
+  it.each(['sk_test_abc', 'rk_test_abc', '', undefined])('does not take %j for one', (key) => {
+    expect(isLiveKey(key)).toBe(false);
   });
 });
