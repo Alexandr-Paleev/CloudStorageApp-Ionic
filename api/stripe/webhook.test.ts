@@ -377,12 +377,16 @@ describe('webhook: when Stripe cannot be asked', () => {
      hour: a payment could sit unapplied with nobody told. */
   it('reports the failure, with the event it was handling', async () => {
     stripe.listSubscriptions.mockRejectedValue(new Error('api.stripe.com unreachable'));
-    deliver('customer.subscription.updated', subscription());
+    stripe.constructEvent.mockReturnValue({
+      id: 'evt_test',
+      type: 'customer.subscription.updated',
+      data: { object: subscription() },
+    });
     await handler(post(), mockResponse());
 
     expect(report).toHaveBeenCalledWith(expect.any(Error), {
       route: 'stripe/webhook',
-      extra: { event: 'customer.subscription.updated' },
+      extra: { event: 'customer.subscription.updated', id: 'evt_test' },
     });
   });
 });

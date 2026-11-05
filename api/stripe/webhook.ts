@@ -183,8 +183,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Webhook handler error:', handlerError);
     /* Stripe retries a failed event for three days, and in that time a
        payment can sit unapplied: the one failure here that costs a customer
-       something. */
-    await report(handlerError, { route: 'stripe/webhook', extra: { event: event.type } });
+       something. The id is what the Dashboard finds the event and resends it
+       by. */
+    await report(handlerError, {
+      route: 'stripe/webhook',
+      extra: { event: event.type, id: event.id },
+    });
     return res.status(500).json({ message: 'Webhook handler failed' });
   }
 }

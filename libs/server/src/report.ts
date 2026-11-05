@@ -85,15 +85,31 @@ export function parseDsn(dsn: string | undefined): Dsn | null {
   };
 }
 
-/** A failure as Sentry's exception wants it: a type and a sentence. Errors
- *  that are not Errors, such as the body supabase-js resolves with, keep
- *  their message. */
+/**
+ * What a failure says about itself. Not every failure is an Error: supabase-js
+ * resolves with a body that has a message, and Cloudinary's admin API, which
+ * the erase uses, rejects with its answer, which keeps the message under
+ * `error`. Nothing else of such an object is read. Cloudinary's also holds the
+ * request it made, with the key and the secret in it unless `hide_sensitive`
+ * is set (erase-providers.ts sets it).
+ */
+function messageOf(error: unknown): string {
+  const body = error as { message?: unknown; error?: { message?: unknown } } | null | undefined;
+  const message = body?.message ?? body?.error?.message;
+  if (typeof message === 'string') return message;
+  if (message instanceof Error) return message.message;
+  return typeof error === 'object' && error !== null ? 'A failure with no message' : String(error);
+}
+
+/** A failure as Sentry's exception wants it: a type and a sentence. */
 function asException(error: unknown): { type: string; value: string; stack?: string } {
-  if (error instanceof Error) {
-    return { type: error.name || 'Error', value: error.message, stack: error.stack };
-  }
-  const message = (error as { message?: unknown } | null)?.message;
-  return { type: 'Error', value: typeof message === 'string' ? message : String(error) };
+  const value = messageOf(error);
+  if (!(error instanceof Error)) return { type: 'Error', value };
+  return {
+    type: error.name || 'Error',
+    value,
+    stack: typeof error.stack === 'string' ? error.stack : undefined,
+  };
 }
 
 /**
@@ -110,34 +126,37 @@ export async function report(error: unknown, context: ReportContext): Promise<vo
   const dsn = parseDsn(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN);
   if (!dsn) return;
 
-  const { type, value, stack } = asException(error);
-  const eventId = randomUUID().replace(/-/g, '');
-
-  const event = {
-    event_id: eventId,
-    timestamp: Date.now() / 1000,
-    platform: 'node',
-    level: context.level ?? 'error',
-    logger: 'api',
-    environment: process.env.VERCEL_ENV ?? 'development',
-    release: process.env.VERCEL_GIT_COMMIT_SHA,
-    transaction: context.route,
-    tags: { route: context.route },
-    ...(context.userId && { user: { id: context.userId } }),
-    exception: { values: [{ type, value: scrubbed(value).slice(0, MAX_MESSAGE) }] },
-    extra: {
-      ...context.extra,
-      ...(stack && { stack: scrubbed(stack).slice(0, MAX_STACK) }),
-    },
-  };
-
-  const envelope = [
-    JSON.stringify({ event_id: eventId, dsn: dsn.dsn, sent_at: new Date().toISOString() }),
-    JSON.stringify({ type: 'event' }),
-    JSON.stringify(event),
-  ].join('\n');
-
+  /* All of it, not only the POST: a failure that cannot be read, such as one
+     whose getter throws, must not become the failure either. The erase awaits
+     this between providers, and a throw here would stop it halfway. */
   try {
+    const { type, value, stack } = asException(error);
+    const eventId = randomUUID().replace(/-/g, '');
+
+    const event = {
+      event_id: eventId,
+      timestamp: Date.now() / 1000,
+      platform: 'node',
+      level: context.level ?? 'error',
+      logger: 'api',
+      environment: process.env.VERCEL_ENV ?? 'development',
+      release: process.env.VERCEL_GIT_COMMIT_SHA,
+      transaction: context.route,
+      tags: { route: context.route },
+      ...(context.userId && { user: { id: context.userId } }),
+      exception: { values: [{ type, value: scrubbed(value).slice(0, MAX_MESSAGE) }] },
+      extra: {
+        ...context.extra,
+        ...(stack && { stack: scrubbed(stack).slice(0, MAX_STACK) }),
+      },
+    };
+
+    const envelope = [
+      JSON.stringify({ event_id: eventId, dsn: dsn.dsn, sent_at: new Date().toISOString() }),
+      JSON.stringify({ type: 'event' }),
+      JSON.stringify(event),
+    ].join('\n');
+
     await fetch(dsn.endpoint, {
       method: 'POST',
       headers: {
@@ -148,6 +167,7 @@ export async function report(error: unknown, context: ReportContext): Promise<vo
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch {
-    /* Sentry unreachable is not something the caller can act on. */
+    /* Neither a failure this cannot read nor Sentry unreachable is something
+       the caller can act on. */
   }
 }

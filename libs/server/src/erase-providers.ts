@@ -122,7 +122,15 @@ export function configuredProviders(): Omit<EraseDeps, 'supabase'> {
   const apiKey = process.env.CLOUDINARY_API_KEY;
   const apiSecret = process.env.CLOUDINARY_API_SECRET;
   if (cloudName && apiKey && apiSecret) {
-    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+    /* hide_sensitive: a failed admin call rejects with the request it made,
+       and without it the key and the secret are in that request. The erase
+       writes the rejection to the console as it is. */
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      hide_sensitive: true,
+    });
     deps.eraseCloudinary = eraseCloudinary;
   }
 

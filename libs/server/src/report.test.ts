@@ -160,11 +160,60 @@ describe('report', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  /* Cloudinary's admin API, which the erase uses, rejects with its answer
+     rather than an Error, and the answer also holds the request it made. */
+  it("reads the reason Cloudinary's admin API gives, and nothing else of its answer", async () => {
+    await report(
+      {
+        request_options: { host: 'api.cloudinary.com', auth: 'api-key:api-secret' },
+        query_params: `prefix=users%2F${OWNER}%2F`,
+        error: { message: 'Invalid api_key', http_code: 401 },
+      },
+      { route: 'account/erase' }
+    );
+
+    expect(sent().event.exception.values[0]).toEqual({ type: 'Error', value: 'Invalid api_key' });
+    const body = String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body);
+    expect(body).not.toContain('api-secret');
+  });
+
+  it.each([
+    ['an Error with no message', Object.assign(new Error('x'), { message: undefined })],
+    ['an object with no prototype', Object.create(null)],
+  ])('still sends %s', async (_name, failure) => {
+    await report(failure, { route: 'share' });
+
+    expect(sent().event.exception.values[0]?.value).toBe('A failure with no message');
+  });
+
   /* A report that cannot be sent must not become the failure the caller
      answers with. */
   it('never throws, even when Sentry cannot be reached', async () => {
     fetchMock.mockRejectedValue(new TypeError('fetch failed'));
 
     await expect(report(new Error('boom'), { route: 'share' })).resolves.toBeUndefined();
+  });
+
+  it('never throws, even for a failure that cannot be read at all', async () => {
+    const unreadable = Object.defineProperty({}, 'message', {
+      get() {
+        throw new Error('unreadable');
+      },
+    });
+
+    await expect(report(unreadable, { route: 'share' })).resolves.toBeUndefined();
+  });
+
+  /* Awaited before every error response: a Sentry that does not answer must
+     not hold one until the function times out. */
+  it('gives Sentry two seconds to answer', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+
+    await report(new Error('boom'), { route: 'share' });
+
+    expect(timeout).toHaveBeenCalledWith(2_000);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBe(timeout.mock.results[0]!.value);
+    timeout.mockRestore();
   });
 });

@@ -73,6 +73,15 @@ reasoning behind the larger decisions lives in
 
 ### Security
 
+- **A failed call to Cloudinary during an erase put its API key and secret in
+  the function's log.** Cloudinary's admin API rejects with the request it
+  made, and the credentials are in that request unless the SDK is configured
+  with `hide_sensitive`. The erase writes such a rejection to the console as it
+  is, so an account deletion or a demo sweep that Cloudinary refused printed
+  both. Vercel keeps those logs for an hour, for the project's members only.
+  `libs/server/src/erase-providers.ts` sets the option now. Found in the review
+  of the functions' reports to Sentry, which read only the message of such a
+  rejection, and checked against the SDK itself, 2.11.0.
 - **Search by meaning had no ceiling on what it could spend.** Describing a
   file is a paid call to Claude and one to Voyage, and the only limits were
   per minute and held in a function's memory: thirty a minute per account,

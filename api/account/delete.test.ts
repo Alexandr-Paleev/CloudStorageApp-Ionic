@@ -7,7 +7,7 @@ import {
 } from '../../libs/server/src/test-utils';
 import type { EraseDeps } from '../../libs/server/src/account-erase';
 
-const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, config, db } =
+const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, config, db, report } =
   vi.hoisted(() => ({
     FakeAuthError: class FakeAuthError extends Error {},
     authenticateUser: vi.fn(),
@@ -16,6 +16,7 @@ const { FakeAuthError, authenticateUser, eraseAccount, send, deleteByPrefix, con
     deleteByPrefix: vi.fn(),
     config: vi.fn(),
     db: { client: null as { from: (table: string) => unknown } | null },
+    report: vi.fn(),
   }));
 
 vi.mock('../../libs/server/src/auth', () => ({
@@ -36,6 +37,10 @@ vi.mock('../../libs/server/src/r2', () => ({
 
 vi.mock('cloudinary', () => ({
   v2: { config, api: { delete_resources_by_prefix: deleteByPrefix } },
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './delete';
@@ -107,6 +112,7 @@ describe('account deletion', () => {
     await handler(request(), res);
     expect(res.statusCode).toBe(401);
     expect(eraseAccount).not.toHaveBeenCalled();
+    expect(report).not.toHaveBeenCalled();
   });
 
   /* The id comes from the verified token, never from the body — otherwise this
@@ -133,6 +139,18 @@ describe('account deletion', () => {
     const res = mockResponse();
     await handler(request(), res);
     expect(res.statusCode).toBe(500);
+  });
+
+  /* A deletion that did not happen is finished by hand, and the report is
+     the only place that says whose it was. */
+  it('reports a deletion that did not happen, with the account it was for', async () => {
+    eraseAccount.mockRejectedValue(new Error('Failed to delete the account: nope'));
+    await handler(request(), mockResponse());
+
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'account/delete',
+      userId: 'user-1',
+    });
   });
 
   it('refuses a sixth attempt from one address within the hour', async () => {
@@ -180,6 +198,11 @@ describe('what the account pays for', () => {
 
       expect(res.statusCode).toBe(status);
       expect(res.body).toEqual({ message });
+      expect(report).toHaveBeenCalledWith(expect.any(BillingNotClosed), {
+        route: 'account/delete',
+        userId: 'user-1',
+        level: 'warning',
+      });
     }
   );
 });
@@ -214,6 +237,7 @@ describe('which providers the erase is given', () => {
       cloud_name: 'demo-cloud',
       api_key: 'key',
       api_secret: 'secret',
+      hide_sensitive: true,
     });
   });
 

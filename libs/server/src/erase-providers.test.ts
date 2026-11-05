@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const { deleteByPrefix, deleteCustomer } = vi.hoisted(() => ({
+const { deleteByPrefix, deleteCustomer, config } = vi.hoisted(() => ({
   deleteByPrefix: vi.fn(),
   deleteCustomer: vi.fn(),
+  config: vi.fn(),
 }));
 
 vi.mock('cloudinary', () => ({
-  v2: { config: vi.fn(), api: { delete_resources_by_prefix: deleteByPrefix } },
+  v2: { config, api: { delete_resources_by_prefix: deleteByPrefix } },
 }));
 
 vi.mock('stripe', () => ({
@@ -36,6 +37,15 @@ function eraseCloudinary(userId: string): Promise<void> {
 }
 
 describe('erasing an account from Cloudinary', () => {
+  /* A failed admin call rejects with the request it made, and without this
+     the key and the secret are in it, and so in the line the erase writes to
+     the console. Checked against the SDK itself (2.11.0). */
+  it('keeps the key and the secret out of what a failed call rejects with', () => {
+    configuredProviders();
+
+    expect(config).toHaveBeenCalledWith(expect.objectContaining({ hide_sensitive: true }));
+  });
+
   /* Cloudinary deletes at most 1000 assets a call and says `partial` when it
      stopped there. The erase used to take the first answer as the last. */
   it('keeps going past the first thousand assets, from where the last call stopped', async () => {
