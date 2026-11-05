@@ -249,7 +249,30 @@ describe('webhook: a payment from a customer no profile names', () => {
       customer: 'cus_abandoned',
       limit: 100,
     });
+    // Only over the customer that was read: a checkout may store one between.
+    expect(db.calls).toContainEqual({
+      table: 'profiles',
+      op: 'eq',
+      args: ['stripe_customer_id', 'cus_abandoned'],
+    });
   });
+
+  /* An unpaid subscription charges nothing, so it is not a second payment:
+     the profile follows the customer that pays. Held as a subscription by
+     create-checkout (holdsASubscription), it is not billing here (isBilling). */
+  it.each(['unpaid', 'paused'])(
+    'moves the profile when the one it names is only %s',
+    async (status) => {
+      profileNames('cus_abandoned');
+      stripeHoldsForBoth([subscription({ id: 'sub_old', customer: 'cus_abandoned', status })]);
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(200);
+      expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_customer_id: CUSTOMER });
+      expect(report).not.toHaveBeenCalled();
+    }
+  );
 
   it('links a profile that names no customer at all', async () => {
     profileNames(null);
@@ -279,7 +302,12 @@ describe('webhook: a payment from a customer no profile names', () => {
     expect(db.calls.filter((call) => call.op === 'update')).toHaveLength(1);
     expect(lastUpdate()).not.toHaveProperty('stripe_customer_id');
     expect(report).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('pays twice') }),
+      expect.objectContaining({
+        message: expect.stringContaining(
+          `pays twice: customers cus_paying and ${CUSTOMER} are both billing. ` +
+            `The profile keeps cus_paying: refund and cancel the subscription of ${CUSTOMER}`
+        ),
+      }),
       {
         route: 'stripe/webhook',
         userId: OWNER,
@@ -313,6 +341,36 @@ describe('webhook: subscription updated', () => {
     deliver('customer.subscription.updated', subscription());
     await handler(post(), mockResponse());
     expect(lastUpdate()).toMatchObject({ tier: 'pro' });
+  });
+
+  /* Two sessions paid before either payment landed: one customer, two
+     subscriptions, both billed. The profile has room for one, so nothing
+     else would ever say so. */
+  it('follows the newest of two active subscriptions, and says the account pays twice', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    stripeHolds(subscription({ id: 'sub_new' }), subscription({ id: 'sub_old' }));
+    deliver('customer.subscription.updated', subscription({ id: 'sub_new' }));
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_subscription_id: 'sub_new' });
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          `Customer ${CUSTOMER} pays twice: sub_new, sub_old are all active`
+        ),
+      }),
+      { route: 'stripe/webhook', extra: { customer: CUSTOMER } }
+    );
+  });
+
+  it('says nothing of a second payment when one subscription is active', async () => {
+    stripeHolds(subscription(), subscription({ id: 'sub_ended', status: 'canceled' }));
+    deliver('customer.subscription.updated', subscription());
+    await handler(post(), mockResponse());
+
+    expect(report).not.toHaveBeenCalled();
   });
 
   it('marks a past_due subscription without touching the tier', async () => {

@@ -77,8 +77,11 @@ async function adoptCustomer(customerId: string, pro: Record<string, unknown>) {
   if (named) {
     const { data: theirs } = await stripe.subscriptions.list({ customer: named, limit: 100 });
     if (theirs.some(isBilling)) {
+      /* Which one to refund, said here: cancelling the one the profile names
+         would put the account on Free while the other went on charging. */
       const twice = new Error(
-        `Account ${userId} pays twice: customers ${named} and ${customerId} are both billing`
+        `Account ${userId} pays twice: customers ${named} and ${customerId} are both billing. ` +
+          `The profile keeps ${named}: refund and cancel the subscription of ${customerId}`
       );
       console.error('Webhook:', twice.message);
       await report(twice, { route: 'stripe/webhook', userId });
@@ -188,7 +191,19 @@ async function syncCustomer(customerId: string) {
     throw error;
   }
 
-  const active = data.find((subscription) => subscription.status === 'active');
+  const [active, ...alsoActive] = data.filter((subscription) => subscription.status === 'active');
+
+  /* An account paying twice on one customer, which no write here undoes: two
+     sessions paid before either payment landed, say. Nothing else would ever
+     say so, since the profile has room for one subscription. */
+  if (active && alsoActive.length > 0) {
+    const twice = new Error(
+      `Customer ${customerId} pays twice: ${[active, ...alsoActive].map(({ id }) => id).join(', ')} are all active. ` +
+        `The profile follows ${active.id}, the newest: refund and cancel the rest`
+    );
+    console.error('Webhook:', twice.message);
+    await report(twice, { route: 'stripe/webhook', extra: { customer: customerId } });
+  }
 
   if (active) {
     await upgradeToPro(customerId, active.id, getPeriodEnd(active));

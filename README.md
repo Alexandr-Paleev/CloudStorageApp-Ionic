@@ -446,8 +446,10 @@ DROPBOX_APP_KEY=your_dropbox_app_key
 5. Under **Settings → Checkout and Payment Links → Subscriptions**, have Stripe
    send a customer who already has a subscription to your app's `/pricing`,
    with nothing after the path (decision 0015). `create-checkout` refuses a new
-   checkout while a subscription is billing, but a session it opened before the
-   first payment stays payable; this has Stripe check again on its own page
+   checkout beside every subscription this setting holds, and gives a second
+   checkout in the same ten-minute window the session the first opened; the
+   setting is Stripe asking the same question on its own page, for two
+   sessions opened in different windows
 6. Locally, forward events instead of registering an endpoint:
    `stripe listen --forward-to localhost:8100/api/stripe/webhook`
 

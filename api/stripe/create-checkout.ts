@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import Stripe from 'stripe';
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
-import { isBilling, isLiveKey } from '../../libs/server/src/stripe';
+import { holdsASubscription, isLiveKey } from '../../libs/server/src/stripe';
 import { report } from '../../libs/server/src/report';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
@@ -14,11 +14,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
    this project does not control. */
 const byUser = new RateLimiter(BILLING_LIMIT);
 
-/* Room for a double click and a second tab, and no more. Stripe keeps a key
-   for a day at least and answers it with whatever it answered first, a
-   failure included, so a key for the account alone would turn one failed
-   create into a day of refused checkouts. */
-const CUSTOMER_KEY_WINDOW_MS = 10 * 60 * 1000;
+/* Room for a double click and a second tab, and no more: the customer and
+   the session are both created under a key of the account and this window.
+   Stripe keeps a key for a day at least and answers it with whatever it
+   answered first, a failure included, so a key for the account alone would
+   turn one failed create into a day of refused checkouts. */
+const KEY_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * The account's Stripe customer, created where it has none, and only once.
@@ -31,8 +32,7 @@ const CUSTOMER_KEY_WINDOW_MS = 10 * 60 * 1000;
  * is stored only where none is yet, so a checkout that loses the race takes
  * the winner's.
  */
-async function customerFor(userId: string, email: string | null): Promise<string> {
-  const slot = Math.floor(Date.now() / CUSTOMER_KEY_WINDOW_MS);
+async function customerFor(userId: string, email: string | null, slot: number): Promise<string> {
   const customer = await stripe.customers.create(
     { email: email ?? undefined, metadata: { supabase_user_id: userId } },
     // The account's id, which the customer's metadata holds anyway: the key
@@ -94,9 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Outside the try, so that a failure is reported with the account it was for.
+  let userId: string | undefined;
+
   try {
     const user = await authenticate(req);
-    const userId = user.id;
+    userId = user.id;
 
     /* Keyed on the user rather than the address: the route is authenticated, so
        there is a better key than an IP, and a shared office should not share a
@@ -135,50 +138,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
+    // One window for both keys, read once, so that they agree.
+    const slot = Math.floor(Date.now() / KEY_WINDOW_MS);
+
     const customerId: string =
-      profile.stripe_customer_id ?? (await customerFor(userId, profile.email));
+      profile.stripe_customer_id ?? (await customerFor(userId, profile.email, slot));
 
     // The client hides the upgrade button for Pro users, but this route is
     // reachable directly — without this check a second checkout creates a
     // second subscription and Stripe bills for both. Not only an active one
-    // (see isBilling); the client takes a 409 to the portal, where a failed
-    // card is fixed. Without a status, Stripe lists every subscription that
-    // has not been cancelled.
+    // (see holdsASubscription); the client takes a 409 to the portal, where a
+    // failed card is fixed. Without a status, Stripe lists every subscription
+    // that has not been cancelled.
     const { data: subscriptions } = await stripe.subscriptions.list({
       customer: customerId,
       limit: 100,
     });
 
-    if (subscriptions.some(isBilling)) {
+    if (subscriptions.some(holdsASubscription)) {
       return res.status(409).json({ message: 'Subscription already active' });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID_PRO_MONTHLY!,
-          quantity: 1,
-        },
-      ],
-      /* A path and nothing after it. This used to end in
-         `?session_id={CHECKOUT_SESSION_ID}`, which nothing in the app ever
-         read: the page it leads to asks for the profile again, and the tier
-         is written by the webhook. What it did do was put the id of a
-         payment into an address the app's analytics were then told. An
-         address carries what something reads, and nothing more: decision
-         0015. */
-      success_url: `${appUrl}/subscription/success`,
-      cancel_url: `${appUrl}/pricing`,
-      metadata: { supabase_user_id: userId },
-    });
+    /* Under a key, as the customer is. Two checkouts started together each
+       opened a session of their own, and each could be paid: two
+       subscriptions on one customer, both billed. Now a second one in the
+       same window gets the session the first opened, and a session is paid
+       once. */
+    const session = await stripe.checkout.sessions.create(
+      {
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [
+          {
+            price: process.env.STRIPE_PRICE_ID_PRO_MONTHLY!,
+            quantity: 1,
+          },
+        ],
+        /* A path and nothing after it. This used to end in
+           `?session_id={CHECKOUT_SESSION_ID}`, which nothing in the app ever
+           read: the page it leads to asks for the profile again, and the tier
+           is written by the webhook. What it did do was put the id of a
+           payment into an address the app's analytics were then told. An
+           address carries what something reads, and nothing more: decision
+           0015. */
+        success_url: `${appUrl}/subscription/success`,
+        cancel_url: `${appUrl}/pricing`,
+        metadata: { supabase_user_id: userId },
+      },
+      { idempotencyKey: `checkout-${userId}-${slot}` }
+    );
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Checkout error:', error);
-    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/checkout' });
+    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/checkout', userId });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

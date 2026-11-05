@@ -151,18 +151,24 @@ describe('create-checkout: duplicate subscriptions', () => {
 
   /* Only `active` used to count. A trial goes on to charge, and a past_due
      subscription is still being collected: the card is fixed in the portal,
-     where the client takes a 409, not by buying a second subscription. */
-  it.each(['trialing', 'past_due'])('refuses with 409 when one is %s', async (status) => {
-    stripeHolds({ id: 'sub_live', status });
-    const res = mockResponse();
-    await handler(request(), res);
+     where the client takes a 409, not by buying a second subscription.
+     `unpaid` and `paused` are held too, as Stripe's one-subscription setting
+     holds them: a checkout let through beside one would be sent by Stripe
+     back to the plans page, which would offer the same checkout again. */
+  it.each(['trialing', 'past_due', 'unpaid', 'paused'])(
+    'refuses with 409 when one is %s',
+    async (status) => {
+      stripeHolds({ id: 'sub_live', status });
+      const res = mockResponse();
+      await handler(request(), res);
 
-    expect(res.statusCode).toBe(409);
-    expect(stripe.createSession).not.toHaveBeenCalled();
-  });
+      expect(res.statusCode).toBe(409);
+      expect(stripe.createSession).not.toHaveBeenCalled();
+    }
+  );
 
-  /* A declined first payment, and everything the webhook takes for ended. */
-  it.each(['incomplete', 'incomplete_expired', 'unpaid', 'paused'])(
+  /* A declined first payment, and one that expired so. */
+  it.each(['incomplete', 'incomplete_expired'])(
     'starts a checkout beside one that is %s',
     async (status) => {
       stripeHolds({ id: 'sub_old', status });
@@ -258,7 +264,8 @@ describe('create-checkout: one customer per account', () => {
 
     expect(res.statusCode).toBe(200);
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_winner' })
+      expect.objectContaining({ customer: 'cus_winner' }),
+      expect.anything()
     );
     // It holds the account's email, and deleting the account would not find it.
     expect(stripe.deleteCustomer).toHaveBeenCalledWith('cus_new');
@@ -274,7 +281,8 @@ describe('create-checkout: one customer per account', () => {
 
     expect(stripe.deleteCustomer).not.toHaveBeenCalled();
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_new' })
+      expect.objectContaining({ customer: 'cus_new' }),
+      expect.anything()
     );
   });
 
@@ -298,13 +306,50 @@ describe('create-checkout: one customer per account', () => {
     });
   });
 
-  it('does not open a session when the customer cannot be stored', async () => {
+  it('does not open a session when the customer cannot be stored, and says for whom', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     withProfile([profileRow(NO_CUSTOMER), { error: { message: 'connection reset' } }]);
     const res = mockResponse();
     await handler(request(), res);
 
     expect(res.statusCode).toBe(500);
     expect(stripe.createSession).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'stripe/checkout',
+      userId: signedIn,
+    });
+  });
+});
+
+/* Two checkouts started together each opened a session of their own, and
+   each could be paid: two subscriptions on one customer, both billed. */
+describe('create-checkout: one session for a double click', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('opens it under a key of the account, as the customer is', async () => {
+    await handler(request(), mockResponse());
+
+    expect(stripe.createSession).toHaveBeenCalledWith(expect.anything(), {
+      idempotencyKey: expect.stringMatching(new RegExp(`^checkout-${signedIn}-\\d+$`)),
+    });
+  });
+
+  it('keys it on the same ten minutes as the customer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(2_000_000 * 10 * 60 * 1000 + 1000);
+    withProfile({ stripe_customer_id: null, email: 'new@example.com' });
+    await handler(request(), mockResponse());
+
+    const [, customer] = stripe.createCustomer.mock.calls[0] as [
+      unknown,
+      { idempotencyKey: string },
+    ];
+    const [, session] = stripe.createSession.mock.calls[0] as [unknown, { idempotencyKey: string }];
+    expect(session.idempotencyKey.split('-').at(-1)).toBe(
+      customer.idempotencyKey.split('-').at(-1)
+    );
   });
 });
 
@@ -322,7 +367,8 @@ describe('create-checkout: the session', () => {
 
     expect(stripe.createCustomer).not.toHaveBeenCalled();
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_existing', mode: 'subscription' })
+      expect.objectContaining({ customer: 'cus_existing', mode: 'subscription' }),
+      expect.anything()
     );
   });
 
@@ -335,7 +381,8 @@ describe('create-checkout: the session', () => {
       expect.anything()
     );
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_new' })
+      expect.objectContaining({ customer: 'cus_new' }),
+      expect.anything()
     );
   });
 
@@ -370,13 +417,15 @@ describe('create-checkout: the session', () => {
   it('carries the user id into the session metadata', async () => {
     await handler(request(), mockResponse());
     expect(stripe.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ metadata: { supabase_user_id: signedIn } })
+      expect.objectContaining({ metadata: { supabase_user_id: signedIn } }),
+      expect.anything()
     );
   });
 });
 
-/* A demo account is erased a day after it was made, and nobody can sign in to
-   it again: a subscription it bought would renew for no one. */
+/* A demo account is erased a day after it was made, and the erase ends its
+   subscription at once and refunds nothing: on a live key, whoever paid would
+   get a day of the month they paid for. */
 describe('create-checkout: demo accounts', () => {
   const demo = () =>
     authenticate.mockResolvedValue({ id: signedIn, email: 'demo-1700000000-ab12@example.com' });

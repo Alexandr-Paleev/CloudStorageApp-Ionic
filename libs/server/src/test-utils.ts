@@ -119,19 +119,22 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     const chain: Record<string, unknown> = {
       then: (...args: Parameters<Promise<unknown>['then']>) => settled().then(...args),
     };
-    for (const method of ['select', 'eq', 'limit', 'range', 'order', 'single', 'maybeSingle']) {
+    for (const method of ['select', 'limit', 'range', 'order', 'single', 'maybeSingle']) {
       chain[method] = () => {
         calls.push({ table, op: method });
         if (method === 'single' || method === 'maybeSingle') unwrap = method;
         return chain;
       };
     }
-    // Keeps its arguments, unlike the filters above: `.is(column, null)` is
-    // what makes a write conditional, and a test has to see on which column.
-    chain.is = (...args: unknown[]) => {
-      calls.push({ table, op: 'is', args });
-      return chain;
-    };
+    // These two keep their arguments, unlike the rest: `.eq(column, value)`
+    // and `.is(column, null)` are what make a write conditional, and a test
+    // has to see on which column, and against what.
+    for (const method of ['eq', 'is']) {
+      chain[method] = (...args: unknown[]) => {
+        calls.push({ table, op: method, args });
+        return chain;
+      };
+    }
     return chain;
   }
 
