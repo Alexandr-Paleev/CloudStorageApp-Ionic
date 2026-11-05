@@ -8,14 +8,19 @@ import {
 
 const APP_URL = 'https://app.example';
 
-const { FakeAuthError, authenticate, db, stripe } = vi.hoisted(() => ({
+const { FakeAuthError, authenticate, db, stripe, report } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticate: vi.fn(),
-  db: { client: null as { from: (table: string) => unknown } | null },
+  report: vi.fn(),
+  db: {
+    client: null as { from: (table: string) => unknown } | null,
+    calls: [] as { table: string; op: string; args?: unknown[] }[],
+  },
   stripe: {
     listSubscriptions: vi.fn(),
     createSession: vi.fn(),
     createCustomer: vi.fn(),
+    deleteCustomer: vi.fn(),
   },
 }));
 
@@ -29,8 +34,12 @@ vi.mock('stripe', () => ({
   default: class {
     subscriptions = { list: stripe.listSubscriptions };
     checkout = { sessions: { create: stripe.createSession } };
-    customers = { create: stripe.createCustomer };
+    customers = { create: stripe.createCustomer, del: stripe.deleteCustomer };
   },
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './create-checkout';
@@ -41,12 +50,26 @@ function profileRow(row: Record<string, unknown> | null): TableAnswer {
 
 const KNOWN_CUSTOMER = { stripe_customer_id: 'cus_existing', email: 'a@example.com' };
 
-function withProfile(row: Record<string, unknown> | null) {
-  db.client = mockSupabase({ profiles: profileRow(row) }).client;
+function withProfile(row: Record<string, unknown> | TableAnswer[] | null) {
+  const mock = mockSupabase({ profiles: Array.isArray(row) ? row : profileRow(row) });
+  db.client = mock.client;
+  db.calls = mock.calls;
 }
 
 function request() {
   return mockRequest({ headers: { authorization: 'Bearer t', origin: APP_URL } });
+}
+
+/** What Stripe holds for the customer, listed the way Stripe lists it: by the
+ *  status asked for, and without one, everything not cancelled. */
+function stripeHolds(...subscriptions: { id: string; status: string }[]) {
+  stripe.listSubscriptions.mockImplementation(async ({ status }: { status?: string }) => ({
+    data: subscriptions.filter((subscription) =>
+      status === undefined
+        ? subscription.status !== 'canceled'
+        : status === 'all' || subscription.status === status
+    ),
+  }));
 }
 
 /* One caller per test. The billing limiter allows six a minute and keys on the
@@ -64,9 +87,10 @@ beforeEach(() => {
   signedIn = `user-${callers}`;
   authenticate.mockResolvedValue({ id: signedIn, email: 'person@company.com' });
   withProfile(KNOWN_CUSTOMER);
-  stripe.listSubscriptions.mockResolvedValue({ data: [] });
+  stripeHolds();
   stripe.createSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' });
   stripe.createCustomer.mockResolvedValue({ id: 'cus_new' });
+  stripe.deleteCustomer.mockResolvedValue({ id: 'cus_new', deleted: true });
 });
 
 describe('create-checkout: access', () => {
@@ -117,7 +141,7 @@ describe('create-checkout: duplicate subscriptions', () => {
     // The client hides the upgrade button for Pro users, but this route is
     // reachable directly — four live subscriptions on one customer is how this
     // was found.
-    stripe.listSubscriptions.mockResolvedValue({ data: [{ id: 'sub_live' }] });
+    stripeHolds({ id: 'sub_live', status: 'active' });
     const res = mockResponse();
     await handler(request(), res);
 
@@ -125,17 +149,161 @@ describe('create-checkout: duplicate subscriptions', () => {
     expect(stripe.createSession).not.toHaveBeenCalled();
   });
 
-  it('asks Stripe about the caller, not about subscriptions in general', async () => {
+  /* Only `active` used to count. A trial goes on to charge, and a past_due
+     subscription is still being collected: the card is fixed in the portal,
+     where the client takes a 409, not by buying a second subscription. */
+  it.each(['trialing', 'past_due'])('refuses with 409 when one is %s', async (status) => {
+    stripeHolds({ id: 'sub_live', status });
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(409);
+    expect(stripe.createSession).not.toHaveBeenCalled();
+  });
+
+  /* A declined first payment, and everything the webhook takes for ended. */
+  it.each(['incomplete', 'incomplete_expired', 'unpaid', 'paused'])(
+    'starts a checkout beside one that is %s',
+    async (status) => {
+      stripeHolds({ id: 'sub_old', status });
+      const res = mockResponse();
+      await handler(request(), res);
+
+      expect(res.statusCode).toBe(200);
+      expect(stripe.createSession).toHaveBeenCalled();
+    }
+  );
+
+  it('asks Stripe about every subscription of the caller that is not cancelled', async () => {
     await handler(request(), mockResponse());
-    expect(stripe.listSubscriptions).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: 'cus_existing', status: 'active' })
-    );
+    expect(stripe.listSubscriptions).toHaveBeenCalledWith({ customer: 'cus_existing', limit: 100 });
   });
 
   it('checks before creating the session, not after', async () => {
-    stripe.listSubscriptions.mockResolvedValue({ data: [{ id: 'sub_live' }] });
+    stripeHolds({ id: 'sub_live', status: 'active' });
     await handler(request(), mockResponse());
     expect(stripe.listSubscriptions).toHaveBeenCalled();
+    expect(stripe.createSession).not.toHaveBeenCalled();
+  });
+});
+
+/* Two checkouts started together each created a customer. The profile kept
+   the one stored last, both sessions stayed open, and a payment in the other
+   found no profile: the webhook answered 500 for three days, and Pro never
+   came. */
+describe('create-checkout: one customer per account', () => {
+  const NO_CUSTOMER = { stripe_customer_id: null, email: 'new@example.com' };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('creates it with a key Stripe answers twice with the same customer', async () => {
+    withProfile(NO_CUSTOMER);
+    await handler(request(), mockResponse());
+
+    expect(stripe.createCustomer).toHaveBeenCalledWith(
+      { email: 'new@example.com', metadata: { supabase_user_id: signedIn } },
+      { idempotencyKey: expect.stringMatching(new RegExp(`^customer-${signedIn}-\\d+$`)) }
+    );
+  });
+
+  /* Stripe answers a key with whatever it answered first, a failure
+     included, for a day at least: a key for the account alone would turn one
+     failed create into a day of refused checkouts. */
+  it('keys it on the account and ten minutes, not on the account alone', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const tenMinutes = 10 * 60 * 1000;
+    const keyAt = async (time: number) => {
+      vi.setSystemTime(time);
+      withProfile(NO_CUSTOMER);
+      await handler(request(), mockResponse());
+      const [, options] = stripe.createCustomer.mock.calls.at(-1) as [
+        unknown,
+        { idempotencyKey: string },
+      ];
+      return options.idempotencyKey;
+    };
+
+    const start = 2_000_000 * tenMinutes + 1000;
+    const first = await keyAt(start);
+    expect(await keyAt(start + 5 * 60 * 1000)).toBe(first);
+    expect(await keyAt(start + tenMinutes)).not.toBe(first);
+  });
+
+  it('stores it only where the profile has none yet', async () => {
+    withProfile(NO_CUSTOMER);
+    await handler(request(), mockResponse());
+
+    expect(db.calls).toContainEqual({
+      table: 'profiles',
+      op: 'update',
+      args: [{ stripe_customer_id: 'cus_new' }],
+    });
+    expect(db.calls).toContainEqual({
+      table: 'profiles',
+      op: 'is',
+      args: ['stripe_customer_id', null],
+    });
+  });
+
+  it('opens the session on the customer another checkout stored first, and deletes its own', async () => {
+    withProfile([
+      profileRow(NO_CUSTOMER),
+      { data: [] }, // the conditional write found a customer already there
+      profileRow({ stripe_customer_id: 'cus_winner' }),
+    ]);
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(stripe.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_winner' })
+    );
+    // It holds the account's email, and deleting the account would not find it.
+    expect(stripe.deleteCustomer).toHaveBeenCalledWith('cus_new');
+  });
+
+  it('does not delete the customer Stripe gave both checkouts', async () => {
+    withProfile([
+      profileRow(NO_CUSTOMER),
+      { data: [] },
+      profileRow({ stripe_customer_id: 'cus_new' }),
+    ]);
+    await handler(request(), mockResponse());
+
+    expect(stripe.deleteCustomer).not.toHaveBeenCalled();
+    expect(stripe.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_new' })
+    );
+  });
+
+  it('still opens the checkout when its own customer cannot be deleted, and says so', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    withProfile([
+      profileRow(NO_CUSTOMER),
+      { data: [] },
+      profileRow({ stripe_customer_id: 'cus_winner' }),
+    ]);
+    stripe.deleteCustomer.mockRejectedValue(new Error('api.stripe.com unreachable'));
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'stripe/checkout',
+      userId: signedIn,
+      level: 'warning',
+      extra: { customer: 'cus_new' },
+    });
+  });
+
+  it('does not open a session when the customer cannot be stored', async () => {
+    withProfile([profileRow(NO_CUSTOMER), { error: { message: 'connection reset' } }]);
+    const res = mockResponse();
+    await handler(request(), res);
+
+    expect(res.statusCode).toBe(500);
     expect(stripe.createSession).not.toHaveBeenCalled();
   });
 });
@@ -163,7 +331,8 @@ describe('create-checkout: the session', () => {
     await handler(request(), mockResponse());
 
     expect(stripe.createCustomer).toHaveBeenCalledWith(
-      expect.objectContaining({ metadata: { supabase_user_id: signedIn } })
+      expect.objectContaining({ metadata: { supabase_user_id: signedIn } }),
+      expect.anything()
     );
     expect(stripe.createSession).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_new' })

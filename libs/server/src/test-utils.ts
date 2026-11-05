@@ -99,16 +99,19 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     // .single() unwraps to one row — or to PGRST116 when there is none. Keeping
     // that difference matters: a bare [] would read as truthy and let a "no
     // profile row" test pass while the handler took the happy path.
-    let single = false;
+    // .maybeSingle() unwraps the same way but answers no row with null and no
+    // error, as supabase-js does.
+    let unwrap: 'rows' | 'single' | 'maybeSingle' = 'rows';
 
     const settled = () => {
       const answer = answerFor(table);
       const rows = answer.data ?? [];
       if (answer.error) return Promise.resolve({ data: null, error: answer.error });
-      if (!single) return Promise.resolve({ data: rows, error: null });
+      if (unwrap === 'rows') return Promise.resolve({ data: rows, error: null });
+      if (rows.length > 0) return Promise.resolve({ data: rows[0], error: null });
       return Promise.resolve(
-        rows.length > 0
-          ? { data: rows[0], error: null }
+        unwrap === 'maybeSingle'
+          ? { data: null, error: null }
           : { data: null, error: { code: 'PGRST116', message: 'no rows returned' } }
       );
     };
@@ -119,10 +122,16 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     for (const method of ['select', 'eq', 'limit', 'range', 'order', 'single', 'maybeSingle']) {
       chain[method] = () => {
         calls.push({ table, op: method });
-        if (method === 'single' || method === 'maybeSingle') single = true;
+        if (method === 'single' || method === 'maybeSingle') unwrap = method;
         return chain;
       };
     }
+    // Keeps its arguments, unlike the filters above: `.is(column, null)` is
+    // what makes a write conditional, and a test has to see on which column.
+    chain.is = (...args: unknown[]) => {
+      calls.push({ table, op: 'is', args });
+      return chain;
+    };
     return chain;
   }
 

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import Stripe from 'stripe';
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
-import { isLiveKey } from '../../libs/server/src/stripe';
+import { isBilling, isLiveKey } from '../../libs/server/src/stripe';
 import { report } from '../../libs/server/src/report';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
@@ -13,6 +13,77 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 /* Each call here can create a Stripe customer, which is a row in an account
    this project does not control. */
 const byUser = new RateLimiter(BILLING_LIMIT);
+
+/* Room for a double click and a second tab, and no more. Stripe keeps a key
+   for a day at least and answers it with whatever it answered first, a
+   failure included, so a key for the account alone would turn one failed
+   create into a day of refused checkouts. */
+const CUSTOMER_KEY_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * The account's Stripe customer, created where it has none, and only once.
+ *
+ * Two checkouts started together each used to create one. The profile kept
+ * the one stored last, but both sessions stayed open, and a subscription paid
+ * for in the other found no profile: the webhook answered 500 for the three
+ * days Stripe retries, and Pro never came. Now a create repeated with the
+ * same idempotency key gets back the customer the first one made, and the id
+ * is stored only where none is yet, so a checkout that loses the race takes
+ * the winner's.
+ */
+async function customerFor(userId: string, email: string | null): Promise<string> {
+  const slot = Math.floor(Date.now() / CUSTOMER_KEY_WINDOW_MS);
+  const customer = await stripe.customers.create(
+    { email: email ?? undefined, metadata: { supabase_user_id: userId } },
+    // The account's id, which the customer's metadata holds anyway: the key
+    // tells Stripe nothing it is not already told.
+    { idempotencyKey: `customer-${userId}-${slot}` }
+  );
+
+  // Cannot be swallowed: without this id the webhook has no way to find the
+  // profile later, and a paid subscription would never be applied.
+  const { data: stored, error: updateError } = await supabase
+    .from('profiles')
+    .update({ stripe_customer_id: customer.id })
+    .eq('id', userId)
+    .is('stripe_customer_id', null)
+    .select('id');
+
+  if (updateError) {
+    throw new Error(`Failed to store Stripe customer id: ${updateError.message}`);
+  }
+  if (stored?.length) return customer.id;
+
+  const { data: winner, error: readError } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .single();
+
+  if (readError || !winner?.stripe_customer_id) {
+    throw new Error(
+      `Failed to read the Stripe customer id another checkout stored: ${readError?.message ?? 'none'}`
+    );
+  }
+
+  /* Made in another window than the winner's, so a customer of its own. It
+     holds the account's email and nothing else, and deleting the account
+     would never find it. */
+  if (winner.stripe_customer_id !== customer.id) {
+    try {
+      await stripe.customers.del(customer.id);
+    } catch (error) {
+      console.warn(`Checkout: could not delete the extra customer ${customer.id}:`, error);
+      await report(error, {
+        route: 'stripe/checkout',
+        userId,
+        level: 'warning',
+        extra: { customer: customer.id },
+      });
+    }
+  }
+  return winner.stripe_customer_id;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   /* Before anything else: a preflight from the native shell carries no
@@ -64,37 +135,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    let customerId = profile.stripe_customer_id;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: profile.email ?? undefined,
-        metadata: { supabase_user_id: userId },
-      });
-      customerId = customer.id;
-
-      // Cannot be swallowed: without this id the webhook has no way to find the
-      // profile later, and a paid subscription would never be applied.
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', userId);
-
-      if (updateError) {
-        throw new Error(`Failed to store Stripe customer id: ${updateError.message}`);
-      }
-    }
+    const customerId: string =
+      profile.stripe_customer_id ?? (await customerFor(userId, profile.email));
 
     // The client hides the upgrade button for Pro users, but this route is
     // reachable directly — without this check a second checkout creates a
-    // second subscription and Stripe bills for both.
-    const activeSubscriptions = await stripe.subscriptions.list({
+    // second subscription and Stripe bills for both. Not only an active one
+    // (see isBilling); the client takes a 409 to the portal, where a failed
+    // card is fixed. Without a status, Stripe lists every subscription that
+    // has not been cancelled.
+    const { data: subscriptions } = await stripe.subscriptions.list({
       customer: customerId,
-      status: 'active',
-      limit: 1,
+      limit: 100,
     });
 
-    if (activeSubscriptions.data.length > 0) {
+    if (subscriptions.some(isBilling)) {
       return res.status(409).json({ message: 'Subscription already active' });
     }
 

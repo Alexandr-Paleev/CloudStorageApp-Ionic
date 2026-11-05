@@ -6,7 +6,7 @@ import Stripe from 'stripe';
    key and failed at every event, in the one function that writes what a
    customer paid for. */
 import { supabase } from '../../libs/server/src/auth';
-import { getPeriodEnd, isMissingInStripe } from '../../libs/server/src/stripe';
+import { getPeriodEnd, isBilling, isMissingInStripe } from '../../libs/server/src/stripe';
 import { TIER_LIMITS } from '../../libs/core/src/tiers';
 import { report } from '../../libs/server/src/report';
 
@@ -21,21 +21,86 @@ async function buffer(readable: VercelRequest): Promise<Buffer> {
 }
 
 async function upgradeToPro(customerId: string, subscriptionId: string, periodEnd: Date) {
+  const pro = {
+    tier: 'pro',
+    storage_limit: TIER_LIMITS.pro.storage_limit,
+    stripe_subscription_id: subscriptionId,
+    subscription_status: 'active',
+    subscription_period_end: periodEnd.toISOString(),
+    allowed_providers: TIER_LIMITS.pro.allowed_providers,
+  };
+
   const { data, error } = await supabase
     .from('profiles')
-    .update({
-      tier: 'pro',
-      storage_limit: TIER_LIMITS.pro.storage_limit,
-      stripe_subscription_id: subscriptionId,
-      subscription_status: 'active',
-      subscription_period_end: periodEnd.toISOString(),
-      allowed_providers: TIER_LIMITS.pro.allowed_providers,
-    })
+    .update(pro)
     .eq('stripe_customer_id', customerId)
     .select('id');
 
   if (error) throw new Error(`Failed to upgrade: ${error.message}`);
-  if (!data?.length) throw new Error(`No profile found for customer ${customerId}`);
+  if (!data?.length) await adoptCustomer(customerId, pro);
+}
+
+/**
+ * Puts Pro on the account a paying customer belongs to, when no profile names
+ * that customer.
+ *
+ * Two checkouts started together used to create a customer each. The profile
+ * kept the one stored last, both sessions stayed open, and a subscription paid
+ * for in the other found no profile here: this answered 500 for the three days
+ * Stripe retries, and Pro never came. create-checkout no longer makes the
+ * second customer, and every customer it makes carries the account's id in its
+ * metadata, written by the server with the secret key, so a profile that names
+ * the wrong one can be put right.
+ *
+ * The profile moves to the customer that pays, unless the one it names is
+ * billing too. Then the account pays twice, which no webhook can undo: the
+ * profile stays with the customer it names, whose subscription it already
+ * reflects, and the owner is told, to refund one.
+ */
+async function adoptCustomer(customerId: string, pro: Record<string, unknown>) {
+  const customer = await stripe.customers.retrieve(customerId);
+  const userId = customer.deleted ? undefined : customer.metadata.supabase_user_id;
+  if (!userId) throw new Error(`No profile found for customer ${customerId}`);
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to read the profile: ${error.message}`);
+  if (!profile) {
+    throw new Error(`Customer ${customerId} pays for account ${userId}, which has no profile`);
+  }
+
+  const named: string | null = profile.stripe_customer_id;
+  if (named) {
+    const { data: theirs } = await stripe.subscriptions.list({ customer: named, limit: 100 });
+    if (theirs.some(isBilling)) {
+      const twice = new Error(
+        `Account ${userId} pays twice: customers ${named} and ${customerId} are both billing`
+      );
+      console.error('Webhook:', twice.message);
+      await report(twice, { route: 'stripe/webhook', userId });
+      return;
+    }
+  }
+
+  /* Only over the customer that was read. If a checkout stored one in
+     between, nothing is written, and the 500 has Stripe deliver the event
+     again, to be decided against the profile as it is then. */
+  const move = supabase
+    .from('profiles')
+    .update({ ...pro, stripe_customer_id: customerId })
+    .eq('id', userId);
+  const { data: moved, error: moveError } = await (
+    named ? move.eq('stripe_customer_id', named) : move.is('stripe_customer_id', null)
+  ).select('id');
+
+  if (moveError) throw new Error(`Failed to upgrade: ${moveError.message}`);
+  if (!moved?.length) {
+    throw new Error(`The profile of account ${userId} changed while it was being upgraded`);
+  }
 }
 
 async function downgradeToFree(customerId: string) {

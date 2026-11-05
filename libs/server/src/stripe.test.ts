@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type Stripe from 'stripe';
-import { getPeriodEnd, isLiveKey, isMissingInStripe } from './stripe';
+import { getPeriodEnd, isBilling, isLiveKey, isMissingInStripe } from './stripe';
 
 function subscriptionWith(items: { current_period_end: number }[]): Stripe.Subscription {
   return { id: 'sub_test', items: { data: items } } as unknown as Stripe.Subscription;
@@ -49,4 +49,23 @@ describe('isLiveKey', () => {
   it.each(['sk_test_abc', 'rk_test_abc', '', undefined])('does not take %j for one', (key) => {
     expect(isLiveKey(key)).toBe(false);
   });
+});
+
+describe('isBilling', () => {
+  /* What a second checkout would duplicate: a subscription that charges, or
+     is still being collected. */
+  it.each(['active', 'trialing', 'past_due'] as const)('counts %s', (status) => {
+    expect(isBilling({ status })).toBe(true);
+  });
+
+  /* A first payment that never went through, and everything the webhook
+     takes for ended. Counted, the first would lock out a declined card for a
+     day, and the rest would send an account that is back on Free to the
+     portal instead of to a checkout. */
+  it.each(['incomplete', 'incomplete_expired', 'canceled', 'unpaid', 'paused'] as const)(
+    'does not count %s',
+    (status) => {
+      expect(isBilling({ status })).toBe(false);
+    }
+  );
 });
