@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '../libs/server/src/vercel';
-import { authenticateUser, AuthError, supabase } from '../libs/server/src/auth';
+import { authenticate, authenticateUser, AuthError, supabase } from '../libs/server/src/auth';
+import { isDemoEmail } from '../libs/server/src/demo';
 import {
   generateShareToken,
   hashShareToken,
@@ -112,7 +113,19 @@ async function downloadUrlFor(file: FileRow): Promise<string> {
 }
 
 async function createLink(req: VercelRequest, res: VercelResponse) {
-  const userId = await authenticateUser(req);
+  const user = await authenticate(req);
+  const userId = user.id;
+
+  /* A link opens a file for anyone, on this project's own domain, under the
+     words "Shared with you". A demo account is made for whoever asks, with
+     no address behind it, which made it the place to host a page that asks
+     for a password. A storage provider that finds one can suspend the whole
+     account it is on, and every user's files with it. */
+  if (isDemoEmail(user.email)) {
+    return res.status(403).json({
+      message: 'A demo account cannot create share links. Create an account to share files.',
+    });
+  }
 
   // After authentication, so the limit belongs to the account rather than to
   // whoever shares its address.

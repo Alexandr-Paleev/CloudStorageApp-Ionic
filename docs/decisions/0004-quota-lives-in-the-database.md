@@ -67,3 +67,21 @@ can turn into:
 
 The size stated at upload is still the browser's. The step that closes it is
 the server confirming an upload with the provider before the row is written.
+
+**A demo account's limit is the database's too.** An account
+`/api/demo/session` opens for anyone had the Free plan's 500 MB, and the
+webhook writes the limit of every plan change: on test keys, with the card the
+plans page gives, a demo account had 5 GB for the day.
+[`019`](../../migrations/019_hold_demo_storage.sql) holds a profile with a demo
+address to 10 MB on the insert that creates it and on every update that sets
+its limit, whoever writes it. The webhook is not told: it writes the plan, and
+the row keeps the smaller number.
+
+So is their number. A limit on each account bounds none of them together, and
+the route's rate limit counts in one instance's memory. `019` refuses a demo
+profile while twenty exist, counted under a lock, so two made at once cannot
+both take the last place: 200 MB at most, of the 1 GB of storage the project
+has. A visitor who finds them all taken gets the place of the oldest once it
+is an hour old (`api/demo/session.ts`): with a day's life each, one address
+could otherwise take every place at once and keep the demo closed for the
+day.

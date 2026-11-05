@@ -13,9 +13,11 @@ const APP_URL = 'https://app.example';
 const TOKEN = 'test-token-value';
 const FILE_ID = 'file-1';
 
-const { FakeAuthError, authenticateUser, db, signedUrl } = vi.hoisted(() => ({
+const { FakeAuthError, authenticateUser, signedIn, db, signedUrl } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticateUser: vi.fn(),
+  /** The address of whoever authenticateUser says is signed in. */
+  signedIn: { email: 'person@company.com' as string | undefined },
   db: {
     client: null as { from: (t: string) => unknown } | null,
     calls: [] as { table: string; op: string; args?: unknown[] }[],
@@ -27,6 +29,12 @@ const { FakeAuthError, authenticateUser, db, signedUrl } = vi.hoisted(() => ({
 vi.mock('../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
   authenticateUser: (...args: unknown[]) => authenticateUser(...args),
+  /* Creating a link reads the account's address too, to know a demo account:
+     the same mock says who, and a test can say at what address. */
+  authenticate: async (...args: unknown[]) => ({
+    id: await authenticateUser(...args),
+    email: signedIn.email,
+  }),
   supabase: {
     from: (table: string) => db.client!.from(table),
     storage: { from: () => db.storage },
@@ -90,6 +98,7 @@ beforeEach(() => {
   // in this file would be the one that finds the create limit spent.
   resetRateLimits();
   authenticateUser.mockResolvedValue('user-1');
+  signedIn.email = 'person@company.com';
   signedUrl.mockResolvedValue('https://r2.example/signed');
   db.storage.createSignedUrl.mockResolvedValue({
     data: { signedUrl: 'https://supa.example/signed' },
@@ -112,6 +121,27 @@ describe('share: creating a link', () => {
     const res = mockResponse();
     await handler(post({}), res);
     expect(res.statusCode).toBe(400);
+  });
+
+  /* A link opens a file for anyone, on this project's domain, under "Shared
+     with you", and a demo account is made for whoever asks: the place to host
+     a page that asks for a password. */
+  it('refuses a demo account, before it reads anything', async () => {
+    signedIn.email = 'demo-1700000000-ab12@example.com';
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('demo account') });
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it('lets an account whose address only starts like a demo one share', async () => {
+    signedIn.email = 'demo-anna@company.com';
+    const res = mockResponse();
+    await handler(post({ fileId: FILE_ID }), res);
+
+    expect(res.statusCode).toBe(201);
   });
 
   it('refuses to share a file the caller does not own', async () => {

@@ -152,6 +152,24 @@ reasoning behind the larger decisions lives in
   - Cloudinary was erased for images and raw files, not videos. The app sends
     nothing to the video endpoint, but the endpoint is in the address an
     upload goes to, not in its signature.
+- **A demo account was free hosting, and a place for a phishing page.**
+  Anyone can open one, with no address behind it. It had the Free plan's
+  500 MB, and 5 GB for the day through the test card the plans page gives,
+  and nothing counted how many there were: one address could open twenty an
+  hour. A share link is a page on this project's own domain that says
+  "Shared with you", which is where a page asking for a password would go,
+  and a provider that finds one can suspend the whole account it is on. A
+  demo account now stores at most 10 MB whatever writes its limit, and no
+  more than twenty exist at once, 200 MB of the 1 GB the project's storage
+  has. Triggers on `profiles` hold both
+  (`migrations/019_hold_demo_storage.sql`). A visitor who finds the demo full
+  takes the place of the oldest demo account once it is an hour old, so that
+  one address cannot hold every place for the day, and is told the demo is
+  full while none is. A demo account cannot create share links. Every page a
+  link opens has **Report this file**, a letter to
+  the address the terms give, with the link in it, and the terms now say
+  what may not be shared and what a report does. Production had no demo
+  accounts and no live links.
 
 ## [4.13.0] — 2026-10-30
 

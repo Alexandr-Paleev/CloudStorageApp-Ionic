@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
+  DEMO_ADDRESS_PATTERN,
   DEMO_EMAIL_PREFIX,
+  DEMO_EVICT_AFTER_MS,
+  DEMO_LIVE_LIMIT,
   DEMO_SEED,
+  DEMO_STORAGE_LIMIT,
   DEMO_TTL_MS,
   demoEmail,
   demoPassword,
   demoStoragePath,
+  givesUpItsPlace,
   isDemoEmail,
   isExpiredDemoUser,
 } from './demo';
@@ -104,6 +110,30 @@ describe('isExpiredDemoUser', () => {
   });
 });
 
+describe('givesUpItsPlace', () => {
+  const now = Date.parse('2026-11-05T12:00:00Z');
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+
+  it('gives a place held for more than an hour to a visitor who finds the demo full', () => {
+    expect(givesUpItsPlace(ago(DEMO_EVICT_AFTER_MS + 1000), now)).toBe(true);
+  });
+
+  it('keeps a place held for less, which is a demo likely still in use', () => {
+    expect(givesUpItsPlace(ago(DEMO_EVICT_AFTER_MS - 1000), now)).toBe(false);
+  });
+
+  it('keeps a place whose time cannot be read', () => {
+    expect(givesUpItsPlace('nope', now)).toBe(false);
+  });
+
+  /* Shorter than the sweep's day, or nothing would ever be taken; at least
+     the hour a demo needs, or a visitor would lose one in use. */
+  it('is an hour, between a demo in use and the sweep', () => {
+    expect(DEMO_EVICT_AFTER_MS).toBe(60 * 60 * 1000);
+    expect(DEMO_EVICT_AFTER_MS).toBeLessThan(DEMO_TTL_MS);
+  });
+});
+
 describe('demoStoragePath', () => {
   it('puts the owner in the first segment, which is what migration 006 checks', () => {
     expect(demoStoragePath('user-1', 'a.png', 111)).toBe('user-1/111_a.png');
@@ -126,6 +156,53 @@ describe('DEMO_SEED', () => {
     const { existsSync } = await import('node:fs');
     for (const item of DEMO_SEED) {
       expect(existsSync(new URL(`../../../public/demo/${item.asset}`, import.meta.url))).toBe(true);
+    }
+  });
+});
+
+/* SQL cannot import a constant: migration 019 writes both limits and the
+   address a second time, and this is what notices when they stop agreeing. */
+describe('what the database holds demo accounts to', () => {
+  const migration = readFileSync(
+    new URL('../../../migrations/019_hold_demo_storage.sql', import.meta.url),
+    'utf8'
+  );
+
+  it('stores DEMO_STORAGE_LIMIT, 10 MB, in each', () => {
+    expect(DEMO_STORAGE_LIMIT).toBe(10 * 1024 * 1024);
+    expect(migration).toContain(`LEAST(NEW.storage_limit, ${DEMO_STORAGE_LIMIT})`);
+    expect(migration).toContain(`SET storage_limit = ${DEMO_STORAGE_LIMIT}`);
+  });
+
+  /* The route tells a full demo from any other refusal by counting again,
+     so its count and the trigger's have to agree on both the number and
+     the accounts. */
+  it('lets DEMO_LIVE_LIMIT, 20, exist at once', () => {
+    expect(DEMO_LIVE_LIMIT).toBe(20);
+    expect(migration).toContain(`>= ${DEMO_LIVE_LIMIT} THEN`);
+  });
+
+  /* Postgres reads `~` with the same syntax for everything this pattern
+     uses, so the trigger's pattern is run here as it is written there. */
+  it('reaches the accounts isDemoEmail calls demo accounts, and no other', () => {
+    const patterns = [...migration.matchAll(/email ~ '([^']+)'/g)].map((match) => match[1]);
+    // Two triggers' WHEN, the count, and the update of the accounts there are.
+    expect(patterns).toHaveLength(4);
+    expect(new Set(patterns).size).toBe(1);
+    expect(patterns[0]).toBe(DEMO_ADDRESS_PATTERN);
+
+    const database = new RegExp(patterns[0] ?? '');
+    for (const address of [
+      demoEmail(),
+      'demo-1700000000-ab12@example.com',
+      'demo-1700000000-@example.com',
+      'demo-anna@company.com',
+      'demo-1700000000-AB12@example.com',
+      'demo-1700000000-ab12@example.com.evil.net',
+      'e2e-1700000000-ab12@example.com',
+      'person@company.com',
+    ]) {
+      expect(database.test(address), address).toBe(isDemoEmail(address));
     }
   });
 });

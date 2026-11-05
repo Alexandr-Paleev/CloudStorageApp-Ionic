@@ -2,6 +2,7 @@ import type { Metadata, ResolvingMetadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { formatBytes } from '@cloud-storage/core/format';
+import { reportAddress } from '../../../lib/report';
 import { describeLink, type Description } from '../../../lib/share';
 import { APP_ORIGIN, SITE_NAME } from '../../../lib/site';
 import { DownloadButton } from './download-button';
@@ -139,6 +140,12 @@ export default async function SharePage({ params }: Props) {
         <p className={styles.note}>
           Shared through <Link href="/">{SITE_NAME}</Link>. This link expires, and whoever made it
           can stop it from opening at any time.
+        </p>
+        {/* Only where the link opens the file: an ended one shows nothing to
+            report. The letter carries the link, which is what finds it. */}
+        <p className={styles.note}>
+          Not what it claims to be, or asking for a password?{' '}
+          <a href={reportAddress(token)}>Report this file</a>.
         </p>
       </div>
     </section>

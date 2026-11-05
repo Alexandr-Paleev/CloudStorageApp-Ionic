@@ -235,6 +235,7 @@ export async function sharePageAsAVisitor({ browser, origin, stub, expect, audit
 
   const heading = () => page.getByRole('heading', { level: 1 }).innerText();
   const download = page.getByRole('button', { name: 'Download' });
+  const report = page.getByRole('link', { name: 'Report this file' });
   /* Next keeps an alert of its own outside `main`, to announce a new page. */
   const problem = page.locator('main [role="alert"]');
   const open = (token) => page.goto(at(token), { waitUntil: 'networkidle' });
@@ -249,6 +250,13 @@ export async function sharePageAsAVisitor({ browser, origin, stub, expect, audit
   try {
     await open(TOKENS.live);
     expect((await heading()) === 'report.pdf', 'the share page does not show the name of the file');
+    /* A letter about the file, with the link in it: the token is the one
+       thing that finds the file again. */
+    const letter = (await report.count()) > 0 ? ((await report.getAttribute('href')) ?? '') : '';
+    expect(
+      letter.startsWith('mailto:') && decodeURIComponent(letter).includes(`/s/${TOKENS.live}`),
+      `the share page offers no letter about the file: ${letter}`
+    );
     await download.click();
     await arriveAtTheFile();
     expect(
@@ -311,6 +319,10 @@ export async function sharePageAsAVisitor({ browser, origin, stub, expect, audit
       (await problem.innerText()) === 'Internal server error' && (await download.isVisible()),
       'a failure that may pass does not leave the button to try again with'
     );
+
+    /* A link that has ended opens nothing, and there is nothing to report. */
+    await open(TOKENS.revoked);
+    expect((await report.count()) === 0, 'a link that has ended still offers a report');
 
     /* Every state, at every width. A file's name is one long word as often
        as not, and the page for a link nobody made is put together by the

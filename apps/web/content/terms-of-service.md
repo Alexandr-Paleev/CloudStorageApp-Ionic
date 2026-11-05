@@ -1,6 +1,6 @@
 # Terms of Service for Cloud Storage App
 
-**Last Updated:** October 18, 2026
+**Last Updated:** November 1, 2026
 
 ## 1. Acceptance of Terms
 
@@ -50,6 +50,7 @@ You **MAY**:
 You **MAY NOT**:
 - Upload illegal, harmful, or infringing content
 - Use the Service to distribute malware or spam
+- Share files made to trick people into giving up passwords, payment details or other personal data (phishing)
 - Violate any laws or regulations
 - Abuse or overload our infrastructure
 - Attempt to access other users' accounts
@@ -65,6 +66,7 @@ You **MAY NOT**:
 ### Storage Limits
 - **Free tier**: The limit shown on the pricing page
 - **Pro tier**: Increased limits as specified in your plan
+- **Demo accounts**: 10 MB, whatever the plan
 - We reserve the right to delete inactive accounts (180+ days)
 
 ### Prohibited Content
@@ -72,6 +74,17 @@ You **MAY NOT**:
 - Copyrighted content (without permission)
 - Malware, viruses, or harmful code
 - Content that violates third-party rights
+
+### Share Links
+- A share link opens the file for anyone who has it, until it expires or you revoke it
+- Share only what you have the right to share
+- We revoke a link, and may close the account behind it, when it carries content these Terms prohibit
+- Demo accounts cannot create share links
+
+### Reporting a Shared File
+- Every page a share link opens has a **Report this file** link, which writes to the address in section 19 with the link included
+- You can also write to that address yourself. Include the link: nothing else identifies the file
+- We look into every report, and revoke a link that carries content these Terms prohibit
 
 ## 6. Third-Party Services
 
