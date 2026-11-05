@@ -4,6 +4,7 @@ import { applyCors } from '../../libs/server/src/cors';
 import { RateLimiter, clientIp, tooManyRequests } from '../../libs/server/src/rate-limit';
 import { BillingNotClosed, eraseAccount } from '../../libs/server/src/account-erase';
 import { configuredProviders } from '../../libs/server/src/erase-providers';
+import { report } from '../../libs/server/src/report';
 
 /**
  * DELETE /api/account — erases the caller's account and everything under it.
@@ -40,8 +41,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
   }
 
+  /* Outside the try, so that a failure once the caller is known is reported
+     with the account it was for: a deletion that did not happen is finished
+     by hand, and only the id says whose it was. */
+  let userId: string | undefined;
+
   try {
-    const userId = await authenticateUser(req);
+    userId = await authenticateUser(req);
 
     /* The erase ends what the account pays for before it erases anything, and
        stops if it cannot: libs/server/src/account-erase.ts. */
@@ -58,11 +64,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        erase chose: 503 for a deployment that cannot reach Stripe, 502 for
        Stripe not doing it. */
     if (error instanceof BillingNotClosed) {
+      await report(error, { route: 'account/delete', userId, level: 'warning' });
       return res.status(error.status).json({ message: error.message });
     }
 
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Account deletion error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'account/delete', userId });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

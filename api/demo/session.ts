@@ -18,6 +18,7 @@ import { RateLimiter, clientIp, tooManyRequests } from '../../libs/server/src/ra
 import { applyCors } from '../../libs/server/src/cors';
 import { eraseAccount } from '../../libs/server/src/account-erase';
 import { configuredProviders } from '../../libs/server/src/erase-providers';
+import { report } from '../../libs/server/src/report';
 
 /**
  * POST /api/demo/session — hands an anonymous visitor a signed-in account.
@@ -105,6 +106,7 @@ async function sweepExpired(): Promise<void> {
       }
     } catch (error) {
       console.error(`[demo/session] sweep could not erase ${user.id}:`, error);
+      await report(error, { route: 'demo/sweep', userId: user.id, level: 'warning' });
     }
   }
 }
@@ -239,6 +241,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[demo/session]', message);
+    await report(error, { route: 'demo/session' });
     return res.status(500).json({ message: 'Could not start a demo session' });
   }
 }

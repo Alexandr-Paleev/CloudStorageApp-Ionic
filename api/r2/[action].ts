@@ -25,6 +25,7 @@ import {
 } from '../../libs/server/src/rate-limit';
 import { applyCors } from '../../libs/server/src/cors';
 import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
+import { report } from '../../libs/server/src/report';
 
 /**
  * Everything R2, behind one serverless function.
@@ -394,6 +395,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error(`R2 ${name} error:`, error);
+    if (!(error instanceof AuthError)) await report(error, { route: `r2/${name}` });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

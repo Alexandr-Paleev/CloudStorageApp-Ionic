@@ -27,6 +27,7 @@ import {
   tooManyRequests,
 } from '../../libs/server/src/rate-limit';
 import { applyCors } from '../../libs/server/src/cors';
+import { report } from '../../libs/server/src/report';
 
 /**
  * The two halves of semantic search that need a secret:
@@ -360,7 +361,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
        a client that reads it comes back after midnight UTC rather than in a
        second. */
     if (error instanceof BudgetSpent) {
-      if (error.scope === 'deployment') console.warn('[ai]', error.message);
+      /* The deployment's budget is the one its owner sets, and reaching it is
+         worth knowing about the same day. */
+      if (error.scope === 'deployment') {
+        console.warn('[ai]', error.message);
+        await report(error, { route: 'ai', level: 'warning' });
+      }
       tooManyRequests(res, secondsUntilTomorrow(), error.message);
       return;
     }
@@ -380,6 +386,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    if (!(error instanceof AuthError)) await report(error, { route: 'ai' });
     res.status(error instanceof AuthError ? 401 : 500).json({
       message: error instanceof Error ? error.message : 'Unknown server error',
     });

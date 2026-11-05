@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
 import { refreshAccessToken } from '../../libs/server/src/dropbox';
 import { applyCors } from '../../libs/server/src/cors';
+import { report } from '../../libs/server/src/report';
 
 /**
  * Hands the caller a fresh access token for their own Dropbox connection.
@@ -43,6 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // The user revoked access on Dropbox's side, or the token was rotated.
       // Drop the dead row so the app offers to reconnect instead of retrying.
       console.error('Dropbox refresh failed, clearing connection:', refreshError);
+      await report(refreshError, { route: 'dropbox/token', userId, level: 'warning' });
       await supabase.from('dropbox_connections').delete().eq('user_id', userId);
       return res.status(404).json({ message: 'Dropbox session expired. Please reconnect.' });
     }
@@ -54,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Dropbox token error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'dropbox/token' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

@@ -20,6 +20,7 @@ const {
   createSignedUrl,
   presign,
   rpc,
+  report,
 } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticate: vi.fn(),
@@ -34,6 +35,7 @@ const {
   createSignedUrl: vi.fn(),
   presign: vi.fn(),
   rpc: vi.fn(),
+  report: vi.fn(),
 }));
 
 vi.mock('../../libs/server/src/auth', () => ({
@@ -64,6 +66,10 @@ vi.mock('../../libs/server/src/r2', () => ({
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: (...args: unknown[]) => presign(...args),
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './[action]';
@@ -407,6 +413,19 @@ describe('index', () => {
       expect(embed).not.toHaveBeenCalled();
     }
   );
+
+  /* The deployment's limit is the one its owner set, and reaching it is worth
+     knowing the same day. An account reaching its own is the limit working. */
+  it('reports the deployment\u2019s budget running out, and not an account\u2019s', async () => {
+    rpc.mockResolvedValue({ data: 'account', error: null });
+    await handler(index('file-1'), mockResponse());
+    expect(report).not.toHaveBeenCalled();
+
+    rpc.mockResolvedValue({ data: 'deployment', error: null });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await handler(index('file-1'), mockResponse());
+    expect(report).toHaveBeenCalledWith(expect.any(Error), { route: 'ai', level: 'warning' });
+  });
 
   it('refuses to pay when the budget cannot be checked', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'connection reset' } });

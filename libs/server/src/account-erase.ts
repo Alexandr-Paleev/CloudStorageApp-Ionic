@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { report } from './report';
 
 /**
  * Erases everything one account owns, in the order the foreign keys demand.
@@ -178,6 +179,14 @@ export async function eraseAccount(userId: string, deps: EraseDeps): Promise<Era
     } catch (error) {
       failures.push(name);
       console.error(`Account erase: ${name} failed for ${userId}:`, error);
+      /* The account goes regardless, and what stayed behind has to be swept
+         by hand: this is the one place that knows it is there. */
+      await report(error, {
+        route: 'account/erase',
+        userId,
+        level: 'warning',
+        extra: { provider: name },
+      });
     }
   }
 
