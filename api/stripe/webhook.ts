@@ -8,6 +8,7 @@ import Stripe from 'stripe';
 import { supabase } from '../../libs/server/src/auth';
 import { getPeriodEnd, isMissingInStripe } from '../../libs/server/src/stripe';
 import { TIER_LIMITS } from '../../libs/core/src/tiers';
+import { report } from '../../libs/server/src/report';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -180,6 +181,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ received: true });
   } catch (handlerError) {
     console.error('Webhook handler error:', handlerError);
+    /* Stripe retries a failed event for three days, and in that time a
+       payment can sit unapplied: the one failure here that costs a customer
+       something. */
+    await report(handlerError, { route: 'stripe/webhook', extra: { event: event.type } });
     return res.status(500).json({ message: 'Webhook handler failed' });
   }
 }

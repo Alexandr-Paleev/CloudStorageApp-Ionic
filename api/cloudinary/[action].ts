@@ -12,6 +12,7 @@ import {
 } from '../../libs/server/src/rate-limit';
 import { applyCors } from '../../libs/server/src/cors';
 import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
+import { report } from '../../libs/server/src/report';
 
 /**
  * Two actions, one serverless function: /api/cloudinary/sign and
@@ -284,6 +285,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     } else {
       console.error(`[Cloudinary] Deletion failed:`, result);
+      await report(new Error(`Cloudinary did not delete an asset: ${result.result}`), {
+        route: 'cloudinary/delete',
+        userId,
+      });
       res.status(500).json({
         message: `Failed to delete file from Cloudinary: ${result.result}`,
         details: result,
@@ -296,6 +301,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // one, and a mismatch turned every failure here — an expired session, a
     // missing migration — into a bare "Failed to authorize the upload".
     console.error('[cloudinary]', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'cloudinary' });
     res.status(error instanceof AuthError ? 401 : 500).json({
       message: error instanceof Error ? error.message : 'Unknown server error',
     });

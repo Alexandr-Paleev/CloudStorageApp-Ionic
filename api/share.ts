@@ -18,6 +18,7 @@ import { SITE_ORIGIN } from '../libs/core/src/origins';
 import { shareLinkUrl } from '../libs/core/src/share-link';
 import { signOwnedPath } from '../libs/server/src/sign-owned-path';
 import { storedUrlIsOnItsProvider } from '../libs/server/src/stored-url';
+import { report } from '../libs/server/src/report';
 
 /**
  * Public share links.
@@ -305,6 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Share error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'share' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

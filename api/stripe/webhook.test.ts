@@ -8,7 +8,8 @@ import {
 } from '../../libs/server/src/test-utils';
 import { TIER_LIMITS } from '../../libs/core/src/tiers';
 
-const { db, stripe } = vi.hoisted(() => ({
+const { db, stripe, report } = vi.hoisted(() => ({
+  report: vi.fn(),
   db: {
     client: null as { from: (table: string) => unknown } | null,
     calls: [] as { table: string; op: string; args?: unknown[] }[],
@@ -34,6 +35,10 @@ vi.mock('stripe', () => ({
     webhooks = { constructEvent: stripe.constructEvent };
     subscriptions = { list: stripe.listSubscriptions };
   },
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './webhook';
@@ -366,6 +371,19 @@ describe('webhook: when Stripe cannot be asked', () => {
 
     expect(res.statusCode).toBe(500);
     expect(db.calls).toHaveLength(0);
+  });
+
+  /* Stripe retries for three days, and the logs of a Hobby project last an
+     hour: a payment could sit unapplied with nobody told. */
+  it('reports the failure, with the event it was handling', async () => {
+    stripe.listSubscriptions.mockRejectedValue(new Error('api.stripe.com unreachable'));
+    deliver('customer.subscription.updated', subscription());
+    await handler(post(), mockResponse());
+
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'stripe/webhook',
+      extra: { event: 'customer.subscription.updated' },
+    });
   });
 });
 

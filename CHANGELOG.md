@@ -30,6 +30,17 @@ reasoning behind the larger decisions lives in
   left to write: their specifications are tests, worked out by hand, that skip
   until the code exists, and nine typical mistakes were checked to fail them.
   There is no number yet; the first comes with the vectors.
+- **The functions report their failures to Sentry.** They wrote them to the
+  console, and Vercel keeps a Hobby project's runtime logs for an hour: a
+  webhook that failed at night, an erase that left a bucket behind or a model
+  that refused was gone before anyone looked. `libs/server/src/report.ts` sends
+  each 500, each provider an erase could not reach, a demo account the sweep
+  could not erase, and the day the deployment's AI budget runs out. It is one
+  POST in Sentry's envelope format rather than the Node SDK, which would load
+  OpenTelemetry on every cold start. Decision 0015 holds for it as for the
+  browser: an address loses its query string, a stored path the file's name.
+  It sends to `SENTRY_DSN`, or the browser's `VITE_SENTRY_DSN` where that is
+  unset, and nothing under Vitest.
 
 ### Changed
 

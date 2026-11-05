@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
 import { authenticateUser, AuthError, supabase } from '../../libs/server/src/auth';
 import { applyCors } from '../../libs/server/src/cors';
+import { report } from '../../libs/server/src/report';
 
 /** Forgets the stored refresh token. Disconnecting has to happen server-side
  *  now that the browser no longer holds one. */
@@ -23,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Dropbox disconnect error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'dropbox/disconnect' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

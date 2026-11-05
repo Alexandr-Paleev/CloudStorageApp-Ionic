@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
 import { isLiveKey } from '../../libs/server/src/stripe';
+import { report } from '../../libs/server/src/report';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
 import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../libs/server/src/rate-limit';
@@ -122,6 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Checkout error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/checkout' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

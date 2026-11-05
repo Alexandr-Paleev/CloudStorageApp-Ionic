@@ -4,6 +4,7 @@ import { authenticateUser, AuthError, supabase } from '../../libs/server/src/aut
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
 import { BILLING_LIMIT, RateLimiter, tooManyRequests } from '../../libs/server/src/rate-limit';
+import { report } from '../../libs/server/src/report';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -53,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Portal error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/portal' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

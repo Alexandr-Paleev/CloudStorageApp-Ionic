@@ -491,6 +491,11 @@ Analytics are automatically enabled in production when environment variables are
 > described by the `alt`, `title` and `aria-label` of what was tapped, which
 > hold no name, and a test describes each element of the rendered pages with
 > Sentry's own function (`src/test/sentry.ts`).
+>
+> The functions report their failures too, through `libs/server/src/report.ts`,
+> with the same two cuts: an address loses its query string, a stored path the
+> name after the owner's id. They send to `SENTRY_DSN` where it is set, and to
+> the browser's `VITE_SENTRY_DSN` otherwise, which is the same project.
 
 ### 4. Run Application
 
@@ -523,7 +528,7 @@ The app will be available at: `http://localhost:8100`
 - **Backend API**: Vercel Functions
 - **Testing**: Vitest (node and jsdom projects) + Playwright (e2e), run in GitHub Actions
 - **Analytics**: Google Analytics 4 (GA4) + Hotjar
-- **Error Tracking**: Sentry
+- **Error Tracking**: Sentry, in the browser through its SDK and in the functions through one envelope POST each
 
 ## 🏗️ Architecture
 

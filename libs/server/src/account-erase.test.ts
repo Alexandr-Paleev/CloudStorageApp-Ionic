@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { report } = vi.hoisted(() => ({ report: vi.fn() }));
+vi.mock('./report', () => ({ report: (...args: unknown[]) => report(...args) }));
+
 import { BillingNotClosed, eraseAccount } from './account-erase';
 
 const USER = 'user-1';
@@ -121,6 +125,21 @@ describe('eraseAccount', () => {
     expect(failures).toEqual(['r2']);
     expect(s.deletedFrom).toEqual(['files', 'folders']);
     expect(s.client.auth.admin.deleteUser).toHaveBeenCalledWith(USER);
+  });
+
+  /* "Reported so it can be swept later" meant a log line that a Hobby project
+     keeps for an hour. */
+  it('reports what it left behind, and in which provider', async () => {
+    const eraseR2 = vi.fn().mockRejectedValue(new Error('bucket unreachable'));
+
+    await eraseAccount(USER, { supabase: s.client as never, eraseR2 });
+
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'account/erase',
+      userId: USER,
+      level: 'warning',
+      extra: { provider: 'r2' },
+    });
   });
 
   /* The opposite case: failing to delete the user is the request not being

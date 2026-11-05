@@ -237,3 +237,17 @@ is off now: a setting in Google Analytics, which no line here can switch.
 With both, the same visit sends one page view per page. A route that only
 redirects is still reported on its way through, `/dashboard` on the way to
 `/login` for a visitor who is not signed in.
+
+## Update — 2026-11-01
+
+**The functions report to Sentry as well, under the same rules.** They wrote
+their failures to the console, and Vercel keeps a Hobby project's runtime logs
+for an hour, so a webhook that failed at night or an erase that left a bucket
+behind was gone before anyone read it. `libs/server/src/report.ts` sends each
+failure to Sentry as one envelope, without the SDK, and cuts what this record
+keeps from a collector out of the message and the stack first: an address
+loses its query string and fragment, where a signed URL keeps its token, and
+a stored path loses everything after the owner's id, to the end of the line,
+since a name can have spaces in it. The account is named by its id. Under
+Vitest nothing is sent, because the tests take routes to their failures on
+purpose and a developer's `.env` holds the DSN.

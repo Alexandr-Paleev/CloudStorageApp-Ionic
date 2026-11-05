@@ -3,6 +3,7 @@ import { authenticateUser, AuthError, supabase } from '../../libs/server/src/aut
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { assertSameOrigin, exchangeCode } from '../../libs/server/src/dropbox';
 import { applyCors } from '../../libs/server/src/cors';
+import { report } from '../../libs/server/src/report';
 
 /**
  * Exchanges the OAuth code for tokens and keeps the refresh token here.
@@ -62,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Dropbox callback error:', error);
+    if (!(error instanceof AuthError)) await report(error, { route: 'dropbox/callback' });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }
