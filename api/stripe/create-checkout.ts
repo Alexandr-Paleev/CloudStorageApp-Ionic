@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import Stripe from 'stripe';
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
-import { isLiveKey } from '../../libs/server/src/stripe';
+import { holdsASubscription, isLiveKey } from '../../libs/server/src/stripe';
 import { report } from '../../libs/server/src/report';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import { applyCors } from '../../libs/server/src/cors';
@@ -14,6 +14,77 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
    this project does not control. */
 const byUser = new RateLimiter(BILLING_LIMIT);
 
+/* Room for a double click and a second tab, and no more: the customer and
+   the session are both created under a key of the account and this window.
+   Stripe keeps a key for a day at least and answers it with whatever it
+   answered first, a failure included, so a key for the account alone would
+   turn one failed create into a day of refused checkouts. */
+const KEY_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * The account's Stripe customer, created where it has none, and only once.
+ *
+ * Two checkouts started together each used to create one. The profile kept
+ * the one stored last, but both sessions stayed open, and a subscription paid
+ * for in the other found no profile: the webhook answered 500 for the three
+ * days Stripe retries, and Pro never came. Now a create repeated with the
+ * same idempotency key gets back the customer the first one made, and the id
+ * is stored only where none is yet, so a checkout that loses the race takes
+ * the winner's.
+ */
+async function customerFor(userId: string, email: string | null, slot: number): Promise<string> {
+  const customer = await stripe.customers.create(
+    { email: email ?? undefined, metadata: { supabase_user_id: userId } },
+    // The account's id, which the customer's metadata holds anyway: the key
+    // tells Stripe nothing it is not already told.
+    { idempotencyKey: `customer-${userId}-${slot}` }
+  );
+
+  // Cannot be swallowed: without this id the webhook has no way to find the
+  // profile later, and a paid subscription would never be applied.
+  const { data: stored, error: updateError } = await supabase
+    .from('profiles')
+    .update({ stripe_customer_id: customer.id })
+    .eq('id', userId)
+    .is('stripe_customer_id', null)
+    .select('id');
+
+  if (updateError) {
+    throw new Error(`Failed to store Stripe customer id: ${updateError.message}`);
+  }
+  if (stored?.length) return customer.id;
+
+  const { data: winner, error: readError } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .single();
+
+  if (readError || !winner?.stripe_customer_id) {
+    throw new Error(
+      `Failed to read the Stripe customer id another checkout stored: ${readError?.message ?? 'none'}`
+    );
+  }
+
+  /* Made in another window than the winner's, so a customer of its own. It
+     holds the account's email and nothing else, and deleting the account
+     would never find it. */
+  if (winner.stripe_customer_id !== customer.id) {
+    try {
+      await stripe.customers.del(customer.id);
+    } catch (error) {
+      console.warn(`Checkout: could not delete the extra customer ${customer.id}:`, error);
+      await report(error, {
+        route: 'stripe/checkout',
+        userId,
+        level: 'warning',
+        extra: { customer: customer.id },
+      });
+    }
+  }
+  return winner.stripe_customer_id;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   /* Before anything else: a preflight from the native shell carries no
      Authorization header, and everything below expects one. */
@@ -23,9 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Outside the try, so that a failure is reported with the account it was for.
+  let userId: string | undefined;
+
   try {
     const user = await authenticate(req);
-    const userId = user.id;
+    userId = user.id;
 
     /* Keyed on the user rather than the address: the route is authenticated, so
        there is a better key than an IP, and a shared office should not share a
@@ -64,66 +138,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    let customerId = profile.stripe_customer_id;
+    // One window for both keys, read once, so that they agree.
+    const slot = Math.floor(Date.now() / KEY_WINDOW_MS);
 
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: profile.email ?? undefined,
-        metadata: { supabase_user_id: userId },
-      });
-      customerId = customer.id;
-
-      // Cannot be swallowed: without this id the webhook has no way to find the
-      // profile later, and a paid subscription would never be applied.
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', userId);
-
-      if (updateError) {
-        throw new Error(`Failed to store Stripe customer id: ${updateError.message}`);
-      }
-    }
+    const customerId: string =
+      profile.stripe_customer_id ?? (await customerFor(userId, profile.email, slot));
 
     // The client hides the upgrade button for Pro users, but this route is
     // reachable directly — without this check a second checkout creates a
-    // second subscription and Stripe bills for both.
-    const activeSubscriptions = await stripe.subscriptions.list({
+    // second subscription and Stripe bills for both. Not only an active one
+    // (see holdsASubscription); the client takes a 409 to the portal, where a
+    // failed card is fixed. Without a status, Stripe lists every subscription
+    // that has not been cancelled.
+    const { data: subscriptions } = await stripe.subscriptions.list({
       customer: customerId,
-      status: 'active',
-      limit: 1,
+      limit: 100,
     });
 
-    if (activeSubscriptions.data.length > 0) {
+    if (subscriptions.some(holdsASubscription)) {
       return res.status(409).json({ message: 'Subscription already active' });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID_PRO_MONTHLY!,
-          quantity: 1,
-        },
-      ],
-      /* A path and nothing after it. This used to end in
-         `?session_id={CHECKOUT_SESSION_ID}`, which nothing in the app ever
-         read: the page it leads to asks for the profile again, and the tier
-         is written by the webhook. What it did do was put the id of a
-         payment into an address the app's analytics were then told. An
-         address carries what something reads, and nothing more: decision
-         0015. */
-      success_url: `${appUrl}/subscription/success`,
-      cancel_url: `${appUrl}/pricing`,
-      metadata: { supabase_user_id: userId },
-    });
+    /* Under a key, as the customer is. Two checkouts started together each
+       opened a session of their own, and each could be paid: two
+       subscriptions on one customer, both billed. Now a second one in the
+       same window gets the session the first opened, and a session is paid
+       once. */
+    const session = await stripe.checkout.sessions.create(
+      {
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [
+          {
+            price: process.env.STRIPE_PRICE_ID_PRO_MONTHLY!,
+            quantity: 1,
+          },
+        ],
+        /* A path and nothing after it. This used to end in
+           `?session_id={CHECKOUT_SESSION_ID}`, which nothing in the app ever
+           read: the page it leads to asks for the profile again, and the tier
+           is written by the webhook. What it did do was put the id of a
+           payment into an address the app's analytics were then told. An
+           address carries what something reads, and nothing more: decision
+           0015. */
+        success_url: `${appUrl}/subscription/success`,
+        cancel_url: `${appUrl}/pricing`,
+        metadata: { supabase_user_id: userId },
+      },
+      { idempotencyKey: `checkout-${userId}-${slot}` }
+    );
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     console.error('Checkout error:', error);
-    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/checkout' });
+    if (!(error instanceof AuthError)) await report(error, { route: 'stripe/checkout', userId });
     return res.status(error instanceof AuthError ? 401 : 500).json({ message });
   }
 }

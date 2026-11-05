@@ -17,6 +17,7 @@ const { db, stripe, report } = vi.hoisted(() => ({
   stripe: {
     constructEvent: vi.fn(),
     listSubscriptions: vi.fn(),
+    retrieveCustomer: vi.fn(),
   },
 }));
 
@@ -34,6 +35,7 @@ vi.mock('stripe', () => ({
   default: class {
     webhooks = { constructEvent: stripe.constructEvent };
     subscriptions = { list: stripe.listSubscriptions };
+    customers = { retrieve: stripe.retrieveCustomer };
   },
 }));
 
@@ -64,7 +66,7 @@ function stripeHolds(...subscriptions: unknown[]) {
   stripe.listSubscriptions.mockResolvedValue({ data: subscriptions });
 }
 
-function withProfiles(answer: TableAnswer = { data: [{ id: 'profile-1' }] }) {
+function withProfiles(answer: TableAnswer | TableAnswer[] = { data: [{ id: 'profile-1' }] }) {
   const mock = mockSupabase({ profiles: answer });
   db.client = mock.client;
   db.calls = mock.calls;
@@ -91,6 +93,8 @@ beforeEach(() => {
   withProfiles();
   stripeHolds(subscription());
   deliver('unknown.event', {});
+  // A customer made somewhere other than create-checkout names no account.
+  stripe.retrieveCustomer.mockResolvedValue({ id: CUSTOMER, metadata: {} });
 });
 
 describe('webhook: signature', () => {
@@ -180,7 +184,7 @@ describe('webhook: checkout completed', () => {
     expect(db.calls).toHaveLength(0);
   });
 
-  it('reports failure when no profile matches the customer', async () => {
+  it('reports failure when no profile matches the customer, and the customer names no account', async () => {
     // Returning 200 here would let Stripe consider a lost upgrade delivered.
     // A downgrade with no profile is acknowledged instead: see the events an
     // account deletion sets off, below.
@@ -200,11 +204,173 @@ describe('webhook: checkout completed', () => {
   });
 });
 
+/* Two checkouts started together used to create a customer each, and the
+   profile kept the one stored last: a payment in the other found no profile,
+   and Pro never came. Every customer create-checkout makes names its account
+   in its metadata. */
+describe('webhook: a payment from a customer no profile names', () => {
+  const OWNER = 'user-1';
+
+  /** The three reads and writes of profiles, in order: the upgrade by
+   *  customer, the profile the customer names, the move. */
+  function profileNames(named: string | null, moved: TableAnswer = { data: [{ id: OWNER }] }) {
+    withProfiles([{ data: [] }, { data: [{ stripe_customer_id: named }] }, moved]);
+  }
+
+  /** What Stripe holds for the paying customer, and for the one the profile
+   *  names. */
+  function stripeHoldsForBoth(theirs: unknown[]) {
+    stripe.listSubscriptions.mockImplementation(async ({ customer }: { customer: string }) => ({
+      data: customer === CUSTOMER ? [subscription()] : theirs,
+    }));
+  }
+
+  beforeEach(() => {
+    deliver('checkout.session.completed', { subscription: 'sub_test', customer: CUSTOMER });
+    stripe.retrieveCustomer.mockResolvedValue({
+      id: CUSTOMER,
+      metadata: { supabase_user_id: OWNER },
+    });
+  });
+
+  it('moves the profile to the paying customer when the one it names bills nothing', async () => {
+    profileNames('cus_abandoned');
+    stripeHoldsForBoth([]);
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lastUpdate()).toMatchObject({
+      tier: 'pro',
+      stripe_subscription_id: 'sub_test',
+      stripe_customer_id: CUSTOMER,
+    });
+    expect(stripe.listSubscriptions).toHaveBeenLastCalledWith({
+      customer: 'cus_abandoned',
+      limit: 100,
+    });
+    // Only over the customer that was read: a checkout may store one between.
+    expect(db.calls).toContainEqual({
+      table: 'profiles',
+      op: 'eq',
+      args: ['stripe_customer_id', 'cus_abandoned'],
+    });
+  });
+
+  /* An unpaid subscription charges nothing, so it is not a second payment:
+     the profile follows the customer that pays. Held as a subscription by
+     create-checkout (holdsASubscription), it is not billing here (isBilling). */
+  it.each(['unpaid', 'paused'])(
+    'moves the profile when the one it names is only %s',
+    async (status) => {
+      profileNames('cus_abandoned');
+      stripeHoldsForBoth([subscription({ id: 'sub_old', customer: 'cus_abandoned', status })]);
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(200);
+      expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_customer_id: CUSTOMER });
+      expect(report).not.toHaveBeenCalled();
+    }
+  );
+
+  it('links a profile that names no customer at all', async () => {
+    profileNames(null);
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_customer_id: CUSTOMER });
+    expect(db.calls).toContainEqual({
+      table: 'profiles',
+      op: 'is',
+      args: ['stripe_customer_id', null],
+    });
+  });
+
+  /* The account pays twice, which no webhook can undo, and a retry would not
+     change that: the profile stays with the customer it names, and the owner
+     is told, to refund one. */
+  it('keeps the profile where it is when the customer it names bills too, and says so', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    profileNames('cus_paying');
+    stripeHoldsForBoth([subscription({ id: 'sub_other', customer: 'cus_paying' })]);
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(db.calls.filter((call) => call.op === 'update')).toHaveLength(1);
+    expect(lastUpdate()).not.toHaveProperty('stripe_customer_id');
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          `pays twice: customers cus_paying and ${CUSTOMER} are both billing. ` +
+            `The profile keeps cus_paying: refund and cancel the subscription of ${CUSTOMER}`
+        ),
+      }),
+      {
+        route: 'stripe/webhook',
+        userId: OWNER,
+      }
+    );
+  });
+
+  it('answers 500 when the account the customer names has no profile', async () => {
+    withProfiles([{ data: [] }, { data: [] }]);
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(db.calls.filter((call) => call.op === 'update')).toHaveLength(1);
+  });
+
+  /* A checkout stored a customer between the read and the move: Stripe
+     delivers again, and the next attempt decides against what it stored. */
+  it('answers 500 when the profile changed while it was being upgraded', async () => {
+    profileNames('cus_abandoned', { data: [] });
+    stripeHoldsForBoth([]);
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(500);
+  });
+});
+
 describe('webhook: subscription updated', () => {
   it('upgrades when Stripe holds an active subscription', async () => {
     deliver('customer.subscription.updated', subscription());
     await handler(post(), mockResponse());
     expect(lastUpdate()).toMatchObject({ tier: 'pro' });
+  });
+
+  /* Two sessions paid before either payment landed: one customer, two
+     subscriptions, both billed. The profile has room for one, so nothing
+     else would ever say so. */
+  it('follows the newest of two active subscriptions, and says the account pays twice', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    stripeHolds(subscription({ id: 'sub_new' }), subscription({ id: 'sub_old' }));
+    deliver('customer.subscription.updated', subscription({ id: 'sub_new' }));
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lastUpdate()).toMatchObject({ tier: 'pro', stripe_subscription_id: 'sub_new' });
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          `Customer ${CUSTOMER} pays twice: sub_new, sub_old are all active`
+        ),
+      }),
+      { route: 'stripe/webhook', extra: { customer: CUSTOMER } }
+    );
+  });
+
+  it('says nothing of a second payment when one subscription is active', async () => {
+    stripeHolds(subscription(), subscription({ id: 'sub_ended', status: 'canceled' }));
+    deliver('customer.subscription.updated', subscription());
+    await handler(post(), mockResponse());
+
+    expect(report).not.toHaveBeenCalled();
   });
 
   it('marks a past_due subscription without touching the tier', async () => {

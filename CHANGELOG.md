@@ -70,6 +70,23 @@ reasoning behind the larger decisions lives in
   checked before an upload starts rather than after the bytes have arrived,
   so a name the row would refuse, such as `nul.pdf` or one of three hundred
   characters, no longer travels to the provider first.
+- **Two checkouts started together could lose the payment.** Each created a
+  Stripe customer. The profile kept the one stored last, but both sessions
+  stayed open, and a subscription paid for in the other found no profile: the
+  webhook answered 500 for the three days Stripe retries, and Pro never came.
+  The customer is now created under an idempotency key, so Stripe answers both
+  with the same one, and stored only where the profile has none, so a checkout
+  that loses the race uses the winner's. The session is created under a key
+  too, so a double click or a second tab gets the session the first opened,
+  and a session is paid once. The webhook, handed a payment from a customer no
+  profile names, finds the account in that customer's metadata and moves the
+  profile to it, unless the customer the profile names is billing too: an
+  account paying twice is reported, with which subscription to refund, not
+  retried. Two active subscriptions on one customer are reported the same way.
+  A checkout is also refused beside every subscription Stripe's
+  one-subscription setting holds, `past_due`, `unpaid` and `paused`, and beside
+  a `trialing` one, not only an `active` one, so that the plans page and Stripe
+  agree on who has a subscription already.
 
 ### Security
 

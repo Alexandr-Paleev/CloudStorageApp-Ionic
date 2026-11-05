@@ -99,16 +99,19 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     // .single() unwraps to one row — or to PGRST116 when there is none. Keeping
     // that difference matters: a bare [] would read as truthy and let a "no
     // profile row" test pass while the handler took the happy path.
-    let single = false;
+    // .maybeSingle() unwraps the same way but answers no row with null and no
+    // error, as supabase-js does.
+    let unwrap: 'rows' | 'single' | 'maybeSingle' = 'rows';
 
     const settled = () => {
       const answer = answerFor(table);
       const rows = answer.data ?? [];
       if (answer.error) return Promise.resolve({ data: null, error: answer.error });
-      if (!single) return Promise.resolve({ data: rows, error: null });
+      if (unwrap === 'rows') return Promise.resolve({ data: rows, error: null });
+      if (rows.length > 0) return Promise.resolve({ data: rows[0], error: null });
       return Promise.resolve(
-        rows.length > 0
-          ? { data: rows[0], error: null }
+        unwrap === 'maybeSingle'
+          ? { data: null, error: null }
           : { data: null, error: { code: 'PGRST116', message: 'no rows returned' } }
       );
     };
@@ -116,10 +119,19 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
     const chain: Record<string, unknown> = {
       then: (...args: Parameters<Promise<unknown>['then']>) => settled().then(...args),
     };
-    for (const method of ['select', 'eq', 'limit', 'range', 'order', 'single', 'maybeSingle']) {
+    for (const method of ['select', 'limit', 'range', 'order', 'single', 'maybeSingle']) {
       chain[method] = () => {
         calls.push({ table, op: method });
-        if (method === 'single' || method === 'maybeSingle') single = true;
+        if (method === 'single' || method === 'maybeSingle') unwrap = method;
+        return chain;
+      };
+    }
+    // These two keep their arguments, unlike the rest: `.eq(column, value)`
+    // and `.is(column, null)` are what make a write conditional, and a test
+    // has to see on which column, and against what.
+    for (const method of ['eq', 'is']) {
+      chain[method] = (...args: unknown[]) => {
+        calls.push({ table, op: method, args });
         return chain;
       };
     }
