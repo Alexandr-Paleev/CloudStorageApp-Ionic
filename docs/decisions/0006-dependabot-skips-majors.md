@@ -48,13 +48,18 @@ family so that `@aws-sdk`'s three packages move together.
   pulled within days, and what is merged is installed by the run on `main`,
   which goes on to give the end-to-end job the production database's
   service-role key. Dependabot already waited three days unasked. Only version
-  updates wait. Dependabot's security updates skip the cooldown, but they are a
-  setting of the repository, and while they are off the fix for a known
-  vulnerability is a version update and waits the week like any other: the
-  fix for the three vite advisories above was to come that way. Its
-  alert does not wait, and neither does the production audit, which fails CI
-  on a high one in what ships. The Python of `evals/` is not Dependabot's: its
-  `pyproject.toml` takes nothing published in the two weeks before the lock
-  was made, and moving that date is how it is updated.
+  updates wait. Dependabot's security updates skip the cooldown, and they were
+  switched on in the repository's settings on 2026-11-06, with this amendment:
+  until then the fix for a known vulnerability was a version update, as the
+  fix for the three vite advisories above was to be, and it would have waited
+  the week like any other. They also reach a fix that only a major carries:
+  for a security update Dependabot applies an ignore's `versions` and not its
+  `update-types` (`ignore_condition.rb` in dependabot-core), and the ignore
+  here has no `versions`. That is the gap the README's postmortem is about.
+  They have to stay on. With them off, only the
+  alert would say so at once, and the production audit, which fails CI on a
+  high one in what ships, at the next push. The Python of `evals/` is not
+  Dependabot's: its `pyproject.toml` takes nothing published in the two weeks
+  before the lock was made, and moving that date is how it is updated.
 - Majors are still owed a periodic manual pass. Nothing automates that, and this
   record does not pretend otherwise.
