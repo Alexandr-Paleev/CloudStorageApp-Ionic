@@ -42,15 +42,24 @@ family so that `@aws-sdk`'s three packages move together.
   against vite 8.2.2 had no pull request to carry the fix. Every update is in a
   group now — the families, and `runtime` and `tooling` for the rest — and the
   limit stays above the number of groups. The comment above the limit says why.
-- *Amended on 2026-11-01:* an update is proposed a week after its release at
+- *Amended in v4.14.0:* an update is proposed a week after its release at
   the earliest (`cooldown`, `default-days: 7`), for npm and for the actions.
   A version published from a maintainer's stolen account is usually found and
   pulled within days, and what is merged is installed by the run on `main`,
   which goes on to give the end-to-end job the production database's
-  service-role key. Dependabot already waited three days unasked. Security
-  updates are not held back, and neither is the production audit. The Python
-  of `evals/` is not Dependabot's: its `pyproject.toml` takes nothing published
-  in the two weeks before the lock was made, and moving that date is how it
-  is updated.
+  service-role key. Dependabot already waited three days unasked. Only version
+  updates wait. Dependabot's security updates skip the cooldown, and they were
+  switched on in the repository's settings on 2026-11-06, with this amendment:
+  until then the fix for a known vulnerability was a version update, as the
+  fix for the three vite advisories above was to be, and it would have waited
+  the week like any other. They also reach a fix that only a major carries:
+  for a security update Dependabot applies an ignore's `versions` and not its
+  `update-types` (`ignore_condition.rb` in dependabot-core), and the ignore
+  here has no `versions`. That is the gap the README's postmortem is about.
+  They have to stay on. With them off, only the
+  alert would say so at once, and the production audit, which fails CI on a
+  high one in what ships, at the next push. The Python of `evals/` is not
+  Dependabot's: its `pyproject.toml` takes nothing published in the two weeks
+  before the lock was made, and moving that date is how it is updated.
 - Majors are still owed a periodic manual pass. Nothing automates that, and this
   record does not pretend otherwise.
