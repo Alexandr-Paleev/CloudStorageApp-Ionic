@@ -1,6 +1,6 @@
 # Terms of Service for Cloud Storage App
 
-**Last Updated:** November 1, 2026
+**Last Updated:** November 5, 2026
 
 ## 1. Acceptance of Terms
 
@@ -131,7 +131,7 @@ We may terminate your account if:
 - You engage in fraudulent activity
 - Required by law
 
-A demo account, opened without signing up, is kept for 24 hours and then deleted with its files when the next demo account is opened.
+A demo account, opened without signing up, is kept for up to 24 hours and then deleted with its files when the next demo account is opened. While every demo place is taken, one that is more than an hour old is deleted sooner, to make room for the next visitor.
 
 ## 10. Disclaimers
 

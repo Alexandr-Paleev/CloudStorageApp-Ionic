@@ -159,10 +159,15 @@ reasoning behind the larger decisions lives in
   hour. A share link is a page on this project's own domain that says
   "Shared with you", which is where a page asking for a password would go,
   and a provider that finds one can suspend the whole account it is on. A
-  demo account now stores at most 10 MB whatever writes its limit, and no
-  more than twenty exist at once, 200 MB of the 1 GB the project's storage
-  has. Triggers on `profiles` hold both
-  (`migrations/019_hold_demo_storage.sql`). A visitor who finds the demo full
+  demo account's quota is now 10 MB whatever writes its limit, and no more
+  than twenty exist at once: 200 MB of the 1 GB the project's storage has,
+  of what the quota counts. It counts rows, as for every account (decision
+  0004), so bytes put in a bucket with no row are still counted by nothing.
+  Triggers on `profiles` hold both
+  (`migrations/019_hold_demo_storage.sql`), and the app says so: the plans
+  page tells a demo account it stores 10 MB on either plan, the dashboard no
+  longer offers it Pro's 5 GB, and the welcome file seeded into it no longer
+  asks it to make a share link. A visitor who finds the demo full
   takes the place of the oldest demo account once it is an hour old, so that
   one address cannot hold every place for the day, and is told the demo is
   full while none is. A demo account cannot create share links. Every page a

@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 1001 >>
+<< /Length 1064 >>
 stream
 BT
 /F1 22 Tf
@@ -41,31 +41,35 @@ T*
 T*
 /F1 12 Tf
 18 TL
-(  - Open a file and create a share link. It expires in) Tj
+(  - Watch the storage meter. A demo account stores 10 MB,) Tj
 T*
 /F1 12 Tf
 22 TL
-(    7 days and can be revoked from the same screen.) Tj
-T*
-/F1 12 Tf
-18 TL
-(  - Watch the storage meter. The quota is enforced) Tj
-T*
-/F1 12 Tf
-22 TL
-(    server-side when an R2 upload URL is signed.) Tj
+(    and the database refuses an upload past it.) Tj
 T*
 /F1 12 Tf
 18 TL
 (  - Visit Plans. Stripe runs in test mode, so card) Tj
 T*
 /F1 12 Tf
-30 TL
+18 TL
 (    4242 4242 4242 4242 upgrades without charging you.) Tj
 T*
 /F1 12 Tf
+30 TL
+(    The plan changes; a demo account keeps its 10 MB.) Tj
+T*
+/F1 12 Tf
+22 TL
+(A demo account cannot make share links.) Tj
+T*
+/F1 12 Tf
+18 TL
+(This account is yours alone. It is kept for up to a day,) Tj
+T*
+/F1 12 Tf
 26 TL
-(This account is yours alone and is deleted after 24 hours.) Tj
+(or for an hour while every demo place is taken.) Tj
 T*
 /F1 12 Tf
 18 TL
@@ -84,9 +88,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000001294 00000 n 
+0000001357 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-1391
+1454
 %%EOF

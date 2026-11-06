@@ -19,7 +19,9 @@
 -- memory, and an account lives a day: one address would fill the 1 GB of
 -- storage the whole project has on Supabase's free plan, real users' files
 -- included, in five hours. So the database also refuses a demo profile
--- while 20 exist: 200 MB at most, whoever opens them and from where.
+-- while 20 exist: 200 MB of quota at most, whoever opens them and from
+-- where. Of quota: it counts rows (decision 0004), and bytes a script puts
+-- in a bucket with no row it does not count, for these accounts as for any.
 -- The route answers the refusal by erasing the oldest demo account once it is
 -- an hour old and asking again, and with 503 while none is; its sweep frees a
 -- place as an account ages out.

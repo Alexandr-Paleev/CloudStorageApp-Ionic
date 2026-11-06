@@ -19,6 +19,8 @@ import { billingIsOffered } from '../utils/billing.utils';
 import { useProfile } from '../hooks/useProfile';
 import billingService, { SubscriptionExistsError } from '../services/billing.service';
 import { formatMonthlyPrice } from '@cloud-storage/core/plans';
+import { formatStorage } from '@cloud-storage/core/format';
+import { isDemoEmail } from '@cloud-storage/core/demo-address';
 import { TIER_CONFIG } from '../types/billing.types';
 import './Pricing.css';
 import { LEGAL_URL } from '../utils/legal.utils';
@@ -131,6 +133,18 @@ const Pricing: React.FC = () => {
                 <strong>Demo mode.</strong> Stripe runs on test keys here — real cards are declined.
                 Use <code>4242 4242 4242 4242</code> with any future expiry and any CVC. No money
                 changes hands.
+              </span>
+            </div>
+          )}
+
+          {/* The cards below say what each plan stores, and the database holds
+              a demo account to its limit on either one (migrations/019). */}
+          {profile && isDemoEmail(profile.email) && (
+            <div className="pricing-demo-notice" role="note">
+              <IonIcon icon={informationCircle} aria-hidden="true" />
+              <span>
+                <strong>This is a demo account.</strong> It stores{' '}
+                {formatStorage(profile.storage_limit)} on either plan.
               </span>
             </div>
           )}

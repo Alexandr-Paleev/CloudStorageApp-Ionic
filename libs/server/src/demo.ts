@@ -12,10 +12,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { DEMO_ADDRESS_PATTERN, DEMO_EMAIL_PREFIX, isDemoEmail } from '../../core/src/demo-address';
 import { ownerPrefix } from '../../core/src/stored-path';
 
-/** Demo accounts are recognised by this prefix, and deleted by it. */
-export const DEMO_EMAIL_PREFIX = 'demo-';
+/* The address is in libs/core, because the app asks it too. */
+export { DEMO_ADDRESS_PATTERN, DEMO_EMAIL_PREFIX, isDemoEmail };
 
 /** How long a demo account survives before the next request sweeps it up. */
 export const DEMO_TTL_MS = 24 * 60 * 60 * 1000;
@@ -51,7 +52,9 @@ export const DEMO_STORAGE_LIMIT = 10 * 1024 * 1024;
  * DEMO_RATE_LIMIT an hour, the counter is one instance's memory, and an
  * account lives DEMO_TTL_MS: with no count, one address would fill the 1 GB
  * of storage the whole project has on Supabase's free plan, real users'
- * files included, in five hours. Twenty at DEMO_STORAGE_LIMIT is 200 MB.
+ * files included, in five hours. Twenty at DEMO_STORAGE_LIMIT is 200 MB of
+ * quota. The quota counts rows (decision 0004), and bytes a script puts in a
+ * bucket with no row it does not count, for these accounts as for any.
  *
  * Held by the database too (migrations/019), counted under a lock, so two
  * visitors who arrive together cannot both take the last place. The route
@@ -140,22 +143,6 @@ export function demoEmail(now: number = Date.now(), random: () => number = Math.
  *  it each kind of character a password policy can ask for. */
 export function demoPassword(uuid: () => string = randomUUID): string {
   return `Demo!${uuid()}`;
-}
-
-/* The whole address demoEmail() makes. The prefix alone used to be the test,
-   and it matched people: sign-up is open, by e-mail and through Google, and
-   `demo-anna@company.com` is an address its owner can confirm. The sweep
-   erases what this matches, files and all. example.com is reserved (RFC 2606):
-   no mail is delivered there, so no account on it can be confirmed, and
-   Google issues none.
-
-   Text as well as a RegExp: the route counts demo profiles with it, and
-   Postgres reads it with `~` as JavaScript does. */
-export const DEMO_ADDRESS_PATTERN = `^${DEMO_EMAIL_PREFIX}\\d+-[a-z0-9]*@example\\.com$`;
-const DEMO_ADDRESS = new RegExp(DEMO_ADDRESS_PATTERN);
-
-export function isDemoEmail(email: string | undefined): boolean {
-  return typeof email === 'string' && DEMO_ADDRESS.test(email);
 }
 
 /** A demo account past its lifetime. Anything not created by this endpoint is

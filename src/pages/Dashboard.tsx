@@ -30,6 +30,7 @@ import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import type { Folder } from '../services/storage.service';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
+import { isDemoEmail } from '@cloud-storage/core/demo-address';
 import { useState } from 'react';
 import './Dashboard.css';
 
@@ -112,6 +113,7 @@ const Dashboard: React.FC = () => {
             usedBytes={usage.usedBytes}
             storageLimit={usage.storageLimit}
             tier={profile?.tier}
+            demo={isDemoEmail(profile?.email)}
           />
 
           <div className="dashboard-actions-grid">

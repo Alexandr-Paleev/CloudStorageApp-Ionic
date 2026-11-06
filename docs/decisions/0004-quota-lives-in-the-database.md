@@ -80,8 +80,10 @@ the row keeps the smaller number.
 So is their number. A limit on each account bounds none of them together, and
 the route's rate limit counts in one instance's memory. `019` refuses a demo
 profile while twenty exist, counted under a lock, so two made at once cannot
-both take the last place: 200 MB at most, of the 1 GB of storage the project
-has. A visitor who finds them all taken gets the place of the oldest once it
-is an hour old (`api/demo/session.ts`): with a day's life each, one address
-could otherwise take every place at once and keep the demo closed for the
-day.
+both take the last place: 200 MB at most of what the quota counts, of the
+1 GB of storage the project has. What it does not count stays open for a demo
+account as for any other: a size the browser states, and bytes put in a
+bucket with no row at all. A visitor who finds them all taken gets the place
+of the oldest once it is an hour old (`api/demo/session.ts`): with a day's
+life each, one address could otherwise take every place at once and keep the
+demo closed for the day.

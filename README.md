@@ -22,7 +22,8 @@ An **open-source** cloud storage product: an app for storing, viewing, sharing a
 > row-level security, same quota check, same Stripe test-mode checkout — because
 > a demo running down a different code path stops proving anything. Three things
 > differ, because anyone can open one: it stores 10 MB whatever its plan, it
-> cannot make share links, and no more than twenty exist at once.
+> cannot make share links, and no more than twenty exist at once, so while all
+> twenty are taken, one an hour old gives its place up to the next visitor.
 >
 > It sits at the foot of that page rather than the top on purpose. As the first
 > element, styled like the submit button, it left two identical primary buttons
@@ -132,8 +133,8 @@ render — and the banner says the deletion has not reached the server yet:
   share links, profile and login, in the order the missing foreign keys demand —
   bytes first, rows second, the user last. A Pro subscription ends first, with
   the Stripe customer that held it; if Stripe cannot be reached, nothing is
-  deleted. Demo accounts, cleared a day after they are made, are erased the
-  same way, Stripe included
+  deleted. Demo accounts, cleared a day after they are made or sooner to make
+  room, are erased the same way, Stripe included
 
 > **What account deletion does not reach.** Files the app placed in *your own*
 > Google Drive or Dropbox stay where they are. They live in a storage account

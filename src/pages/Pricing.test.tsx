@@ -162,6 +162,32 @@ describe('Pricing', () => {
     expect(screen.getByRole('note')).toHaveTextContent('4242 4242 4242 4242');
   });
 
+  /* The cards say what each plan stores, and the database holds a demo
+     account to its limit on either one (migrations/019). */
+  it('tells a demo account that no plan changes what it stores', () => {
+    profileMock.current = {
+      tier: 'free',
+      email: 'demo-1700000000-ab12@example.com',
+      storage_limit: 10 * 1024 * 1024,
+    };
+    show();
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'This is a demo account. It stores 10 MB on either plan.'
+    );
+  });
+
+  it('tells no other account so', () => {
+    profileMock.current = {
+      tier: 'free',
+      email: 'demo-anna@company.com',
+      storage_limit: 500 * 1024 * 1024,
+    };
+    show();
+
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
   it('links the terms and the privacy policy before anyone pays', () => {
     show();
 

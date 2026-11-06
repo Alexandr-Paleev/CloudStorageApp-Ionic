@@ -32,7 +32,8 @@ import { report } from '../../libs/server/src/report';
  * signs it in, and returns the session for the browser to adopt.
  *
  * The account is disposable: once it is 24 hours old, the next demo opened
- * sweeps it. It is a real account in every other respect — same RLS, same
+ * sweeps it, and while the demo is full, one an hour old gives its place up
+ * (makeRoom). It is a real account in every other respect — same RLS, same
  * quota trigger, same Stripe test-mode checkout — because a demo that takes a
  * different code path stops proving anything. What differs is what a
  * stranger could use it for: the database holds its storage to

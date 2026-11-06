@@ -54,23 +54,8 @@ describe('demoPassword', () => {
   });
 });
 
+/* Which addresses it takes is libs/core/src/demo-address.test.ts. */
 describe('isDemoEmail', () => {
-  it.each([
-    ['demo-123-abc@example.com', true],
-    // The e2e suite creates accounts on the same domain. Deleting one mid-run
-    // would fail a test that has nothing to do with the demo.
-    ['e2e-123-abc@example.com', false],
-    ['someone@example.com', false],
-    [undefined, false],
-    // People. Sign-up is open by e-mail and through Google, and these are
-    // addresses their owners can confirm; the sweep erases what matches.
-    ['demo-anna@company.com', false],
-    ['demo-1700000000000-abc@gmail.com', false],
-    ['demo-1700000000000-abc@example.com.evil.io', false],
-  ])('%s -> %s', (email, expected) => {
-    expect(isDemoEmail(email as string | undefined)).toBe(expected);
-  });
-
   it('recognises every address the demo makes', () => {
     for (const random of [() => 0.5, () => 0.123456789, Math.random]) {
       expect(isDemoEmail(demoEmail(Date.now(), random))).toBe(true);
