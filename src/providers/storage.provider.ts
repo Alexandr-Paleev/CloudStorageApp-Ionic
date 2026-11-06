@@ -32,6 +32,13 @@ export interface IStorageProvider {
   isConnected?(): Promise<boolean> | boolean;
 
   /**
+   * Whether an upload of this file can be paused and continued later, which
+   * is when the upload page offers Pause. A provider that cannot leaves this
+   * out: an upload it stopped would be lost, not paused.
+   */
+  resumes?(file: File): boolean;
+
+  /**
    * Upload a file
    */
   upload(

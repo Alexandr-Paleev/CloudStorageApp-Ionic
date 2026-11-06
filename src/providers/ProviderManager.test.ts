@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { providerManager } from './ProviderManager';
 import { IStorageProvider } from './storage.provider';
+import { FileTooLargeError } from './upload-limits';
 
 /**
  * The most consequential branch in the client: it decides where a file lands,
@@ -41,6 +42,12 @@ function install(overrides: Record<string, StubOptions> = {}) {
 
 const image = { name: 'photo.png', type: 'image/png', size: 1_000 } as File;
 const pdf = { name: 'report.pdf', type: 'application/pdf', size: 1_000 } as File;
+
+const MB = 1024 * 1024;
+/* A phone's photo, over Cloudinary's 10 MB, and a scan over Supabase
+   Storage's 50 MB. */
+const largePhoto = { name: 'IMG_0001.jpg', type: 'image/jpeg', size: 12 * MB } as File;
+const largeScan = { name: 'scan.pdf', type: 'application/pdf', size: 60 * MB } as File;
 
 const allow = async () => true;
 const deny = async () => false;
@@ -234,5 +241,84 @@ describe('configuredNames', () => {
       'supabase_storage',
       'googledrive',
     ]);
+  });
+});
+
+/* Each provider's limit, asked before a byte travels. A 12 MB photo went to
+   Cloudinary in full and was refused at the end, and a 60 MB PDF the same
+   way to Supabase Storage. Production has R2 switched off. */
+describe('selectProvider — a file a provider would refuse', () => {
+  it('sends an image Cloudinary would refuse to Supabase Storage instead', async () => {
+    install({ r2: { configured: false } });
+
+    const provider = await providerManager.selectProvider(largePhoto, 'user-1', {
+      canUploadToLocal: allow,
+    });
+
+    expect(provider.name).toBe('supabase_storage');
+  });
+
+  it('sends it to R2 where R2 is set up, as a PDF of its size would go', async () => {
+    const provider = await providerManager.selectProvider(largePhoto, 'user-1', {
+      canUploadToLocal: allow,
+    });
+
+    expect(provider.name).toBe('r2');
+  });
+
+  it('sends a file over 50 MB to a connected Drive when no hosted provider takes it', async () => {
+    install({ r2: { configured: false }, googledrive: { connected: true } });
+
+    const provider = await providerManager.selectProvider(largeScan, 'user-1', {
+      canUploadToLocal: allow,
+    });
+
+    expect(provider.name).toBe('googledrive');
+  });
+
+  it('refuses it before it travels when Drive is not connected, and says where it can go', async () => {
+    install({ r2: { configured: false } });
+
+    const choice = providerManager.selectProvider(largeScan, 'user-1', {
+      canUploadToLocal: allow,
+    });
+
+    await expect(choice).rejects.toBeInstanceOf(FileTooLargeError);
+    await expect(choice).rejects.toThrow(
+      'This file is 60.0 MB. Over 50 MB, a file can only go to Google Drive, and Drive is not connected.'
+    );
+  });
+
+  it('lets R2 take a file over 50 MB', async () => {
+    const provider = await providerManager.selectProvider(largeScan, 'user-1', {
+      canUploadToLocal: allow,
+    });
+
+    expect(provider.name).toBe('r2');
+  });
+
+  it('refuses a provider picked by hand that would refuse the file', async () => {
+    await expect(
+      providerManager.selectProvider(largePhoto, 'user-1', {
+        canUploadToLocal: allow,
+        preferredProvider: 'cloudinary',
+        allowedProviders: ['cloudinary', 'supabase_storage'],
+      })
+    ).rejects.toThrow(
+      'Provider "cloudinary" takes files up to 10 MB. Choose another for this one.'
+    );
+  });
+});
+
+/* What the upload page weighs a selection against, to offer Drive before
+   anything is sent. */
+describe('largestHostedUpload', () => {
+  it('is what Supabase Storage takes where R2 is not set up', () => {
+    install({ r2: { configured: false } });
+    expect(providerManager.largestHostedUpload()).toBe(50 * MB);
+  });
+
+  it('has no ceiling where R2 is set up', () => {
+    expect(providerManager.largestHostedUpload()).toBe(Infinity);
   });
 });

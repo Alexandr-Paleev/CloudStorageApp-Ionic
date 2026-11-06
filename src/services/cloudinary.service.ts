@@ -1,7 +1,7 @@
 import * as Sentry from '../observability/sentry';
 import { UploadProgress } from './storage.service';
 import { supabase } from '../supabase/supabase.config';
-import { httpErrorFrom } from '../utils/http.utils';
+import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { apiUrl } from '../utils/api.utils';
 
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -148,7 +148,17 @@ const cloudinaryService = {
             bytes: response.bytes,
           });
         } else {
-          reject(new Error(`Cloudinary upload failed: ${xhr.responseText}`));
+          /* With the status: a plain Error was retried, and a photo Cloudinary
+             refused as too large went up twice more. In Cloudinary's words
+             rather than its JSON. */
+          let reason = xhr.responseText;
+          try {
+            const body = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+            reason = body.error?.message || reason;
+          } catch {
+            /* not JSON: the text itself says enough */
+          }
+          reject(new HttpError(`Cloudinary upload failed: ${reason}`, xhr.status));
         }
       };
 

@@ -82,6 +82,49 @@ function removeButton(name: string): HTMLElement {
   return screen.getByText(`Remove ${name}`).closest('ion-button') as HTMLElement;
 }
 
+const MB = 1024 * 1024;
+
+/** A file of a given size, without allocating it: only the size is read. */
+function chooseSized(name: string, size: number) {
+  const input = document.querySelector('#file-input') as HTMLInputElement;
+  const file = new File(['x'], name, { type: 'application/pdf' });
+  Object.defineProperty(file, 'size', { value: size });
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  fireEvent.change(input);
+}
+
+/** Several files of given sizes, the same way. */
+function chooseSizedFiles(...picked: [name: string, size: number][]) {
+  const input = document.querySelector('#file-input') as HTMLInputElement;
+  const files = picked.map(([name, size]) => {
+    const file = new File(['x'], name, { type: 'application/pdf' });
+    Object.defineProperty(file, 'size', { value: size });
+    return file;
+  });
+  Object.defineProperty(input, 'files', { value: files, configurable: true });
+  fireEvent.change(input);
+}
+
+/** The alert that offers Drive, and one of its buttons as Ionic holds it. */
+const driveAlert = () =>
+  document.querySelector('ion-alert') as HTMLElement & {
+    header?: string;
+    buttons: { text: string; handler?: () => unknown }[];
+  };
+const driveAlertButton = (text: string) =>
+  driveAlert().buttons.find((button) => button.text === text)!;
+
+/** An upload that starts, says whether it can be paused, and stays on its way. */
+function uploadingWith(resumable: boolean) {
+  uploadFile.mockImplementation((...args: unknown[]) => {
+    (args[5] as { onStart: (start: { resumable: boolean }) => void }).onStart({ resumable });
+    return new Promise(() => {});
+  });
+}
+
+const pause = () =>
+  [...document.querySelectorAll('ion-button')].find((b) => b.textContent === 'Pause');
+
 function landed(storage_type = 'r2') {
   return { id: crypto.randomUUID(), storage_type, name: 'x', size: 1 };
 }
@@ -97,6 +140,8 @@ beforeEach(() => {
      and production has R2 switched off and Dropbox never set up. */
   Object.assign(storageService, {
     configuredProviders: () => ['cloudinary', 'supabase_storage', 'googledrive'],
+    // Supabase Storage's, which is the largest production keeps itself.
+    largestHostedUpload: () => 50 * MB,
   });
 });
 
@@ -156,6 +201,37 @@ describe('Upload: choosing where the files go', () => {
 
     await waitFor(() => expect(option('Google Drive')).toHaveAttribute('aria-pressed', 'true'));
     expect(googleDriveAuthService.authorize).not.toHaveBeenCalled();
+  });
+
+  /* The queue used to start with the choice from before the press: a Pro
+     account that had picked a provider by hand and filled its plan connected
+     Drive, and was then told on every file to upgrade to Pro. */
+  it('sends the queue to Drive once Drive is connected for a full plan', async () => {
+    vi.mocked(storageService.getUserStorageSize).mockResolvedValue(5 * 1024 ** 3);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Cloudinary' }));
+    await waitFor(() => expect(option('Cloudinary')).toHaveAttribute('aria-pressed', 'true'));
+    choose('a.txt');
+    await waitFor(() => expect(storageService.getUserStorageSize).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(driveAlert().header).toBe('Storage Limit Exceeded'));
+    // Over the plan there is no "rest" that fits: Drive or nothing.
+    expect(driveAlert().buttons.map((button) => button.text)).toEqual([
+      'Cancel',
+      'Connect Google Drive',
+    ]);
+    await act(async () => {
+      await driveAlertButton('Connect Google Drive').handler!();
+    });
+
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+    const [, , , , useGoogleDrive, options] = uploadFile.mock.calls[0]!;
+    expect(useGoogleDrive).toBe(true);
+    expect((options as { preferredProvider?: string }).preferredProvider).toBeUndefined();
   });
 });
 
@@ -356,5 +432,114 @@ describe('Upload', () => {
   it("asks for the signed-in account's interrupted uploads", async () => {
     show();
     await waitFor(() => expect(storageService.resumableUploads).toHaveBeenCalledWith('user-1'));
+  });
+});
+
+/* Pause was offered by size alone, from 16 MB, and only R2 continues an
+   upload. On production, where files go to Supabase Storage and Cloudinary,
+   it showed and did nothing: the file went on uploading. */
+describe('Upload: pausing', () => {
+  it('offers Pause when the provider says the upload can be continued', async () => {
+    uploadingWith(true);
+
+    show();
+    chooseSized('archive.zip', 20 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(pause()).toBeDefined());
+  });
+
+  it('does not offer it for a large file its provider cannot continue', async () => {
+    uploadingWith(false);
+
+    show();
+    chooseSized('scan.pdf', 20 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(uploadFile).toHaveBeenCalled());
+    await screen.findByText(/Uploading 1 of 1/);
+    expect(pause()).toBeUndefined();
+  });
+});
+
+/* A file no provider here takes went up in full and was refused at the
+   end. Only Drive takes it, so Drive is offered before anything is sent. */
+describe('Upload: a file too large to keep here', () => {
+  const alert = () => document.querySelector('ion-alert') as HTMLElement & { header?: string };
+
+  it('offers Drive before sending a byte', async () => {
+    show();
+    chooseSized('scan.pdf', 60 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(alert().header).toBe('Too Large to Store Here'));
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('connects Drive and sends the queue on', async () => {
+    show();
+    chooseSized('scan.pdf', 60 * MB);
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(alert().header).toBe('Too Large to Store Here'));
+
+    const connect = (
+      alert() as unknown as { buttons: { text: string; handler: () => unknown }[] }
+    ).buttons.find((button) => button.text === 'Connect Google Drive')!;
+    await act(async () => {
+      await connect.handler();
+    });
+
+    expect(googleDriveAuthService.authorize).toHaveBeenCalledTimes(1);
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends it straight on when Drive is connected', async () => {
+    vi.mocked(googleDriveAuthService.isAuthorized).mockResolvedValue(true);
+
+    show();
+    chooseSized('scan.pdf', 60 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(1));
+  });
+
+  /* Cancel was the only other answer, and it sent nothing: one file only
+     Drive takes held back every file that fit. */
+  it('sends the files that fit when Drive is not wanted, and says why the large one stayed', async () => {
+    uploadFile.mockImplementation(async (_userId: unknown, file: File) => {
+      if (file.size > 50 * MB) {
+        // What the provider choice answers, before a byte is sent.
+        const refusal = new Error('Only Google Drive takes scan.pdf, and Drive is not connected.');
+        refusal.name = 'FileTooLargeError';
+        throw refusal;
+      }
+      return landed();
+    });
+
+    show();
+    chooseSizedFiles(['scan.pdf', 60 * MB], ['notes.pdf', 1 * MB]);
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(driveAlert().header).toBe('Too Large to Store Here'));
+
+    await act(async () => {
+      await driveAlertButton('Upload the rest').handler!();
+    });
+
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+    expect(googleDriveAuthService.authorize).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Only Google Drive takes scan\.pdf/)).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing to send on when every file is too large', async () => {
+    show();
+    chooseSized('scan.pdf', 60 * MB);
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(driveAlert().header).toBe('Too Large to Store Here'));
+
+    expect(driveAlert().buttons.map((button) => button.text)).toEqual([
+      'Cancel',
+      'Connect Google Drive',
+    ]);
   });
 });

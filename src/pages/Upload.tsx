@@ -29,8 +29,8 @@ import googleDriveAuthService from '../services/googledrive-auth.service';
 import { useProfile } from '../hooks/useProfile';
 import ProviderSelector from '../components/ProviderSelector';
 import ResumableUploads from '../components/ResumableUploads';
-import { shouldUseMultipart } from '@cloud-storage/core/multipart';
 import UploadQueue from '../components/UploadQueue';
+import { formatBytes, formatStorage } from '@cloud-storage/core/format';
 import {
   absorb,
   enqueue,
@@ -46,6 +46,13 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { cloudUploadOutline } from 'ionicons/icons';
 import './Upload.css';
 
+/** Where the queue sends its files: everything to Drive, to a provider
+ *  chosen by hand, or, with neither, to the provider each file is routed to. */
+interface Route {
+  useGoogleDrive: boolean;
+  preferredProvider: string | undefined;
+}
+
 const Upload: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -59,7 +66,9 @@ const Upload: React.FC = () => {
      session, whose File lives in IndexedDB rather than in a picker. */
   const [resumeProgress, setResumeProgress] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [showGoogleDriveAlert, setShowGoogleDriveAlert] = useState(false);
+  /* Why Drive is being offered: the files do not fit the plan, or one is
+     larger than any provider here takes. */
+  const [driveOffer, setDriveOffer] = useState<'quota' | 'size' | null>(null);
   const [useGoogleDrive, setUseGoogleDrive] = useState(false);
   const [preferredProvider, setPreferredProvider] = useState<string | undefined>(undefined);
   const [paused, setPaused] = useState(false);
@@ -108,8 +117,14 @@ const Upload: React.FC = () => {
    * Sequential on purpose. Parallel uploads would race for the same quota —
    * the trigger on public.files serialises them anyway and the loser gets a
    * 413 — and a progress bar per file is only honest if one of them is moving.
+   *
+   * Where the files go is an argument, the page's choice unless told
+   * otherwise. Connecting Drive from the alert changes that choice in the
+   * same press, and the queue the alert was rendered with still holds the one
+   * from before: a Pro account that had picked a provider by hand and filled
+   * its plan connected Drive, and was then told on every file to upgrade.
    */
-  const runQueue = async () => {
+  const runQueue = async (route: Route = { useGoogleDrive, preferredProvider }) => {
     if (!user?.id || isUploading) return;
 
     setIsUploading(true);
@@ -133,7 +148,7 @@ const Upload: React.FC = () => {
         const item = nextPending(items);
         if (!item) break;
 
-        apply(item.id, { status: 'uploading', progress: 0, error: undefined });
+        apply(item.id, { status: 'uploading', progress: 0, error: undefined, resumable: false });
         abortRef.current = new AbortController();
         setPaused(false);
 
@@ -143,12 +158,13 @@ const Upload: React.FC = () => {
             item.file,
             (progress) => apply(item.id, { progress: progress.progress }),
             folderId || null,
-            useGoogleDrive,
+            route.useGoogleDrive,
             {
-              preferredProvider,
+              preferredProvider: route.preferredProvider,
               allowedProviders: profile?.allowed_providers,
               storageLimit: profile?.storage_limit,
               signal: abortRef.current.signal,
+              onStart: ({ resumable }) => apply(item.id, { resumable }),
             }
           );
 
@@ -270,9 +286,11 @@ const Upload: React.FC = () => {
   /** The file being sent right now, if any — what the Pause button acts on. */
   const uploading = queue.find((item) => item.status === 'uploading');
 
-  /* Only a file large enough to go up in parts can be paused and continued: a
-     single PUT has nothing to come back to. */
-  const canPause = !!uploading && shouldUseMultipart(uploading.file.size);
+  /* Only an upload its provider can continue: R2's parts stay in the bucket,
+     and a single PUT, or any upload to Supabase Storage or Cloudinary, keeps
+     nothing to come back to. The button used to go by size alone, and on
+     production, where files go to those two, it showed and did nothing. */
+  const canPause = !!uploading?.resumable;
 
   const addFiles = (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
@@ -299,6 +317,14 @@ const Upload: React.FC = () => {
     addFiles(e.dataTransfer?.files ?? null);
   };
 
+  /* What no provider this deployment hosts would take, which only Drive can:
+     known before a byte travels. */
+  const largestHosted = storageService.largestHostedUpload();
+  const oversized = queue.filter(
+    (item) => item.status === 'pending' && item.file.size > largestHosted
+  );
+  const fitting = queue.filter((item) => item.status === 'pending').length - oversized.length;
+
   const handleUpload = async () => {
     if (!user?.id) return;
 
@@ -318,7 +344,18 @@ const Upload: React.FC = () => {
        Drive without a token behind it sent a full account on to uploads that
        could only fail, with nothing on screen offering to connect again. */
     if (wouldExceedLimit && !(await googleDriveAuthService.isAuthorized())) {
-      setShowGoogleDriveAlert(true);
+      setDriveOffer('quota');
+      return;
+    }
+
+    /* Only Drive takes these. A provider chosen by hand says it is too small
+       itself, file by file. */
+    if (
+      !preferredProvider &&
+      oversized.length > 0 &&
+      !(await googleDriveAuthService.isAuthorized())
+    ) {
+      setDriveOffer('size');
       return;
     }
 
@@ -337,11 +374,19 @@ const Upload: React.FC = () => {
   const handleConnectGoogleDrive = async () => {
     try {
       await googleDriveAuthService.authorize();
-      setUseGoogleDrive(true);
-      setPreferredProvider(undefined);
-      setShowGoogleDriveAlert(false);
+      /* Over the plan, every file goes to Drive. Over a provider's size, only
+         the files that are: the choice of provider sends them there itself.
+         Handed to the queue as well as kept, because this render's queue
+         still holds the choice from before the press. */
+      const route: Route =
+        driveOffer === 'quota'
+          ? { useGoogleDrive: true, preferredProvider: undefined }
+          : { useGoogleDrive, preferredProvider };
+      setUseGoogleDrive(route.useGoogleDrive);
+      setPreferredProvider(route.preferredProvider);
+      setDriveOffer(null);
       // Carry on with the queue that was stopped by the alert
-      await runQueue();
+      await runQueue(route);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect Google Drive');
     }
@@ -461,9 +506,8 @@ const Upload: React.FC = () => {
                   aria-label="Upload progress"
                 />
 
-                {/* Only large files go up in parts, and only those can be
-                    picked up again — offering to pause a single PUT would
-                    promise something the protocol cannot deliver. */}
+                {/* Only an upload its provider can pick up again: offering
+                    to pause any other would promise what nothing keeps. */}
                 {(canPause || resumeMutation.isPending) && !paused && (
                   <IonButton
                     size="small"
@@ -518,15 +562,27 @@ const Upload: React.FC = () => {
         />
 
         <IonAlert
-          isOpen={showGoogleDriveAlert}
-          onDidDismiss={() => setShowGoogleDriveAlert(false)}
-          header="Storage Limit Exceeded"
-          message={`You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your ${(storageLimit / 1024 / 1024).toFixed(0)} MB limit. Connect Google Drive to upload more files?`}
+          isOpen={driveOffer !== null}
+          onDidDismiss={() => setDriveOffer(null)}
+          header={driveOffer === 'size' ? 'Too Large to Store Here' : 'Storage Limit Exceeded'}
+          message={
+            driveOffer === 'size'
+              ? oversized.length === 1
+                ? `${oversized[0]!.file.name} is ${formatBytes(oversized[0]!.file.size)}. Over ${formatStorage(largestHosted)}, a file can only go to Google Drive. Connect Google Drive to upload it?`
+                : `${oversized.length} files are over ${formatStorage(largestHosted)}, which only Google Drive takes. Connect Google Drive to upload them?`
+              : `You've used ${((storageSize || 0) / 1024 / 1024).toFixed(2)} MB of your ${(storageLimit / 1024 / 1024).toFixed(0)} MB limit. Connect Google Drive to upload more files?`
+          }
           buttons={[
             {
               text: 'Cancel',
               role: 'cancel',
             },
+            /* A file only Drive takes must not hold back the ones that fit.
+               They go, and each large one is refused before a byte is sent,
+               with the reason beside it. */
+            ...(driveOffer === 'size' && fitting > 0
+              ? [{ text: 'Upload the rest', handler: () => void runQueue() }]
+              : []),
             {
               text: 'Connect Google Drive',
               handler: handleConnectGoogleDrive,
