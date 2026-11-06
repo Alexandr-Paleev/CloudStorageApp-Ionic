@@ -8,6 +8,15 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # A week between a release and the pull request that proposes it. A
+    # version published from a maintainer's stolen account is usually found
+    # and pulled within days, and what is merged here is installed by the run
+    # on main, the one that goes on to give the end-to-end job the production
+    # database's service-role key. Dependabot waits three days without being
+    # asked; this makes it seven. Security updates are not held back, and the
+    # production audit in CI waits for nothing.
+    cooldown:
+      default-days: 7
     # Above the number of groups below, and it has to stay there. The limit
     # counts pull requests, a group is one, and the groups are opened first.
     # At 5, with eight groups, an update outside them got a slot only in a
@@ -94,5 +103,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # The same week, for the same reason: an action runs in the job that holds
+    # the secrets. Every one is pinned to a commit, so this is about which
+    # commit a pull request proposes, not about a tag moving under us.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
