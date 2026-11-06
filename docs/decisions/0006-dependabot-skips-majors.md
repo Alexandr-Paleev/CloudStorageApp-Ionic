@@ -42,15 +42,19 @@ family so that `@aws-sdk`'s three packages move together.
   against vite 8.2.2 had no pull request to carry the fix. Every update is in a
   group now — the families, and `runtime` and `tooling` for the rest — and the
   limit stays above the number of groups. The comment above the limit says why.
-- *Amended on 2026-11-01:* an update is proposed a week after its release at
+- *Amended in v4.14.0:* an update is proposed a week after its release at
   the earliest (`cooldown`, `default-days: 7`), for npm and for the actions.
   A version published from a maintainer's stolen account is usually found and
   pulled within days, and what is merged is installed by the run on `main`,
   which goes on to give the end-to-end job the production database's
-  service-role key. Dependabot already waited three days unasked. Security
-  updates are not held back, and neither is the production audit. The Python
-  of `evals/` is not Dependabot's: its `pyproject.toml` takes nothing published
-  in the two weeks before the lock was made, and moving that date is how it
-  is updated.
+  service-role key. Dependabot already waited three days unasked. Only version
+  updates wait. Dependabot's security updates skip the cooldown, but they are a
+  setting of the repository, and while they are off the fix for a known
+  vulnerability is a version update and waits the week like any other: the
+  fix for the three vite advisories above was to come that way. Its
+  alert does not wait, and neither does the production audit, which fails CI
+  on a high one in what ships. The Python of `evals/` is not Dependabot's: its
+  `pyproject.toml` takes nothing published in the two weeks before the lock
+  was made, and moving that date is how it is updated.
 - Majors are still owed a periodic manual pass. Nothing automates that, and this
   record does not pretend otherwise.

@@ -13,8 +13,11 @@ updates:
     # and pulled within days, and what is merged here is installed by the run
     # on main, the one that goes on to give the end-to-end job the production
     # database's service-role key. Dependabot waits three days without being
-    # asked; this makes it seven. Security updates are not held back, and the
-    # production audit in CI waits for nothing.
+    # asked; this makes it seven. Only version updates wait. Security updates
+    # are a setting of the repository, not of this file, and skip the
+    # cooldown; with them off, the fix for a known vulnerability waits the
+    # week like any version, and what says so at once is Dependabot's alert,
+    # and the production audit in CI for a high one in what ships.
     cooldown:
       default-days: 7
     # Above the number of groups below, and it has to stay there. The limit

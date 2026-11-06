@@ -181,8 +181,12 @@ reasoning behind the larger decisions lives in
   on `main`, which goes on to give the end-to-end job the production
   database's service-role key. `.github/dependabot.yml` sets `cooldown` to
   seven days for npm and for the actions; Dependabot's own default was three.
-  Security updates are not held back, and the production audit in CI is not
-  either. The evals' Python already waits two weeks, by `exclude-newer`.
+  Only version updates wait. Dependabot's security updates skip the cooldown,
+  but they are a setting of the repository, and while they are off the fix
+  for a known vulnerability is a version update and waits the week too. Its
+  alert does not wait, and neither does the production audit, which fails CI
+  on a high one in what ships. The evals' Python already waits two weeks, by
+  `exclude-newer`.
 
 ## [4.13.0] — 2026-10-30
 
