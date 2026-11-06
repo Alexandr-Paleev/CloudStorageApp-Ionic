@@ -175,6 +175,14 @@ reasoning behind the larger decisions lives in
   the address the terms give, with the link in it, and the terms now say
   what may not be shared and what a report does. Production had no demo
   accounts and no live links.
+- **A dependency update is proposed a week after its release, not three
+  days.** A version published from a maintainer's stolen account is usually
+  found and pulled within days, and a merged update is installed by the run
+  on `main`, which goes on to give the end-to-end job the production
+  database's service-role key. `.github/dependabot.yml` sets `cooldown` to
+  seven days for npm and for the actions; Dependabot's own default was three.
+  Security updates are not held back, and the production audit in CI is not
+  either. The evals' Python already waits two weeks, by `exclude-newer`.
 
 ## [4.13.0] — 2026-10-30
 
