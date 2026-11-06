@@ -62,6 +62,34 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **An upload on production said three things that were not so.** R2 is
+  switched off there, so files go to Supabase Storage and images to
+  Cloudinary, and that was the unfinished path.
+  - Its progress was drawn: 10% before the request and 100% after it, and a
+    40 MB PDF on a slow connection sat at 10% for minutes. It goes through XHR
+    now, to an address signed for its path, as the same request supabase-js
+    makes, and the bar is what the browser measures.
+  - **Pause** showed for every file from 16 MB and did nothing: only R2
+    continues an upload, and the file went on uploading. The provider says
+    now whether it can continue one, and only then is there a Pause.
+  - No size was asked before an upload. A 12 MB photo went to Cloudinary,
+    whose free plan takes 10 MB, and a 60 MB PDF to Supabase Storage, which
+    takes 50, each in full before it was refused, and then twice more: the
+    refusal was a plain error, and plain errors are retried. Each provider's
+    limit is in one table (`src/providers/upload-limits.ts`) and asked first.
+    An image Cloudinary would refuse goes where a PDF of its size would. A
+    file larger than anything the deployment keeps goes to a connected Google
+    Drive, and without one the page offers Drive before a byte is sent, or
+    **Upload the rest**: the files that fit go, and the large one stays with
+    its reason beside it. A provider picked by hand says it is too small,
+    file by file. A refusal from either provider carries its status now, so
+    it is not sent again, and Cloudinary's is told in its own words rather
+    than its JSON.
+- **Connecting Google Drive for a full plan sent the files where they had
+  just been refused.** The queue started with the choice from before the
+  press: a Pro account that had picked a provider by hand and filled its
+  plan connected Drive, and was told on every file to upgrade to Pro. The
+  queue is handed the choice made in the same press now.
 - **An empty file could not be uploaded, and said so in JSON.** The row's
   schema required a size above zero, so an empty file went to its provider,
   was deleted again, and the toast read `Failed to finalize upload: [{"origin":

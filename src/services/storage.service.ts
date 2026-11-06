@@ -47,6 +47,12 @@ const storageService = {
     return providerManager.configuredNames();
   },
 
+  /** The largest file this deployment keeps itself; anything larger can only
+   *  go to Google Drive. */
+  largestHostedUpload(): number {
+    return providerManager.largestHostedUpload();
+  },
+
   /**
    * Upload file and save metadata
    */
@@ -64,6 +70,9 @@ const storageService = {
        *  parts already in the bucket stay, and so does the record that knows
        *  which ones they were. */
       signal?: AbortSignal;
+      /** Told once the provider is chosen, before a byte travels, whether this
+       *  upload can be paused: only then is there a Pause to offer. */
+      onStart?: (start: { resumable: boolean }) => void;
     }
   ): Promise<FileMetadata> {
     /* The name first, before a byte travels. It used to be asked only once the
@@ -79,6 +88,8 @@ const storageService = {
       preferredProvider: options?.preferredProvider,
       allowedProviders: options?.allowedProviders,
     });
+
+    options?.onStart?.({ resumable: provider.resumes?.(file) ?? false });
 
     const result = await withRetry(
       () => provider.upload(file, userId, onProgress, { signal: options?.signal, folderId }),

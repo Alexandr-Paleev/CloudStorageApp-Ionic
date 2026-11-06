@@ -171,6 +171,8 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Five backends: Cloudinary, Supabase Storage and Google Drive, plus Cloudflare R2
   and Dropbox (Pro), which are written and tested and not on the demo yet
 - ✅ Images routed to Cloudinary, other files to R2/Supabase — Pro users can pick a provider by hand
+- ✅ Each provider's size limit asked before a byte travels: an image Cloudinary would refuse goes
+  to R2 or Supabase Storage, and a file no hosted provider takes is offered Google Drive
 - ✅ Where R2 is set up, files over 16 MB go to it in parts, and can be paused and resumed — including after a reload
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
@@ -1047,9 +1049,12 @@ only ever read server-side.
 - **Extra storage**: Google Drive (15 GB free) — auto-connects when limit is reached
 - **Max single file size**: 50 MB for a file kept in Supabase Storage, where the
   bucket refuses more (`file_size_limit`, migrations/018), which is also the most
-  Supabase's Free plan accepts. Other providers impose their own ceilings, and the
-  app checks none of them before an upload. Vercel caps a function request body at
-  4.5 MB, which is why R2 uploads are presigned.
+  Supabase's Free plan accepts; 10 MB on Cloudinary's free plan; 150 MB through
+  the Dropbox endpoint the app uses. The app asks these before an upload
+  (`src/providers/upload-limits.ts`): an image over Cloudinary's goes to R2 or
+  Supabase Storage, and a file over what this deployment keeps goes to a connected
+  Google Drive, or is offered Drive before anything is sent. Vercel caps a
+  function request body at 4.5 MB, which is why R2 uploads are presigned.
 - **Names**: up to 255 characters for files and folders, checked before an upload
   and by the database.
 - Cancelling Pro drops the limit back to 500 MB. Files already stored stay

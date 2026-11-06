@@ -551,3 +551,30 @@ describe('renameFolder', () => {
     expect(name).toBe('Invoices');
   });
 });
+
+/* The upload page offers Pause only for what can be continued, and the
+   provider is what knows. It went by size, and on production, where files go
+   to providers that continue nothing, the button showed and did nothing. */
+describe('uploadFile — whether the upload can be paused', () => {
+  it('says so once the provider is chosen, before a byte travels', async () => {
+    const r2 = provider({ resumes: () => true });
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+    const onStart = vi.fn();
+
+    await storageService.uploadFile('user-1', file(), undefined, null, false, { onStart });
+
+    expect(onStart).toHaveBeenCalledWith({ resumable: true });
+    expect(onStart.mock.invocationCallOrder[0]!).toBeLessThan(
+      vi.mocked(r2.upload).mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('says it cannot be for a provider that does not resume', async () => {
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(provider());
+    const onStart = vi.fn();
+
+    await storageService.uploadFile('user-1', file(), undefined, null, false, { onStart });
+
+    expect(onStart).toHaveBeenCalledWith({ resumable: false });
+  });
+});

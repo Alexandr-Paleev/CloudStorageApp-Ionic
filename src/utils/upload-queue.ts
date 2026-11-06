@@ -18,6 +18,9 @@ export interface QueueItem {
   /** Percent of this file, not of the queue. */
   progress: number;
   error?: string;
+  /** Said by the provider once the upload starts: whether it can be paused
+   *  and continued. Nothing else decides whether there is a Pause. */
+  resumable?: boolean;
 }
 
 /**

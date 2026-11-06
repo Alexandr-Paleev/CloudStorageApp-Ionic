@@ -4,7 +4,9 @@ import { SupabaseStorageProvider } from './impl/SupabaseStorageProvider';
 import { GoogleDriveProvider } from './impl/GoogleDriveProvider';
 import { R2Provider } from './impl/R2Provider';
 import { DropboxProvider } from './impl/DropboxProvider';
-import { isHostedProvider } from '@cloud-storage/core/stored-path';
+import { HOSTED_PROVIDERS, isHostedProvider } from '@cloud-storage/core/stored-path';
+import { formatBytes, formatStorage } from '@cloud-storage/core/format';
+import { FileTooLargeError, UPLOAD_LIMITS, fitsProvider } from './upload-limits';
 
 class ProviderManager {
   private providers: Map<string, IStorageProvider> = new Map();
@@ -35,6 +37,16 @@ class ProviderManager {
     return [...this.providers.values()]
       .filter((provider) => provider.isConfigured())
       .map((provider) => provider.name);
+  }
+
+  /** The largest file a provider this deployment hosts takes, which is the
+   *  largest the automatic choice can keep without Google Drive. */
+  largestHostedUpload(): number {
+    return Math.max(
+      ...HOSTED_PROVIDERS.filter((name) => this.getProvider(name).isConfigured()).map(
+        (name) => UPLOAD_LIMITS[name] ?? Infinity
+      )
+    );
   }
 
   /**
@@ -68,6 +80,12 @@ class ProviderManager {
             `Provider "${options.preferredProvider}" is not connected. Please authorize it first.`
           );
         }
+      }
+      // Said before a byte travels, not by the provider after the last one.
+      if (!fitsProvider(preferred.name, file.size)) {
+        throw new FileTooLargeError(
+          `Provider "${preferred.name}" takes files up to ${formatStorage(UPLOAD_LIMITS[preferred.name] ?? 0)}. Choose another for this one.`
+        );
       }
       // Picking a provider by hand must not skip the quota the auto path
       // enforces. Only the providers we host and pay for count against it:
@@ -104,9 +122,10 @@ class ProviderManager {
       );
     }
 
+    // An image Cloudinary would refuse goes where a PDF of its size would.
     const isImage = file.type.startsWith('image/');
     const cloudinaryProvider = this.getProvider('cloudinary');
-    if (isImage && cloudinaryProvider.isConfigured()) {
+    if (isImage && cloudinaryProvider.isConfigured() && fitsProvider('cloudinary', file.size)) {
       return cloudinaryProvider;
     }
 
@@ -115,7 +134,19 @@ class ProviderManager {
       return r2Provider;
     }
 
-    return this.getProvider('supabase_storage');
+    if (fitsProvider('supabase_storage', file.size)) {
+      return this.getProvider('supabase_storage');
+    }
+
+    // Too large for every provider this deployment hosts. Drive takes it, and
+    // it costs the plan nothing.
+    if (isDriveConnected) {
+      return driveProvider;
+    }
+
+    throw new FileTooLargeError(
+      `This file is ${formatBytes(file.size)}. Over ${formatStorage(this.largestHostedUpload())}, a file can only go to Google Drive, and Drive is not connected.`
+    );
   }
 }
 

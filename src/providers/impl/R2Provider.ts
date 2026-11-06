@@ -1,12 +1,19 @@
 import { IStorageProvider, StorageUploadResult } from '../storage.provider';
 import r2Service from '../../services/r2.service';
 import { UploadProgress } from '../../services/storage.service';
+import { shouldUseMultipart } from '@cloud-storage/core/multipart';
 
 export class R2Provider implements IStorageProvider {
   readonly name = 'r2';
 
   isConfigured(): boolean {
     return r2Service.isConfigured();
+  }
+
+  /** A file large enough to go up in parts: the parts sent stay in the
+   *  bucket, and a record says which they are. A single PUT keeps nothing. */
+  resumes(file: File): boolean {
+    return shouldUseMultipart(file.size);
   }
 
   async upload(

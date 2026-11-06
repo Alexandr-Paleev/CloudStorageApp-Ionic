@@ -169,6 +169,24 @@ describe('uploadFile', () => {
     expect((error as HttpError).status).toBe(413);
   });
 
+  it("carries Cloudinary's own refusal through, with its status and in its words", async () => {
+    class RefusingXhr extends FakeXhr {
+      status = 400;
+      responseText = JSON.stringify({
+        error: { message: 'File size too large. Got 12582912. Maximum is 10485760.' },
+      });
+    }
+    vi.stubGlobal('XMLHttpRequest', RefusingXhr);
+
+    const error = await cloudinaryService.uploadFile(file(), 'user-1').catch((e) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({
+      status: 400,
+      message: 'Cloudinary upload failed: File size too large. Got 12582912. Maximum is 10485760.',
+    });
+  });
+
   it("maps Cloudinary's answer onto what the provider stores", async () => {
     const result = await cloudinaryService.uploadFile(file(), 'user-1');
 
