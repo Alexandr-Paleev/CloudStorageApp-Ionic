@@ -15,15 +15,19 @@ interface UpgradeBannerProps {
   usedBytes: number;
   storageLimit: number;
   tier?: string;
+  /** A demo account, which the database holds to its limit on either plan
+   *  (migrations/019): Pro would not give it the storage this offers.
+   *  Required, so that a page showing the banner says which it is. */
+  demo: boolean;
 }
 
-const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, tier }) => {
+const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ usedBytes, storageLimit, tier, demo }) => {
   const navigate = useNavigate();
   // Same arithmetic as the dashboard meter, so the banner cannot appear at a
   // percentage the bar disagrees with.
   const { ratio: usagePercent } = storageMeter(usedBytes, storageLimit);
 
-  if (!billingIsOffered() || tier === 'pro' || usagePercent < 0.8) return null;
+  if (!billingIsOffered() || tier === 'pro' || demo || usagePercent < 0.8) return null;
 
   return (
     <div

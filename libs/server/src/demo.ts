@@ -12,10 +12,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { DEMO_ADDRESS_PATTERN, DEMO_EMAIL_PREFIX, isDemoEmail } from '../../core/src/demo-address';
 import { ownerPrefix } from '../../core/src/stored-path';
 
-/** Demo accounts are recognised by this prefix, and deleted by it. */
-export const DEMO_EMAIL_PREFIX = 'demo-';
+/* The address is in libs/core, because the app asks it too. */
+export { DEMO_ADDRESS_PATTERN, DEMO_EMAIL_PREFIX, isDemoEmail };
 
 /** How long a demo account survives before the next request sweeps it up. */
 export const DEMO_TTL_MS = 24 * 60 * 60 * 1000;
@@ -30,6 +31,61 @@ export const DEMO_SWEEP_PAGE_SIZE = 200;
 export const DEMO_SWEEP_PAGES = 10;
 
 export const DEMO_FOLDER_NAME = 'Design assets';
+
+/**
+ * What a demo account may store. It had the Free plan's 500 MB, on an account
+ * anyone could open without signing up: 500 MB of hosting a day for whoever
+ * asked. The seed is about 150 KB, and this leaves room to try the uploader
+ * on a photo or two of the size a phone takes.
+ *
+ * Held by the database rather than set here (migrations/019): the webhook
+ * writes the limit of every plan change, and on test keys the plans page
+ * gives the card that pays for Pro. A test holds the migration to this
+ * number and to `isDemoEmail`.
+ */
+export const DEMO_STORAGE_LIMIT = 10 * 1024 * 1024;
+
+/**
+ * How many demo accounts may exist at once.
+ *
+ * A limit on each account bounds none of them together. An address may open
+ * DEMO_RATE_LIMIT an hour, the counter is one instance's memory, and an
+ * account lives DEMO_TTL_MS: with no count, one address would fill the 1 GB
+ * of storage the whole project has on Supabase's free plan, real users'
+ * files included, in five hours. Twenty at DEMO_STORAGE_LIMIT is 200 MB of
+ * quota. The quota counts rows (decision 0004), and bytes a script puts in a
+ * bucket with no row it does not count, for these accounts as for any.
+ *
+ * Held by the database too (migrations/019), counted under a lock, so two
+ * visitors who arrive together cannot both take the last place. The route
+ * answers that refusal by making room (DEMO_EVICT_AFTER_MS), and with 503
+ * when no demo account is old enough to give its place up. The sweep frees a
+ * place as an account ages out.
+ */
+export const DEMO_LIVE_LIMIT = 20;
+
+/**
+ * How long a demo account keeps its place while the demo is full.
+ *
+ * Twenty places that each last a day, and an address may open twenty an
+ * hour: one script could take every place at once and hold it for the day,
+ * and everyone after it, a recruiter among them, would be told the demo is
+ * full. So a visitor who finds it full takes the place of the oldest demo
+ * account once that one is an hour old. A demo is mostly over in minutes,
+ * and one still in use an hour on is lost only while the demo is full.
+ */
+export const DEMO_EVICT_AFTER_MS = 60 * 60 * 1000;
+
+/** Whether a demo account made at `createdAt` gives its place up to a visitor
+ *  who finds the demo full. An unreadable time keeps it. */
+export function givesUpItsPlace(
+  createdAt: string,
+  now: number = Date.now(),
+  after: number = DEMO_EVICT_AFTER_MS
+): boolean {
+  const created = new Date(createdAt).getTime();
+  return !Number.isNaN(created) && now - created > after;
+}
 
 /**
  * Demo sessions allowed per address per hour.
@@ -87,18 +143,6 @@ export function demoEmail(now: number = Date.now(), random: () => number = Math.
  *  it each kind of character a password policy can ask for. */
 export function demoPassword(uuid: () => string = randomUUID): string {
   return `Demo!${uuid()}`;
-}
-
-/* The whole address demoEmail() makes. The prefix alone used to be the test,
-   and it matched people: sign-up is open, by e-mail and through Google, and
-   `demo-anna@company.com` is an address its owner can confirm. The sweep
-   erases what this matches, files and all. example.com is reserved (RFC 2606):
-   no mail is delivered there, so no account on it can be confirmed, and
-   Google issues none. */
-const DEMO_ADDRESS = new RegExp(`^${DEMO_EMAIL_PREFIX}\\d+-[a-z0-9]*@example\\.com$`);
-
-export function isDemoEmail(email: string | undefined): boolean {
-  return typeof email === 'string' && DEMO_ADDRESS.test(email);
 }
 
 /** A demo account past its lifetime. Anything not created by this endpoint is

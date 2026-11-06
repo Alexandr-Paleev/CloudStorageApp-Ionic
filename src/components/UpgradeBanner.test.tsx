@@ -15,10 +15,10 @@ vi.mock('@capacitor/core', () => ({
 
 const LIMIT = 500 * 1024 * 1024;
 
-function show(props: { usedBytes: number; storageLimit?: number; tier?: string }) {
+function show(props: { usedBytes: number; storageLimit?: number; tier?: string; demo?: boolean }) {
   return renderWithProviders(
     <Routes>
-      <Route path="/" element={<UpgradeBanner storageLimit={LIMIT} {...props} />} />
+      <Route path="/" element={<UpgradeBanner storageLimit={LIMIT} demo={false} {...props} />} />
       <Route path="/pricing" element={<p>Plans</p>} />
     </Routes>
   );
@@ -49,6 +49,14 @@ describe('UpgradeBanner', () => {
   it('has nothing to sell a Pro account', () => {
     show({ usedBytes: LIMIT, tier: 'pro' });
     expect(screen.queryByText('Storage full!')).not.toBeInTheDocument();
+  });
+
+  /* The database holds a demo account to 10 MB on either plan
+     (migrations/019): Pro's storage is not on offer to it. */
+  it('has nothing to sell a demo account either', () => {
+    show({ usedBytes: 10 * 1024 * 1024, storageLimit: 10 * 1024 * 1024, demo: true });
+    expect(screen.queryByText('Storage full!')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to Pro/)).not.toBeInTheDocument();
   });
 
   it('treats a limit of zero as full rather than dividing by it', () => {

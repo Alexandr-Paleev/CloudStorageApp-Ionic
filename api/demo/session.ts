@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import { supabase } from '../../libs/server/src/auth';
 import { getAppUrl } from '../../libs/server/src/app-url';
 import {
+  DEMO_ADDRESS_PATTERN,
   DEMO_FOLDER_NAME,
+  DEMO_LIVE_LIMIT,
   DEMO_RATE_LIMIT,
   DEMO_RATE_WINDOW_MS,
   DEMO_SEED,
@@ -12,6 +14,7 @@ import {
   demoEmail,
   demoPassword,
   demoStoragePath,
+  givesUpItsPlace,
   isExpiredDemoUser,
 } from '../../libs/server/src/demo';
 import { RateLimiter, clientIp, tooManyRequests } from '../../libs/server/src/rate-limit';
@@ -29,11 +32,16 @@ import { report } from '../../libs/server/src/report';
  * signs it in, and returns the session for the browser to adopt.
  *
  * The account is disposable: once it is 24 hours old, the next demo opened
- * sweeps it. It is a real account in every other respect — same RLS, same
- * quota, same Stripe test-mode checkout — because a demo that takes a
- * different code path stops proving anything. On a live Stripe key the
- * checkout refuses it: the erase ends a subscription with no refund, and a
- * month would be paid for a day.
+ * sweeps it, and while the demo is full, one an hour old gives its place up
+ * (makeRoom). It is a real account in every other respect — same RLS, same
+ * quota trigger, same Stripe test-mode checkout — because a demo that takes a
+ * different code path stops proving anything. What differs is what a
+ * stranger could use it for: the database holds its storage to
+ * DEMO_STORAGE_LIMIT whatever its plan, and the number of demo accounts to
+ * DEMO_LIVE_LIMIT (migrations/019), it cannot make a share link
+ * (api/share.ts), and on a live Stripe key the checkout refuses it: the
+ * erase ends a subscription with no refund, and a month would be paid for a
+ * day.
  */
 
 const BUCKET = 'files';
@@ -108,6 +116,61 @@ async function sweepExpired(): Promise<void> {
       console.error(`[demo/session] sweep could not erase ${user.id}:`, error);
       await report(error, { route: 'demo/sweep', userId: user.id, level: 'warning' });
     }
+  }
+}
+
+/**
+ * Whether DEMO_LIVE_LIMIT demo accounts exist, which is when migrations/019
+ * refuses another.
+ *
+ * Asked after a refusal rather than before every account. The database holds
+ * the number, under a lock, and a count read here first would let two
+ * visitors who arrive together both find the last place. The admin API
+ * reports the refusal as a database error like any other, so this is what
+ * tells the two apart. A failed read answers no, and the error is reported
+ * as one.
+ */
+async function demoIsFull(): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .filter('email', 'match', DEMO_ADDRESS_PATTERN);
+  return !error && (count ?? 0) >= DEMO_LIVE_LIMIT;
+}
+
+/**
+ * Erases the oldest demo account to make room for this visitor, if it is old
+ * enough to give its place up (DEMO_EVICT_AFTER_MS). Says whether it did.
+ *
+ * Read from `profiles`, the rows migrations/019 counts, by the whole demo
+ * address, as the sweep reads accounts: nothing but a demo account can be
+ * taken. Two visitors who find the demo full together can pick the same
+ * one; the second erase fails, is reported, and its visitor is told the demo
+ * is full.
+ */
+async function makeRoom(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, created_at')
+    .filter('email', 'match', DEMO_ADDRESS_PATTERN)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  const oldest = (data as { id: string; created_at: string }[] | null)?.[0];
+  if (error || !oldest || !givesUpItsPlace(oldest.created_at)) return false;
+
+  try {
+    const { failures } = await eraseAccount(oldest.id, { supabase, ...configuredProviders() });
+    if (failures.length > 0) {
+      console.error(
+        `[demo/session] making room left ${failures.join(', ')} behind for ${oldest.id}`
+      );
+    }
+    return true;
+  } catch (eraseError) {
+    console.error(`[demo/session] could not make room by erasing ${oldest.id}:`, eraseError);
+    await report(eraseError, { route: 'demo/session', userId: oldest.id, level: 'warning' });
+    return false;
   }
 }
 
@@ -219,13 +282,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const email = demoEmail();
     const password = demoPassword();
 
-    const { data: created, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+    const create = () => supabase.auth.admin.createUser({ email, password, email_confirm: true });
+
+    let { data: created, error: createError } = await create();
+
+    /* Full, the limit doing its job. The oldest demo account, once it is an
+       hour old, makes room, and the account is asked for once more. */
+    if ((createError || !created?.user) && (await demoIsFull()) && (await makeRoom())) {
+      ({ data: created, error: createError } = await create());
+    }
 
     if (createError || !created?.user) {
+      /* Not reported: a full demo is the limit doing its job, and a place
+         frees up once an account is an hour old. */
+      if (await demoIsFull()) {
+        return res.status(503).json({
+          message: 'The demo is full right now. Try again later, or create an account.',
+        });
+      }
       throw new Error(`Could not create the demo account: ${createError?.message}`);
     }
 

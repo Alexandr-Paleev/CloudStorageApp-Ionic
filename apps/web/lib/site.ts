@@ -28,6 +28,13 @@ export const APP_ORIGIN = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? APP).replace(/\
 export const REPOSITORY_URL = 'https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic';
 
 /**
+ * Where to write: the address the terms and the privacy policy give, and
+ * where a report about a shared file goes (`lib/report.ts`). A test holds the
+ * two documents to it.
+ */
+export const CONTACT_EMAIL = 'paleev045@gmail.com';
+
+/**
  * Whether paying is real. It is not: the app's deployment runs Stripe on test
  * keys, and the plans page says so before anyone reaches a checkout.
  *

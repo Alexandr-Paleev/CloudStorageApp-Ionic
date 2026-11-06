@@ -1,6 +1,6 @@
 # Privacy Policy for Cloud Storage App
 
-**Last Updated:** October 20, 2026
+**Last Updated:** November 5, 2026
 
 ## Introduction
 
@@ -88,7 +88,7 @@ Contact us at: [paleev045@gmail.com](mailto:paleev045@gmail.com) (or via GitHub 
 
 - **Account data**: Retained while your account is active
 - **Files**: Retained until you delete them or close your account
-- **Demo accounts**: Kept for 24 hours, then deleted with their files when the next demo account is opened
+- **Demo accounts**: Kept for up to 24 hours, then deleted with their files when the next demo account is opened. While every demo place is taken, one that is more than an hour old is deleted sooner, to make room for the next visitor
 - **Logs**: Kept by the hosting (Vercel) and the error reporting (Sentry) for as long as their plans keep them
 
 ## Security

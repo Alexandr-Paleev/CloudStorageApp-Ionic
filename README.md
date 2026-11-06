@@ -19,8 +19,11 @@ An **open-source** cloud storage product: an app for storing, viewing, sharing a
 > ⚡ **No sign-up needed.** "Just looking? Open a demo account", at the foot of
 > the login page, opens a private account seeded with a few files. Once it is a
 > day old, the next demo account opened deletes it. It is a real account — same
-> row-level security, same quota, same Stripe test-mode checkout — because a
-> demo running down a different code path stops proving anything.
+> row-level security, same quota check, same Stripe test-mode checkout — because
+> a demo running down a different code path stops proving anything. Three things
+> differ, because anyone can open one: it stores 10 MB whatever its plan, it
+> cannot make share links, and no more than twenty exist at once, so while all
+> twenty are taken, one an hour old gives its place up to the next visitor.
 >
 > It sits at the foot of that page rather than the top on purpose. As the first
 > element, styled like the submit button, it left two identical primary buttons
@@ -130,8 +133,8 @@ render — and the banner says the deletion has not reached the server yet:
   share links, profile and login, in the order the missing foreign keys demand —
   bytes first, rows second, the user last. A Pro subscription ends first, with
   the Stripe customer that held it; if Stripe cannot be reached, nothing is
-  deleted. Demo accounts, cleared a day after they are made, are erased the
-  same way, Stripe included
+  deleted. Demo accounts, cleared a day after they are made or sooner to make
+  room, are erased the same way, Stripe included
 
 > **What account deletion does not reach.** Files the app placed in *your own*
 > Google Drive or Dropbox stay where they are. They live in a storage account
@@ -201,6 +204,8 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ A link opens a page of the public site, rendered on a server: a messenger
   that unfurls the link shows the file's name, and the recipient does not
   download the app to read it
+- ✅ That page has **Report this file**: a letter to the deployment's contact
+  address, with the link in it. Demo accounts cannot make links at all
 
 > **What revoking does, precisely.** It stops `/s/:token` from opening. It cannot
 > withdraw a file someone already downloaded, and on providers that serve
@@ -208,6 +213,12 @@ render — and the banner says the deletion has not reached the server yet:
 > address keeps working for anyone who opened it. R2 and Supabase Storage are
 > signed per request and do expire. The UI says this rather than promising a
 > clean revoke.
+
+> **Acting on a report.** The letter carries the link, and the token in it is
+> the one thing that finds the file: `shared_links` keeps only its SHA-256. In
+> the SQL editor,
+> `update shared_links set revoked_at = now() where token_hash = encode(sha256(convert_to('<token>', 'UTF8')), 'hex') returning file_id, created_by;`
+> stops the link and names the file and the account behind it.
 
 ### 📱 Platforms
 
@@ -352,8 +363,17 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      through Supabase's default privileges alone, which stop covering a new
      table on 2026-10-30, and a project built from these files after that date
      would have refused every function. Production holds them already
+   - `017` — a daily budget for the two paid AI calls, counted in the database
+     per account and for the whole deployment by `claim_ai_call()`, which only
+     `service_role` may call. Apply it before adding the AI keys
+   - `018` — what a file row can be turned into: an account may rename its rows
+     and change nothing else, a size is not negative, a provider is one the app
+     has, a folder belongs to the row's own account, and the Storage bucket
+     takes a file into the owner's folder only, up to 50 MB
+   - `019` — holds a demo account's storage to 10 MB, whatever writes its limit,
+     and refuses a demo account while twenty exist
 
-   All seventeen are safe to re-run, so there is no need to track which ones have
+   All twenty are safe to re-run, so there is no need to track which ones have
    already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
@@ -620,6 +640,8 @@ uploads first, to save the round trip — but it is the pre-flight, not the gate
 | Search by meaning spends at most a daily budget, counted in the database              | the per-minute limits live in a function's memory and reset on a cold start, and describing a file again paid again; a bill is bounded only by a count every instance shares, and accounts are free to make, so the deployment has a budget of its own besides each account's                         |
 | The demo endpoint needs a server-side `DEMO_ENABLED`, not just the client flag        | a route that creates accounts should not open because a `VITE_` variable was left set in a preview                                                                                                                                                                                                    |
 | Demo accounts are swept by the whole address the demo makes, never by age alone       | the sweep erases with the service-role key. Age alone would reach a real account, and so did the `demo-` prefix alone: sign-up is open, and `demo-anna@company.com` is an address its owner can confirm. Demo addresses are on example.com, where nobody can confirm one                              |
+| A demo account stores 10 MB whatever its plan, and cannot make share links            | anyone can open one, with no address behind it: its 500 MB was a day of free hosting, and 5 GB through the test card on the plans page, and a link is a page on this project's own domain that says "Shared with you", the place for one that asks for a password. The limit is a trigger on `profiles` (migrations/019), because the webhook writes the limit of every plan change |
+| No more than twenty demo accounts exist at once, counted by the database              | a limit on each bounds none of them together: an address may open twenty an hour, the rate limit's counter is one instance's, and an account lives a day, so one address would fill the project's 1 GB of storage in five hours. A trigger counts them under a lock (migrations/019), so two visitors cannot both take the last place. A visitor who finds them all taken gets the place of the oldest once it is an hour old, so one address cannot hold the demo for a day, and a 503 while none is |
 | The demo rate limit is 20/hour per address, and per instance                          | an office or a campus behind one NAT is a single address, so a tight limit turns away the visitors this exists for; the counter lives in module scope, so it resets on a cold start and is not a defence against a distributed attempt — a shared counter is what all of these limits still want |
 | Share and upload limits count per account, and per address before the token check    | an address can be a whole office, so the limit that matters belongs to the account; the address one runs first because validating a token costs a round trip that an anonymous caller must not be able to buy by repeating the request. Revoking a share link is exempt                                |
 | A share link hands out a stored address only if it is on the file's own provider      | the row is written by the owner's browser, and can be rewritten after the link is made; asking only for `http(s)` let the Download button of a link send its recipient to any site                                                                                                                    |

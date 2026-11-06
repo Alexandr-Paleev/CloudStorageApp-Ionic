@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mockRequest, mockResponse } from '../../libs/server/src/test-utils';
 import {
+  DEMO_ADDRESS_PATTERN,
+  DEMO_LIVE_LIMIT,
   DEMO_RATE_LIMIT,
   DEMO_SWEEP_LIMIT,
   DEMO_SWEEP_PAGE_SIZE,
@@ -10,7 +12,8 @@ import {
 
 const APP_URL = 'https://app.example';
 
-const { admin, storage, table, providers } = vi.hoisted(() => ({
+const { admin, storage, table, providers, report } = vi.hoisted(() => ({
+  report: vi.fn(),
   /* What configuredProviders() hands the sweep. Empty by default, which is a
      deployment with neither R2 nor Cloudinary configured. */
   providers: { current: {} as Record<string, unknown> },
@@ -31,6 +34,10 @@ const { admin, storage, table, providers } = vi.hoisted(() => ({
     /* The Stripe customer on every profile the erase reads: by default, an
        account that never opened a checkout. */
     customer: null as string | null,
+    /* How many demo profiles the route counts after a refusal. */
+    demoCount: 0,
+    /* The oldest demo profile, which the route reads to make room. */
+    oldest: null as { id: string; created_at: string } | null,
   },
 }));
 
@@ -54,11 +61,27 @@ vi.mock('../../libs/server/src/auth', () => ({
           return Promise.resolve({ data: null, error: null });
         },
       }),
-      select: () => ({
+      select: (_columns?: string, options?: { count?: string }) => ({
         eq: () => ({
           limit: () =>
             Promise.resolve({ data: [{ stripe_customer_id: table.customer }], error: null }),
         }),
+        // Asked for a count, the number of demo profiles; asked for rows, the
+        // oldest of them.
+        filter: (...args: unknown[]) => {
+          if (options?.count) {
+            table.calls.push({ table: name, op: 'count', args });
+            return Promise.resolve({ count: table.demoCount, error: null });
+          }
+          return {
+            order: (...order: unknown[]) => ({
+              limit: () => {
+                table.calls.push({ table: name, op: 'oldest', args: [...args, ...order] });
+                return Promise.resolve({ data: table.oldest ? [table.oldest] : [], error: null });
+              },
+            }),
+          };
+        },
       }),
     }),
   },
@@ -66,6 +89,10 @@ vi.mock('../../libs/server/src/auth', () => ({
 
 vi.mock('../../libs/server/src/erase-providers', () => ({
   configuredProviders: () => providers.current,
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './session';
@@ -105,6 +132,8 @@ beforeEach(() => {
   table.calls = [];
   table.folderId = 'folder-1';
   table.customer = null;
+  table.demoCount = 0;
+  table.oldest = null;
   providers.current = {};
 
   process.env.DEMO_ENABLED = 'true';
@@ -473,11 +502,114 @@ describe('POST /api/demo/session', () => {
 
   it('answers 500 without leaking the reason when the account cannot be created', async () => {
     admin.createUser.mockResolvedValue({ data: null, error: { message: 'quota exceeded' } });
+    table.demoCount = DEMO_LIVE_LIMIT - 1;
+    // Old enough to give its place up, and still not taken: the demo is not full.
+    table.oldest = {
+      id: 'demo-old',
+      created_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
+    };
 
     const res = mockResponse();
     await handler(post(), res);
 
     expect(res.statusCode).toBe(500);
     expect(JSON.stringify(res.body)).not.toContain('quota exceeded');
+    expect(admin.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it('says the demo is full when the database holds as many demo accounts as it allows', async () => {
+    // What the admin API makes of the refusal in migrations/019.
+    admin.createUser.mockResolvedValue({
+      data: null,
+      error: { message: 'Database error creating new user' },
+    });
+    table.demoCount = DEMO_LIVE_LIMIT;
+
+    const res = mockResponse();
+    await handler(post(), res);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      message: 'The demo is full right now. Try again later, or create an account.',
+    });
+    expect(table.calls).toContainEqual({
+      table: 'profiles',
+      op: 'count',
+      args: ['email', 'match', DEMO_ADDRESS_PATTERN],
+    });
+  });
+
+  /* Twenty places, a day each, and an address may open twenty an hour: one
+     script could hold every place for the day. A place held for an hour goes
+     to whoever asks next. */
+  describe('when the demo is full', () => {
+    const FULL = { data: null, error: { message: 'Database error creating new user' } };
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
+    beforeEach(() => {
+      table.demoCount = DEMO_LIVE_LIMIT;
+    });
+
+    it('erases the oldest demo account once it is an hour old, and opens the session in its place', async () => {
+      table.oldest = { id: 'demo-old', created_at: minutesAgo(61) };
+      admin.createUser
+        .mockResolvedValueOnce(FULL)
+        .mockResolvedValueOnce({ data: { user: { id: 'user-2' } }, error: null });
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(201);
+      expect(admin.deleteUser).toHaveBeenCalledWith('demo-old');
+      expect(admin.createUser).toHaveBeenCalledTimes(2);
+      // Only a demo account, the oldest first.
+      expect(table.calls).toContainEqual({
+        table: 'profiles',
+        op: 'oldest',
+        args: ['email', 'match', DEMO_ADDRESS_PATTERN, 'created_at', { ascending: true }],
+      });
+    });
+
+    it('leaves a demo account younger than an hour where it is, and says the demo is full', async () => {
+      table.oldest = { id: 'demo-recent', created_at: minutesAgo(59) };
+      admin.createUser.mockResolvedValue(FULL);
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(503);
+      expect(admin.deleteUser).not.toHaveBeenCalled();
+      expect(admin.createUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('says the demo is full when the account that would make room will not go, and reports it', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      table.oldest = { id: 'demo-old', created_at: minutesAgo(120) };
+      admin.createUser.mockResolvedValue(FULL);
+      admin.deleteUser.mockResolvedValue({ data: null, error: { message: 'User not found' } });
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(503);
+      expect(admin.createUser).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledWith(expect.any(Error), {
+        route: 'demo/session',
+        userId: 'demo-old',
+        level: 'warning',
+      });
+    });
+
+    it('says the demo is full when another visitor took the place it made', async () => {
+      table.oldest = { id: 'demo-old', created_at: minutesAgo(120) };
+      admin.createUser.mockResolvedValue(FULL);
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(503);
+      expect(admin.deleteUser).toHaveBeenCalledWith('demo-old');
+      expect(admin.createUser).toHaveBeenCalledTimes(2);
+    });
   });
 });
