@@ -31,6 +31,13 @@ import './Account.css';
  *  a person can take without having decided to. */
 const CONFIRM_WORD = 'DELETE';
 
+/** The providers that keep a file in the person's own account, which the
+ *  erase cannot reach (libs/server/src/account-erase.ts). */
+const THEIR_CLOUD: Record<string, string> = {
+  googledrive: 'Google Drive',
+  dropbox: 'Dropbox',
+};
+
 const Account: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -65,6 +72,10 @@ const Account: React.FC = () => {
 
   const tier = profile?.tier ?? 'free';
   const limit = profile?.storage_limit ?? TIER_CONFIG.free.storage_limit;
+  const theirCloud = storageService
+    .configuredProviders()
+    .filter((name) => name in THEIR_CLOUD)
+    .map((name) => THEIR_CLOUD[name]);
 
   const { data: used } = useQuery({
     queryKey: ['storageSize', user?.id],
@@ -85,7 +96,11 @@ const Account: React.FC = () => {
     try {
       await accountService.deleteAccount();
       /* replace, not push: the back button must not lead to a dashboard
-         belonging to an account that no longer exists. */
+         belonging to an account that no longer exists. The login page says
+         it is done, and whether anything could not be erased straight away,
+         from the notice accountService left for it before signing out
+         (utils/deletion-notice.ts). The sign-out may well have sent this tab
+         there already. */
       navigate('/login', { replace: true });
     } catch (err) {
       setDeleting(false);
@@ -237,9 +252,20 @@ const Account: React.FC = () => {
 
                 <IonText>
                   <p>
-                    This deletes your account, every file you uploaded, your folders and every share
-                    link you created. It cannot be undone, and support cannot restore it.
+                    This deletes your account, every file this app stores for you, your folders and
+                    every share link you created. It cannot be undone, and support cannot restore
+                    it.
                   </p>
+                  {/* It used to say "every file you uploaded". A file in the
+                      person's own Google Drive or Dropbox was put there with
+                      their own grant, and the erase cannot reach it: only
+                      this app's list of it goes. */}
+                  {theirCloud.length > 0 && (
+                    <p>
+                      Files you keep in {theirCloud.join(' or ')} stay there, in your own account.
+                      Only the list of them in this app is deleted.
+                    </p>
+                  )}
                   {/* Said before the word is typed, not discovered on the
                       next statement: the deletion ends the subscription at
                       once, and what is left of the period is not refunded. */}

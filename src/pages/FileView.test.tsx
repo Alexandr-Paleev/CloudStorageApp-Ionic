@@ -5,6 +5,8 @@ import FileView from './FileView';
 import { renderWithProviders } from '../test/utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
 import { whereSentryWouldRead } from '../test/sentry';
+import { overlay, overlays, press } from '../test/overlays';
+import { GoogleDriveAuthError } from '../services/googledrive-auth.service';
 
 /**
  * Sharing, renaming and deleting — the three things this page does to a file
@@ -19,21 +21,27 @@ import { whereSentryWouldRead } from '../test/sentry';
 const {
   getFileMetadata,
   renameFile,
+  deleteFile,
+  forgetFile,
   createLink,
   listLinks,
   revokeLink,
   runOrQueue,
   navigate,
   offerSystemShare,
+  authorize,
 } = vi.hoisted(() => ({
   getFileMetadata: vi.fn(),
   renameFile: vi.fn(),
+  deleteFile: vi.fn(),
+  forgetFile: vi.fn(),
   createLink: vi.fn(),
   listLinks: vi.fn(),
   revokeLink: vi.fn(),
   runOrQueue: vi.fn(),
   navigate: vi.fn(),
   offerSystemShare: vi.fn(),
+  authorize: vi.fn(),
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -44,8 +52,15 @@ vi.mock('../services/storage.service', () => ({
   default: {
     getFileMetadata: (...a: unknown[]) => getFileMetadata(...a),
     renameFile: (...a: unknown[]) => renameFile(...a),
-    deleteFile: vi.fn().mockResolvedValue(undefined),
+    deleteFile: (...a: unknown[]) => deleteFile(...a),
+    forgetFile: (...a: unknown[]) => forgetFile(...a),
   },
+}));
+
+/* Google's window, answered here. The rest of the module is the real one. */
+vi.mock('../services/googledrive-auth.service', async (importActual) => ({
+  ...(await importActual<typeof import('../services/googledrive-auth.service')>()),
+  default: { authorize: () => authorize() },
 }));
 
 vi.mock('../services/share.service', () => ({
@@ -122,6 +137,9 @@ function ionButtonByText(text: string): HTMLElement {
 beforeEach(() => {
   vi.clearAllMocks();
   getFileMetadata.mockResolvedValue(FILE);
+  deleteFile.mockResolvedValue(undefined);
+  forgetFile.mockResolvedValue(undefined);
+  authorize.mockResolvedValue('drive-token');
   createLink.mockResolvedValue({ url: 'https://app.example.com/s/tok', expiresAt: '2026-09-08' });
   listLinks.mockResolvedValue([]);
   revokeLink.mockResolvedValue(undefined);
@@ -272,6 +290,28 @@ describe('FileView', () => {
      is that neither action happens on the tap that opens the sheet; the rest of
      both journeys is covered against a real browser in
      e2e/file-lifecycle.spec.ts, which uploads, renames and deletes one file. */
+  /**
+   * A button inside the sheet that is open.
+   *
+   * Ionic React renders what is inside a modal only once the modal says it is
+   * about to appear, which an element that never upgrades does not: the event
+   * is sent here instead, as test/overlays.ts does for the others.
+   */
+  function modalButton(text: string): HTMLElement {
+    const modal = openModal()!;
+    fireEvent(modal, new CustomEvent('willPresent'));
+    return [...modal.querySelectorAll('ion-button')].find((b) =>
+      (b.textContent ?? '').includes(text)
+    ) as HTMLElement;
+  }
+
+  /** The toast that says a deletion or a rename did not happen. */
+  function failureToast() {
+    return overlays('ion-toast').find(
+      (t) => t.message === 'Failed to delete' || t.message === 'Failed to rename'
+    );
+  }
+
   function openModal(): (HTMLElement & { isOpen?: boolean }) | undefined {
     return [...document.querySelectorAll('ion-modal')].find(
       (m) => (m as HTMLElement & { isOpen?: boolean }).isOpen
@@ -301,6 +341,90 @@ describe('FileView', () => {
 
       await waitFor(() => expect(openModal()).toBeTruthy());
       expect(runOrQueue).not.toHaveBeenCalled();
+    });
+
+    /* A Drive token lasts an hour. Past it this page said "Failed to delete",
+       and the file could not be deleted from anywhere but the upload page,
+       once Drive was connected there again. */
+    describe('a file in Google Drive, with Drive not connected any more', () => {
+      const driveDialog = () => overlay('ion-alert', 'Google Drive is not connected');
+
+      async function deleteIt() {
+        getFileMetadata.mockResolvedValue(IN_DRIVE);
+        deleteFile.mockRejectedValueOnce(new GoogleDriveAuthError('Google Drive is not connected'));
+        show();
+        await screen.findByText('notes.txt');
+
+        fireEvent.click(ionButtonByText('Delete'));
+        await waitFor(() => expect(openModal()).toBeTruthy());
+        fireEvent.click(modalButton('Delete'));
+        await waitFor(() => expect(driveDialog().isOpen).toBe(true));
+      }
+
+      const IN_DRIVE = {
+        ...FILE,
+        name: 'notes.txt',
+        type: 'text/plain',
+        storage_type: 'googledrive',
+        download_url: 'https://drive.google.com/file/d/abc/view',
+      };
+
+      it('asks what to do, and shows no failure', async () => {
+        await deleteIt();
+
+        expect(failureToast()?.isOpen).toBe(false);
+        expect(navigate).not.toHaveBeenCalled();
+      });
+
+      it('connects Drive from the press, then deletes it there', async () => {
+        await deleteIt();
+
+        press(driveDialog(), 'Connect Drive');
+
+        await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
+        expect(authorize).toHaveBeenCalledTimes(1);
+        expect(deleteFile).toHaveBeenCalledTimes(2);
+      });
+
+      it('takes it off the list and leaves it in Drive, then goes back to the files', async () => {
+        await deleteIt();
+
+        press(driveDialog(), 'Remove from list');
+
+        await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
+        expect(forgetFile).toHaveBeenCalledWith('file-1', 'user-1');
+        expect(deleteFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('says why when Drive was not connected after all, and stays', async () => {
+        authorize.mockRejectedValue(new Error('Google Drive was not connected'));
+        await deleteIt();
+
+        press(driveDialog(), 'Connect Drive');
+
+        await waitFor(() =>
+          expect(
+            overlays('ion-toast').some((t) => t.message === 'Google Drive was not connected')
+          ).toBe(true)
+        );
+        expect(deleteFile).toHaveBeenCalledTimes(1);
+        expect(navigate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('still says a deletion failed when the reason is anything else', async () => {
+      deleteFile.mockRejectedValueOnce(
+        new Error('Failed to delete file from storage: R2 unreachable')
+      );
+      show();
+      await screen.findByText('report.pdf');
+
+      fireEvent.click(ionButtonByText('Delete'));
+      await waitFor(() => expect(openModal()).toBeTruthy());
+      fireEvent.click(modalButton('Delete'));
+
+      await waitFor(() => expect(failureToast()?.isOpen).toBe(true));
+      expect(overlay('ion-alert', 'Google Drive is not connected').isOpen).toBe(false);
     });
   });
 });

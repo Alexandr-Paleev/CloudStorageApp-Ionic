@@ -1,7 +1,7 @@
 import { ReactElement, ReactNode } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, type InitialEntry } from 'react-router';
 
 /**
  * A client that fails fast. The app retries queries three times with backoff,
@@ -40,7 +40,8 @@ export function withQueryClient() {
 }
 
 type Options = Omit<RenderOptions, 'wrapper'> & {
-  route?: string;
+  /** Where the page opens: a path, or a path with the router's state. */
+  route?: InitialEntry;
   queryClient?: QueryClient;
 };
 

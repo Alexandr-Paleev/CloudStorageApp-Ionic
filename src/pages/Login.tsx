@@ -24,6 +24,7 @@ import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/she
 import './Login.css';
 import { LEGAL_URL } from '../utils/legal.utils';
 import { askAgain, collectorsConfigured } from '../analytics/consent';
+import { takeDeletionNotice } from '../utils/deletion-notice';
 import './Legal.css';
 
 /* Supabase's words for a password sign-in before the address is confirmed
@@ -60,6 +61,9 @@ const Login: React.FC = () => {
 
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
+  /* Taken once, when the page opens: utils/deletion-notice.ts says why it is
+     not in the router's state. */
+  const [deleted] = useState(takeDeletionNotice);
 
   // Redirect if already logged in. Declared rather than called: navigate() here
   // is a side effect during render, which React makes no promise about — under
@@ -138,6 +142,16 @@ const Login: React.FC = () => {
                 out of what Hotjar records, as the field is. A live region from
                 the start, so that a screen reader says it when it appears. */}
             <div role="status" data-hj-suppress="">
+              {/* A deletion used to end on this page with nothing said, and
+                  what could not be erased was not said at all. The server
+                  reports that too, for it to be swept by hand. */}
+              {deleted && (
+                <p className="login-notice">
+                  Your account has been deleted.
+                  {deleted.failures.length > 0 &&
+                    ' Some of its files could not be erased straight away. That has been reported, and they will be removed.'}
+                </p>
+              )}
               {confirming && (
                 <p className="login-notice">
                   We have sent a link to <strong>{confirming}</strong>. Open it to confirm the

@@ -40,7 +40,9 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import OfflineQueueBanner from '../components/OfflineQueueBanner';
 import storageService from '../services/storage.service';
 import shareService from '../services/share.service';
+import googleDriveAuthService, { needsDriveConnected } from '../services/googledrive-auth.service';
 import PdfFrame from '../components/PdfFrame';
+import ReconnectDriveDialog from '../components/ReconnectDriveDialog';
 import ShareLinks from '../components/ShareLinks';
 import { FileMetadata } from '../schemas/file.schema';
 import { formatFileSize, formatDateTime } from '../utils/format.utils';
@@ -145,6 +147,46 @@ const FileView: React.FC = () => {
       navigate('/dashboard');
     },
   });
+
+  /* The deletion stopped because Google Drive is not connected any more
+     (ReconnectDriveDialog asks what to do). Read from the mutation rather
+     than set in an onError of its own, which would replace the one main.tsx
+     gives every mutation, the one that reports a failure to Google
+     Analytics. */
+  const driveBlocked = deleteMutation.isError && needsDriveConnected(deleteMutation.error);
+  const deleteFailed = deleteMutation.isError && !driveBlocked;
+
+  /* The other answer to a file Drive will not let go of: off this list, and
+     left in Drive. Not through the queue, because it answers a deletion that
+     has just been tried online. */
+  const leaveInDriveMutation = useMutation({
+    mutationFn: () => {
+      if (!fileId) throw new Error('File ID is required');
+      if (!user?.id) throw new Error('User not authenticated');
+      return storageService.forgetFile(fileId, user.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', user?.id] });
+      navigate('/dashboard');
+    },
+  });
+
+  /* Asked in the press itself, as the upload page asks it, so the window
+     Google opens is not taken for a pop-up nobody asked for. */
+  const handleConnectDrive = async () => {
+    deleteMutation.reset();
+    try {
+      await googleDriveAuthService.authorize();
+    } catch (err) {
+      setCopyToast({
+        show: true,
+        message: err instanceof Error ? err.message : 'Google Drive was not connected',
+        color: 'danger',
+      });
+      return;
+    }
+    deleteMutation.mutate();
+  };
 
   const renameMutation = useMutation({
     mutationFn: (name: string) => {
@@ -655,9 +697,25 @@ const FileView: React.FC = () => {
           </IonContent>
         </IonModal>
 
+        <ReconnectDriveDialog
+          blocked={driveBlocked ? 'file' : null}
+          onDismiss={() => {
+            if (driveBlocked) deleteMutation.reset();
+          }}
+          onConnect={handleConnectDrive}
+          onRemoveFromList={() => {
+            deleteMutation.reset();
+            leaveInDriveMutation.mutate();
+          }}
+        />
+
+        {/* Not for Drive asking to be connected again: the dialog above says
+            that, and what can be done about it. */}
         <IonToast
-          isOpen={deleteMutation.isError || renameMutation.isError}
-          message={deleteMutation.isError ? 'Failed to delete' : 'Failed to rename'}
+          isOpen={deleteFailed || leaveInDriveMutation.isError || renameMutation.isError}
+          message={
+            deleteFailed || leaveInDriveMutation.isError ? 'Failed to delete' : 'Failed to rename'
+          }
           duration={3000}
           color="danger"
         />

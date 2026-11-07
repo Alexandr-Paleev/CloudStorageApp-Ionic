@@ -19,6 +19,7 @@ import FolderBreadcrumbs from '../components/FolderBreadcrumbs';
 import FolderGrid from '../components/FolderGrid';
 import NewFolderDialog from '../components/NewFolderDialog';
 import OfflineQueueBanner from '../components/OfflineQueueBanner';
+import ReconnectDriveDialog from '../components/ReconnectDriveDialog';
 import StorageMeter from '../components/StorageMeter';
 import { useFileListing } from '../hooks/useFileListing';
 import { useFolderTrail } from '../hooks/useFolderTrail';
@@ -26,6 +27,7 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { useSearchIndex } from '../hooks/useSearchIndex';
 import { useStorageMutations } from '../hooks/useStorageMutations';
 import { useStorageUsage } from '../hooks/useStorageUsage';
+import { needsDriveConnected } from '../services/googledrive-auth.service';
 import { DEFAULT_DIRECTION, DEFAULT_SORT } from '../utils/file-query';
 import type { Folder } from '../services/storage.service';
 import { useProfile } from '../hooks/useProfile';
@@ -74,7 +76,7 @@ const Dashboard: React.FC = () => {
   });
   const { folder: currentFolder, path: folderPath, parentId } = useFolderTrail(folderId);
   const usage = useStorageUsage();
-  const { renameFolder, deleteFolder, deleteFile, createFolder } = useStorageMutations({
+  const { renameFolder, deleteFolder, deleteFile, createFolder, drive } = useStorageMutations({
     folderId,
     onProblem: setErrorToast,
   });
@@ -195,8 +197,10 @@ const Dashboard: React.FC = () => {
           onDelete={(folder) => deleteFolder.mutate(folder)}
         />
 
+        {/* Not for Drive asking to be connected again: the dialog below says
+            that, and what can be done about it. */}
         <IonToast
-          isOpen={deleteFile.isError}
+          isOpen={deleteFile.isError && !needsDriveConnected(deleteFile.error)}
           message="Failed to delete file"
           duration={3000}
           color="danger"
@@ -206,6 +210,13 @@ const Dashboard: React.FC = () => {
           fileId={fileToDelete}
           onDismiss={() => setFileToDelete(null)}
           onConfirm={(fileId) => deleteFile.mutate(fileId)}
+        />
+
+        <ReconnectDriveDialog
+          blocked={drive.blocked}
+          onDismiss={drive.dismiss}
+          onConnect={drive.connect}
+          onRemoveFromList={drive.removeFromList}
         />
 
         <NewFolderDialog

@@ -22,7 +22,8 @@ import { report } from './report';
  * grant, and the app holds no standing authority to delete from either — the
  * Dropbox refresh token is erased along with the row that held it. Leaving a
  * person's files in a storage account they control is the right outcome, but
- * the interface has to say so rather than imply a clean sweep.
+ * the interface has to say so rather than imply a clean sweep, and the account
+ * page does.
  *
  * Everything an erase must do lives here, and not in a route that calls it.
  * Closing the Stripe customer lived in `DELETE /api/account` alone, and the
