@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { apiUrl } from '../utils/api.utils';
 import storageService from './storage.service';
+import { leaveDeletionNotice } from '../utils/deletion-notice';
 
 /** Providers whose bytes could not be reached. The account is gone regardless. */
 export interface DeletionResult {
@@ -45,6 +46,11 @@ const accountService = {
     }
 
     const { failures = [] } = (await response.json()) as { failures?: string[] };
+
+    /* Before the sign-out, which sends this tab to /login by a redirect of
+       its own: see utils/deletion-notice.ts for why the notice cannot ride
+       on the navigation. */
+    leaveDeletionNotice({ failures });
 
     if (session) await storageService.forgetUploads(session.user.id).catch(() => undefined);
     await supabase.auth.signOut().catch(() => undefined);

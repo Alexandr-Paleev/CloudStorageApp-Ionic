@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { Route, Routes, useLocation } from 'react-router';
+import { Route, Routes } from 'react-router';
 import Account from './Account';
 import { renderWithProviders } from '../test/utils';
 import { forgetConsent, readConsent, writeConsent } from '../analytics/consent';
@@ -77,16 +77,10 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', email: 'someone@example.com' } }),
 }));
 
-/** The login page, as far as this page is concerned: where it leads, and
- *  what it hands over in the router's state. */
+/** The login page, as far as this page is concerned: where it leads. What it
+ *  says there, accountService leaves for it (utils/deletion-notice.ts). */
 function SignIn() {
-  const { state } = useLocation();
-  return (
-    <>
-      <p>Sign in</p>
-      <output data-testid="handed-over">{JSON.stringify(state)}</output>
-    </>
-  );
+  return <p>Sign in</p>;
 }
 
 function show() {
@@ -313,21 +307,6 @@ describe('Account', () => {
 
     await waitFor(() => expect(screen.getByText('Sign in')).toBeInTheDocument());
     expect(deleteAccount).toHaveBeenCalledTimes(1);
-  });
-
-  /* The server answers with the providers it could not empty. The page used
-     to throw that away; the login page now says it. */
-  it('tells the login page what could not be erased straight away', async () => {
-    deleteAccount.mockResolvedValue({ failures: ['cloudinary'] });
-    show();
-    openDangerZone();
-    confirm('DELETE');
-    fireEvent.click(deleteButton());
-
-    await waitFor(() => expect(screen.getByText('Sign in')).toBeInTheDocument());
-    expect(JSON.parse(screen.getByTestId('handed-over').textContent!)).toEqual({
-      accountDeleted: { failures: ['cloudinary'] },
-    });
   });
 
   it('stays put and says what went wrong when the request fails', async () => {

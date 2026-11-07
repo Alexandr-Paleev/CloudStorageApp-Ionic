@@ -94,12 +94,14 @@ const Account: React.FC = () => {
     setDeleting(true);
     setError('');
     try {
-      const { failures } = await accountService.deleteAccount();
+      await accountService.deleteAccount();
       /* replace, not push: the back button must not lead to a dashboard
          belonging to an account that no longer exists. The login page says
-         it is done, and whether anything could not be erased straight away:
-         the server's answer says so, and the page used to throw it away. */
-      navigate('/login', { replace: true, state: { accountDeleted: { failures } } });
+         it is done, and whether anything could not be erased straight away,
+         from the notice accountService left for it before signing out
+         (utils/deletion-notice.ts). The sign-out may well have sent this tab
+         there already. */
+      navigate('/login', { replace: true });
     } catch (err) {
       setDeleting(false);
       setError(err instanceof Error ? err.message : 'Failed to delete the account');

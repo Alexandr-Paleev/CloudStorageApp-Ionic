@@ -47,9 +47,11 @@ test.describe('Deleting an account', () => {
        for: the redirect happens only once the erase has answered. */
     await expect(page).toHaveURL(/\/login$/, { timeout: 30_000 });
 
-    /* Said on arrival. It used to end here with nothing said, and the state
-       that says it travels with the navigation, so only a browser shows it
-       survives the sign-out on the way. */
+    /* Said on arrival. It used to end here with nothing said. Only a browser
+       shows the notice survives the sign-out on the way: it rode in the
+       router's state at first, and PrivateRoute's redirect, which the
+       sign-out sets off, replaced it before the page could read it
+       (utils/deletion-notice.ts). This line found that. */
     await expect(page.getByText('Your account has been deleted.')).toBeVisible();
 
     /* The account is gone, so its own credentials no longer open a session.

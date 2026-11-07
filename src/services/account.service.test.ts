@@ -13,6 +13,13 @@ vi.mock('./storage.service', () => ({
   default: { forgetUploads: (userId: string) => forgetUploads(userId) },
 }));
 
+const leaveDeletionNotice = vi.fn((_notice: { failures: string[] }) => {
+  order.push('notice');
+});
+vi.mock('../utils/deletion-notice', () => ({
+  leaveDeletionNotice: (notice: { failures: string[] }) => leaveDeletionNotice(notice),
+}));
+
 const fetchMock = vi.fn();
 
 /** What happened, in the order it happened — the order is the whole subject. */
@@ -49,7 +56,7 @@ describe('deleting the account', () => {
      request would come back 401 with the account still there. */
   it('signs out after the account is gone, never before', async () => {
     await accountService.deleteAccount();
-    expect(order).toEqual(['delete', 'signOut']);
+    expect(order).toEqual(['delete', 'notice', 'signOut']);
   });
 
   /* By the time signOut runs the user it would sign out no longer exists, so
@@ -96,6 +103,30 @@ describe('deleting the account', () => {
     });
   });
 
+  /* The sign-out sends the tab to /login by PrivateRoute's own redirect,
+     which carries nothing: the notice has to be there before it. */
+  it('leaves the login page its notice before signing out', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => {
+        order.push('delete');
+        return { deleted: true, failures: ['cloudinary'] };
+      },
+    });
+
+    await accountService.deleteAccount();
+
+    expect(order).toEqual(['delete', 'notice', 'signOut']);
+    expect(leaveDeletionNotice).toHaveBeenCalledWith({ failures: ['cloudinary'] });
+  });
+
+  it('leaves no notice when the deletion is refused', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({ message: 'no' }) });
+
+    await expect(accountService.deleteAccount()).rejects.toThrow();
+    expect(leaveDeletionNotice).not.toHaveBeenCalled();
+  });
+
   it('reads a response with no failures list as none', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ deleted: true }) });
     await expect(accountService.deleteAccount()).resolves.toEqual({ failures: [] });
@@ -112,7 +143,7 @@ describe('deleting the account', () => {
     await accountService.deleteAccount();
 
     expect(forgetUploads).toHaveBeenCalledWith('user-1');
-    expect(order).toEqual(['delete', 'forgetUploads', 'signOut']);
+    expect(order).toEqual(['delete', 'notice', 'forgetUploads', 'signOut']);
   });
 
   it('keeps them while the account still exists', async () => {

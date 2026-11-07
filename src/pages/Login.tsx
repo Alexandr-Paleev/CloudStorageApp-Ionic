@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import {
   IonContent,
   IonPage,
@@ -24,6 +24,7 @@ import { setStatusBarForDarkBackground, syncStatusBarStyle } from '../native/she
 import './Login.css';
 import { LEGAL_URL } from '../utils/legal.utils';
 import { askAgain, collectorsConfigured } from '../analytics/consent';
+import { takeDeletionNotice } from '../utils/deletion-notice';
 import './Legal.css';
 
 /* Supabase's words for a password sign-in before the address is confirmed
@@ -33,15 +34,6 @@ function sayWhy(err: unknown): string {
     return 'This address is not confirmed yet. Open the link we emailed to it, then sign in.';
   }
   return err instanceof Error ? err.message : 'An error occurred';
-}
-
-/** What the account page leaves in the router's state once it has deleted an
- *  account (Account.tsx), or null. History state outlives a reload and can
- *  hold anything, so it is read with care. */
-function deletionIn(state: unknown): { failures: string[] } | null {
-  const deleted = (state as { accountDeleted?: { failures?: unknown } } | null)?.accountDeleted;
-  if (!deleted) return null;
-  return { failures: Array.isArray(deleted.failures) ? deleted.failures : [] };
 }
 
 const Login: React.FC = () => {
@@ -69,7 +61,9 @@ const Login: React.FC = () => {
 
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
-  const deleted = deletionIn(useLocation().state);
+  /* Taken once, when the page opens: utils/deletion-notice.ts says why it is
+     not in the router's state. */
+  const [deleted] = useState(takeDeletionNotice);
 
   // Redirect if already logged in. Declared rather than called: navigate() here
   // is a side effect during render, which React makes no promise about — under
