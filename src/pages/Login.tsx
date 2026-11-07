@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 import {
   IonContent,
   IonPage,
@@ -35,6 +35,15 @@ function sayWhy(err: unknown): string {
   return err instanceof Error ? err.message : 'An error occurred';
 }
 
+/** What the account page leaves in the router's state once it has deleted an
+ *  account (Account.tsx), or null. History state outlives a reload and can
+ *  hold anything, so it is read with care. */
+function deletionIn(state: unknown): { failures: string[] } | null {
+  const deleted = (state as { accountDeleted?: { failures?: unknown } } | null)?.accountDeleted;
+  if (!deleted) return null;
+  return { failures: Array.isArray(deleted.failures) ? deleted.failures : [] };
+}
+
 const Login: React.FC = () => {
   /* This page is a deep indigo gradient in both themes, and on a device the
      status bar sits on top of it. Without this the clock follows body.dark and
@@ -60,6 +69,7 @@ const Login: React.FC = () => {
 
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
+  const deleted = deletionIn(useLocation().state);
 
   // Redirect if already logged in. Declared rather than called: navigate() here
   // is a side effect during render, which React makes no promise about — under
@@ -138,6 +148,16 @@ const Login: React.FC = () => {
                 out of what Hotjar records, as the field is. A live region from
                 the start, so that a screen reader says it when it appears. */}
             <div role="status" data-hj-suppress="">
+              {/* A deletion used to end on this page with nothing said, and
+                  what could not be erased was not said at all. The server
+                  reports that too, for it to be swept by hand. */}
+              {deleted && (
+                <p className="login-notice">
+                  Your account has been deleted.
+                  {deleted.failures.length > 0 &&
+                    ' Some of its files could not be erased straight away. That has been reported, and they will be removed.'}
+                </p>
+              )}
               {confirming && (
                 <p className="login-notice">
                   We have sent a link to <strong>{confirming}</strong>. Open it to confirm the

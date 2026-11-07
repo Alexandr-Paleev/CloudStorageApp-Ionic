@@ -8,8 +8,10 @@ import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 import { isQuotaRejection } from '../utils/quota.utils';
 import { messageOf } from '../utils/postgrest-error';
 import r2Service from './r2.service';
+import { needsDriveConnected } from './googledrive-auth.service';
 import type { PendingUpload } from './upload-store';
 import { isSearching, type FileQuery } from '../utils/file-query';
+import { isHostedProvider } from '@cloud-storage/core/stored-path';
 
 export type { FileMetadata, Folder };
 export type { PendingUpload };
@@ -272,6 +274,11 @@ const storageService = {
       // Pass metadata so the provider knows if it's a PDF (raw) or Image
       await provider.delete(file.storage_path, { type: file.type, name: file.name });
     } catch (error) {
+      /* Not a fault: a Drive token lasts an hour. Thrown as it came, so that
+         the page can ask the question it needs (ReconnectDriveDialog) rather
+         than print a sentence with the reason wrapped out of reach. */
+      if (needsDriveConnected(error)) throw error;
+
       storageDeleteError =
         error instanceof Error ? error : new Error('Unknown storage deletion error');
       Sentry.captureException(storageDeleteError, {
@@ -290,6 +297,35 @@ const storageService = {
         extra: { fileId, userId },
       });
       throw new Error(`Failed to delete file metadata: ${messageOf(dbError) ?? 'Unknown error'}`);
+    }
+  },
+
+  /**
+   * Takes a file off the list and leaves it where it is.
+   *
+   * For a file in the person's own Google Drive or Dropbox, when the app
+   * cannot reach that account to delete it there: it is theirs either way,
+   * and the row is only this app's note of where it went. Never for a file
+   * this app stores. The quota counts that row, and without it the bytes
+   * would stay in a bucket this app pays for, listed and counted by nothing.
+   */
+  async forgetFile(fileId: string, userId: string): Promise<void> {
+    const file = await supabaseService.getFileMetadata(fileId, userId);
+    if (!file) {
+      throw new Error('File not found or access denied');
+    }
+    if (isHostedProvider(file.storage_type)) {
+      throw new Error(
+        'Only a file kept in Google Drive or Dropbox can be taken off the list alone'
+      );
+    }
+
+    try {
+      await supabaseService.deleteFileMetadata(fileId, userId);
+    } catch (dbError) {
+      throw new Error(
+        `Failed to take the file off the list: ${messageOf(dbError) ?? 'Unknown error'}`
+      );
     }
   },
 
@@ -368,11 +404,19 @@ const storageService = {
    * Depth first, so a subfolder is empty before its parent is removed, and a
    * failure halfway leaves a consistent half: what is gone is gone from both
    * places, and what remains is still listed and still deletable.
+   *
+   * `keepTheirCloud` is the answer to a folder that stopped at a file in
+   * Google Drive: such files are taken off the list and left in Drive
+   * (forgetFile), and everything else goes as before.
    */
-  async deleteFolder(folderId: string, userId: string): Promise<void> {
+  async deleteFolder(
+    folderId: string,
+    userId: string,
+    options: { keepTheirCloud?: boolean } = {}
+  ): Promise<void> {
     const children = await supabaseService.getFolders(userId, folderId);
     for (const child of children) {
-      if (child.id) await this.deleteFolder(child.id, userId);
+      if (child.id) await this.deleteFolder(child.id, userId, options);
     }
 
     /* Paged rather than fetched whole: a folder with a thousand files would
@@ -391,7 +435,11 @@ const storageService = {
       if (deletable.length === 0) break;
 
       for (const file of deletable) {
-        await this.deleteFile(file.id, userId);
+        if (options.keepTheirCloud && !isHostedProvider(file.storage_type)) {
+          await this.forgetFile(file.id, userId);
+        } else {
+          await this.deleteFile(file.id, userId);
+        }
       }
     }
 

@@ -5,6 +5,7 @@ import supabaseService from './supabase.service';
 import * as Sentry from '../observability/sentry';
 import { withoutSecrets } from '../observability/scrub';
 import { HttpError } from '../utils/http.utils';
+import { GoogleDriveAuthError } from './googledrive-auth.service';
 import { DEFAULT_STORAGE_LIMIT } from '@cloud-storage/core/tiers';
 import { z } from 'zod';
 
@@ -382,6 +383,89 @@ describe('deleteFile', () => {
       'Failed to delete file metadata: canceling statement due to statement timeout'
     );
   });
+
+  /* A Drive token lasts an hour. Wrapped in "Failed to delete file from
+     storage", the page could not tell this from a fault, and had nothing to
+     offer but a toast; and Sentry heard about every expired token. */
+  it('hands back Drive asking to be connected again as it came, and tells Sentry nothing', async () => {
+    const refused = new GoogleDriveAuthError('Google Drive is not connected');
+    vi.mocked(supabaseService.getFileMetadata).mockResolvedValue({
+      id: 'file-1',
+      name: 'notes.txt',
+      type: 'text/plain',
+      storage_type: 'googledrive',
+      storage_path: 'drive-file-id',
+    } as unknown as Awaited<ReturnType<typeof supabaseService.getFileMetadata>>);
+    vi.mocked(providerManager.getProvider).mockReturnValue(
+      provider({ name: 'googledrive', delete: vi.fn(async () => Promise.reject(refused)) })
+    );
+
+    await expect(storageService.deleteFile('file-1', 'user-1')).rejects.toBe(refused);
+    expect(supabaseService.deleteFileMetadata).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe('forgetFile', () => {
+  function stored(storage_type: string) {
+    vi.mocked(supabaseService.getFileMetadata).mockResolvedValue({
+      id: 'file-1',
+      name: 'notes.txt',
+      type: 'text/plain',
+      storage_type,
+      storage_path: storage_type === 'googledrive' ? 'drive-file-id' : 'user-1/notes.txt',
+    } as unknown as Awaited<ReturnType<typeof supabaseService.getFileMetadata>>);
+  }
+
+  it.each(['googledrive', 'dropbox'])(
+    'takes a %s file off the list and asks nothing of the provider',
+    async (storageType) => {
+      stored(storageType);
+      vi.mocked(supabaseService.deleteFileMetadata).mockResolvedValue(undefined as never);
+
+      await storageService.forgetFile('file-1', 'user-1');
+
+      expect(supabaseService.deleteFileMetadata).toHaveBeenCalledWith('file-1', 'user-1');
+      expect(providerManager.getProvider).not.toHaveBeenCalled();
+    }
+  );
+
+  /* The quota counts the row. Without it the bytes would stay in a bucket
+     this app pays for, listed and counted by nothing. */
+  it.each(['cloudinary', 'r2', 'supabase_storage'])(
+    'refuses a file this app keeps in %s',
+    async (storageType) => {
+      stored(storageType);
+
+      await expect(storageService.forgetFile('file-1', 'user-1')).rejects.toThrow(
+        'Only a file kept in Google Drive or Dropbox can be taken off the list alone'
+      );
+      expect(supabaseService.deleteFileMetadata).not.toHaveBeenCalled();
+    }
+  );
+
+  it("refuses a file that is not the caller's", async () => {
+    vi.mocked(supabaseService.getFileMetadata).mockResolvedValue(null);
+
+    await expect(storageService.forgetFile('file-1', 'user-2')).rejects.toThrow(
+      'File not found or access denied'
+    );
+    expect(supabaseService.deleteFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it('says what the database said when the row would not go', async () => {
+    stored('googledrive');
+    vi.mocked(supabaseService.deleteFileMetadata).mockRejectedValue({
+      code: '57014',
+      details: null,
+      hint: null,
+      message: 'canceling statement due to statement timeout',
+    });
+
+    await expect(storageService.forgetFile('file-1', 'user-1')).rejects.toThrow(
+      'Failed to take the file off the list: canceling statement due to statement timeout'
+    );
+  });
 });
 
 describe('getFileMetadata', () => {
@@ -538,6 +622,55 @@ describe('deleteFolder', () => {
 
     expect(p.delete).not.toHaveBeenCalled();
     expect(supabaseService.deleteFolderRow).toHaveBeenCalledWith('folder-1', 'user-1');
+  });
+
+  describe('with a file in Google Drive inside, and Drive not connected', () => {
+    const inDrive: Row = {
+      id: 'file-drive',
+      name: 'notes.txt',
+      storage_type: 'googledrive',
+      storage_path: 'drive-file-id',
+    };
+
+    /** Drive says what it says without a token; R2 deletes. */
+    function providers() {
+      const r2 = provider();
+      const drive = provider({
+        name: 'googledrive',
+        delete: vi.fn(async () => Promise.reject(new GoogleDriveAuthError())),
+      });
+      vi.mocked(providerManager.getProvider).mockImplementation(
+        (name: string) => (name === 'googledrive' ? drive : r2) as never
+      );
+      return { r2, drive };
+    }
+
+    it('stops there, keeps the folder, and says Drive has to be connected', async () => {
+      providers();
+      tree({ folders: {}, files: { 'folder-1': [inDrive] } });
+
+      await expect(storageService.deleteFolder('folder-1', 'user-1')).rejects.toBeInstanceOf(
+        GoogleDriveAuthError
+      );
+      expect(supabaseService.deleteFolderRow).not.toHaveBeenCalled();
+    });
+
+    it('asked to keep it there, takes it off the list and deletes the rest', async () => {
+      const { r2, drive } = providers();
+      tree({
+        folders: { 'folder-1': [{ id: 'folder-2' }] },
+        files: { 'folder-1': [row('file-1')], 'folder-2': [inDrive] },
+      });
+
+      await storageService.deleteFolder('folder-1', 'user-1', { keepTheirCloud: true });
+
+      expect(drive.delete).not.toHaveBeenCalled();
+      expect(r2.delete).toHaveBeenCalledWith('user-1/file-1', expect.anything());
+      const rows = vi.mocked(supabaseService.deleteFileMetadata).mock.calls.map(([id]) => id);
+      expect(rows.sort()).toEqual(['file-1', 'file-drive']);
+      const folders = vi.mocked(supabaseService.deleteFolderRow).mock.calls.map(([id]) => id);
+      expect(folders).toEqual(['folder-2', 'folder-1']);
+    });
   });
 });
 

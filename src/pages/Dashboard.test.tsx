@@ -6,6 +6,7 @@ import { renderWithProviders } from '../test/utils';
 import { overlay, overlays, press } from '../test/overlays';
 import { whereHotjarWouldRead } from '../test/hotjar';
 import { whereSentryWouldRead } from '../test/sentry';
+import { GoogleDriveAuthError } from '../services/googledrive-auth.service';
 
 /**
  * The quota arithmetic, the delete path and what the screen says when a
@@ -213,6 +214,31 @@ describe('Dashboard', () => {
 
       expect(confirmation().isOpen).toBe(false);
       expect(runOrQueue).not.toHaveBeenCalled();
+    });
+
+    /* The page's half of a deletion Drive would not take: the question, and
+       not "Failed to delete file". What each answer does is the hook's, in
+       useStorageMutations.test.tsx. */
+    const driveQuestion = () => overlay('ion-alert', 'Google Drive is not connected');
+    const failureToast = () =>
+      overlays('ion-toast').find((toast) => toast.message === 'Failed to delete file');
+
+    it('asks about Google Drive instead of saying the deletion failed', async () => {
+      deleteFile.mockRejectedValue(new GoogleDriveAuthError('Google Drive is not connected'));
+      await tapTheBin();
+      press(confirmation(), 'Delete');
+
+      await waitFor(() => expect(driveQuestion().isOpen).toBe(true));
+      expect(failureToast()?.isOpen).toBe(false);
+    });
+
+    it('still says a deletion failed when the reason is anything else', async () => {
+      deleteFile.mockRejectedValue(new Error('Failed to delete file from storage: R2 unreachable'));
+      await tapTheBin();
+      press(confirmation(), 'Delete');
+
+      await waitFor(() => expect(failureToast()?.isOpen).toBe(true));
+      expect(driveQuestion().isOpen).toBe(false);
     });
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import Account from './Account';
 import { renderWithProviders } from '../test/utils';
 import { forgetConsent, readConsent, writeConsent } from '../analytics/consent';
@@ -27,6 +27,12 @@ const {
   isNativePlatform: vi.fn(() => false),
 }));
 
+/* What this deployment has set up. Google Drive is always among them: its
+   provider answers isConfigured() with true. */
+const { configured } = vi.hoisted(() => ({
+  configured: { current: ['cloudinary', 'supabase_storage', 'googledrive'] },
+}));
+
 const { analyticsConfigured } = vi.hoisted(() => ({ analyticsConfigured: { current: false } }));
 
 /* Whether there is anything to ask about is a property of the build; the
@@ -49,7 +55,10 @@ vi.mock('../services/billing.service', () => ({
 }));
 
 vi.mock('../services/storage.service', () => ({
-  default: { getUserStorageSize: (...args: unknown[]) => getUserStorageSize(...args) },
+  default: {
+    getUserStorageSize: (...args: unknown[]) => getUserStorageSize(...args),
+    configuredProviders: () => configured.current,
+  },
 }));
 
 vi.mock('../hooks/useProfile', () => ({
@@ -68,11 +77,23 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', email: 'someone@example.com' } }),
 }));
 
+/** The login page, as far as this page is concerned: where it leads, and
+ *  what it hands over in the router's state. */
+function SignIn() {
+  const { state } = useLocation();
+  return (
+    <>
+      <p>Sign in</p>
+      <output data-testid="handed-over">{JSON.stringify(state)}</output>
+    </>
+  );
+}
+
 function show() {
   return renderWithProviders(
     <Routes>
       <Route path="/" element={<Account />} />
-      <Route path="/login" element={<p>Sign in</p>} />
+      <Route path="/login" element={<SignIn />} />
       <Route path="/pricing" element={<p>Pro plan</p>} />
     </Routes>
   );
@@ -109,6 +130,7 @@ beforeEach(() => {
   };
   envMock.VITE_BILLING_ENABLED = true;
   isNativePlatform.mockReturnValue(false);
+  configured.current = ['cloudinary', 'supabase_storage', 'googledrive'];
 });
 
 describe('Account', () => {
@@ -252,6 +274,37 @@ describe('Account', () => {
     expect(screen.queryByText(/subscription ends/)).not.toBeInTheDocument();
   });
 
+  /* It used to promise "every file you uploaded". A file in the person's own
+     Google Drive was put there with their own grant, and the erase cannot
+     reach it (libs/server/src/account-erase.ts). */
+  it('says that files kept in Google Drive stay there', () => {
+    show();
+    openDangerZone();
+
+    expect(screen.queryByText(/every file you uploaded/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Files you keep in Google Drive stay there, in your own account\./)
+    ).toBeInTheDocument();
+  });
+
+  it('names Dropbox as well where this deployment has set it up', () => {
+    configured.current = ['cloudinary', 'googledrive', 'dropbox'];
+    show();
+    openDangerZone();
+
+    expect(
+      screen.getByText(/Files you keep in Google Drive or Dropbox stay there/)
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing of a cloud of their own where none is offered', () => {
+    configured.current = ['cloudinary', 'supabase_storage'];
+    show();
+    openDangerZone();
+
+    expect(screen.queryByText(/stay there/)).not.toBeInTheDocument();
+  });
+
   it('deletes the account and leaves for the login page', async () => {
     show();
     openDangerZone();
@@ -260,6 +313,21 @@ describe('Account', () => {
 
     await waitFor(() => expect(screen.getByText('Sign in')).toBeInTheDocument());
     expect(deleteAccount).toHaveBeenCalledTimes(1);
+  });
+
+  /* The server answers with the providers it could not empty. The page used
+     to throw that away; the login page now says it. */
+  it('tells the login page what could not be erased straight away', async () => {
+    deleteAccount.mockResolvedValue({ failures: ['cloudinary'] });
+    show();
+    openDangerZone();
+    confirm('DELETE');
+    fireEvent.click(deleteButton());
+
+    await waitFor(() => expect(screen.getByText('Sign in')).toBeInTheDocument());
+    expect(JSON.parse(screen.getByTestId('handed-over').textContent!)).toEqual({
+      accountDeleted: { failures: ['cloudinary'] },
+    });
   });
 
   it('stays put and says what went wrong when the request fails', async () => {

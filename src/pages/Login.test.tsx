@@ -56,11 +56,13 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigate };
 });
 
-function show() {
+/** The page, opened with what the router carries to it, if anything. */
+function show(state?: unknown) {
   return renderWithProviders(
     <Routes>
       <Route path="/" element={<Login />} />
-    </Routes>
+    </Routes>,
+    { route: { pathname: '/', state } }
   );
 }
 
@@ -298,6 +300,40 @@ describe('Login', () => {
     show();
     fireEvent.click(ionButtonByText("Don't have an account? Sign up"));
     expect(ionButtonByText('Forgot?')).toBeUndefined();
+  });
+});
+
+/* A deletion ended on this page with nothing said, and what the server could
+   not erase was not said at all. The account page hands both over. */
+describe('Login, after an account was deleted', () => {
+  const status = () => screen.getByRole('status');
+
+  it('says the account is gone', () => {
+    show({ accountDeleted: { failures: [] } });
+
+    expect(status()).toHaveTextContent('Your account has been deleted.');
+    expect(status()).not.toHaveTextContent('could not be erased');
+  });
+
+  it('says when some of its files could not be erased straight away', () => {
+    show({ accountDeleted: { failures: ['cloudinary'] } });
+
+    expect(status()).toHaveTextContent(
+      'Your account has been deleted. Some of its files could not be erased straight away.'
+    );
+  });
+
+  it('says nothing of a deletion when there was none', () => {
+    show();
+    expect(status()).not.toHaveTextContent('deleted');
+  });
+
+  /* History state outlives a reload, and can hold anything. */
+  it('makes do with a state it cannot read in full', () => {
+    show({ accountDeleted: { failures: 'cloudinary' } });
+
+    expect(status()).toHaveTextContent('Your account has been deleted.');
+    expect(status()).not.toHaveTextContent('could not be erased');
   });
 });
 
