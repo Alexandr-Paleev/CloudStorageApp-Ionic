@@ -5,6 +5,7 @@ import Login from './Login';
 import { renderWithProviders } from '../test/utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
 import { SITE_ORIGIN } from '@cloud-storage/core/origins';
+import { leaveDeletionNotice } from '../utils/deletion-notice';
 
 /**
  * The four ways into this app, and what each of them does when it fails.
@@ -56,11 +57,13 @@ vi.mock('react-router', async () => {
   return { ...actual, useNavigate: () => navigate };
 });
 
-function show() {
+/** The page, opened with what the router carries to it, if anything. */
+function show(state?: unknown) {
   return renderWithProviders(
     <Routes>
       <Route path="/" element={<Login />} />
-    </Routes>
+    </Routes>,
+    { route: { pathname: '/', state } }
   );
 }
 
@@ -298,6 +301,62 @@ describe('Login', () => {
     show();
     fireEvent.click(ionButtonByText("Don't have an account? Sign up"));
     expect(ionButtonByText('Forgot?')).toBeUndefined();
+  });
+});
+
+/* A deletion ended on this page with nothing said, and what the server could
+   not erase was not said at all. accountService leaves both for it. */
+describe('Login, after an account was deleted', () => {
+  const status = () => screen.getByRole('status');
+
+  beforeEach(() => sessionStorage.clear());
+
+  it('says the account is gone', () => {
+    leaveDeletionNotice({ failures: [] });
+    show();
+
+    expect(status()).toHaveTextContent('Your account has been deleted.');
+    expect(status()).not.toHaveTextContent('could not be erased');
+  });
+
+  it('says when some of its files could not be erased straight away', () => {
+    leaveDeletionNotice({ failures: ['cloudinary'] });
+    show();
+
+    expect(status()).toHaveTextContent(
+      'Your account has been deleted. Some of its files could not be erased straight away.'
+    );
+  });
+
+  it('says nothing of a deletion when there was none', () => {
+    show();
+    expect(status()).not.toHaveTextContent('deleted');
+  });
+
+  /* Storage is the browser's, and can hold anything. */
+  it('makes do with a notice it cannot read in full', () => {
+    sessionStorage.setItem('account-deleted', JSON.stringify({ failures: 'cloudinary' }));
+    show();
+
+    expect(status()).toHaveTextContent('Your account has been deleted.');
+    expect(status()).not.toHaveTextContent('could not be erased');
+  });
+
+  it('says it once: opening the page again does not say it again', () => {
+    leaveDeletionNotice({ failures: [] });
+    const first = show();
+    expect(status()).toHaveTextContent('Your account has been deleted.');
+    first.unmount();
+
+    show();
+    expect(status()).not.toHaveTextContent('deleted');
+  });
+
+  /* It travelled in the router's state, and PrivateRoute's redirect, which
+     carries none, replaced it on the way. */
+  it('does not look for it in the router state any more', () => {
+    show({ accountDeleted: { failures: [] } });
+    expect(status()).not.toHaveTextContent('deleted');
   });
 });
 

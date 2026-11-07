@@ -1,18 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { onlineManager } from '@tanstack/react-query';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useStorageMutations } from './useStorageMutations';
 import type { Folder } from '../services/storage.service';
+import { GoogleDriveAuthError } from '../services/googledrive-auth.service';
 import { withQueryClient } from '../test/utils';
 
-const { storage, runOrQueue } = vi.hoisted(() => ({
+const { storage, runOrQueue, authorize } = vi.hoisted(() => ({
   storage: {
     renameFolder: vi.fn(),
     deleteFolder: vi.fn(),
     deleteFile: vi.fn(),
+    forgetFile: vi.fn(),
     createFolder: vi.fn(),
   },
   runOrQueue: vi.fn(),
+  authorize: vi.fn(),
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -20,6 +24,12 @@ vi.mock('../contexts/AuthContext', () => ({
 }));
 
 vi.mock('../services/storage.service', () => ({ default: storage }));
+
+/* Google's window, answered here. The rest of the module is the real one. */
+vi.mock('../services/googledrive-auth.service', async (importActual) => ({
+  ...(await importActual<typeof import('../services/googledrive-auth.service')>()),
+  default: { authorize: () => authorize() },
+}));
 
 /* The queue itself is tested in useOfflineQueue.test.tsx. What matters here
    is which changes are handed to it, and how. */
@@ -42,7 +52,9 @@ beforeEach(() => {
   storage.renameFolder.mockResolvedValue({ ...WORK, name: 'Archive' });
   storage.deleteFolder.mockResolvedValue(undefined);
   storage.deleteFile.mockResolvedValue(undefined);
+  storage.forgetFile.mockResolvedValue(undefined);
   storage.createFolder.mockResolvedValue({ id: 'new', name: 'Invoices' });
+  authorize.mockResolvedValue('drive-token');
 });
 
 afterEach(() => {
@@ -300,6 +312,150 @@ describe('useStorageMutations', () => {
 
       await waitFor(() => expect(result.current.deleteFile.isError).toBe(true));
       expect(onProblem).not.toHaveBeenCalled();
+    });
+
+    /* main.tsx gives every mutation one onError, which tells Google Analytics,
+       and a mutation with an onError of its own replaces it. The deletion's
+       Drive question is read from its state for that reason. */
+    it.each([
+      ['any failure', () => new Error('File not found or access denied')],
+      ['Drive asking to be connected again', () => new GoogleDriveAuthError()],
+    ])(
+      'leaves a file that was not deleted, for %s, to the handler every mutation shares',
+      async (_, failure) => {
+        storage.deleteFile.mockRejectedValue(failure());
+        const shared = vi.fn();
+        const queryClient = new QueryClient({
+          defaultOptions: { mutations: { retry: false, onError: shared } },
+        });
+        const wrapper = ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        );
+        const { result } = renderHook(
+          () => useStorageMutations({ folderId: undefined, onProblem: vi.fn() }),
+          { wrapper }
+        );
+
+        act(() => result.current.deleteFile.mutate('f1'));
+
+        await waitFor(() => expect(shared).toHaveBeenCalledTimes(1));
+      }
+    );
+  });
+
+  /* A Drive token lasts an hour, and past it a file in Drive could not be
+     deleted at all: the row goes only after Drive has said yes. The page said
+     "Failed to delete file" and offered nothing; connecting Drive again was
+     only possible on the upload page. */
+  describe('a deletion Google Drive will not take, because it is not connected', () => {
+    const notConnected = () => new GoogleDriveAuthError('Google Drive is not connected');
+
+    async function stoppedAtAFile() {
+      storage.deleteFile.mockRejectedValueOnce(notConnected());
+      const shown = show();
+      act(() => shown.result.current.deleteFile.mutate('f1'));
+      await waitFor(() => expect(shown.result.current.drive.blocked).toBe('file'));
+      return shown;
+    }
+
+    async function stoppedAtAFolder() {
+      storage.deleteFolder.mockRejectedValueOnce(notConnected());
+      const shown = show();
+      act(() => shown.result.current.deleteFolder.mutate(WORK));
+      await waitFor(() => expect(shown.result.current.drive.blocked).toBe('folder'));
+      return shown;
+    }
+
+    it('asks what to do about a file, rather than reporting a problem', async () => {
+      const { onProblem } = await stoppedAtAFile();
+      expect(onProblem).not.toHaveBeenCalled();
+    });
+
+    it('asks what to do about a folder, rather than reporting a problem', async () => {
+      const { onProblem } = await stoppedAtAFolder();
+      expect(onProblem).not.toHaveBeenCalled();
+    });
+
+    it('connects Drive, then deletes the file again', async () => {
+      const { result } = await stoppedAtAFile();
+
+      await act(() => result.current.drive.connect());
+
+      await waitFor(() => expect(result.current.deleteFile.isSuccess).toBe(true));
+      expect(authorize).toHaveBeenCalledTimes(1);
+      expect(storage.deleteFile).toHaveBeenCalledTimes(2);
+      expect(result.current.drive.blocked).toBeNull();
+    });
+
+    it('connects Drive, then deletes the folder again', async () => {
+      const { result } = await stoppedAtAFolder();
+
+      await act(() => result.current.drive.connect());
+
+      await waitFor(() => expect(result.current.deleteFolder.isSuccess).toBe(true));
+      expect(storage.deleteFolder).toHaveBeenCalledTimes(2);
+      expect(storage.deleteFolder).toHaveBeenLastCalledWith('work', 'user-1');
+    });
+
+    it('says why, and deletes nothing more, when Drive was not connected after all', async () => {
+      authorize.mockRejectedValue(new Error('Google Drive was not connected'));
+      const { result, onProblem } = await stoppedAtAFile();
+
+      await act(() => result.current.drive.connect());
+
+      expect(onProblem).toHaveBeenCalledWith('Google Drive was not connected');
+      expect(storage.deleteFile).toHaveBeenCalledTimes(1);
+    });
+
+    /* Not through the queue: it has no way to write down "and leave the
+       Drive files where they are", and a deletion replayed later would stop
+       at the same file. */
+    it('takes the file off the list instead, leaving it in Drive', async () => {
+      const { result, queryClient } = await stoppedAtAFile();
+      queryClient.setQueryData(['items', 'user-1', 'root'], {});
+
+      act(() => result.current.drive.removeFromList());
+
+      await waitFor(() => expect(storage.forgetFile).toHaveBeenCalledWith('f1', 'user-1'));
+      expect(runOrQueue).toHaveBeenCalledTimes(1);
+      await waitFor(() =>
+        expect(queryClient.getQueryState(['items', 'user-1', 'root'])?.isInvalidated).toBe(true)
+      );
+      expect(result.current.drive.blocked).toBeNull();
+    });
+
+    it('deletes the folder instead, leaving the files in Drive where they are', async () => {
+      const { result } = await stoppedAtAFolder();
+
+      act(() => result.current.drive.removeFromList());
+
+      await waitFor(() =>
+        expect(storage.deleteFolder).toHaveBeenLastCalledWith('work', 'user-1', {
+          keepTheirCloud: true,
+        })
+      );
+      expect(runOrQueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('says why when the file could not be taken off the list', async () => {
+      storage.forgetFile.mockRejectedValue(new Error('File not found or access denied'));
+      const { result, onProblem } = await stoppedAtAFile();
+
+      act(() => result.current.drive.removeFromList());
+
+      await waitFor(() =>
+        expect(onProblem).toHaveBeenCalledWith('File not found or access denied')
+      );
+    });
+
+    it('asks nothing more once the question is put away', async () => {
+      const { result } = await stoppedAtAFile();
+
+      act(() => result.current.drive.dismiss());
+
+      await waitFor(() => expect(result.current.drive.blocked).toBeNull());
+      expect(storage.forgetFile).not.toHaveBeenCalled();
+      expect(authorize).not.toHaveBeenCalled();
     });
   });
 });

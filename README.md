@@ -160,6 +160,9 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
 - ✅ File renaming and deletion — removed from the provider, not just from the list
+- ✅ A file in Google Drive can be deleted after Drive's one-hour token has run out: the
+  app asks to connect Drive again and deletes it there, or takes it off the list and
+  leaves it in your Drive
 - ✅ **Renames and deletions survive being offline.** The change is written to
   IndexedDB, applied to the screen immediately, and sent when the connection
   returns — coalesced, retried, and reported if it is finally refused

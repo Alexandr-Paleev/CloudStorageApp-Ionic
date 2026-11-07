@@ -62,6 +62,26 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **A file in Google Drive could not be deleted once Drive's hour was up.** A
+  Drive token lasts an hour, and Supabase drops the one a Google sign-in
+  brings along before that. Past it, deleting a file kept in Drive said
+  "Failed to delete" and nothing more, every time: the row goes only after the
+  provider has said yes, and with no token there was nobody to ask. A folder
+  with such a file in it could not be deleted either, and the only place to
+  connect Drive again was the upload page. The deletion now asks instead:
+  connect Drive and delete the file there, or take it off the list and leave
+  it in Drive, for a person who cannot reach that account any more. A folder
+  asks the same about the Drive files inside it. Only a file in the person's
+  own Drive or Dropbox can leave the list alone, since the row of a file this
+  app stores is what the quota counts. An expired token is no longer sent to
+  Sentry as a failure.
+- **Deleting an account promised more than it does.** The page said it
+  deletes "every file you uploaded", and files in the person's own Google
+  Drive or Dropbox stay there, as `account-erase.ts` and the README say. The
+  page says so now. The login page it leads to says the account is gone and,
+  when the server could not empty a provider, that some files could not be
+  erased straight away: the server's answer said so, and the page threw it
+  away.
 - **An upload on production said three things that were not so.** R2 is
   switched off there, so files go to Supabase Storage and images to
   Cloudinary, and that was the unfinished path.

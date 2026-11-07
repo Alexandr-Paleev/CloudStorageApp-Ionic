@@ -50,6 +50,12 @@ export class GoogleDriveAuthError extends Error {
   }
 }
 
+/** Whether a failure is Drive asking to be connected again. By name, as
+ *  isRetriableError asks it in utils/http.utils. */
+export function needsDriveConnected(error: unknown): boolean {
+  return error instanceof Error && error.name === 'GoogleDriveAuthError';
+}
+
 let tokenClient: TokenClient | null = null;
 /** The request authorize() is waiting on. Google answers one at a time. */
 let waiting: {
