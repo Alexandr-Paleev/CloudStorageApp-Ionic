@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager } from '@tanstack/react-query';
 import { useStorageMutations } from './useStorageMutations';
 import type { Folder } from '../services/storage.service';
 import { GoogleDriveAuthError } from '../services/googledrive-auth.service';
@@ -313,34 +312,6 @@ describe('useStorageMutations', () => {
       await waitFor(() => expect(result.current.deleteFile.isError).toBe(true));
       expect(onProblem).not.toHaveBeenCalled();
     });
-
-    /* main.tsx gives every mutation one onError, which tells Google Analytics,
-       and a mutation with an onError of its own replaces it. The deletion's
-       Drive question is read from its state for that reason. */
-    it.each([
-      ['any failure', () => new Error('File not found or access denied')],
-      ['Drive asking to be connected again', () => new GoogleDriveAuthError()],
-    ])(
-      'leaves a file that was not deleted, for %s, to the handler every mutation shares',
-      async (_, failure) => {
-        storage.deleteFile.mockRejectedValue(failure());
-        const shared = vi.fn();
-        const queryClient = new QueryClient({
-          defaultOptions: { mutations: { retry: false, onError: shared } },
-        });
-        const wrapper = ({ children }: { children: ReactNode }) => (
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-        );
-        const { result } = renderHook(
-          () => useStorageMutations({ folderId: undefined, onProblem: vi.fn() }),
-          { wrapper }
-        );
-
-        act(() => result.current.deleteFile.mutate('f1'));
-
-        await waitFor(() => expect(shared).toHaveBeenCalledTimes(1));
-      }
-    );
   });
 
   /* A Drive token lasts an hour, and past it a file in Drive could not be

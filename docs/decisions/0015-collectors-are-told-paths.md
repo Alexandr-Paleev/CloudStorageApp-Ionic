@@ -251,3 +251,19 @@ a stored path loses everything after the owner's id, to the end of the line,
 since a name can have spaces in it. The account is named by its id. Under
 Vitest nothing is sent, because the tests take routes to their failures on
 purpose and a developer's `.env` holds the DSN.
+
+## Update — 2026-11-05
+
+**The two sides cut the same way, name the deployment the same way, and a
+local run stays out.** Three changes to the update above.
+- A stored path in a function's report keeps the time it was uploaded after
+  the owner's id, `…/<owner>/1760950000000_…`, as the browser's reports always
+  have. With the owner's id it says which object it was.
+- The browser names the deployment by Vercel's `VITE_VERCEL_ENV`, as the
+  functions do by `VERCEL_ENV`, so a preview is no longer reported as
+  production. The commit's id is not read by the bundle (`src/env.ts`), and
+  only the functions send a release.
+- Off Vercel a function reports only to `SENTRY_DSN`. `npm run dev` serves the
+  functions with the whole `.env` loaded, the end-to-end suite runs on it, and
+  the browser's DSN in that file made a local run's failures events in the
+  real project.

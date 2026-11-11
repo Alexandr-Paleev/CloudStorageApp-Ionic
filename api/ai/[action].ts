@@ -311,10 +311,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
+  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
+  /* What a report says the failure was in: one of the two actions, or the
+     function for a segment that is neither. */
+  const route = action === 'index' || action === 'embed' ? `ai/${action}` : 'ai';
+
   try {
     const user = await authenticate(req);
     const userId = user.id;
-    const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
 
     if (action === 'index') {
       /* Describing a file is the one thing this deployment pays a third party
@@ -365,7 +369,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
          worth knowing about the same day. */
       if (error.scope === 'deployment') {
         console.warn('[ai]', error.message);
-        await report(error, { route: 'ai', level: 'warning' });
+        await report(error, { route, level: 'warning' });
       }
       tooManyRequests(res, secondsUntilTomorrow(), error.message);
       return;
@@ -386,7 +390,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    if (!(error instanceof AuthError)) await report(error, { route: 'ai' });
+    if (!(error instanceof AuthError)) await report(error, { route });
     res.status(error instanceof AuthError ? 401 : 500).json({
       message: error instanceof Error ? error.message : 'Unknown server error',
     });

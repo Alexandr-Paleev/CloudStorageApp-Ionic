@@ -424,7 +424,10 @@ describe('index', () => {
     rpc.mockResolvedValue({ data: 'deployment', error: null });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     await handler(index('file-1'), mockResponse());
-    expect(report).toHaveBeenCalledWith(expect.any(Error), { route: 'ai', level: 'warning' });
+    expect(report).toHaveBeenCalledWith(expect.any(Error), {
+      route: 'ai/index',
+      level: 'warning',
+    });
   });
 
   it('refuses to pay when the budget cannot be checked', async () => {

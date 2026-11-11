@@ -86,9 +86,9 @@ export function useStorageMutations({ folderId, onProblem }: StorageMutationsOpt
     },
   });
 
-  /* No onError here at all: the dashboard says "Failed to delete file" itself,
-     from `isError`, and one of its own would replace the one main.tsx gives
-     every mutation, which reports the failure to Google Analytics. */
+  /* No onError here: the dashboard says "Failed to delete file" itself, from
+     `isError`, and asks about Drive from the same state. Google Analytics
+     hears of the failure from the mutation cache (src/query-client.ts). */
   const deleteFile = useMutation({
     ...THROUGH_THE_QUEUE,
     mutationFn: (fileId: string) => {
