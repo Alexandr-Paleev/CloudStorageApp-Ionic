@@ -64,6 +64,31 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **A deploy broke a tab that was open before it.** Every page but Login is
+  a chunk of its own, and a deploy renames them all. A tab opened earlier
+  asked for the old names on its way to a page it had not opened yet, was
+  handed the app shell in their place (`200`, `text/html`, marked immutable
+  for a year and served from Vercel's cache from the second request on), and
+  showed "Something went wrong". Only a tab the service worker did not
+  control, such as a private window or a browser inside another app, but
+  every merge to `main` deploys. A chunk that is not there is a 404 now: the
+  rewrite to `index.html` leaves `assets/` and `fonts/` out. And a page that
+  cannot be loaded reloads the tab, once for each build, with the spinner up
+  until the new version is there (`src/utils/lazy-page.ts`). Not on Vite's
+  `vite:preloadError`: that fires for the imports that run in the background
+  too, and cancelled, it still lets the error boundary, and a report to
+  Sentry, through first. `npm run smoke`, given a deployment, asks for a chunk
+  that is not there and fails on anything but a 404.
+- **The "New version available" toast had never shown, and a new version
+  reloaded every open tab without asking.** The worker was registered with
+  `registerType: 'autoUpdate'`, in which vite-plugin-pwa skips the waiting,
+  reloads each tab of the app the moment the new worker takes over, and never
+  calls the `onNeedRefresh` the toast listens for. A name half typed in a
+  dialog went with the reload. It is `'prompt'` now: a new version waits until
+  Update is pressed, and until then a tab under the worker goes on loading
+  the pages of the version it started with. A tab still running a version
+  from before this change is not asked: the new one takes over once the last
+  of those is closed.
 - **A failed query, and a mutation that handled its own failure, never
   reached Google Analytics.** The one handler sat in the query client's
   `defaultOptions`, where a mutation's own `onError` replaces it, so four of

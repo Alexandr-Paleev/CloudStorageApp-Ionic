@@ -45,6 +45,13 @@
  * shipped exactly this fault itself: in 2021 a popover's backdrop was left out
  * of production builds (ionic-team/ionic-framework#24129).
  *
+ * And one question for a deployment alone: is a chunk that is not there a
+ * 404? A tab opened before a deploy asks for chunks the deploy removed.
+ * Vercel used to answer with the app shell, and the header rule for assets/
+ * kept that for a year under the chunk's name. `vite preview` answers the
+ * same way for any file it lacks and reads nothing from vercel.json, so
+ * against dist/ the question is not asked.
+ *
  * Usage: node scripts/smoke-built-bundle.mjs [url]
  * Serves dist/ itself unless a URL is given.
  */
@@ -224,10 +231,25 @@ async function askWorker() {
   return { answered };
 }
 
+/**
+ * What the server says about a chunk it does not have. The name is new on
+ * every run, so no cache can answer in the server's place.
+ */
+async function askForAMissingChunk() {
+  const address = new URL(`/assets/smoke-${Date.now().toString(36)}.js`, target);
+  const response = await fetch(address, { headers: { accept: '*/*' } });
+  return {
+    path: address.pathname,
+    status: response.status,
+    type: response.headers.get('content-type') ?? 'no content-type',
+  };
+}
+
 let rendered = '';
 let unregistered = [];
 let worker;
 let collectors;
+let missingChunk;
 try {
   await page.goto(target, { waitUntil: 'networkidle', timeout: 30_000 });
   rendered = ((await page.textContent('body')) ?? '').trim();
@@ -252,6 +274,12 @@ try {
     problems: [`The collectors could not be asked: ${error.message.split('\n')[0]}`],
     said: 'could not be asked',
   }));
+
+  if (url) {
+    missingChunk = await askForAMissingChunk().catch((error) => ({
+      problem: `A missing chunk could not be asked about: ${error.cause?.code ?? error.message}`,
+    }));
+  }
 } finally {
   await browser.close();
   preview?.kill();
@@ -274,6 +302,14 @@ console.log(
   `  service worker: ${worker.problem ?? [THE_APP, ...NOT_THE_APP].map(whoAnswered).join(', ')}`
 );
 console.log(`  collectors: ${collectors.said}`);
+console.log(
+  `  missing chunk: ${
+    !missingChunk
+      ? 'not asked of vite preview, which answers it with the shell'
+      : (missingChunk.problem ??
+        `${missingChunk.path} answered ${missingChunk.status}, ${missingChunk.type}`)
+  }`
+);
 
 if (tooEmpty || errors.length > 0) {
   console.error(
@@ -313,6 +349,20 @@ if (overreach.length > 0) {
     `\nThe service worker answered a navigation to ${overreach.join(', ')}. That is not the app.\n` +
       'In vite.config.mts, navigateFallbackDenylist keeps the fallback out of such addresses,\n' +
       'and the image cache must not take navigations.'
+  );
+  process.exit(1);
+}
+
+if (missingChunk?.problem) {
+  console.error(`\n${missingChunk.problem}`);
+  process.exit(1);
+}
+
+if (missingChunk && missingChunk.status !== 404) {
+  console.error(
+    `\n${missingChunk.path} answered ${missingChunk.status}, ${missingChunk.type}. A chunk that is not there must be a 404:\n` +
+      'the rewrite to index.html in vercel.json has to leave assets/ out, or a tab opened before a deploy\n' +
+      'is handed the shell for every page it had not loaded yet, kept for a year.'
   );
   process.exit(1);
 }
