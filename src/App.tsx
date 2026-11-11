@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { IonApp, IonSpinner, setupIonicReact } from '@ionic/react';
 
@@ -11,6 +11,7 @@ import { ConsentBanner } from './components/ConsentBanner';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
 import { NEW_PASSWORD_PATH } from './utils/password-reset.utils';
+import { lazyPage } from './utils/lazy-page';
 /* Not lazy, unlike every other page. It is the page a new visitor sees
    first, and a lazy page is fetched only once the app has started: one more
    round trip, after all the others, before the page that matters most draws
@@ -38,17 +39,18 @@ import './theme/global.css';
 
 setupIonicReact();
 
-// Lazy-loaded pages for code-splitting
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Upload = lazy(() => import('./pages/Upload'));
-const FileView = lazy(() => import('./pages/FileView'));
-const Pricing = lazy(() => import('./pages/Pricing'));
-const Account = lazy(() => import('./pages/Account'));
-const SubscriptionSuccess = lazy(() => import('./pages/SubscriptionSuccess'));
-const DropboxCallback = lazy(() => import('./pages/DropboxCallback'));
-const NotFound = lazy(() => import('./pages/NotFound'));
-const Legal = lazy(() => import('./pages/Legal'));
-const PasswordReset = lazy(() => import('./pages/PasswordReset'));
+// Lazy-loaded pages for code-splitting. A tab opened before a deploy asks for
+// chunks the deploy removed: see utils/lazy-page.ts for what happens then.
+const Dashboard = lazyPage(() => import('./pages/Dashboard'));
+const Upload = lazyPage(() => import('./pages/Upload'));
+const FileView = lazyPage(() => import('./pages/FileView'));
+const Pricing = lazyPage(() => import('./pages/Pricing'));
+const Account = lazyPage(() => import('./pages/Account'));
+const SubscriptionSuccess = lazyPage(() => import('./pages/SubscriptionSuccess'));
+const DropboxCallback = lazyPage(() => import('./pages/DropboxCallback'));
+const NotFound = lazyPage(() => import('./pages/NotFound'));
+const Legal = lazyPage(() => import('./pages/Legal'));
+const PasswordReset = lazyPage(() => import('./pages/PasswordReset'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>

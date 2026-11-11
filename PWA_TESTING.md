@@ -7,7 +7,7 @@ Your app is already a **Progressive Web App (PWA)** with:
 - ✅ Service Worker for offline caching
 - ✅ Web App Manifest (`manifest.webmanifest`)
 - ✅ Icons (192x192, 512x512)
-- ✅ Auto-update functionality
+- ✅ Updates that wait for a yes: a toast offers the new version
 - ✅ Installable on mobile and desktop
 
 ## 🧪 How to Test PWA Locally
@@ -76,7 +76,7 @@ PWA works best on HTTPS (required for Service Workers).
 
 ### Current Features:
 - ✅ **Offline Support**: Cached static assets work offline
-- ✅ **Auto-Update**: New versions update automatically
+- ✅ **Updates on request**: a new version waits until Update is pressed on the toast that offers it
 - ✅ **Installable**: Can be installed on any device
 - ✅ **Full-Screen**: Opens like a native app (no browser UI)
 - ✅ **Splash Screen**: Shows app icon while loading
@@ -93,7 +93,7 @@ PWA works best on HTTPS (required for Service Workers).
 ```typescript
 // vite.config.ts
 VitePWA({
-  registerType: 'autoUpdate',
+  registerType: 'prompt',
   manifest: {
     name: 'Cloud Storage App',
     short_name: 'Cloud Storage',

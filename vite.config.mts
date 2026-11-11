@@ -11,7 +11,22 @@ export default defineConfig({
     /* Serves api/ from the dev server; no-op during build */
     devApi(),
     VitePWA({
-      registerType: 'autoUpdate',
+      /**
+       * A new version waits until the person says Update, on the toast in
+       * PWAUpdatePrompt. It was 'autoUpdate', in which the plugin skips the
+       * waiting and reloads every open tab of the app the moment the new
+       * worker takes over, from whichever tab installed it: a folder name half
+       * typed in a dialog was lost without a word. And in that mode the
+       * plugin never calls onNeedRefresh, so the toast had never shown.
+       *
+       * Waiting also keeps the old chunks in the precache, and a tab the
+       * worker controls goes on loading the pages of the version it started
+       * with (utils/lazy-page.ts is for the tabs it does not). The price: an
+       * old version stays open beside newer functions for as long as the
+       * person keeps it, so a function has to go on accepting what the
+       * version before it sent.
+       */
+      registerType: 'prompt',
       includeAssets: ['icon-192x192-v2.png', 'icon-512x512-v2.png'],
       manifest: {
         name: 'Cloud Storage App',

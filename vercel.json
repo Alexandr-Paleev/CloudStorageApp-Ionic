@@ -80,7 +80,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|assets/|fonts/).*)",
       "destination": "/index.html"
     }
   ]

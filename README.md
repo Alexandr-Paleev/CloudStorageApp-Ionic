@@ -1242,7 +1242,11 @@ tell Sentry the tokens. The smoke test now starts the built app at both, with
 made-up values and every collector refused, and reads what leaves
 ([decision 0015](docs/decisions/0015-collectors-are-told-paths.md)). CI's build
 has no collectors configured, so there it says so, and unit tests hold the two
-rules instead.
+rules instead. Given the address of a deployment, it asks one thing more: that
+a chunk that is not there is a 404. A tab opened before a deploy asks for the
+chunks the deploy removed, and Vercel used to hand it the app shell instead,
+marked immutable for a year. `vite preview` answers that way for any file it
+lacks, so against `dist/` the question is not asked.
 
 **Accessibility is asserted on the rendered DOM**, at WCAG 2.1 A and AA, by
 `@axe-core/playwright` — on the login page, the dashboard with folders and
