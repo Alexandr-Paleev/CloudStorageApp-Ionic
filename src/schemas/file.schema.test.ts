@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { FileMetadataSchema, FolderSchema, validateAndSanitizeName } from './file.schema';
+import {
+  FileMetadataSchema,
+  FolderSchema,
+  NameRuleError,
+  validateAndSanitizeName,
+} from './file.schema';
 import { MAX_NAME_LENGTH } from '@cloud-storage/core/file-rules';
 
 const row = {
@@ -46,5 +51,16 @@ describe('validateAndSanitizeName', () => {
       `A name can be at most ${MAX_NAME_LENGTH} characters`
     );
     expect(validateAndSanitizeName('a'.repeat(MAX_NAME_LENGTH))).toHaveLength(MAX_NAME_LENGTH);
+  });
+
+  /* By its name the error metric leaves it out: what was typed, not a
+     failure (src/query-client.ts). */
+  it('refuses as a name rule, by name', () => {
+    for (const name of ['', '   ', 'a'.repeat(MAX_NAME_LENGTH + 1)]) {
+      expect(() => validateAndSanitizeName(name)).toThrow(NameRuleError);
+      expect(() => validateAndSanitizeName(name)).toThrow(
+        expect.objectContaining({ name: 'NameRuleError' })
+      );
+    }
   });
 });

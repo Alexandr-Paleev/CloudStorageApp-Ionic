@@ -95,15 +95,24 @@ export const FileMetadataSchema = z.object({
   created_at: z.string().optional(),
 });
 
+/** A name the rules refuse: what was typed, not something that broke. Named,
+ *  so the error metric can leave it out (src/query-client.ts). */
+export class NameRuleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NameRuleError';
+  }
+}
+
 export const validateAndSanitizeName = (name: string): string => {
   const sanitized = sanitizeFileName(name);
   if (!validateFileName(sanitized) || sanitized.length === 0) {
-    throw new Error('Invalid file or folder name');
+    throw new NameRuleError('Invalid file or folder name');
   }
   /* The schemas above say the same, but only when a row is written: a rename
      passed a name of any length to the database. */
   if (sanitized.length > MAX_NAME_LENGTH) {
-    throw new Error(`A name can be at most ${MAX_NAME_LENGTH} characters`);
+    throw new NameRuleError(`A name can be at most ${MAX_NAME_LENGTH} characters`);
   }
   return sanitized;
 };

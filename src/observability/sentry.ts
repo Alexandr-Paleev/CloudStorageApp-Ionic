@@ -47,7 +47,11 @@ function load(): Promise<SentryModule | null> {
         dsn: env.VITE_SENTRY_DSN,
         integrations: [module.browserTracingIntegration()],
         tracesSampleRate: import.meta.env.PROD ? 0.2 : 1.0,
-        environment: import.meta.env.MODE,
+        /* Vercel's name for the deployment, as the functions report it: the
+           build's MODE says production for a preview too. No release here.
+           The commit's id would rename the bundle's files on every
+           deployment (env.ts); the functions' reports carry it. */
+        environment: env.VITE_VERCEL_ENV || import.meta.env.MODE,
         /* Every address in what is sent is cut at its `?` and its `#`. This
            one collector is started whatever the address is, because the
            errors most worth having are the ones at startup, and a sign-in

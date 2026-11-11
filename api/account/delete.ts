@@ -7,7 +7,7 @@ import { configuredProviders } from '../../libs/server/src/erase-providers';
 import { report } from '../../libs/server/src/report';
 
 /**
- * DELETE /api/account — erases the caller's account and everything under it.
+ * DELETE /api/account/delete — erases the caller's account and everything under it.
  *
  * Both stores require this of any app that lets a person sign up: Apple in
  * guideline 5.1.1(v), Google in its account-deletion policy. Neither accepts a

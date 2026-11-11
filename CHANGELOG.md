@@ -38,9 +38,11 @@ reasoning behind the larger decisions lives in
   could not erase, and the day the deployment's AI budget runs out. It is one
   POST in Sentry's envelope format rather than the Node SDK, which would load
   OpenTelemetry on every cold start. Decision 0015 holds for it as for the
-  browser: an address loses its query string, a stored path the file's name.
-  It sends to `SENTRY_DSN`, or the browser's `VITE_SENTRY_DSN` where that is
-  unset, and nothing under Vitest.
+  browser: an address loses its query string, a stored path the file's name
+  and keeps the time of the upload. It sends to `SENTRY_DSN`, or on Vercel to
+  the browser's `VITE_SENTRY_DSN` where that is unset, and nothing under
+  Vitest or from a local run without `SENTRY_DSN`. A route is named with its
+  action, `ai/index` or `cloudinary/delete`, where one function serves two.
 
 ### Changed
 
@@ -62,6 +64,23 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **A failed query, and a mutation that handled its own failure, never
+  reached Google Analytics.** The one handler sat in the query client's
+  `defaultOptions`, where a mutation's own `onError` replaces it, so four of
+  the dashboard's mutations were never reported, and TanStack Query 5 has no
+  `onError` for queries there at all. The handlers are on the query and
+  mutation caches now (`src/query-client.ts`), which call them for every
+  failure, and a query is named by the first part of its key alone: the rest
+  is ids and, for a search, what was typed. What the person did or chose is
+  left out, by the error's name: a pause, a Drive not connected, a file too
+  large for every provider here, a name the rules refuse (`NameRuleError`
+  now), a queue waiting for its account to sign in. Each is said on screen,
+  and counted with the failures it would be most of the metric.
+- **Sentry reported a preview as production.** The browser named the
+  deployment by the build's `MODE`, which is `production` for a preview too.
+  It reads Vercel's `VITE_VERCEL_ENV` now, as the functions read
+  `VERCEL_ENV`. The commit's id stays out of the bundle, where it would rename
+  files on every deployment, so only the functions send a release.
 - **A file in Google Drive could not be deleted once Drive's hour was up.** A
   Drive token lasts an hour, and Supabase drops the one a Google sign-in
   brings along before that. Past it, deleting a file kept in Drive said

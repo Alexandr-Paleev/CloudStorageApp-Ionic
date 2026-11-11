@@ -4,7 +4,9 @@ import { failedQuery, refused } from '../test/postgrest';
 
 const sent = vi.hoisted((): ErrorEvent[] => []);
 
-vi.mock('../env', () => ({ env: { VITE_SENTRY_DSN: 'https://public@o0.ingest.sentry.io/0' } }));
+vi.mock('../env', () => ({
+  env: { VITE_SENTRY_DSN: 'https://public@o0.ingest.sentry.io/0', VITE_VERCEL_ENV: 'preview' },
+}));
 
 /* The real Sentry, keeping here what it would send. The facade's own init
    runs, scrub.ts with it; what is replaced is the last step, the request, and
@@ -45,6 +47,17 @@ beforeAll(async () => {
 
 beforeEach(() => {
   sent.length = 0;
+});
+
+/* The build's MODE says production for a preview too, and previews were
+   reported as production. */
+describe('the deployment an event names', () => {
+  it("is Vercel's name for it, not the build's mode", async () => {
+    client.captureException(new Error('which deployment'));
+
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.environment).toBe('preview');
+  });
 });
 
 describe('a failed query', () => {

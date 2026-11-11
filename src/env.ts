@@ -28,6 +28,16 @@ const envSchema = z.object({
   // Sentry - Optional
   VITE_SENTRY_DSN: z.string().optional(),
 
+  /**
+   * Which deployment this build is: production, preview or development. Vercel
+   * sets it for a Vite build, from its own VERCEL_ENV, and it is the same for
+   * every deployment of one kind, so it renames no file from one to the next.
+   * Sentry is told it, where the build's MODE says production for a preview
+   * too. The commit's id, which Vercel hands a Vite build as well, is not read:
+   * see `given` below.
+   */
+  VITE_VERCEL_ENV: z.string().optional(),
+
   // Analytics - Optional
   VITE_GA4_MEASUREMENT_ID: z.string().optional(),
   VITE_HOTJAR_SITE_ID: z.string().optional(),
@@ -118,6 +128,7 @@ const given: Record<keyof z.input<typeof envSchema>, unknown> = {
   VITE_API_ORIGIN: import.meta.env.VITE_API_ORIGIN,
   VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
+  VITE_VERCEL_ENV: import.meta.env.VITE_VERCEL_ENV,
   VITE_GA4_MEASUREMENT_ID: import.meta.env.VITE_GA4_MEASUREMENT_ID,
   VITE_HOTJAR_SITE_ID: import.meta.env.VITE_HOTJAR_SITE_ID,
   VITE_HOTJAR_VERSION: import.meta.env.VITE_HOTJAR_VERSION,

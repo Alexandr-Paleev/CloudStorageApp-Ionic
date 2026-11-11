@@ -202,10 +202,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
+  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
+  /* What a report says the failure was in: one of the two actions, or the
+     function for a segment that is neither. */
+  const route = action === 'sign' || action === 'delete' ? `cloudinary/${action}` : 'cloudinary';
+
   try {
     const userId = await authenticateUser(req);
 
-    const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
     if (action === 'sign') {
       if (!bySigningUser.allow(userId)) {
         tooManyRequests(
@@ -301,7 +305,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // one, and a mismatch turned every failure here — an expired session, a
     // missing migration — into a bare "Failed to authorize the upload".
     console.error('[cloudinary]', error);
-    if (!(error instanceof AuthError)) await report(error, { route: 'cloudinary' });
+    if (!(error instanceof AuthError)) await report(error, { route });
     res.status(error instanceof AuthError ? 401 : 500).json({
       message: error instanceof Error ? error.message : 'Unknown server error',
     });

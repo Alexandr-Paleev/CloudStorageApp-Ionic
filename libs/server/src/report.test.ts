@@ -73,7 +73,9 @@ describe('scrubbed', () => {
     expect(scrubbed(`missing users/${OWNER}/tax return 2025.pdf: not found`)).toBe(
       `missing users/${OWNER}/…`
     );
-    expect(scrubbed(`missing ${OWNER}/1700000000_passport.jpg`)).toBe(`missing ${OWNER}/…`);
+    expect(scrubbed(`missing ${OWNER}/1700000000_passport.jpg`)).toBe(
+      `missing ${OWNER}/1700000000_…`
+    );
     expect(scrubbed(`Object "users/${OWNER}/a b.pdf" not found`)).toBe(
       `Object "users/${OWNER}/…" not found`
     );
@@ -143,13 +145,26 @@ describe('report', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to the browser's DSN, which is the same project", async () => {
+  it("falls back on Vercel to the browser's DSN, which is the same project", async () => {
     vi.stubEnv('SENTRY_DSN', '');
     vi.stubEnv('VITE_SENTRY_DSN', DSN);
+    vi.stubEnv('VERCEL', '1');
 
     await report(new Error('boom'), { route: 'share' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  /* `npm run dev` serves the functions with the whole .env loaded, and the
+     end-to-end suite runs on it. */
+  it("does not fall back to the browser's DSN off Vercel", async () => {
+    vi.stubEnv('SENTRY_DSN', '');
+    vi.stubEnv('VITE_SENTRY_DSN', DSN);
+    vi.stubEnv('VERCEL', '');
+
+    await report(new Error('boom'), { route: 'share' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('sends nothing from a test run, whatever the .env holds', async () => {

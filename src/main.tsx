@@ -1,10 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './observability/sentry';
 import { reportPolicyViolations } from './observability/csp-violations';
-import { trackApiErrorStandalone } from './hooks/useAnalytics';
 import {
   followAnswersFromOtherTabs,
   removeTheirCookiesWithoutAYes,
@@ -15,7 +14,7 @@ import { initDeepLinks } from './native/deep-links';
 import { initNativeShell, isNative } from './native/shell';
 import { movedShareLink } from './utils/share-link.utils';
 import { misplacedResetLink } from './utils/password-reset.utils';
-import { messageOf } from './utils/postgrest-error';
+import { createQueryClient } from './query-client';
 
 import '@ionic/react/css/core.css';
 import '@ionic/react/css/normalize.css';
@@ -75,30 +74,8 @@ function start(): void {
   // And an answer given in another tab of the app holds in this one too.
   followAnswersFromOtherTabs();
 
-  /**
-   * Handle query/mutation errors globally for analytics tracking
-   */
-  function handleQueryError(error: unknown, queryKey?: unknown): void {
-    const errorMessage = messageOf(error) ?? 'Unknown error';
-    const queryKeyString = queryKey ? JSON.stringify(queryKey) : undefined;
-
-    trackApiErrorStandalone({
-      error_message: errorMessage,
-      query_key: queryKeyString,
-    });
-  }
-
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        refetchOnWindowFocus: false,
-      },
-      mutations: {
-        onError: (error) => handleQueryError(error),
-      },
-    },
-  });
+  // Every failed query and mutation is told to Google Analytics there.
+  const queryClient = createQueryClient();
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

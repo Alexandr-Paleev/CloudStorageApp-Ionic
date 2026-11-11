@@ -149,10 +149,8 @@ const FileView: React.FC = () => {
   });
 
   /* The deletion stopped because Google Drive is not connected any more
-     (ReconnectDriveDialog asks what to do). Read from the mutation rather
-     than set in an onError of its own, which would replace the one main.tsx
-     gives every mutation, the one that reports a failure to Google
-     Analytics. */
+     (ReconnectDriveDialog asks what to do). Read from the mutation, as the
+     failure toast is: one state says which of the two the page shows. */
   const driveBlocked = deleteMutation.isError && needsDriveConnected(deleteMutation.error);
   const deleteFailed = deleteMutation.isError && !driveBlocked;
 

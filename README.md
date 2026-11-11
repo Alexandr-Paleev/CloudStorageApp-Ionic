@@ -526,8 +526,11 @@ Analytics are automatically enabled in production when environment variables are
 >
 > The functions report their failures too, through `libs/server/src/report.ts`,
 > with the same two cuts: an address loses its query string, a stored path the
-> name after the owner's id. They send to `SENTRY_DSN` where it is set, and to
-> the browser's `VITE_SENTRY_DSN` otherwise, which is the same project.
+> name after the owner's id but not the time of the upload. They send to
+> `SENTRY_DSN` where it is set, and on Vercel to the browser's `VITE_SENTRY_DSN`
+> otherwise, which is the same project; a local run sends only to `SENTRY_DSN`.
+> Both sides name the deployment by Vercel's `VERCEL_ENV`, so a preview is not
+> reported as production.
 
 ### 4. Run Application
 

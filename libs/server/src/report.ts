@@ -13,8 +13,8 @@ import { randomUUID } from 'node:crypto';
  * No SDK. Sentry's Node SDK brings OpenTelemetry with it, and every function
  * would load that on a cold start to send what is one POST. This is the POST,
  * in the envelope format Sentry documents, and it is sent only where a DSN is
- * configured: `SENTRY_DSN`, or the browser's `VITE_SENTRY_DSN`, which is public
- * by design and the same project.
+ * configured: `SENTRY_DSN`, or on Vercel the browser's `VITE_SENTRY_DSN`, which
+ * is public by design and the same project.
  *
  * What it sends follows decision 0015, as the browser's reports do: an
  * address loses its query string and fragment, where a signed URL keeps its
@@ -47,12 +47,15 @@ const ADDRESS_TAIL = /(https?:\/\/[^\s?#'"<>]*)[?#][^\s'"<>]*/gi;
  * What follows an owner's id and a slash: a stored file's name. To the end of
  * the line or the closing quote, not to the next space, because a name can
  * have spaces in it, and whatever the message said after the path goes too.
+ * The time it was uploaded stays, as the browser keeps it
+ * (src/observability/scrub.ts): with the owner's id it says which object it
+ * was, for whoever has to find it by hand.
  */
-const STORED_NAME = new RegExp(`(${OWNER}/)[^'"<>\\n]+`, 'gi');
+const STORED_NAME = new RegExp(`(${OWNER}/)(\\d+_)?[^'"<>\\n]+`, 'gi');
 
 /** The text, with what decision 0015 keeps from a collector taken out. */
 export function scrubbed(text: string): string {
-  return text.replace(ADDRESS_TAIL, '$1').replace(STORED_NAME, '$1…');
+  return text.replace(ADDRESS_TAIL, '$1').replace(STORED_NAME, '$1$2…');
 }
 
 interface Dsn {
@@ -113,6 +116,18 @@ function asException(error: unknown): { type: string; value: string; stack?: str
 }
 
 /**
+ * `SENTRY_DSN`, or on Vercel the browser's, which is the same project. Off
+ * Vercel only the first: `npm run dev` serves these functions with the whole
+ * `.env` loaded (vite-plugin-dev-api.mts), the end-to-end suite runs on it,
+ * and the browser's DSN in a developer's `.env` made a local run's failures
+ * events in the real project. `VERCEL` is set on every deployment.
+ */
+function dsnToSendTo(): string | undefined {
+  if (process.env.SENTRY_DSN) return process.env.SENTRY_DSN;
+  return process.env.VERCEL ? process.env.VITE_SENTRY_DSN : undefined;
+}
+
+/**
  * Sends one failure, and never throws: a report that cannot be sent must not
  * become the failure the caller answers with. Awaited by the caller, because
  * work left running after a function has answered may never finish.
@@ -123,7 +138,7 @@ export async function report(error: unknown, context: ReportContext): Promise<vo
      an event in the real project. */
   if (process.env.VITEST) return;
 
-  const dsn = parseDsn(process.env.SENTRY_DSN || process.env.VITE_SENTRY_DSN);
+  const dsn = parseDsn(dsnToSendTo());
   if (!dsn) return;
 
   /* All of it, not only the POST: a failure that cannot be read, such as one

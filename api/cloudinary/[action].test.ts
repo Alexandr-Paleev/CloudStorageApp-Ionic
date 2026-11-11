@@ -13,14 +13,17 @@ import {
   resetRateLimits,
 } from '../../libs/server/src/rate-limit';
 
-const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest } = vi.hoisted(() => ({
-  FakeAuthError: class FakeAuthError extends Error {},
-  authenticateUser: vi.fn(),
-  db: { client: null as { from: (table: string) => unknown } | null },
-  destroy: vi.fn(),
-  config: vi.fn(),
-  apiSignRequest: vi.fn((_params: Record<string, unknown>, _secret: string) => 'the-signature'),
-}));
+const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest, report } = vi.hoisted(
+  () => ({
+    FakeAuthError: class FakeAuthError extends Error {},
+    authenticateUser: vi.fn(),
+    db: { client: null as { from: (table: string) => unknown } | null },
+    destroy: vi.fn(),
+    config: vi.fn(),
+    apiSignRequest: vi.fn((_params: Record<string, unknown>, _secret: string) => 'the-signature'),
+    report: vi.fn(),
+  })
+);
 
 vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
@@ -37,6 +40,10 @@ vi.mock('cloudinary', () => ({
         apiSignRequest(params, secret),
     },
   },
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 import handler from './[action]';
@@ -204,6 +211,18 @@ describe('cloudinary delete: result handling', () => {
     await handler(del('users/user-1/photo', 'image'), res);
 
     expect(res.statusCode).toBe(500);
+  });
+
+  /* One function, two actions: Sentry is told which of them failed. */
+  it('tells Sentry a failure by the action it happened in', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    destroy.mockRejectedValue({ message: 'Rate Limit Exceeded', http_code: 420 });
+    await handler(del('users/user-1/photo', 'image'), mockResponse());
+
+    expect(report).toHaveBeenCalledWith(
+      { message: 'Rate Limit Exceeded', http_code: 420 },
+      { route: 'cloudinary/delete' }
+    );
   });
 });
 
