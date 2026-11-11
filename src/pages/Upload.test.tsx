@@ -125,6 +125,9 @@ function uploadingWith(resumable: boolean) {
 const pause = () =>
   [...document.querySelectorAll('ion-button')].find((b) => b.textContent === 'Pause');
 
+const cancel = () =>
+  [...document.querySelectorAll('ion-button')].find((b) => b.textContent === 'Cancel');
+
 function landed(storage_type = 'r2') {
   return { id: crypto.randomUUID(), storage_type, name: 'x', size: 1 };
 }
@@ -459,6 +462,92 @@ describe('Upload: pausing', () => {
     await waitFor(() => expect(uploadFile).toHaveBeenCalled());
     await screen.findByText(/Uploading 1 of 1/);
     expect(pause()).toBeUndefined();
+  });
+});
+
+/* Nothing but R2 could be stopped, and R2 is off on production: an upload
+   whose connection had died held the queue until the page was reloaded. */
+describe('Upload: cancelling', () => {
+  it('offers Cancel, in place of Pause, for an upload its provider cannot continue', async () => {
+    uploadingWith(false);
+
+    show();
+    chooseSized('scan.pdf', 20 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(cancel()).toBeDefined());
+    expect(pause()).toBeUndefined();
+  });
+
+  it('offers Pause, and no Cancel, for one that can be continued', async () => {
+    uploadingWith(true);
+
+    show();
+    chooseSized('archive.zip', 20 * MB);
+    fireEvent.click(uploadButton());
+
+    await waitFor(() => expect(pause()).toBeDefined());
+    expect(cancel()).toBeUndefined();
+  });
+
+  it('stops that file alone: it is marked cancelled, and the next one goes', async () => {
+    uploadFile
+      .mockImplementationOnce((...args: unknown[]) => {
+        const { signal, onStart } = args[5] as {
+          signal: AbortSignal;
+          onStart: (start: { resumable: boolean }) => void;
+        };
+        onStart({ resumable: false });
+        return new Promise((_, reject) =>
+          signal.addEventListener('abort', () =>
+            reject(new DOMException('Upload aborted', 'AbortError'))
+          )
+        );
+      })
+      .mockResolvedValueOnce(landed());
+
+    show();
+    choose('stuck.txt', 'next.txt');
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(cancel()).toBeDefined());
+    fireEvent.click(cancel()!);
+
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/Cancelled/)).toBeInTheDocument();
+    // The next file is sent with a signal of its own, not the one Cancel used.
+    expect((uploadFile.mock.calls[1]![5] as { signal: AbortSignal }).signal.aborted).toBe(false);
+    // Not a pause: nothing is kept to resume, and the page says nothing of one.
+    expect(screen.queryByText(/parts already sent are kept/)).toBeNull();
+
+    // And it can be sent again, once the queue has stopped.
+    uploadFile.mockResolvedValueOnce(landed());
+    fireEvent.click((await screen.findByText('Retry')).closest('ion-button')!);
+    await waitFor(() => expect(uploadButton().disabled).toBe(false));
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(uploadFile).toHaveBeenCalledTimes(3));
+    expect((uploadFile.mock.calls[2]![1] as File).name).toBe('stuck.txt');
+  });
+
+  it('leaves a file that fails on its own after a cancelled one to say why', async () => {
+    uploadFile
+      .mockImplementationOnce((...args: unknown[]) => {
+        const { signal } = args[5] as { signal: AbortSignal };
+        return new Promise((_, reject) =>
+          signal.addEventListener('abort', () =>
+            reject(new DOMException('Upload aborted', 'AbortError'))
+          )
+        );
+      })
+      .mockRejectedValueOnce(new Error('provider unavailable'));
+
+    show();
+    choose('stuck.txt', 'next.txt');
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(cancel()).toBeDefined());
+    fireEvent.click(cancel()!);
+
+    expect(await screen.findByText(/provider unavailable/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Cancelled/)).toHaveLength(1);
   });
 });
 

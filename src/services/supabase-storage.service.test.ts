@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import supabaseStorageService from './supabase-storage.service';
 import { HttpError } from '../utils/http.utils';
+import * as Sentry from '../observability/sentry';
 
 const { bucket } = vi.hoisted(() => ({
   bucket: {
@@ -168,5 +169,37 @@ describe('uploadFile', () => {
     await expect(supabaseStorageService.uploadFile(pdf(), 'user-1')).rejects.toThrow(
       'Supabase Storage upload network error'
     );
+  });
+});
+
+/* The page's Cancel aborts the signal. It is the person's choice, and every
+   failure of this upload used to go to Sentry. */
+describe('a cancelled upload', () => {
+  it('stops when its signal is aborted, and tells Sentry nothing', async () => {
+    class Stoppable extends FakeXhr {
+      onabort: (() => void) | null = null;
+      abort() {
+        this.onabort?.();
+      }
+    }
+    FakeXhr.answer = () => {};
+    vi.stubGlobal('XMLHttpRequest', Stoppable);
+    const controller = new AbortController();
+
+    const upload = supabaseStorageService.uploadFile(pdf(), 'user-1', undefined, controller.signal);
+    await vi.waitFor(() => expect(FakeXhr.last).not.toBeNull());
+    controller.abort();
+
+    await expect(upload).rejects.toMatchObject({ name: 'AbortError' });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('still tells Sentry about an upload that failed on its own', async () => {
+    FakeXhr.answer = (xhr) => xhr.onerror?.();
+
+    await expect(supabaseStorageService.uploadFile(pdf(), 'user-1')).rejects.toThrow(
+      'Supabase Storage upload network error'
+    );
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 });

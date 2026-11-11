@@ -3,6 +3,7 @@ import { UploadProgress } from './storage.service';
 import { supabase } from '../supabase/supabase.config';
 import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { apiUrl } from '../utils/api.utils';
+import { readAnswer, sendUpload } from './xhr-upload';
 
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 /**
@@ -98,7 +99,8 @@ const cloudinaryService = {
   async uploadFile(
     file: File,
     _userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    signal?: AbortSignal
   ): Promise<CloudinaryUploadResult> {
     if (!this.isConfigured()) {
       throw new Error('Cloudinary is not configured correctly.');
@@ -119,52 +121,47 @@ const cloudinaryService = {
     formData.append('overwrite', String(auth.overwrite));
     formData.append('tags', auth.tags);
 
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open(
-        'POST',
-        `https://api.cloudinary.com/v1_1/${auth.cloudName}/${auth.resourceType}/upload`
-      );
-
-      if (onProgress) {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            onProgress({
-              bytesTransferred: event.loaded,
-              totalBytes: event.total,
-              progress: (event.loaded / event.total) * 100,
-            });
-          }
-        };
-      }
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
-          resolve({
-            publicId: response.public_id,
-            url: response.secure_url,
-            format: response.format,
-            bytes: response.bytes,
-          });
-        } else {
-          /* With the status: a plain Error was retried, and a photo Cloudinary
-             refused as too large went up twice more. In Cloudinary's words
-             rather than its JSON. */
-          let reason = xhr.responseText;
-          try {
-            const body = JSON.parse(xhr.responseText) as { error?: { message?: string } };
-            reason = body.error?.message || reason;
-          } catch {
-            /* not JSON: the text itself says enough */
-          }
-          reject(new HttpError(`Cloudinary upload failed: ${reason}`, xhr.status));
+    const xhr = await sendUpload({
+      provider: 'Cloudinary',
+      method: 'POST',
+      url: `https://api.cloudinary.com/v1_1/${auth.cloudName}/${auth.resourceType}/upload`,
+      body: formData,
+      signal,
+      onProgress:
+        onProgress &&
+        ((loaded, total) =>
+          onProgress({
+            bytesTransferred: loaded,
+            totalBytes: total,
+            progress: (loaded / total) * 100,
+          })),
+      /* With the status: a plain Error was retried, and a photo Cloudinary
+         refused as too large went up twice more. In Cloudinary's words
+         rather than its JSON. */
+      refusal: (xhr) => {
+        let reason = xhr.responseText;
+        try {
+          const body = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+          reason = body.error?.message || reason;
+        } catch {
+          /* not JSON: the text itself says enough */
         }
-      };
-
-      xhr.onerror = () => reject(new Error('Cloudinary upload network error'));
-      xhr.send(formData);
+        return new HttpError(`Cloudinary upload failed: ${reason}`, xhr.status);
+      },
     });
+
+    const response = readAnswer<{
+      public_id: string;
+      secure_url: string;
+      format: string;
+      bytes: number;
+    }>(xhr, 'Cloudinary');
+    return {
+      publicId: response.public_id,
+      url: response.secure_url,
+      format: response.format,
+      bytes: response.bytes,
+    };
   },
 
   /**

@@ -1,10 +1,11 @@
 import { supabase } from '../supabase/supabase.config';
-import { HttpError, httpErrorFrom } from '../utils/http.utils';
+import { httpErrorFrom } from '../utils/http.utils';
 import { shouldUseMultipart } from '@cloud-storage/core/multipart';
 import { ownerPrefix } from '@cloud-storage/core/stored-path';
 import { createMultipartUploader, type PartUploadOptions } from './multipart.upload';
 import { uploadStore, type PendingUpload } from './upload-store';
 import { apiUrl } from '../utils/api.utils';
+import { sendUpload } from './xhr-upload';
 
 const r2BucketName = import.meta.env.VITE_R2_BUCKET_NAME;
 
@@ -24,11 +25,9 @@ export type R2UploadResult = {
 };
 
 /**
- * One PUT, with progress and the ability to give up halfway.
- *
- * XHR rather than fetch, and not for nostalgia: fetch still cannot report
- * upload progress, and a five-gigabyte file with no progress bar is
- * indistinguishable from a frozen tab.
+ * One PUT, with progress and the ability to give up halfway: a part of a
+ * multipart upload, or a whole file. Resolved with the request, whose ETag
+ * the multipart upload needs.
  */
 function putWithProgress(
   url: string,
@@ -36,37 +35,14 @@ function putWithProgress(
   contentType: string,
   { signal, onProgress }: PartUploadOptions
 ): Promise<XMLHttpRequest> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', contentType || 'application/octet-stream');
-
-    if (onProgress) {
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) onProgress(event.loaded);
-      };
-    }
-
-    const abort = () => xhr.abort();
-    signal?.addEventListener('abort', abort, { once: true });
-
-    const done = () => signal?.removeEventListener('abort', abort);
-
-    xhr.onload = () => {
-      done();
-      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr);
-      else reject(new HttpError(`R2 upload failed with status ${xhr.status}`, xhr.status));
-    };
-    xhr.onerror = () => {
-      done();
-      reject(new Error('R2 upload network error'));
-    };
-    xhr.onabort = () => {
-      done();
-      reject(new DOMException('Upload aborted', 'AbortError'));
-    };
-
-    xhr.send(body);
+  return sendUpload({
+    provider: 'R2',
+    method: 'PUT',
+    url,
+    headers: { 'Content-Type': contentType || 'application/octet-stream' },
+    body,
+    signal,
+    onProgress: onProgress && ((loaded) => onProgress(loaded)),
   });
 }
 

@@ -15,6 +15,7 @@ vi.mock('./googledrive-auth.service', async (importOriginal) => ({
 
 import googleDriveService from './googledrive.service';
 import { GoogleDriveAuthError } from './googledrive-auth.service';
+import { HttpError, isRetriableError } from '../utils/http.utils';
 
 /** Answers every upload with the status and body a test sets. */
 let answer = { status: 200, body: '{"id":"f1","name":"a.txt","webViewLink":"https://drive"}' };
@@ -111,6 +112,33 @@ describe('deleting from Drive', () => {
     answering(500);
     await expect(googleDriveService.deleteFile('f1')).rejects.toThrow(
       'Failed to delete file from Google Drive'
+    );
+  });
+});
+
+describe('what else Drive can answer an upload with', () => {
+  /* The refusal had no status, and the retry helper sent the file twice more:
+     to a Drive that was full, a full upload each time. */
+  it('a refusal carries its status, so a full Drive is not sent the file again', async () => {
+    answer = {
+      status: 403,
+      body: '{"error":{"code":403,"message":"The user has exceeded their Drive storage quota"}}',
+    };
+    const error = await googleDriveService.uploadFile(file()).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({
+      status: 403,
+      message: 'Google Drive upload failed: The user has exceeded their Drive storage quota',
+    });
+    expect(isRetriableError(error)).toBe(false);
+  });
+
+  it('a yes it cannot read fails the upload instead of leaving it waiting for ever', async () => {
+    answer = { status: 200, body: '<html>Bad gateway</html>' };
+
+    await expect(googleDriveService.uploadFile(file())).rejects.toThrow(
+      'Google Drive took the file, but its answer could not be read'
     );
   });
 });

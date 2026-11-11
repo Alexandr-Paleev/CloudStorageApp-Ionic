@@ -64,6 +64,25 @@ reasoning behind the larger decisions lives in
 
 ### Fixed
 
+- **An upload whose connection died held the queue for good, and only R2's
+  could be stopped.** None of the five uploaders gave up: a phone that went
+  from Wi-Fi to LTE in the middle of a PDF kept a request nothing would ever
+  answer, the bar stood still, and the files behind it waited with it. The
+  way out was a reload, which loses the queue. Three of them also read a
+  successful answer with `JSON.parse` inside the request's `onload`, where a
+  throw is the browser's and not the promise's, and an answer they could not
+  read left the upload waiting for ever. They share one function now
+  (`src/services/xhr-upload.ts`): it gives up once nothing has moved, either
+  way, for a minute, and that is retried like a network error. It stops when
+  its signal is aborted, and the answer is read after the request has
+  settled. The upload page offers Cancel for every upload that cannot be
+  paused. It stops that file alone, marked "Cancelled", and the queue goes
+  on. Once the queue has stopped, a failed file offers Retry: before, one
+  could be neither sent again nor taken out, and picking it once more did
+  nothing, since the queue knew it. A Cancel is not reported to Sentry, and
+  the retry helper knows one by its name: a cancel is a DOMException, which
+  need not be an `Error`. Drive's refusals carry their status now, so a file
+  a full Drive refused is no longer sent twice more.
 - **A deploy broke a tab that was open before it.** Every page but Login is
   a chunk of its own, and a deploy renames them all. A tab opened earlier
   asked for the old names on its way to a page it had not opened yet, was

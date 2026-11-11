@@ -12,9 +12,10 @@ export class CloudinaryProvider implements IStorageProvider {
   async upload(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    options?: { signal?: AbortSignal }
   ): Promise<StorageUploadResult> {
-    const result = await cloudinaryService.uploadFile(file, userId, onProgress);
+    const result = await cloudinaryService.uploadFile(file, userId, onProgress, options?.signal);
     return {
       url: result.url,
       path: result.publicId,

@@ -3,6 +3,7 @@ import { env } from '../env';
 import { supabase } from '../supabase/supabase.config';
 import { HttpError } from '../utils/http.utils';
 import { UploadProgress } from './storage.service';
+import { sendUpload, stoppedOnPurpose } from './xhr-upload';
 
 const BUCKET_NAME = 'files';
 
@@ -19,48 +20,44 @@ function sendWithProgress(
   signedUrl: string,
   file: File,
   accessToken: string | undefined,
-  onProgress?: (progress: UploadProgress) => void
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const body = new FormData();
   body.append('cacheControl', '3600');
   body.append('', file);
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', signedUrl);
-    xhr.setRequestHeader('apikey', env.VITE_SUPABASE_ANON_KEY);
-    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-    xhr.setRequestHeader('x-upsert', 'false');
-
-    if (onProgress) {
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return;
-        // The form around the file counts too, so the last event can pass it.
+  return sendUpload({
+    provider: 'Supabase Storage',
+    method: 'PUT',
+    url: signedUrl,
+    headers: {
+      apikey: env.VITE_SUPABASE_ANON_KEY,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      'x-upsert': 'false',
+    },
+    body,
+    signal,
+    onProgress:
+      onProgress &&
+      ((loaded, total) =>
         onProgress({
-          bytesTransferred: Math.min(event.loaded, file.size),
+          // The form around the file counts too, so the last event can pass it.
+          bytesTransferred: Math.min(loaded, file.size),
           totalBytes: file.size,
-          progress: (event.loaded / event.total) * 100,
-        });
-      };
-    }
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-        return;
-      }
-      // With the status, so the retry helper does not send a refused file twice more.
+          progress: (loaded / total) * 100,
+        })),
+    // With the status, so the retry helper does not send a refused file twice more.
+    refusal: (xhr) => {
       let message = 'Upload to Supabase Storage failed';
       try {
         message = (JSON.parse(xhr.responseText) as { message?: string }).message || message;
       } catch {
         /* not JSON: the fallback says enough */
       }
-      reject(new HttpError(message, xhr.status));
-    };
-    xhr.onerror = () => reject(new Error('Supabase Storage upload network error'));
-    xhr.send(body);
-  });
+      return new HttpError(message, xhr.status);
+    },
+  }).then(() => undefined);
 }
 
 const supabaseStorageService = {
@@ -71,7 +68,8 @@ const supabaseStorageService = {
   async uploadFile(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    signal?: AbortSignal
   ): Promise<{ path: string; url: string }> {
     const timestamp = Date.now();
     const fileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
@@ -94,9 +92,12 @@ const supabaseStorageService = {
     } = await supabase.auth.getSession();
 
     try {
-      await sendWithProgress(signed.signedUrl, file, session?.access_token, onProgress);
+      await sendWithProgress(signed.signedUrl, file, session?.access_token, onProgress, signal);
     } catch (error) {
-      Sentry.captureException(error, { tags: { context: 'supabaseStorage.uploadFile' } });
+      // A Cancel is the person's, and nothing went wrong.
+      if (!stoppedOnPurpose(error)) {
+        Sentry.captureException(error, { tags: { context: 'supabaseStorage.uploadFile' } });
+      }
       throw error;
     }
 

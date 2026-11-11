@@ -89,6 +89,17 @@ const UploadQueue: React.FC<UploadQueueProps> = ({ items, running, onRemove, onR
                 Resume
               </IonButton>
             )}
+
+            {/* Sent again once the queue has stopped: a file that was
+                cancelled, or whose connection gave out for good. Neither can
+                be picked a second time, since the queue knows the file. A
+                refusal says the same again, which costs one attempt. */}
+            {item.status === 'failed' && !running && (
+              <IonButton size="small" fill="outline" onClick={() => onRetry(item.id)}>
+                <span aria-hidden="true">Retry</span>
+                <span className="sr-only">Retry {item.file.name}</span>
+              </IonButton>
+            )}
           </div>
         );
       })}

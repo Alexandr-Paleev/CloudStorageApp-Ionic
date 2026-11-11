@@ -199,6 +199,24 @@ describe('uploadFile', () => {
   });
 });
 
+/* Before the 501 below, which leaves the service unconfigured for the rest
+   of this file.
+
+   Cloudinary's yes was read with JSON.parse inside onload, where a throw is
+   the browser's and not the promise's: the upload never ended. */
+describe('an answer that cannot be read', () => {
+  it('fails the upload instead of leaving it waiting for ever', async () => {
+    class Garbled extends FakeXhr {
+      responseText = '<html>Bad gateway</html>';
+    }
+    vi.stubGlobal('XMLHttpRequest', Garbled);
+
+    await expect(cloudinaryService.uploadFile(file(), 'user-1')).rejects.toThrow(
+      'Cloudinary took the file, but its answer could not be read'
+    );
+  });
+});
+
 describe('when the deployment cannot sign', () => {
   it('stops offering itself after the server answers 501', async () => {
     // Only the server knows whether CLOUDINARY_API_SECRET is set. Before

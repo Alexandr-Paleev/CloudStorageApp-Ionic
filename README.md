@@ -177,6 +177,8 @@ render — and the banner says the deletion has not reached the server yet:
 - ✅ Each provider's size limit asked before a byte travels: an image Cloudinary would refuse goes
   to R2 or Supabase Storage, and a file no hosted provider takes is offered Google Drive
 - ✅ Where R2 is set up, files over 16 MB go to it in parts, and can be paused and resumed — including after a reload
+- ✅ Any other upload can be cancelled, and one that stops moving for a minute is given up and tried again,
+  so a connection that died halfway no longer holds the queue
 - ✅ Automatic Google Drive connection when the limit is exceeded
 - ✅ Visual storage usage indicator, honest about accounts that are over the limit
 - ✅ Quota is enforced in the database, on every path. A file exists in this app

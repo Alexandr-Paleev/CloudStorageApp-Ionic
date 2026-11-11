@@ -23,9 +23,11 @@ export class HttpError extends Error {
 export function isRetriableError(error: unknown): boolean {
   /* A paused upload and a cancelled request are decisions, not failures.
      Retrying one restarts work the user just stopped — and, for a paused
-     multipart upload, does it three times before giving up. */
-  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'UploadPausedError'))
-    return false;
+     multipart upload, does it three times before giving up. Known by name
+     alone: a cancel is a DOMException, which is an Error in a browser but
+     need not be one everywhere, and jsdom's is not. */
+  const name = (error as { name?: unknown } | null)?.name;
+  if (name === 'AbortError' || name === 'UploadPausedError') return false;
 
   /* Drive asking to be connected again answers the same until someone
      connects it, and a retry would only replace the reason with "not
