@@ -77,6 +77,9 @@ const Upload: React.FC = () => {
   /* Held in a ref rather than in state: aborting must not wait for a render,
      and nothing about the controller itself belongs on screen. */
   const abortRef = useRef<AbortController | null>(null);
+  /* Whether that controller was aborted by Cancel rather than Pause. The two
+     abort the same request, and only the page knows which it meant. */
+  const cancelledRef = useRef(false);
 
   /* The runner walks a local copy of the queue — state updates do not land in
      the middle of a loop — and reads this to pick up files added while it was
@@ -150,6 +153,7 @@ const Upload: React.FC = () => {
 
         apply(item.id, { status: 'uploading', progress: 0, error: undefined, resumable: false });
         abortRef.current = new AbortController();
+        cancelledRef.current = false;
         setPaused(false);
 
         try {
@@ -179,6 +183,13 @@ const Upload: React.FC = () => {
           invalidateAfterUpload();
         } catch (err) {
           const error = err as Error;
+
+          /* Cancel stops this file alone. It stays on screen, marked, with
+             Retry beside it, and the rest of the queue goes on. */
+          if (cancelledRef.current) {
+            apply(item.id, { status: 'failed', error: 'Cancelled' });
+            continue;
+          }
 
           // Pausing raises too — it is how the part loop stops — but it is a
           // decision, not a failure, and it stops the queue rather than
@@ -263,6 +274,11 @@ const Upload: React.FC = () => {
   });
 
   const pauseUpload = () => abortRef.current?.abort();
+
+  const cancelUpload = () => {
+    cancelledRef.current = true;
+    abortRef.current?.abort();
+  };
 
   /* A page closed or loaded again in the middle of an upload loses it: of the
      providers here only R2 continues one, and the demo does not run R2. So
@@ -516,6 +532,21 @@ const Upload: React.FC = () => {
                     style={{ marginTop: '10px' }}
                   >
                     Pause
+                  </IonButton>
+                )}
+
+                {/* Any other upload can be stopped, and only stopped: its
+                    provider keeps nothing to go on from. There was no way
+                    out of one but a reload, which loses the whole queue. */}
+                {uploading && !canPause && (
+                  <IonButton
+                    size="small"
+                    fill="outline"
+                    color="medium"
+                    onClick={cancelUpload}
+                    style={{ marginTop: '10px' }}
+                  >
+                    Cancel
                   </IonButton>
                 )}
 

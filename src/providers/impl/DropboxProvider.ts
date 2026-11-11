@@ -16,9 +16,10 @@ export class DropboxProvider implements IStorageProvider {
   async upload(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    options?: { signal?: AbortSignal }
   ): Promise<StorageUploadResult> {
-    const result = await dropboxService.uploadFile(file, userId, onProgress);
+    const result = await dropboxService.uploadFile(file, userId, onProgress, options?.signal);
     return {
       url: result.sharedLink,
       path: result.id,

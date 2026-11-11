@@ -16,9 +16,15 @@ export class GoogleDriveProvider implements IStorageProvider {
   async upload(
     file: File,
     _userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    options?: { signal?: AbortSignal }
   ): Promise<StorageUploadResult> {
-    const result = await googleDriveService.uploadFile(file, undefined, onProgress);
+    const result = await googleDriveService.uploadFile(
+      file,
+      undefined,
+      onProgress,
+      options?.signal
+    );
     return {
       url: result.webViewLink,
       path: result.id,

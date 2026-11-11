@@ -1,5 +1,7 @@
 import { UploadProgress } from './storage.service';
 import googleDriveAuthService, { GoogleDriveAuthError } from './googledrive-auth.service';
+import { HttpError } from '../utils/http.utils';
+import { readAnswer, sendUpload } from './xhr-upload';
 
 interface GoogleDriveFile {
   id: string;
@@ -39,7 +41,8 @@ const googleDriveService = {
   async uploadFile(
     file: File,
     folderId?: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    signal?: AbortSignal
   ): Promise<GoogleDriveFile> {
     const token = await googleDriveAuthService.getAccessToken();
     if (!token) throw new GoogleDriveAuthError('Google Drive is not connected');
@@ -53,39 +56,33 @@ const googleDriveService = {
     formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     formData.append('file', file);
 
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open(
-        'POST',
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink'
-      );
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-      if (onProgress) {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            onProgress({
-              bytesTransferred: event.loaded,
-              totalBytes: event.total,
-              progress: (event.loaded / event.total) * 100,
-            });
-          }
-        };
-      }
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(JSON.parse(xhr.responseText));
-        } else if (xhr.status === 401) {
-          reject(refused());
-        } else {
-          reject(new Error(`Google Drive upload failed: ${googleMessage(xhr.responseText)}`));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error('Google Drive upload network error'));
-      xhr.send(formData);
+    const xhr = await sendUpload({
+      provider: 'Google Drive',
+      method: 'POST',
+      url: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal,
+      onProgress:
+        onProgress &&
+        ((loaded, total) =>
+          onProgress({
+            bytesTransferred: loaded,
+            totalBytes: total,
+            progress: (loaded / total) * 100,
+          })),
+      /* With the status now. Without one the retry helper sent a file Drive
+         had refused, a full Drive among them, twice more. */
+      refusal: (xhr) =>
+        xhr.status === 401
+          ? refused()
+          : new HttpError(
+              `Google Drive upload failed: ${googleMessage(xhr.responseText)}`,
+              xhr.status
+            ),
     });
+
+    return readAnswer<GoogleDriveFile>(xhr, 'Google Drive');
   },
 
   /**

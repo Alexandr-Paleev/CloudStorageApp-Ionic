@@ -46,10 +46,17 @@ describe('UploadQueue', () => {
   /* A waiting file's name is on its row and in its remove button; a going
      one's names its progress bar. */
   it('keeps file names out of session recordings', () => {
-    show(queue(['secret-contract.pdf', 'pending'], ['payslip.pdf', 'uploading', 30]));
+    show(
+      queue(
+        ['secret-contract.pdf', 'pending'],
+        ['payslip.pdf', 'uploading', 30],
+        ['diagnosis.pdf', 'failed']
+      )
+    );
 
     expect(whereHotjarWouldRead('secret-contract.pdf')).toEqual([]);
     expect(whereHotjarWouldRead('payslip.pdf')).toEqual([]);
+    expect(whereHotjarWouldRead('diagnosis.pdf')).toEqual([]);
   });
 
   it('names the progress bar after its file, from the text', () => {
@@ -99,6 +106,22 @@ describe('UploadQueue', () => {
     fireEvent.click(screen.getByText('Resume'));
 
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  /* A cancelled file could be neither sent again nor taken out, and picking
+     it once more did nothing, since the queue knows it. */
+  it('offers to send a failed file again once the queue has stopped', () => {
+    const items = queue(['a.pdf', 'failed']);
+    const { onRetry } = show(items);
+    fireEvent.click(screen.getByText('Retry').closest('ion-button')!);
+
+    expect(onRetry).toHaveBeenCalledWith(items[0]!.id);
+  });
+
+  it('does not offer it while the queue is running', () => {
+    show(queue(['a.pdf', 'failed'], ['b.pdf', 'uploading', 10]), true);
+
+    expect(screen.queryByText('Retry')).toBeNull();
   });
 });
 

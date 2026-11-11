@@ -70,7 +70,8 @@ const storageService = {
       storageLimit?: number;
       /** Aborting this pauses a resumable upload rather than failing it: the
        *  parts already in the bucket stay, and so does the record that knows
-       *  which ones they were. */
+       *  which ones they were. Any other upload it stops, with an AbortError,
+       *  which is how the page's Cancel works. */
       signal?: AbortSignal;
       /** Told once the provider is chosen, before a byte travels, whether this
        *  upload can be paused: only then is there a Pause to offer. */

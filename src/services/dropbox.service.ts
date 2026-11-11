@@ -1,6 +1,8 @@
 import { UploadProgress } from './storage.service';
 import dropboxAuthService from './dropbox-auth.service';
 import { toDirectLink } from '../utils/dropbox.utils';
+import { HttpError } from '../utils/http.utils';
+import { readAnswer, sendUpload } from './xhr-upload';
 
 interface DropboxUploadResult {
   id: string;
@@ -16,7 +18,8 @@ const dropboxService = {
   async uploadFile(
     file: File,
     userId: string,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: (progress: UploadProgress) => void,
+    signal?: AbortSignal
   ): Promise<{ id: string; sharedLink: string }> {
     const token = await dropboxAuthService.getAccessToken();
     if (!token) throw new Error('Dropbox not connected');
@@ -24,44 +27,28 @@ const dropboxService = {
     const path = `/CloudStorage/${userId}/${Date.now()}_${file.name}`;
 
     // Upload file
-    const uploadResponse = await new Promise<DropboxUploadResult>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'https://content.dropboxapi.com/2/files/upload');
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-      xhr.setRequestHeader(
-        'Dropbox-API-Arg',
-        JSON.stringify({
-          path,
-          mode: 'add',
-          autorename: true,
-          mute: false,
-        })
-      );
-
-      if (onProgress) {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            onProgress({
-              bytesTransferred: event.loaded,
-              totalBytes: event.total,
-              progress: (event.loaded / event.total) * 100,
-            });
-          }
-        };
-      }
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(JSON.parse(xhr.responseText));
-        } else {
-          reject(new Error(`Dropbox upload failed: ${xhr.responseText}`));
-        }
-      };
-
-      xhr.onerror = () => reject(new Error('Dropbox upload network error'));
-      xhr.send(file);
+    const xhr = await sendUpload({
+      provider: 'Dropbox',
+      method: 'POST',
+      url: 'https://content.dropboxapi.com/2/files/upload',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/octet-stream',
+        'Dropbox-API-Arg': JSON.stringify({ path, mode: 'add', autorename: true, mute: false }),
+      },
+      body: file,
+      signal,
+      onProgress:
+        onProgress &&
+        ((loaded, total) =>
+          onProgress({
+            bytesTransferred: loaded,
+            totalBytes: total,
+            progress: (loaded / total) * 100,
+          })),
+      refusal: (xhr) => new HttpError(`Dropbox upload failed: ${xhr.responseText}`, xhr.status),
     });
+    const uploadResponse = readAnswer<DropboxUploadResult>(xhr, 'Dropbox');
 
     // Create shared link
     const linkResponse = await fetch(
