@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.14.0] — 2026-11-13
+
 ### Added
 
 - **A first eval of search by meaning, in Python.** `evals/` measures the
@@ -2933,7 +2937,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.13.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.14.0...HEAD
+[4.14.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.13.0...v4.14.0
 [4.13.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.12.1...v4.13.0
 [4.12.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.12.0...v4.12.1
 [4.12.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.11.3...v4.12.0
