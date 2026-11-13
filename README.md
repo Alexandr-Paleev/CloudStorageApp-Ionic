@@ -773,21 +773,31 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 376.3 kB | 385 kB |
+| First load (JS + CSS) | 376.9 kB | 385 kB |
 | Largest chunk (Ionic) | 178.0 kB | 185 kB |
-| All assets, route chunks included | 468.5 kB | 480 kB |
+| All assets, route chunks included | 471.9 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.13.0, as CI measured them. Its first load is 1.0 kB
-over 4.12.1's: 0.5 kB for Ionic 9.0.9, which is also what the largest chunk
-grew by, 0.2 kB for keeping the Google Drive token with its owner, and 0.3 kB
-for the sign-in page's way back from a forgotten password, with the first lines
-that send a reset link opened at the wrong address on to its page. All assets
-grew 4.7 kB, 2.3 of them the page that asks for that link and takes the new
-password. 4.12.1's figures were 4.12.0's, whose first load was 0.3 kB over
+Those are the figures of 4.14.0, as CI measured them. Its first load is 0.6 kB
+over 4.13.0's: 0.2 kB for the sign-in page saying that an account is gone, and
+when some of its files could not be erased straight away; 0.2 kB for the reload
+that brings a tab a deploy left behind onto the new version, and for the update
+that waits to be asked; 0.1 kB for telling Google Analytics of every failed
+query and mutation, and Sentry of a preview; and the last tenth Ionic 9.0.10,
+too little to move the largest chunk's figure. All assets grew 3.4 kB, 1.3 of
+them what deleting a file kept in Google Drive asks once Drive's hour is up and
+what deleting an account now says, and 0.9 the upload page's measured progress,
+its Pause only where an upload can go on, and its sizes asked before a byte is
+sent. 4.13.0's first load was
+1.0 kB over 4.12.1's: 0.5 kB for Ionic 9.0.9, which is also what the largest
+chunk grew by, 0.2 kB for keeping the Google Drive token with its owner, and
+0.3 kB for the sign-in page's way back from a forgotten password, with the
+first lines that send a reset link opened at the wrong address on to its page.
+Its assets grew 4.7 kB, 2.3 of them the page that asks for that link and takes
+the new password. 4.12.1's figures were 4.12.0's, whose first load was 0.3 kB over
 4.11.3's, for the listener that tells Sentry what the content policy refuses,
 which the first chunk carries so that a refusal at startup is not missed.
 4.11.3's was 0.1 kB over 4.11.2's, for the sign-in page saying where a
@@ -820,7 +830,7 @@ one page, the shell: it is the only HTML the app's build emits. Current scores:
 
 | | Performance | Accessibility | Best practices | SEO |
 | --- | ---: | ---: | ---: | ---: |
-| App shell | 97 | 100 | 100 | 100 |
+| App shell | 99 | 100 | 100 | 100 |
 
 CI asserts accessibility, best practices and SEO at ≥ 95 — near-deterministic
 audits of markup and metadata — and performance at ≥ 80, low enough that a busy
@@ -1187,15 +1197,15 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,710 statements under `src/`, the
-unit tests do not reach 719. The largest share, 327, is in `src/services`, most
+a long way, and it is meant to be. Of the 2,877 statements under `src/`, the
+unit tests do not reach 648. The largest share, 293, is in `src/services`, most
 of it in the code that talks to Supabase and Dropbox and in what keeps state in
-IndexedDB: `supabase.service.ts` and the two Dropbox services hold 146,
+IndexedDB: `supabase.service.ts` and the two Dropbox services hold 132,
 `upload-store.ts` and `idb.ts` 69. The pages come next. With the page a share
 link opens gone to the site, and the dashboard's dialogs, data and markup gone
-to components and hooks of their own, `src/pages` is 598 statements and the
-unit tests reach 432 of them. `Upload.tsx` is the largest at 171, with 118
-reached, and `FileView.tsx` is next at 141, with 79. Three small pages have no
+to components and hooks of their own, `src/pages` is 643 statements and the
+unit tests reach 494 of them. `Upload.tsx` is the largest at 190, with 146
+reached, and `FileView.tsx` is next at 162, with 108. Three small pages have no
 unit test at all, 27 statements between them: the Dropbox callback, the way on
 to the legal pages, and the 404. All of it is named here rather than
 hidden behind one average that would sound fine.
