@@ -9,7 +9,7 @@ They hold for every agent working here (Claude Code, Codex). The owner's persona
 - **Change only what the task needs.** No drive-by refactors, renames, reformatting or new dependencies (a new one needs a yes; `npm run size` holds the budgets). Remove what your change left unused. Comments must stay true: fix the ones your change makes wrong, leave the rest.
 - **Do not touch unless asked:** an applied migration (write the next number instead); `ios/` and `android/` beyond what `npx cap` writes; `.env*`; `package-lock.json` by hand; `apps/web/content/*.md`; released sections of `CHANGELOG.md`. Never print a secret's value, only its name.
 - **Done means checked.** Before saying done: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; the site's own scripts for a change under `apps/web`; `uv run pytest` in `evals/` for a change there; `npm run test:e2e`, `npm run size` and `npm run smoke` when the change can move them; `gitleaks dir` over the changed files. A fix comes with a test that fails on `main` without it. Quote failures; never write "works" without the output that shows it.
-- **CI decides the merge:** `check`, `e2e` and `evals` in `ci.yml`, `codeql` and `gitleaks` in `security.yml`. A CodeQL comment blocks it; the usual causes here are removing tags with a regex (parse through the DOM) and a host regex without anchors (compare `URL.hostname`). gitleaks scans the branch's whole history: a random-looking literal next to the word token or key, even in a test, fails it, and only rewriting that commit clears it.
+- **CI decides the merge.** `main` requires two checks, `check` and `e2e` in `ci.yml` (on GitHub "Lint, types, unit tests" and "Playwright"), and every conversation resolved. `evals` in `ci.yml`, `codeql` and `gitleaks` in `security.yml` run on every push but are not required: a red one leaves the merge button on, so read them yourself. A CodeQL comment is a conversation, so it blocks the merge until resolved; the usual causes here are removing tags with a regex (parse through the DOM) and a host regex without anchors (compare `URL.hostname`). gitleaks scans the branch's whole history: a random-looking literal next to the word token or key, even in a test, fails it, and only rewriting that commit clears it.
 
 ## Project overview
 
@@ -48,20 +48,21 @@ Stripe billing with Free (500MB) and Pro ($9/mo, 5GB) tiers. Deployed on Vercel 
 
 ```
 src/
-├── analytics/       # Hotjar init
+├── analytics/       # Consent, and the collectors it lets start (GA4, Hotjar) — see ADR 0015
 ├── components/      # Shared components (PrivateRoute, PageViewTracker, UpgradeBanner, ProviderSelector)
 ├── contexts/        # React contexts
 ├── hooks/           # Custom hooks (useAnalytics for GA4, useProfile for billing)
 ├── native/          # Capacitor-only code (deep links for OAuth in the shell)
 ├── observability/   # Sentry bootstrap (loads when idle)
-├── pages/           # Route pages (Dashboard, Login, Upload, FileView, Pricing, SubscriptionSuccess, DropboxCallback)
+├── pages/           # Route pages (Dashboard, Login, PasswordReset, Upload, FileView, Account,
+│                    # Pricing, SubscriptionSuccess, DropboxCallback, Legal, NotFound)
 ├── providers/       # Storage provider abstraction layer
 │   └── impl/        # CloudinaryProvider, R2Provider, GoogleDriveProvider, SupabaseStorageProvider, DropboxProvider
 ├── schemas/         # Zod schemas (file metadata)
-├── services/        # API service layers (auth, billing, cloudinary, dropbox, googledrive, r2)
+├── services/        # API service layers: auth, account, billing, share, ai, one per provider, uploads
 ├── supabase/        # Supabase client config
 ├── theme/           # CSS variables and global styles
-├── types/           # TypeScript type definitions (billing.types.ts)
+├── types/           # TypeScript type definitions (billing.types.ts, analytics.types.ts)
 ├── utils/           # Utilities (retry, thumbnail, apiUrl for the native origin)
 └── env.ts           # Environment variables (Zod-validated)
 
@@ -69,8 +70,9 @@ apps/web/            # The public site: Next.js (App Router), an npm workspace, 
                      # Vercel project and origin. Holds no secrets. See ADR 0014
 
 libs/                # Shared code, unit-tested next to the source — see ADR 0014
-├── core/src/        # What more than one side uses (tiers, plans, format, multipart,
-│                    # safe-url, ai, stored-path). A module joins when a second side needs it
+├── core/src/        # What more than one side uses (tiers, plans, origins, share-link,
+│                    # format, multipart, safe-url, ai, stored-path and the rest).
+│                    # A module joins when a second side needs it
 ├── server/src/      # What only api/ may use (auth, cors, quota, share, rate-limit,
 │                    # account-erase, erase-providers and the rest)
 └── boundaries.test.ts  # Holds the lint rule between the projects to its job
@@ -95,10 +97,10 @@ docs/decisions/      # ADRs — read these before changing a decision they cover
 ## Key patterns
 
 - **Storage provider pattern:** Abstract `StorageProvider` interface in `providers/storage.provider.ts`, concrete implementations in `providers/impl/`. Routes images to Cloudinary, files to R2/Supabase. Pro users can manually select a provider via `preferredProvider`.
-- **Billing:** Stripe Checkout for upgrades, Customer Portal for management. Webhook updates `profiles` table. `useProfile()` hook provides tier/limits to components. Dynamic storage limits replace hardcoded `MAX_USER_STORAGE_LIMIT`.
+- **Billing:** Stripe Checkout for upgrades, Customer Portal for management. Webhook updates `profiles` table. `useProfile()` hook provides tier/limits to components. The limits are what the webhook writes to `profiles` from `TIER_LIMITS` (`libs/core/src/tiers.ts`).
 - **Environment config:** All env vars validated via Zod in `src/env.ts`. Analytics vars (GA4, Hotjar) are optional.
-- **Error handling:** Global query error handler in `main.tsx` tracks API errors to GA4. Sentry for crash reporting.
-- **Analytics safety:** All GA4 calls wrapped in `safeAnalyticsCall()` to prevent ad-blocker crashes. GA4 only initializes in production.
+- **Error handling:** every failed query and mutation reaches GA4 through the `onError` of both caches in `src/query-client.ts`. Sentry for crash reporting.
+- **Analytics safety:** All GA4 calls wrapped in `safeAnalyticsCall()` to prevent ad-blocker crashes. GA4 and Hotjar start only in a production build, and only after the visitor says yes (`src/analytics/consent.ts`, `ConsentBanner`).
 - **Pre-commit:** Husky + lint-staged runs ESLint --fix and Prettier on staged .ts/.tsx files.
 - **The native shell has its own origin:** a Capacitor WebView serves the page from `capacitor://localhost`, so every call to a function goes through `apiUrl()` (`src/utils/api.utils.ts`) and `VITE_API_ORIGIN` rather than a bare `/api/...` path. See ADR 0010.
 - **Five Nx projects, kept apart by lint:** the app (root), the site (`apps/web`), `api/`, `libs/core`, `libs/server`. `src/` and `apps/web` import core by name (`@cloud-storage/core/<module>`, from `tsconfig.base.json`) and must not import `libs/server` at all. `api/` and `libs/server` import the libraries by **relative path, never by name**: Vercel's builder builds a named import without an error and the function then fails to load. `eslint.config.mjs` draws the Nx graph itself, because the boundary rule silently checks nothing without one.
@@ -122,7 +124,7 @@ docs/decisions/      # ADRs — read these before changing a decision they cover
 
 ## Style conventions
 
-- 2-space indentation (enforced by Prettier via @ionic/prettier-config)
+- 2-space indentation, single quotes, 100 columns: Prettier reads `.prettierrc`
 - CSS uses lowercase hex colors (e.g. `#4f46e5`)
 - Commits follow conventional commits: `feat:`, `fix:`, `chore:`, `style:`, `refactor:`
 
@@ -130,8 +132,8 @@ docs/decisions/      # ADRs — read these before changing a decision they cover
 
 - `.env` is gitignored — must be set up manually with Supabase, Cloudinary, R2 keys
 - Vercel env vars must use `VITE_` prefix for client-side access
-- Server-only Vercel env vars (no VITE_ prefix): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID_PRO_MONTHLY, SUPABASE_SERVICE_ROLE_KEY
+- Server-only Vercel env vars (no `VITE_` prefix) are read in `api/` and `libs/server` alone: Stripe's three, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, Cloudinary's three, R2's four, the AI keys (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, Cloudflare's two), `DROPBOX_APP_KEY`, `DEMO_ENABLED`, `SENTRY_DSN`. `grep -rhoE 'process\.env\.[A-Z0-9_]+' api libs/server | sort -u` lists every name read there, Vercel's own and a few `VITE_` fallbacks included.
 - Stripe webhook endpoint: `/api/stripe/webhook` — configure in Stripe Dashboard
-- Supabase `profiles` table must exist — run `migrations/001_add_profiles_and_billing.sql`
+- A new Supabase project takes every file in `migrations/`, in number order; `001` (`profiles`) is only the first
 - Supabase project can pause after inactivity — restore from dashboard if login fails with DNS error
 - Releases are cut by hand: close `[Unreleased]` in CHANGELOG.md, bump package.json, tag, publish. Work that ships without this is invisible to anyone reading the repo.

@@ -8,6 +8,7 @@
 # and /terms out of them. A change to either is a change to the site.
 docs/
 README.md
+AGENTS.md
 CHANGELOG.md
 SECURITY.md
 PWA_TESTING.md
