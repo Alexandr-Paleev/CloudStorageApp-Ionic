@@ -10,7 +10,20 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`AGENTS.md`, what every coding agent working here reads first.** The
+  conventions, the layout and the traps lived in a `CLAUDE.md` that
+  `.gitignore` has kept out of the repository since April: no history, no
+  backup and a single reader, one agent on one machine. How an agent is to
+  work here was not written down in the repository at all. `AGENTS.md` is the
+  file Codex and most other agents read, and Claude Code reads it in a
+  project without a `CLAUDE.md` of its own. It opens with six rules: git
+  stays with the owner; when to ask and when only to announce; change only
+  what the task needs; what not to touch; what done means; what CI holds a
+  merge to. The patterns below them gain four that had been written nowhere
+  in the repository: CSP lives only in production, a new table gets no grants
+  by itself, `anon` holds nothing, and the origin each native shell sends.
 
 ## [4.14.0] — 2026-11-13
 
