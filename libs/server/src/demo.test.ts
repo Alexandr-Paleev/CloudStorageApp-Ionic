@@ -15,6 +15,9 @@ import {
   isDemoEmail,
   isExpiredDemoUser,
 } from './demo';
+import { EMBEDDING_DIMENSIONS, planFor } from '../../core/src/ai';
+import { CF_EMBEDDING_MODEL, CF_TEXT_MODEL, CF_VISION_MODEL } from './cloudflare-ai';
+import type { DemoSearchIndex } from './demo-search-index';
 
 describe('demoEmail', () => {
   it('carries the prefix the sweep looks for', () => {
@@ -141,6 +144,33 @@ describe('DEMO_SEED', () => {
     const { existsSync } = await import('node:fs');
     for (const item of DEMO_SEED) {
       expect(existsSync(new URL(`../../../public/demo/${item.asset}`, import.meta.url))).toBe(true);
+    }
+  });
+
+  it('comes indexed by the models the free path runs, every file it can read', () => {
+    /* public/demo/search-index.json is made by libs/server/scripts/demo-search-index.ts.
+       A change of the free path's models, or of the seed, without running it
+       again would seed rows the search cannot use, or none for a new file. */
+    const index = JSON.parse(
+      readFileSync(new URL('../../../public/demo/search-index.json', import.meta.url), 'utf8')
+    ) as DemoSearchIndex;
+
+    expect(index.model).toBe(CF_EMBEDDING_MODEL);
+    const readable = DEMO_SEED.filter((item) => {
+      const plan = planFor({
+        name: item.name,
+        type: item.type,
+        size: 1,
+        storage_type: 'supabase_storage',
+      });
+      return plan.kind === 'image' || plan.kind === 'text';
+    }).map((item) => item.asset);
+    expect(Object.keys(index.files).sort()).toEqual([...readable].sort());
+
+    for (const file of Object.values(index.files)) {
+      expect(file.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
+      expect(file.summary.length).toBeGreaterThan(0);
+      expect([CF_TEXT_MODEL, CF_VISION_MODEL]).toContain(file.summary_model);
     }
   });
 });

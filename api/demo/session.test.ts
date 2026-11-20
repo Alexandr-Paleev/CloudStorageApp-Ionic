@@ -221,6 +221,86 @@ describe('POST /api/demo/session', () => {
     }
   );
 
+  describe('the search index the seed comes with', () => {
+    const INDEX_URL = `${APP_URL}/demo/search-index.json`;
+    const entry = {
+      summary: 'A sample electricity bill.',
+      tags: ['electricity', 'bill'],
+      summary_model: '@cf/meta/llama-3.1-8b-instruct',
+      embedding: [0.5, -0.25],
+    };
+
+    /** The seed assets as before, and an index made with `model`. */
+    function withIndex(model: string) {
+      const base = seedableFetch();
+      const fetchMock = vi.fn(async (input: string | URL) => {
+        if (String(input) === INDEX_URL) {
+          return {
+            ok: true,
+            json: async () => ({ model, files: { 'factura-luz-marzo-2026.txt': entry } }),
+          } as unknown as Response;
+        }
+        return base(input);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    beforeEach(() => {
+      // The free path, which embeds with bge-m3.
+      process.env.CLOUDFLARE_AI_TOKEN = 'cf-test';
+      process.env.CLOUDFLARE_ACCOUNT_ID = 'abc123';
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.VOYAGE_API_KEY;
+    });
+
+    afterEach(() => {
+      delete process.env.CLOUDFLARE_AI_TOKEN;
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    });
+
+    it('writes the row of each indexed file, under the model that made it', async () => {
+      // /api/ai/index refuses demo accounts, so without these rows a demo
+      // search would find nothing.
+      withIndex('@cf/baai/bge-m3');
+
+      await handler(post(), mockResponse());
+
+      const rows = table.calls.filter((c) => c.table === 'file_embeddings' && c.op === 'insert');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.args?.[0]).toMatchObject({
+        file_id: 'folder-1',
+        user_id: 'user-1',
+        summary: entry.summary,
+        tags: entry.tags,
+        summary_model: entry.summary_model,
+        embedding: '[0.5,-0.25]',
+        embedding_model: '@cf/baai/bge-m3',
+      });
+    });
+
+    it('writes none when this deployment searches with another model', async () => {
+      withIndex('voyage-4');
+
+      await handler(post(), mockResponse());
+
+      expect(table.calls.filter((c) => c.table === 'file_embeddings')).toHaveLength(0);
+      expect(table.calls.filter((c) => c.table === 'files').length).toBeGreaterThan(1);
+    });
+
+    it('does not even fetch the index when there is no model to search with', async () => {
+      delete process.env.CLOUDFLARE_AI_TOKEN;
+      const fetchMock = withIndex('@cf/baai/bge-m3');
+
+      const res = mockResponse();
+      await handler(post(), res);
+
+      expect(res.statusCode).toBe(201);
+      expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(INDEX_URL);
+      expect(table.calls.filter((c) => c.table === 'file_embeddings')).toHaveLength(0);
+    });
+  });
+
   it('still hands over a session when a seed asset is missing', async () => {
     vi.stubGlobal(
       'fetch',

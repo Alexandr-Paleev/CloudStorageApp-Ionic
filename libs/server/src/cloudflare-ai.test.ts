@@ -68,10 +68,10 @@ describe('embed', () => {
 });
 
 describe('describeFile, on an image', () => {
-  it('refuses a picture too big to send as an array of numbers', async () => {
-    /* This model's schema takes the bytes as JSON numbers, so a large image
-       costs several times its own size in memory. The size on the `files` row
-       is written by the browser, so it cannot be the thing that stops it. */
+  it('refuses a picture too big to send in a request body', async () => {
+    /* The bytes go into the JSON body as base64, so a large image costs more
+       than its own size in memory. The size on the `files` row is written by
+       the browser, so it cannot be the thing that stops it. */
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -89,6 +89,82 @@ describe('describeFile, on an image', () => {
         mediaType: 'image/png',
       })
     ).rejects.toThrow(/too large/);
+  });
+});
+
+describe('describeFile, on a picture', () => {
+  it('sends the picture as a data URI to a model Cloudflare still serves', async () => {
+    // llava-1.5-7b, the model before, answers 410 since Cloudflare retired it
+    // on 2026-11-20; its schema took the bytes as an array of numbers.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => '3' },
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          result: { response: 'A white cloud on a blue gradient.\nTags: cloud, logo, blue' },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await describeFile('logo.png', {
+      kind: 'image',
+      url: 'https://cdn.test/logo.png',
+      mediaType: 'image/png',
+    });
+
+    expect(result).toEqual({
+      summary: 'A white cloud on a blue gradient.',
+      tags: ['cloud', 'logo', 'blue'],
+      model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+    });
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toMatch(/\/ai\/run\/@cf\/mistralai\/mistral-small-3\.1-24b-instruct$/);
+    const body = JSON.parse(String(init.body)) as {
+      messages: { content: { type: string; image_url?: { url: string } }[] }[];
+    };
+    const parts = body.messages[1]!.content;
+    expect(parts.find((part) => part.type === 'image_url')?.image_url?.url).toBe(
+      'data:image/png;base64,AQID'
+    );
+    expect(body).not.toHaveProperty('image');
+  });
+
+  it('puts only a plain image type into the data URI', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => '1' },
+        arrayBuffer: async () => new Uint8Array([0]).buffer,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, result: { response: 'A picture.' } }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await describeFile('x.png', {
+      kind: 'image',
+      url: 'https://cdn.test/x.png',
+      mediaType: 'image/png;base64,QUFB,text/html',
+    });
+
+    const body = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body)) as {
+      messages: { content: { image_url?: { url: string } }[] }[];
+    };
+    expect(
+      body.messages[1]!.content[1]!.image_url!.url.startsWith('data:image/png;base64,AA')
+    ).toBe(true);
   });
 });
 

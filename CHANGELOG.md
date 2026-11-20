@@ -42,6 +42,15 @@ reasoning behind the larger decisions lives in
   0.25 cuts 73% of the pairs for Voyage, and too few for either bge ever to
   return fewer than all 15. The tables and what they cannot tell are in
   `evals/README.md`.
+- **A demo can search by meaning.** Demo accounts are never indexed, since
+  anyone can open one and a description is paid for, so a demo's searchbar
+  found nothing. The seed now comes indexed: three small documents, each
+  marked as a sample, one per language the eval measures (a Spanish
+  electricity bill, a Russian lease, an English itinerary), and the
+  descriptions and vectors of everything the free path can read, made once
+  by `libs/server/scripts/demo-search-index.ts` and written when the account is created.
+  "счёт за электричество" finds the Spanish bill. A deployment that searches
+  with another model seeds no index rather than one it cannot use.
 
 ### Changed
 
@@ -54,6 +63,16 @@ reasoning behind the larger decisions lives in
   offered again. Each model also searches with its own floor, by the name
   its vectors carry: 0.25 for Voyage and 0.40 for `bge-m3`, for which 0.25
   cut almost nothing and every search returned fifteen results. See ADR 0016.
+
+### Fixed
+
+- **The free path describes pictures again.** Cloudflare retired
+  `llava-1.5-7b` on 2026-11-20 and has answered 410 for it since, so a
+  deployment on Workers AI could index no picture. Pictures go to
+  `mistral-small-3.1-24b-instruct` now, as a data URI in a chat message,
+  which is the only way its schema takes one. It was picked on the demo's
+  pictures over `llama-4-scout` (as accurate, five times slower) and
+  `gemma-4-26b` (answered nothing). See the update to ADR 0016.
 
 ## [4.14.0] — 2026-11-13
 

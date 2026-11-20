@@ -22,6 +22,12 @@ import { applyCors } from '../../libs/server/src/cors';
 import { eraseAccount } from '../../libs/server/src/account-erase';
 import { configuredProviders } from '../../libs/server/src/erase-providers';
 import { report } from '../../libs/server/src/report';
+import { activeBackend } from '../../libs/server/src/ai-provider';
+import {
+  DEMO_SEARCH_INDEX_ASSET,
+  type DemoSearchIndex,
+} from '../../libs/server/src/demo-search-index';
+import { toVectorLiteral } from '../../libs/core/src/ai';
 
 /**
  * POST /api/demo/session — hands an anonymous visitor a signed-in account.
@@ -182,9 +188,12 @@ async function makeRoom(): Promise<boolean> {
  * and these are already static assets a CDN serves.
  *
  * Best-effort per file. An account with two of three files is a working demo;
- * refusing the whole session because one asset 404'd is not.
+ * refusing the whole session because one asset 404'd is not. The same goes for
+ * the index: a file without its row is offered as not indexed, nothing worse.
  */
 async function seed(userId: string, appUrl: string): Promise<void> {
+  const index = await seedIndex(appUrl);
+
   const { data: folder } = await supabase
     .from('folders')
     .insert({ name: DEMO_FOLDER_NAME, user_id: userId, parent_id: null })
@@ -210,19 +219,56 @@ async function seed(userId: string, appUrl: string): Promise<void> {
         .createSignedUrl(path, SIGNED_URL_TTL);
       if (!signed) continue;
 
-      await supabase.from('files').insert({
-        name: item.name,
-        size: bytes.length,
-        type: item.type,
-        download_url: signed.signedUrl,
-        storage_path: path,
-        storage_type: 'supabase_storage',
-        folder_id: item.location === 'folder' ? folderId : null,
-        user_id: userId,
-      });
+      const { data: row } = await supabase
+        .from('files')
+        .insert({
+          name: item.name,
+          size: bytes.length,
+          type: item.type,
+          download_url: signed.signedUrl,
+          storage_path: path,
+          storage_type: 'supabase_storage',
+          folder_id: item.location === 'folder' ? folderId : null,
+          user_id: userId,
+        })
+        .select('id')
+        .single();
+
+      const fileId = (row as { id: string } | null)?.id;
+      const indexed = index?.files[item.asset];
+      if (index && indexed && fileId) {
+        await supabase.from('file_embeddings').insert({
+          file_id: fileId,
+          user_id: userId,
+          summary: indexed.summary,
+          tags: indexed.tags,
+          embedding: toVectorLiteral(indexed.embedding),
+          summary_model: indexed.summary_model,
+          embedding_model: index.model,
+          indexed_at: new Date().toISOString(),
+        });
+      }
     } catch {
       /* one asset short of a full demo is still a demo */
     }
+  }
+}
+
+/**
+ * The seed's index (libs/server/src/demo-search-index.ts), when this
+ * deployment searches with the model its vectors were made with. Otherwise
+ * none: with no AI keys there is no search to serve, and with another model
+ * `match_files` would never compare these rows.
+ */
+async function seedIndex(appUrl: string): Promise<DemoSearchIndex | null> {
+  try {
+    const model = activeBackend().embeddingModel;
+    const response = await fetch(`${appUrl}/demo/${DEMO_SEARCH_INDEX_ASSET}`);
+    if (!response.ok) return null;
+    const index = (await response.json()) as DemoSearchIndex;
+    return index.model === model ? index : null;
+  } catch {
+    return null;
   }
 }
 

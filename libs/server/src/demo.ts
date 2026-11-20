@@ -112,12 +112,36 @@ export interface DemoSeedFile {
  * Deliberately not photographs. Generated gradients read as design assets a
  * person might plausibly store, where stock photos read as filler — and the
  * PDF explains what the visitor is looking at, which nothing else can do.
+ *
+ * The three documents are there for search by meaning, one in each language
+ * the eval measures (evals/README.md): a Spanish electricity bill, a Russian
+ * lease, an English itinerary. Each says it is a sample. Plain text, because
+ * the free path cannot read a PDF, and what the demo shows must be what that
+ * path does. They come indexed: `public/demo/search-index.json`.
  */
 export const DEMO_SEED: DemoSeedFile[] = [
   {
     asset: 'welcome.pdf',
     name: 'Welcome to Cloud Storage.pdf',
     type: 'application/pdf',
+    location: 'root',
+  },
+  {
+    asset: 'factura-luz-marzo-2026.txt',
+    name: 'Factura luz marzo 2026.txt',
+    type: 'text/plain',
+    location: 'root',
+  },
+  {
+    asset: 'dogovor-arendy-2026.txt',
+    name: 'Договор аренды 2026.txt',
+    type: 'text/plain',
+    location: 'root',
+  },
+  {
+    asset: 'lisbon-trip-itinerary.md',
+    name: 'Lisbon trip itinerary.md',
+    type: 'text/markdown',
     location: 'root',
   },
   { asset: 'gradient-hero.png', name: 'gradient-hero.png', type: 'image/png', location: 'root' },

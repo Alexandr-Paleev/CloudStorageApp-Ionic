@@ -51,15 +51,15 @@ test.describe('Try the demo', () => {
       // Seeded through Supabase Storage, so this also proves the object is
       // readable by its owner — the path has to put the user id in the first
       // segment for the policy in migration 006 to allow it.
-      await expect(page.locator('.file-list-item')).toHaveCount(3);
+      await expect(page.locator('.file-list-item')).toHaveCount(6);
       await expect(page.locator('.folder-card')).toHaveCount(1);
 
       // The meter reads the same rows the list does; a seeded size of zero
       // would still render a list and would still be wrong.
       await expect(page.locator('.storage-stats')).not.toContainText('0 B of');
 
-      // The fourth seeded file is inside the folder, which is why the root
-      // listing shows three — folder scoping, proven rather than assumed.
+      // The seventh seeded file is inside the folder, which is why the root
+      // listing shows six — folder scoping, proven rather than assumed.
       await page.locator('.folder-card').first().click();
       await page.waitForURL(/\/dashboard\/[0-9a-f-]+$/);
       await expect(page.locator('.file-list-item')).toHaveCount(1);

@@ -76,3 +76,21 @@ was at 0.25, and it shows 9.9 results on average where Voyage shows 11.6;
 - `libs/core/src/ai.eval-contract.json` holds the floors alongside the other
   constants, and a test on each side holds that side to it. CI scores the
   three models from `evals/cache/` on every run, at the floors the app uses.
+
+## Update — 2026-11-20, the pictures
+
+**`llava-1.5-7b` is gone, and `mistral-small-3.1-24b-instruct` describes the
+pictures.** Cloudflare retired `llava` on the day this record was written;
+from then on it answered 410, so the free path could index no picture at
+all. Its replacement was tried on the demo's three pictures and three text
+files against `llama-4-scout-17b` and `gemma-4-26b`: `mistral-small` was as
+accurate as `llama-4-scout` at a fifth of the time (1–2 s), and `gemma-4`
+spent its 256 tokens thinking and answered nothing. Text stays with
+`llama-3.1-8b-instruct`, which still runs.
+
+**No model on this path writes in the language of the file.** Asked to in so
+many words, all four wrote English about the Spanish bill and the Russian
+lease. The free path's prompt does not ask, and does not ask now: asking
+changed nothing. Search does not suffer, because `bge-m3` matches across
+languages, but a Spanish reader sees an English sentence. Measuring the
+sentences is the eval of the describe step, which does not exist yet.
