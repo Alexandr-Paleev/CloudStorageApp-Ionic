@@ -69,7 +69,9 @@ Two more are not about a fault. They are about how something was built:
   a model writes one sentence about a file, the sentence becomes a vector, and
   Postgres ranks by distance with pgvector, inside the caller's own rows and
   under RLS. Two model backends sit behind one seam, and a deployment that has
-  not switched the mode on does not show it. The public demo is one of those.
+  not switched the mode on does not show it. The public demo has it on, on the
+  free path, Workers AI's `bge-m3` ([decision 0016](docs/decisions/0016-the-free-path-searches-with-bge-m3.md)),
+  and a demo account's files come indexed.
 
 Every decision of this kind has a short record in
 **[`docs/decisions/`](docs/decisions/)** — context, decision, and the
@@ -439,11 +441,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
    - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID_PRO_MONTHLY`, `STRIPE_WEBHOOK_SECRET`
    - `DROPBOX_APP_KEY` (only if Dropbox is enabled)
-   - `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY`, or `CLOUDFLARE_AI_TOKEN` for the
-     free path (only for semantic search). Pair them with
-     `VITE_SMART_SEARCH_ENABLED=true`, which is what puts the mode on screen:
-     without it the dashboard offers the search it always had, and `/api/ai/*`
-     answers `501` to anything that asks anyway. Apply
+   - `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY`, or `CLOUDFLARE_ACCOUNT_ID` +
+     `CLOUDFLARE_AI_TOKEN` for the free path (only for semantic search). Pair
+     them with `VITE_SMART_SEARCH_ENABLED=true`, which is what puts the mode on
+     screen: without it the dashboard offers the search it always had, and
+     `/api/ai/*` answers `501` to anything that asks anyway. Apply
      `migrations/017_bound_ai_spend.sql` before adding the keys: every paid call
      claims a unit of a daily budget there, and a deployment without the table
      refuses them. `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT` (optional)
@@ -773,15 +775,21 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 376.9 kB | 385 kB |
+| First load (JS + CSS) | 377.4 kB | 385 kB |
 | Largest chunk (Ionic) | 178.0 kB | 185 kB |
-| All assets, route chunks included | 471.9 kB | 480 kB |
+| All assets, route chunks included | 472.6 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.14.0, as CI measured them. Its first load is 0.6 kB
+Those are the figures of 4.15.0, as CI measured them. Its first load is 0.5 kB
+over 4.14.0's, and all of it is the updates of supabase-js, TanStack Query
+and Vite: built with the same packages, 4.14.0's code and 4.15.0's give the
+same first load, since search lives in the dashboard's chunk. All assets grew
+0.7 kB, 0.2 of them this release's code (the offer to search by meaning, the
+type tabs in that search, a floor for each model) and 0.5 the same updates.
+4.14.0's first load was 0.6 kB
 over 4.13.0's: 0.2 kB for the sign-in page saying that an account is gone, and
 when some of its files could not be erased straight away; 0.2 kB for the reload
 that brings a tab a deploy left behind onto the new version, and for the update
@@ -818,7 +826,7 @@ likely to have anything cached: the page a share link opens, which moved there
 from the app
 ([decision 0014](docs/decisions/0014-the-public-pages-are-a-second-app.md),
 step 5). The site's smoke test loads it in a browser and adds up the scripts
-and styles that arrived, gzipped the same way: 142.1 kB, under a ceiling of
+and styles that arrived, gzipped the same way: 141.9 kB, under a ceiling of
 148, where the app's first load is three times that. 1.0 kB of it is the
 page's own. The rest is React and Next.js, which every page of the site
 carries, the four that do nothing in a browser included.
@@ -1197,7 +1205,7 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,877 statements under `src/`, the
+a long way, and it is meant to be. Of the 2,890 statements under `src/`, the
 unit tests do not reach 648. The largest share, 293, is in `src/services`, most
 of it in the code that talks to Supabase and Dropbox and in what keeps state in
 IndexedDB: `supabase.service.ts` and the two Dropbox services hold 132,
