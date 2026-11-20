@@ -72,7 +72,9 @@ reasoning behind the larger decisions lives in
   `mistral-small-3.1-24b-instruct` now, as a data URI in a chat message,
   which is the only way its schema takes one. It was picked on the demo's
   pictures over `llama-4-scout` (as accurate, five times slower) and
-  `gemma-4-26b` (answered nothing). See the update to ADR 0016.
+  `gemma-4-26b` (answered nothing). It writes the sentences of text files
+  too: `llama-3.1-8b-instruct`, which did, still answers but is gone from
+  Cloudflare's catalog, with no date given. See the update to ADR 0016.
 
 ## [4.14.0] — 2026-11-13
 

@@ -226,7 +226,7 @@ describe('POST /api/demo/session', () => {
     const entry = {
       summary: 'A sample electricity bill.',
       tags: ['electricity', 'bill'],
-      summary_model: '@cf/meta/llama-3.1-8b-instruct',
+      summary_model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
       embedding: [0.5, -0.25],
     };
 

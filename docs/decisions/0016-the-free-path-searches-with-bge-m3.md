@@ -85,8 +85,11 @@ from then on it answered 410, so the free path could index no picture at
 all. Its replacement was tried on the demo's three pictures and three text
 files against `llama-4-scout-17b` and `gemma-4-26b`: `mistral-small` was as
 accurate as `llama-4-scout` at a fifth of the time (1–2 s), and `gemma-4`
-spent its 256 tokens thinking and answered nothing. Text stays with
-`llama-3.1-8b-instruct`, which still runs.
+spent its 256 tokens thinking and answered nothing. It writes the text
+files' sentences too: `llama-3.1-8b-instruct`, which did, still answered
+that day but was no longer in Cloudflare's catalog, with no date to say when
+it would go the way of `llava`. One model on this path that the catalog
+lists without a retirement date, instead of two of which one is unlisted.
 
 **No model on this path writes in the language of the file.** Asked to in so
 many words, all four wrote English about the Spanish bill and the Russian

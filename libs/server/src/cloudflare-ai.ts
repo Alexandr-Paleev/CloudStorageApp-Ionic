@@ -40,8 +40,13 @@ export const CF_EMBEDDING_MODEL = '@cf/baai/bge-m3';
  */
 export const CF_VISION_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 
-/** For files that are already text, where there is nothing to look at. */
-export const CF_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+/**
+ * For files that are already text, where there is nothing to look at. The
+ * same model as the pictures: `llama-3.1-8b-instruct`, which did this before,
+ * still answered on 2026-11-20 but was gone from Cloudflare's catalog, with
+ * no date to say when it would follow `llava`.
+ */
+export const CF_TEXT_MODEL = CF_VISION_MODEL;
 
 const TIMEOUT_MS = 30_000;
 
