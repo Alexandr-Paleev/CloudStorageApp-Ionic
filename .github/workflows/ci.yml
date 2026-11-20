@@ -394,3 +394,10 @@ jobs:
       - run: uv run --locked pytest -rs
 
       - run: uv run --locked search-evals check
+
+      # The tables in evals/README.md, from the committed vectors. A model
+      # whose vectors are missing exits 2 and fails the step.
+      - run: |
+          for model in voyage-4 @cf/baai/bge-large-en-v1.5 @cf/baai/bge-m3; do
+            uv run --locked search-evals score --model "$model"
+          done

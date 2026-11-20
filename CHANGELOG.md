@@ -29,7 +29,19 @@ reasoning behind the larger decisions lives in
   `match_files` does in `evals/src/search_evals/rank.py`, ties broken by id so
   that two runs give the same table. Their 26 specification tests skipped
   until now; they all run, and `search-evals score` no longer has a "not
-  written yet" exit. There is still no number: that comes with the vectors.
+  written yet" exit.
+- **The first numbers, and a free model that passes.** Vectors for three
+  models are in `evals/cache/`, and CI scores each of them on every run, with
+  no key. At the app's settings (15 results, a floor of 0.25) recall@5 over
+  the 120 queries is 0.974 for Voyage `voyage-4`, 0.564 for Workers AI
+  `bge-large-en-v1.5` and 0.979 for Workers AI `bge-m3`. The model the app
+  falls back to without Anthropic and Voyage keys finds what a Russian query
+  means about one time in four (0.263) and almost never crosses languages
+  (0.251); `bge-m3`, free on the same account and with the same 1024
+  dimensions, keeps up with Voyage. The floor turned out to be the model's:
+  0.25 cuts 73% of the pairs for Voyage, and too few for either bge ever to
+  return fewer than all 15. The tables and what they cannot tell are in
+  `evals/README.md`.
 
 ## [4.14.0] — 2026-11-13
 
