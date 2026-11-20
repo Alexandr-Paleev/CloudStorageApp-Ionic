@@ -169,6 +169,48 @@ describe('FileFilters', () => {
     expect(screen.getByTestId('file-search')).toBeInTheDocument();
   });
 
+  describe('when a search by name finds nothing', () => {
+    it('offers the same words as a search by meaning', () => {
+      const { onChange } = show({ search: 'contrato de alquiler' }, 0);
+
+      fireEvent.click(screen.getByTestId('try-by-meaning'));
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'smart', search: 'contrato de alquiler' })
+      );
+    });
+
+    it('offers nothing while the name search still finds files', () => {
+      show({ search: 'contrato' }, 2);
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+    });
+
+    it('offers nothing once the search is by meaning already', () => {
+      show({ search: 'contrato', mode: 'smart' }, 0);
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+    });
+
+    it('offers nothing where no model provider is configured', () => {
+      envMock.VITE_SMART_SEARCH_ENABLED = false;
+      show({ search: 'contrato' }, 0);
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+    });
+
+    it('offers nothing when the search itself failed', () => {
+      show({ search: 'contrato' }, 0, true);
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+    });
+  });
+
+  it('says in the field that a search can be by meaning, where it can be', () => {
+    show();
+    // A property of the Ionic element, not an HTML attribute.
+    expect(screen.getByTestId('file-search')).toHaveProperty(
+      'placeholder',
+      'Search by name or meaning'
+    );
+  });
+
   it('says nothing about the result when the search itself failed', () => {
     // "Nothing matches" about a search that never ran is a small lie, and it
     // is the one the user reads first.

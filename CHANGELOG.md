@@ -75,6 +75,20 @@ reasoning behind the larger decisions lives in
   `gemma-4-26b` (answered nothing). It writes the sentences of text files
   too: `llama-3.1-8b-instruct`, which did, still answers but is gone from
   Cloudflare's catalog, with no date given. See the update to ADR 0016.
+- **A search by meaning keeps to the type tab.** With "Images" selected it
+  listed the text files it found: the tabs stayed on screen and the results
+  ignored them. They are filtered by the same rule the ordinary list asks the
+  database for (`inTypeGroup` in `src/utils/file-query.ts`).
+- **A demo no longer offers indexing it would be refused.** "Index them" sat
+  under every search by meaning in a demo, and pressing it said "Nothing to
+  index: 1 file cannot be read", for the welcome PDF. A demo account's files
+  come indexed and `/api/ai/index` refuses it, so the count is not asked for.
+- **Search by meaning can be found.** Its switch appears only once a term is
+  typed, and the owner of the app did not find it on the first try. The field
+  now says "Search by name or meaning", and a search by name that finds
+  nothing offers "Search by meaning instead", which keeps the words. Neither
+  that nor "No files match" shows before the search has answered: an empty
+  list while it ran said so already.
 
 ## [4.14.0] — 2026-11-13
 

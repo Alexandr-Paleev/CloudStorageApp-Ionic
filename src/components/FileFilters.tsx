@@ -1,4 +1,5 @@
 import {
+  IonButton,
   IonSearchbar,
   IonSegment,
   IonSegmentButton,
@@ -72,7 +73,9 @@ const FileFilters: React.FC<FileFiltersProps> = ({
     <div className="file-filters">
       <IonSearchbar
         value={value.search}
-        placeholder="Search files"
+        /* The switch to a search by meaning appears only once something is
+           typed, so the field is where anyone learns that it exists. */
+        placeholder={offerSmart ? 'Search by name or meaning' : 'Search files'}
         /* Typing sends a query per keystroke otherwise, and each one is a round
            trip that the next keystroke makes pointless. */
         debounce={300}
@@ -152,6 +155,22 @@ const FileFilters: React.FC<FileFiltersProps> = ({
             `Searching every folder${resultCount === undefined ? '' : ` — ${resultCount} so far`}`
           )}
         </IonLabel>
+      )}
+
+      {searching && !searchFailed && offerSmart && value.mode === 'name' && resultCount === 0 && (
+        /* Where a name search comes back empty is the moment a search by
+           meaning answers the question: "contrato de alquiler" is in no file
+           name, and a lease is what it means. People did not find the switch
+           above on their own. */
+        <IonButton
+          size="small"
+          fill="clear"
+          className="file-filters-try-meaning"
+          data-testid="try-by-meaning"
+          onClick={() => onChange({ ...value, mode: 'smart' })}
+        >
+          Search by meaning instead
+        </IonButton>
       )}
     </div>
   );

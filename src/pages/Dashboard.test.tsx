@@ -326,6 +326,60 @@ describe('Dashboard', () => {
       expect(smartSearch).toHaveBeenCalledWith('hotel receipt');
       expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
     });
+
+    /* A new term is a new query with nothing to show until it answers, and
+       an empty list then said "No files match" and offered a search by
+       meaning about a search that had not finished. */
+    it('says nothing matches only once the search by name has answered', async () => {
+      deployment.offersSmartSearch = true;
+      let answer: (page: { files: never[]; folders: never[] }) => void = () => {};
+      getItems.mockImplementation((_owner: unknown, options: { search?: string }) =>
+        options.search
+          ? new Promise((resolve) => {
+              answer = resolve;
+            })
+          : Promise.resolve({ files: [], folders: [] })
+      );
+      show();
+
+      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'contrato de alquiler');
+
+      await waitFor(() =>
+        expect(getItems).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ search: 'contrato de alquiler' })
+        )
+      );
+      expect(screen.queryByText(/No files match/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+
+      answer({ files: [], folders: [] });
+
+      expect(await screen.findByTestId('try-by-meaning')).toBeInTheDocument();
+    });
+
+    it('offers a demo account no indexing it would be refused', async () => {
+      deployment.offersSmartSearch = true;
+      profile.profile = {
+        tier: 'free',
+        storage_limit: 10 * MB,
+        allowed_providers: ['supabase_storage'],
+        email: 'demo-1763640000000-abc123@example.com',
+      };
+      smartSearch.mockResolvedValue({ files: [], model: '@cf/baai/bge-m3' });
+      unindexedFileIds.mockResolvedValue(['f1']);
+      show();
+
+      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'contrato de alquiler');
+      ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
+
+      // The search has answered, so the model is known: the moment a count
+      // would be asked for. Then a moment more, for a query to start.
+      expect(await screen.findByText(/Nothing indexed matches/)).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(unindexedFileIds).not.toHaveBeenCalled();
+      expect(screen.queryByText(/not indexed yet/)).not.toBeInTheDocument();
+    });
   });
 });
 

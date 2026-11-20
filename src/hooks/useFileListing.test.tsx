@@ -155,6 +155,19 @@ describe('useFileListing', () => {
       expect(getItems).not.toHaveBeenCalled();
     });
 
+    it('keeps to the type tab that is selected', async () => {
+      smartSearch.mockResolvedValue({
+        files: [
+          { ...file('s1', 'lease.txt'), type: 'text/plain' },
+          { ...file('s2', 'logo.png'), type: 'image/png' },
+        ],
+        model: 'voyage-4',
+      });
+      const { result } = show(undefined, { ...BY_MEANING, group: 'images' });
+
+      await waitFor(() => expect(result.current.items.files.map((f) => f.id)).toEqual(['s2']));
+    });
+
     /* Otherwise a file deleted offline comes back from the database as a
        perfectly good match. */
     it('keeps a file deleted offline out of the matches', async () => {

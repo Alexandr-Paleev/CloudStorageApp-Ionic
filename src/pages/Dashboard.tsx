@@ -70,7 +70,10 @@ const Dashboard: React.FC = () => {
     refreshPicture,
   } = listing;
   const { unindexed, indexing, indexMissing } = useSearchIndex({
-    enabled: smartSearching,
+    /* Not for a demo account. /api/ai/index refuses it, since anyone can open
+       one and a description is paid for, so "Index them" could do nothing
+       there; its files come indexed instead (ADR 0013). */
+    enabled: smartSearching && !isDemoEmail(profile?.email),
     model: smartModel,
     onProblem: setErrorToast,
   });
@@ -151,7 +154,9 @@ const Dashboard: React.FC = () => {
           <FileFilters
             value={filters}
             onChange={setFilters}
-            resultCount={items.files.length}
+            /* Unknown until the search answers: an empty list before then said
+               "No files match" and offered a search by meaning instead. */
+            resultCount={listLoading ? undefined : items.files.length}
             /* An empty list after a failed search is not an empty result, and
                saying "nothing matches" about a search that never ran is the
                kind of small lie that makes the rest look unreliable. */
