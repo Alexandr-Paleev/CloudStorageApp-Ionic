@@ -70,7 +70,10 @@ const Dashboard: React.FC = () => {
     refreshPicture,
   } = listing;
   const { unindexed, indexing, indexMissing } = useSearchIndex({
-    enabled: smartSearching,
+    /* Not for a demo account. /api/ai/index refuses it, since anyone can open
+       one and a description is paid for, so "Index them" could do nothing
+       there; its files come indexed instead (ADR 0013). */
+    enabled: smartSearching && !isDemoEmail(profile?.email),
     model: smartModel,
     onProblem: setErrorToast,
   });

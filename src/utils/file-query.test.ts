@@ -4,9 +4,29 @@ import {
   DEFAULT_SORT,
   SORT_OPTIONS,
   escapeLike,
+  inTypeGroup,
   isSearching,
   scopedToFolder,
 } from './file-query';
+
+describe('inTypeGroup', () => {
+  it.each([
+    ['image/png', 'images', true],
+    ['IMAGE/JPEG', 'images', true],
+    ['text/plain', 'images', false],
+    ['application/pdf', 'documents', true],
+    ['text/markdown', 'documents', true],
+    ['image/png', 'documents', false],
+    ['video/mp4', 'other', true],
+    ['', 'other', true],
+    ['text/plain', 'other', false],
+    ['image/png', 'other', false],
+    ['video/mp4', 'all', true],
+  ] as const)('%s in %s: %s', (type, group, expected) => {
+    // The rule the SQL in supabase.service.ts applies to the paginated list.
+    expect(inTypeGroup(type, group)).toBe(expected);
+  });
+});
 
 describe('escapeLike', () => {
   it.each([

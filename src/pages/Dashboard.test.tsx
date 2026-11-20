@@ -326,6 +326,29 @@ describe('Dashboard', () => {
       expect(smartSearch).toHaveBeenCalledWith('hotel receipt');
       expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
     });
+
+    it('offers a demo account no indexing it would be refused', async () => {
+      deployment.offersSmartSearch = true;
+      profile.profile = {
+        tier: 'free',
+        storage_limit: 10 * MB,
+        allowed_providers: ['supabase_storage'],
+        email: 'demo-1763640000000-abc123@example.com',
+      };
+      smartSearch.mockResolvedValue({ files: [], model: '@cf/baai/bge-m3' });
+      unindexedFileIds.mockResolvedValue(['f1']);
+      show();
+
+      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'contrato de alquiler');
+      ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
+
+      // The search has answered, so the model is known: the moment a count
+      // would be asked for. Then a moment more, for a query to start.
+      expect(await screen.findByText(/Nothing indexed matches/)).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(unindexedFileIds).not.toHaveBeenCalled();
+      expect(screen.queryByText(/not indexed yet/)).not.toBeInTheDocument();
+    });
   });
 });
 

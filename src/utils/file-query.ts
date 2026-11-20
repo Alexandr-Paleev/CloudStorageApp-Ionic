@@ -47,6 +47,24 @@ export const DOCUMENT_PREFIXES = ['application/', 'text/'];
 export const IMAGE_PREFIX = 'image/';
 
 /**
+ * Whether a file of this MIME type belongs to the group, by the rule
+ * `supabase.service.ts` writes into SQL for the paginated list: a prefix,
+ * case-insensitively, and "other" for what neither of the two claims.
+ *
+ * For a list that is already whole, which a search by meaning is: one answer
+ * of at most fifteen files, so filtering it here leaves nothing out.
+ */
+export function inTypeGroup(type: string, group: TypeGroup): boolean {
+  const lower = type.toLowerCase();
+  const image = lower.startsWith(IMAGE_PREFIX);
+  const document = DOCUMENT_PREFIXES.some((prefix) => lower.startsWith(prefix));
+  if (group === 'images') return image;
+  if (group === 'documents') return document;
+  if (group === 'other') return !image && !document;
+  return true;
+}
+
+/**
  * Escapes a search term for `ilike`.
  *
  * `%` and `_` are wildcards in SQL patterns, so a file named `report_final.pdf`

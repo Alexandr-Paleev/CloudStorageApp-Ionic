@@ -5,6 +5,7 @@ import aiService from '../services/ai.service';
 import { applyPending } from '../services/mutation-queue';
 import storageService, { type FileMetadata } from '../services/storage.service';
 import { smartSearchIsOffered } from '../utils/smart-search.utils';
+import { inTypeGroup } from '../utils/file-query';
 import { useOfflineQueue } from './useOfflineQueue';
 
 const PAGE_SIZE = 15;
@@ -75,7 +76,13 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
      otherwise come back from the database as a perfectly good match. */
   const items = applyPending(
     smartSearching
-      ? { files: smart?.files ?? [], folders: [] }
+      ? {
+          /* The type tabs stay on screen in this mode, and ignoring them
+             showed text files under "Images". The ordinary list asks the
+             database to filter; this one is already whole. */
+          files: (smart?.files ?? []).filter((file) => inTypeGroup(file.type, filters.group)),
+          folders: [],
+        }
       : {
           files: data?.pages.flatMap((page) => page.files) || [],
           folders: data?.pages[0]?.folders || [],
