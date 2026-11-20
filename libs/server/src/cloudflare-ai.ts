@@ -23,8 +23,13 @@ import type { Description, DescribeSource } from './describe';
  * eval is what turns that from an opinion into a number.
  */
 
-/** 1024 dimensions, which is what `file_embeddings.embedding` holds. */
-export const CF_EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
+/**
+ * 1024 dimensions, which is what `file_embeddings.embedding` holds, and many
+ * languages. `bge-large-en-v1.5`, the model before it, is English-only: it
+ * found what a Russian query meant one time in four, where this one keeps up
+ * with Voyage (evals/README.md, ADR 0016).
+ */
+export const CF_EMBEDDING_MODEL = '@cf/baai/bge-m3';
 
 /** Image in, one sentence out. The documented image-to-text schema. */
 export const CF_VISION_MODEL = '@cf/llava-hf/llava-1.5-7b-hf';

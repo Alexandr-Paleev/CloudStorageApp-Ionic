@@ -43,6 +43,18 @@ reasoning behind the larger decisions lives in
   return fewer than all 15. The tables and what they cannot tell are in
   `evals/README.md`.
 
+### Changed
+
+- **Search by meaning on the free path works in Spanish and Russian.** A
+  deployment without Anthropic and Voyage keys embedded with Workers AI's
+  `bge-large-en-v1.5`, which is English-only: a Russian query found the file
+  about one time in four. It embeds with `bge-m3` now, on the same account
+  and allowance, with the same 1024 dimensions, and in the eval as good as
+  Voyage. Files indexed with the old model show as not indexed and are
+  offered again. Each model also searches with its own floor, by the name
+  its vectors carry: 0.25 for Voyage and 0.40 for `bge-m3`, for which 0.25
+  cut almost nothing and every search returned fifteen results. See ADR 0016.
+
 ## [4.14.0] — 2026-11-13
 
 ### Added

@@ -136,3 +136,13 @@ One consequence: describing a file again under the same model is no longer
 something a caller can ask for. After a change of prompt or of the model that
 writes the sentences, the rows to redo are deleted on purpose, with the
 service role, and the dashboard offers those files again.
+
+## Update — 2026-11-20
+
+**The free model is `bge-m3` now, and the floor is each model's.** The eval
+in `evals/` found `bge-large-en-v1.5` English-only (recall@5 0.263 for
+Russian queries, 0.251 across languages, against 0.963 and 0.959 for
+Voyage) and the 0.25 floor too low for it to cut anything. Why `bge-m3`, and
+how its floor was chosen, is [0016](0016-the-free-path-searches-with-bge-m3.md).
+The rule above holds: its vectors carry its name, and the old rows are hidden
+until re-indexed.

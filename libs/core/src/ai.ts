@@ -51,15 +51,35 @@ export const MAX_TAG_CHARS = 40;
 export const SEARCH_RESULTS = 15;
 
 /**
- * How close is close enough.
+ * How close is close enough, for a model the eval has not measured.
  *
  * A cosine similarity has no natural cut-off: every file in the account is
  * some distance from every query, so without a floor the tenth result is
- * whatever happened to be least unlike it. 0.25 is a starting guess and is
- * expected to move — it is the first thing the eval tunes, which is why it
- * lives here and not in the SQL default.
+ * whatever happened to be least unlike it. Where the cut-off sits belongs to
+ * the model, not to the search: at 0.25 Voyage leaves out 73% of the pairs in
+ * the eval, and `bge-m3` only 9%, too few ever to return fewer than all
+ * fifteen (evals/README.md).
  */
 export const SEARCH_MIN_SIMILARITY = 0.25;
+
+/**
+ * The floor of each model the eval in evals/ has measured, by the name the
+ * vectors carry. Voyage's is the first guess, which the eval kept. At
+ * `bge-m3`'s, every score in the eval is what it was at 0.25, and about as
+ * many results are shown as Voyage shows; 0.50 starts to lose what was asked
+ * for (ADR 0016).
+ */
+export const SEARCH_FLOORS: Readonly<Record<string, number>> = {
+  'voyage-4': 0.25,
+  '@cf/baai/bge-m3': 0.4,
+};
+
+/** The floor a search with this model's vectors uses. */
+export function searchFloor(model: string): number {
+  // Own keys only: a name such as "constructor" must not find Object's.
+  const own = Object.prototype.hasOwnProperty.call(SEARCH_FLOORS, model);
+  return (own ? SEARCH_FLOORS[model] : undefined) ?? SEARCH_MIN_SIMILARITY;
+}
 
 /**
  * The ceiling on an image sent to a model as bytes rather than as a link.
