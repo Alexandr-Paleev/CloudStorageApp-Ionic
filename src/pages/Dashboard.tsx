@@ -154,7 +154,9 @@ const Dashboard: React.FC = () => {
           <FileFilters
             value={filters}
             onChange={setFilters}
-            resultCount={items.files.length}
+            /* Unknown until the search answers: an empty list before then said
+               "No files match" and offered a search by meaning instead. */
+            resultCount={listLoading ? undefined : items.files.length}
             /* An empty list after a failed search is not an empty result, and
                saying "nothing matches" about a search that never ran is the
                kind of small lie that makes the rest look unreliable. */

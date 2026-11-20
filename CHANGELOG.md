@@ -86,7 +86,9 @@ reasoning behind the larger decisions lives in
 - **Search by meaning can be found.** Its switch appears only once a term is
   typed, and the owner of the app did not find it on the first try. The field
   now says "Search by name or meaning", and a search by name that finds
-  nothing offers "Search by meaning instead", which keeps the words.
+  nothing offers "Search by meaning instead", which keeps the words. Neither
+  that nor "No files match" shows before the search has answered: an empty
+  list while it ran said so already.
 
 ## [4.14.0] — 2026-11-13
 

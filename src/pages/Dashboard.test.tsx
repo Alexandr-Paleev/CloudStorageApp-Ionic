@@ -327,6 +327,37 @@ describe('Dashboard', () => {
       expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
     });
 
+    /* A new term is a new query with nothing to show until it answers, and
+       an empty list then said "No files match" and offered a search by
+       meaning about a search that had not finished. */
+    it('says nothing matches only once the search by name has answered', async () => {
+      deployment.offersSmartSearch = true;
+      let answer: (page: { files: never[]; folders: never[] }) => void = () => {};
+      getItems.mockImplementation((_owner: unknown, options: { search?: string }) =>
+        options.search
+          ? new Promise((resolve) => {
+              answer = resolve;
+            })
+          : Promise.resolve({ files: [], folders: [] })
+      );
+      show();
+
+      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'contrato de alquiler');
+
+      await waitFor(() =>
+        expect(getItems).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ search: 'contrato de alquiler' })
+        )
+      );
+      expect(screen.queryByText(/No files match/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId('try-by-meaning')).not.toBeInTheDocument();
+
+      answer({ files: [], folders: [] });
+
+      expect(await screen.findByTestId('try-by-meaning')).toBeInTheDocument();
+    });
+
     it('offers a demo account no indexing it would be refused', async () => {
       deployment.offersSmartSearch = true;
       profile.profile = {
