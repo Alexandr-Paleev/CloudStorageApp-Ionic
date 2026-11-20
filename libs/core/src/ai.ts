@@ -84,10 +84,10 @@ export function searchFloor(model: string): number {
 /**
  * The ceiling on an image sent to a model as bytes rather than as a link.
  *
- * Lower than MAX_DESCRIBE_BYTES on purpose. The Workers AI image-to-text
- * schema takes an array of byte values, so a megabyte of picture becomes a
- * megabyte of comma-separated numbers in a JSON body — the function runs out
- * of memory long before the model runs out of patience.
+ * Lower than MAX_DESCRIBE_BYTES on purpose. Workers AI takes the picture as
+ * base64 inside a JSON body, so the function holds the bytes and a third
+ * again as text at once, and a body that size is slow to send on every
+ * description.
  */
 export const MAX_VISION_BYTES = 3 * 1024 * 1024;
 

@@ -146,3 +146,16 @@ Voyage) and the 0.25 floor too low for it to cut anything. Why `bge-m3`, and
 how its floor was chosen, is [0016](0016-the-free-path-searches-with-bge-m3.md).
 The rule above holds: its vectors carry its name, and the old rows are hidden
 until re-indexed.
+
+## Update — 2026-11-20, the demo
+
+**A demo account comes indexed, and still never pays for a description.**
+`/api/ai/index` refuses demo accounts as above, which left a demo's
+searchbar with nothing to find. The seed now carries its own index,
+`public/demo/search-index.json`: each file's description and vector, made
+once by `libs/server/scripts/demo-search-index.ts` with the functions `/api/ai/index`
+calls, and written to `file_embeddings` when `/api/demo/session` creates the
+account. Only when this deployment searches with the model the vectors were
+made with: otherwise the rows would be ones `match_files` never compares, and
+none are written. A test holds the file to the free path's models and to the
+seed.

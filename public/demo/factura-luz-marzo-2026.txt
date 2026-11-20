@@ -1,0 +1,19 @@
+ENERGÍA DEL EJEMPLO, S.A. — documento de muestra para la demo, datos ficticios
+
+Factura de electricidad
+Número de factura: EJ-2026-03-0417
+Periodo de facturación: 01/03/2026 – 31/03/2026
+Titular: Cliente de demostración
+Dirección de suministro: Calle Ficticia 12, 3.º B, Valencia
+
+Potencia contratada: 4,6 kW
+Consumo del periodo: 212 kWh
+
+Término de potencia: 13,85 €
+Término de energía: 31,48 €
+Impuesto sobre la electricidad: 2,32 €
+Alquiler del contador: 0,81 €
+IVA (21 %): 10,24 €
+Total a pagar: 58,70 €
+
+Fecha de cargo en cuenta: 10/04/2026
