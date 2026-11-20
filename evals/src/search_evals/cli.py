@@ -80,20 +80,16 @@ def _score(model: str, limit: int, min_similarity: float) -> int:
 
     groups = (*LANGUAGES, "same", "across")
     rows: dict[str, list[tuple[float, float, float, bool]]] = {group: [] for group in groups}
-    try:
-        for q, vector in zip(queries, query_vectors, strict=True):
-            ranked = [file_id for file_id, _ in rank(vector, documents, ids, limit=limit, min_similarity=min_similarity)]
-            row = (
-                metrics.recall_at_k(ranked, q.relevant, 5),
-                metrics.reciprocal_rank(ranked, q.relevant),
-                metrics.ndcg_at_k(ranked, q.relevant, 10),
-                not ranked,
-            )
-            rows[q.lang].append(row)
-            rows["across" if only_across_languages(q, by_id) else "same"].append(row)
-    except NotImplementedError as error:
-        print(f"Not written yet — {error}", file=sys.stderr)
-        return 3
+    for q, vector in zip(queries, query_vectors, strict=True):
+        ranked = [file_id for file_id, _ in rank(vector, documents, ids, limit=limit, min_similarity=min_similarity)]
+        row = (
+            metrics.recall_at_k(ranked, q.relevant, 5),
+            metrics.reciprocal_rank(ranked, q.relevant),
+            metrics.ndcg_at_k(ranked, q.relevant, 10),
+            not ranked,
+        )
+        rows[q.lang].append(row)
+        rows["across" if only_across_languages(q, by_id) else "same"].append(row)
 
     print(f"{model}, limit {limit}, min similarity {min_similarity}")
     print(f"{'':6}{'queries':>8}{'recall@5':>10}{'MRR':>8}{'nDCG@10':>9}{'empty':>7}")

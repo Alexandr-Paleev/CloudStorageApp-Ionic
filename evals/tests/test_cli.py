@@ -32,8 +32,7 @@ def test_score_reads_a_full_cache_without_tripping_over_numpy(
     tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # Every vector present, so the run gets past the check for missing ones and
-    # into the ranking. Until rank.py and metrics.py are written that ends in
-    # "Not written yet" (3); after, in a table (0). Either way, no exception.
+    # into the ranking, and ends in the table.
     from search_evals import cli
     from search_evals.contract import embedding_input
     from search_evals.data import load_files, load_queries
@@ -47,5 +46,7 @@ def test_score_reads_a_full_cache_without_tripping_over_numpy(
     cache.save()
     monkeypatch.setattr(cli, "VectorCache", lambda model: VectorCache(model, root=tmp_path))
 
-    assert main(["score", "--model", "fake"]) in (0, 3)
-    assert "not cached" not in capsys.readouterr().err
+    assert main(["score", "--model", "fake"]) == 0
+    out, err = capsys.readouterr()
+    assert "not cached" not in err
+    assert "recall@5" in out
