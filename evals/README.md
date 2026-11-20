@@ -97,14 +97,12 @@ Vectors are kept in `cache/`, one file per model, filed under a hash of the
 text and the side of the search. Change a summary or a query's wording, and
 `embed` fetches that one again.
 
-## What is yours to write
+## The metrics and the ranking
 
-`src/search_evals/metrics.py` (recall@k, reciprocal rank, nDCG@k) and
-`src/search_evals/rank.py` (what `match_files` returns) raise
-`NotImplementedError`. Their tests in `tests/test_metrics.py` and
-`tests/test_rank.py` are the specification, with every expected value worked
-out by hand, and they are skipped until the function exists rather than
-failed. `search-evals score` says which one is still missing.
+`src/search_evals/metrics.py` holds recall@k, reciprocal rank and nDCG@k, and
+`src/search_evals/rank.py` what `match_files` returns. Their tests in
+`tests/test_metrics.py` and `tests/test_rank.py` are the specification, with
+every expected value worked out by hand.
 
 ## Kept in step with the app
 

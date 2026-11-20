@@ -24,6 +24,12 @@ reasoning behind the larger decisions lives in
   merge to. The patterns below them gain four that had been written nowhere
   in the repository: CSP lives only in production, a new table gets no grants
   by itself, `anon` holds nothing, and the origin each native shell sends.
+- **The search eval can score.** recall@k, reciprocal rank and nDCG@k are
+  written in `evals/src/search_evals/metrics.py`, and the ranking
+  `match_files` does in `evals/src/search_evals/rank.py`, ties broken by id so
+  that two runs give the same table. Their 26 specification tests skipped
+  until now; they all run, and `search-evals score` no longer has a "not
+  written yet" exit. There is still no number: that comes with the vectors.
 
 ## [4.14.0] — 2026-11-13
 

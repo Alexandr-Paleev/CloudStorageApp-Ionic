@@ -390,8 +390,7 @@ jobs:
           working-directory: evals
 
       # Offline: the Python in evals/.python-version and the locked
-      # dependencies. The specification tests of what is still to be written
-      # are skipped, not failed, and say so in the summary.
+      # dependencies.
       - run: uv run --locked pytest -rs
 
       - run: uv run --locked search-evals check
