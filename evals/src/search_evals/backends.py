@@ -1,5 +1,5 @@
 """The embedding models the app can run on, called the way the app calls them,
-and the candidates it could switch to, called the same way.
+and the one it ran before, called the same way.
 
 `libs/server/src/embeddings.ts` (Voyage) and `libs/server/src/cloudflare-ai.ts`
 (Workers AI) are the app's side. What matters for a fair measurement is copied
@@ -22,10 +22,10 @@ import urllib.request
 from collections.abc import Callable
 
 VOYAGE_ENDPOINT = "https://api.voyageai.com/v1/embeddings"
-CLOUDFLARE_MODEL = "@cf/baai/bge-large-en-v1.5"
-# Not one the app runs: a multilingual model with the same 1024 dimensions,
-# measured as the candidate for the free path. It answers in the same shape.
-CLOUDFLARE_CANDIDATES = ("@cf/baai/bge-m3",)
+CLOUDFLARE_MODEL = "@cf/baai/bge-m3"
+# The free path's model until ADR 0016, English-only. Kept measurable: its
+# vectors are in cache/, and its table is the reason for the change.
+CLOUDFLARE_FORMER = ("@cf/baai/bge-large-en-v1.5",)
 BATCH = 64
 TIMEOUT_S = 60
 
@@ -94,6 +94,6 @@ def cloudflare(texts: list[str], side: str, model: str) -> list[list[float]]:
 def embedder(model: str) -> Embedder:
     if model.startswith("voyage-"):
         return voyage
-    if model == CLOUDFLARE_MODEL or model in CLOUDFLARE_CANDIDATES:
+    if model == CLOUDFLARE_MODEL or model in CLOUDFLARE_FORMER:
         return cloudflare
-    raise ValueError(f"no backend for {model!r}: voyage-*, {CLOUDFLARE_MODEL} or one of {CLOUDFLARE_CANDIDATES}")
+    raise ValueError(f"no backend for {model!r}: voyage-*, {CLOUDFLARE_MODEL} or one of {CLOUDFLARE_FORMER}")

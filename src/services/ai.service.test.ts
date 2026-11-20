@@ -80,6 +80,19 @@ describe('smartSearch', () => {
     expect(args.query_embedding).toBe(JSON.stringify(VECTOR));
   });
 
+  it('asks with the floor of the model that made the vector', async () => {
+    await aiService.smartSearch('hotel invoice');
+    expect((rpc.mock.calls[0] as [string, Record<string, unknown>])[1].min_similarity).toBe(0.25);
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ embedding: VECTOR, model: '@cf/baai/bge-m3' }),
+    });
+    await aiService.smartSearch('hotel invoice');
+    expect((rpc.mock.calls[1] as [string, Record<string, unknown>])[1].min_similarity).toBe(0.4);
+  });
+
   it('says which model the matches were found with', async () => {
     // The count of files not indexed yet has to ask about the same model:
     // a row another one made is a file this search cannot return.

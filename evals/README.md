@@ -89,12 +89,13 @@ CI prints them again on every run.
 | across languages | 65 | 0.959 | **0.251** | 0.972 |
 | all | 120 | 0.974 | 0.564 | 0.979 |
 
-That is recall@5, at the app's settings: 15 results, a floor of 0.25. MRR and
-nDCG@10 tell the same story (all queries: 0.990 / 0.984 for Voyage, 0.598 /
+That is recall@5 at 15 results and a floor of 0.25, the app's settings for
+every model at the time. `bge-m3` now searches at 0.40 (ADR 0016), where every
+number in its column is the same. MRR and nDCG@10 tell the same story (all queries: 0.990 / 0.984 for Voyage, 0.598 /
 0.584 for `bge-large-en-v1.5`, 0.969 / 0.967 for `bge-m3`).
 
-- **The hypothesis held.** `bge-large-en-v1.5`, the model the app falls back
-  to when it has no Anthropic and Voyage keys, finds what a Russian query
+- **The hypothesis held.** `bge-large-en-v1.5`, the model the app fell back
+  to without Anthropic and Voyage keys until ADR 0016, finds what a Russian query
   means about one time in four, and almost never crosses languages. In one
   language it is fine (0.934).
 - **`bge-m3`, also on Workers AI and also 1024 dimensions, is as good as
@@ -106,7 +107,9 @@ nDCG@10 tell the same story (all queries: 0.990 / 0.984 for Voyage, 0.598 /
   of them above 0.25, so for both the search returns all 15 to every query and
   never says "nothing found". For `bge-m3`, a floor of 0.40 keeps recall@5 at
   0.979 and shows 9.9 results on average; 0.50 starts to lose what was asked
-  for (0.929).
+  for (0.929). The app now gives each model its own floor: `SEARCH_FLOORS` in
+  `libs/core/src/ai.ts`, which `score` uses unless `--min-similarity` says
+  otherwise.
 - **Voyage is near the ceiling.** This set can tell a model that fails a
   language from one that does not; it cannot rank two good models. That needs
   harder queries, and summaries written by the describe step rather than for
@@ -128,8 +131,8 @@ uv run --env-file ../.env search-evals embed --model @cf/baai/bge-large-en-v1.5
 uv run --env-file ../.env search-evals embed --model @cf/baai/bge-m3
 
 # Offline, from cache/, as often as you like.
-uv run search-evals score --model voyage-4
-uv run search-evals score --model @cf/baai/bge-m3 --min-similarity 0.40
+uv run search-evals score --model voyage-4             # at the app's floor for it
+uv run search-evals score --model @cf/baai/bge-m3 --min-similarity 0.50
 ```
 
 Vectors are kept in `cache/`, one file per model, filed under a hash of the
@@ -149,7 +152,7 @@ every expected value worked out by hand.
 The eval cannot import TypeScript, and a copy that drifts does not throw. The
 values both sides depend on are written once, in
 `libs/core/src/ai.eval-contract.json`: the embedding model, the dimensions, the
-limits of the table, the result count, the floor, and the cases of
+limits of the table, the result count, the floors, and the cases of
 `embeddingInput`. `libs/core/src/ai.test.ts` holds the app to that file, and
 `tests/test_contract.py` holds this to it.
 

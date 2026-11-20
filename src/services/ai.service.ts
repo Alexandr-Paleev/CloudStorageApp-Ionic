@@ -1,7 +1,7 @@
 import { supabase } from '../supabase/supabase.config';
 import { apiUrl } from '../utils/api.utils';
 import { HttpError, httpErrorFrom } from '../utils/http.utils';
-import { SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, toVectorLiteral } from '@cloud-storage/core/ai';
+import { SEARCH_RESULTS, searchFloor, toVectorLiteral } from '@cloud-storage/core/ai';
 import type { FileMetadata } from '../schemas/file.schema';
 import * as Sentry from '../observability/sentry';
 
@@ -186,7 +186,9 @@ const aiService = {
          because the server picks the backend, not the browser. */
       model_name: model,
       match_count: SEARCH_RESULTS,
-      min_similarity: SEARCH_MIN_SIMILARITY,
+      /* The floor travels the same way: it belongs to the model, and 0.25,
+         Voyage's, cuts almost nothing from bge-m3 (ADR 0016). */
+      min_similarity: searchFloor(model),
     });
 
     if (error) {

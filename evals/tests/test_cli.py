@@ -50,3 +50,11 @@ def test_score_reads_a_full_cache_without_tripping_over_numpy(
     out, err = capsys.readouterr()
     assert "not cached" not in err
     assert "recall@5" in out
+
+
+def test_score_uses_the_apps_floor_for_the_model_unless_told(capsys: pytest.CaptureFixture[str]) -> None:
+    # From the vectors in cache/, which CI scores too.
+    assert main(["score", "--model", "@cf/baai/bge-m3"]) == 0
+    assert "min similarity 0.4\n" in capsys.readouterr().out
+    assert main(["score", "--model", "@cf/baai/bge-m3", "--min-similarity", "0.5"]) == 0
+    assert "min similarity 0.5\n" in capsys.readouterr().out

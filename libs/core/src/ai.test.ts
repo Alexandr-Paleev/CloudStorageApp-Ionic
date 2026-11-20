@@ -6,12 +6,14 @@ import {
   MAX_SUMMARY_CHARS,
   MAX_TAGS,
   MAX_TAG_CHARS,
+  SEARCH_FLOORS,
   SEARCH_MIN_SIMILARITY,
   SEARCH_RESULTS,
   clampSummary,
   embeddingInput,
   normalizeTags,
   planFor,
+  searchFloor,
   toVectorLiteral,
   type IndexableFile,
 } from './ai';
@@ -180,6 +182,7 @@ describe('the contract with the search eval', () => {
       MAX_TAG_CHARS,
       SEARCH_RESULTS,
       SEARCH_MIN_SIMILARITY,
+      SEARCH_FLOORS,
     });
   });
 
@@ -189,6 +192,18 @@ describe('the contract with the search eval', () => {
       expect(embeddingInput({ name }, summary, tags)).toBe(expected);
     }
   );
+});
+
+describe('searchFloor', () => {
+  it('gives each measured model its own floor', () => {
+    expect(searchFloor('voyage-4')).toBe(0.25);
+    expect(searchFloor('@cf/baai/bge-m3')).toBe(0.4);
+  });
+
+  it('falls back to the general floor for a model nobody measured', () => {
+    expect(searchFloor('@cf/baai/bge-large-en-v1.5')).toBe(SEARCH_MIN_SIMILARITY);
+    expect(searchFloor('constructor')).toBe(SEARCH_MIN_SIMILARITY);
+  });
 });
 
 describe('toVectorLiteral', () => {

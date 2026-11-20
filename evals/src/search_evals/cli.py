@@ -16,7 +16,7 @@ import numpy as np
 
 from . import metrics
 from .backends import MissingKey, embedder
-from .contract import EMBEDDING_MODEL, SEARCH_MIN_SIMILARITY, SEARCH_RESULTS, embedding_input
+from .contract import EMBEDDING_MODEL, SEARCH_RESULTS, embedding_input, search_floor
 from .data import LANGUAGES, load_files, load_queries, only_across_languages, problems
 from .rank import rank
 from .vectors import VectorCache
@@ -111,13 +111,15 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--model", default=EMBEDDING_MODEL)
         if name == "score":
             command.add_argument("--limit", type=int, default=SEARCH_RESULTS)
-            command.add_argument("--min-similarity", type=float, default=SEARCH_MIN_SIMILARITY)
+            # By default the floor the app uses for this model, so a score is the app's.
+            command.add_argument("--min-similarity", type=float, default=None)
     args = parser.parse_args(argv)
     if args.command == "check":
         return _check()
     if args.command == "embed":
         return _embed(args.model)
-    return _score(args.model, args.limit, args.min_similarity)
+    floor = search_floor(args.model) if args.min_similarity is None else args.min_similarity
+    return _score(args.model, args.limit, floor)
 
 
 if __name__ == "__main__":

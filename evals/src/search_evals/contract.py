@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parents[3]
 CONTRACT_PATH = REPO / "libs" / "core" / "src" / "ai.eval-contract.json"
 
 _contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-CONSTANTS: dict[str, str | int | float] = _contract["constants"]
+CONSTANTS: dict[str, str | int | float | dict[str, float]] = _contract["constants"]
 EMBEDDING_INPUT_CASES: list[dict] = _contract["embeddingInput"]
 
 EMBEDDING_MODEL = str(CONSTANTS["EMBEDDING_MODEL"])
@@ -28,6 +28,12 @@ MAX_TAGS = int(CONSTANTS["MAX_TAGS"])
 MAX_TAG_CHARS = int(CONSTANTS["MAX_TAG_CHARS"])
 SEARCH_RESULTS = int(CONSTANTS["SEARCH_RESULTS"])
 SEARCH_MIN_SIMILARITY = float(CONSTANTS["SEARCH_MIN_SIMILARITY"])
+SEARCH_FLOORS: dict[str, float] = {model: float(floor) for model, floor in CONSTANTS["SEARCH_FLOORS"].items()}
+
+
+def search_floor(model: str) -> float:
+    """The floor the app searches this model's vectors with: `searchFloor` in libs/core/src/ai.ts."""
+    return SEARCH_FLOORS.get(model, SEARCH_MIN_SIMILARITY)
 
 
 def embedding_input(name: str, summary: str, tags: Sequence[str]) -> str:

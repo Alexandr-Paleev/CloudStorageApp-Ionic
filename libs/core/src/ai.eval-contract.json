@@ -7,7 +7,8 @@
     "MAX_TAGS": 12,
     "MAX_TAG_CHARS": 40,
     "SEARCH_RESULTS": 15,
-    "SEARCH_MIN_SIMILARITY": 0.25
+    "SEARCH_MIN_SIMILARITY": 0.25,
+    "SEARCH_FLOORS": { "voyage-4": 0.25, "@cf/baai/bge-m3": 0.4 }
   },
   "embeddingInput": [
     {
