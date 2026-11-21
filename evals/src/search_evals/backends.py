@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -27,7 +29,14 @@ CLOUDFLARE_MODEL = "@cf/baai/bge-m3"
 # vectors are in cache/, and its table is the reason for the change.
 CLOUDFLARE_FORMER = ("@cf/baai/bge-large-en-v1.5",)
 BATCH = 64
+# Voyage without a payment method on the account allows 3 requests and 10,000
+# tokens a minute. A batch of 64 of the eval's summaries fits; 64 pieces of a
+# page each do not, so pieces go 10 at a time.
+VOYAGE_BATCH = 10
 TIMEOUT_S = 60
+# A 429 is waited out rather than lost: the minute turns, and the run goes on.
+RATE_LIMIT_TRIES = 8
+RATE_LIMIT_WAIT_S = 25.0
 
 Embedder = Callable[[list[str], str, str], list[list[float]]]
 
@@ -36,20 +45,35 @@ class MissingKey(RuntimeError):
     pass
 
 
-def _post(url: str, token: str, body: dict) -> dict:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode(),
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        method="POST",
-    )
+def _post(url: str, token: str, body: dict, sleep: Callable[[float], None] = time.sleep) -> dict:
+    for attempt in range(1, RATE_LIMIT_TRIES + 1):
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            if error.code == 429 and attempt < RATE_LIMIT_TRIES:
+                wait = _retry_after(error.headers.get("Retry-After") if error.headers else None)
+                print(f"{url} is rate-limited; waiting {wait:.0f} s ({attempt}/{RATE_LIMIT_TRIES})", file=sys.stderr)
+                sleep(wait)
+                continue
+            # The start of the body only: an upstream error can be long.
+            detail = error.read().decode(errors="replace")[:200]
+            raise RuntimeError(f"{url} answered {error.code}: {detail}") from error
+    raise AssertionError("unreachable: the last attempt returns or raises")
+
+
+def _retry_after(header: str | None) -> float:
+    """Seconds to wait: what the server asked for when it said, else a default."""
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
-            return json.loads(response.read())
-    except urllib.error.HTTPError as error:
-        # The start of the body only: an upstream error can be long.
-        detail = error.read().decode(errors="replace")[:200]
-        raise RuntimeError(f"{url} answered {error.code}: {detail}") from error
+        return max(1.0, float(header)) if header else RATE_LIMIT_WAIT_S
+    except ValueError:
+        return RATE_LIMIT_WAIT_S
 
 
 def voyage(texts: list[str], side: str, model: str) -> list[list[float]]:
@@ -57,9 +81,11 @@ def voyage(texts: list[str], side: str, model: str) -> list[list[float]]:
     if not token:
         raise MissingKey("VOYAGE_API_KEY is not set")
     out: list[list[float]] = []
-    for start in range(0, len(texts), BATCH):
+    for start in range(0, len(texts), VOYAGE_BATCH):
         payload = _post(
-            VOYAGE_ENDPOINT, token, {"input": texts[start : start + BATCH], "model": model, "input_type": side}
+            VOYAGE_ENDPOINT,
+            token,
+            {"input": texts[start : start + VOYAGE_BATCH], "model": model, "input_type": side},
         )
         out.extend(row["embedding"] for row in sorted(payload["data"], key=lambda row: row["index"]))
     return out

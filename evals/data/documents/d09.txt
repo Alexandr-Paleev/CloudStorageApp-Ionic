@@ -1,0 +1,37 @@
+Product Platform — weekly sync, 9 April 2026
+
+Attendees: Clara Ibáñez, Andrei Kotov, Sofía Marín, Tomás Riera, Priya Nair
+Notes: Sofía Marín
+
+1. RELEASE 3.4
+
+The release is moved from 14 April to 21 April. The payment page still fails two accessibility checks, and QA needs the extra week to retest the checkout on Safari. Clara will tell the customer success team today.
+
+2. DESIGN SYSTEM MIGRATION
+
+Andrei reported that 41 of 58 components are migrated to the new tokens. The remaining ones are mostly data tables and date pickers. Target: all components migrated by the end of May. Andrei owns the migration; Tomás will review every pull request touching tables.
+
+3. ON-CALL ROTATION
+
+From May, the on-call rotation includes the frontend team. Each engineer is on call for one week every five weeks. Priya will publish the schedule by 24 April. On-call weeks are compensated with 250 euros.
+
+4. HIRING
+
+Two interviews for the junior frontend position next week. Andrei and Priya will run the technical interview; the take-home task is the shopping-cart exercise.
+
+5. INCIDENT FOLLOW-UP
+
+The outage on 2 April was caused by an expired TLS certificate on the image service. Action: Tomás sets up an alert 30 days before any certificate expires, due 17 April.
+
+DECISIONS
+
+- Release 3.4 ships on 21 April.
+- No new features enter 3.4 after today.
+- The team offsite is in Altea on 5 and 6 June; budget approved.
+
+ACTION ITEMS
+
+- Clara: inform customer success about the new release date (today).
+- Andrei: finish the date picker migration (30 April).
+- Priya: on-call schedule (24 April).
+- Tomás: certificate expiry alert (17 April).

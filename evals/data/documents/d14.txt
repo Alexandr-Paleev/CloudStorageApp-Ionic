@@ -1,0 +1,39 @@
+NETLINK HX300 WI-FI ROUTER — QUICK START GUIDE
+
+IN THE BOX
+
+The router, a power adapter (12 V, 1.5 A), one Ethernet cable and this guide.
+
+CONNECTING
+
+1. Connect the fibre terminal (ONT) to the yellow WAN port with the Ethernet cable.
+2. Plug in the power adapter and press the power button on the back.
+3. Wait about two minutes until the Internet light turns solid white.
+
+DEFAULT SETTINGS
+
+The default Wi-Fi network names and password are printed on the label under the router. The 2.4 GHz network ends in -24 and the 5 GHz network ends in -5G.
+
+To open the settings page, connect to the router and go to http://192.168.1.1 in a browser. The default username is admin and the default password is the one printed on the label as "Admin key". You will be asked to change it on the first login.
+
+CHANGING THE WI-FI PASSWORD
+
+In the settings page, open Wireless → Security, type the new password (at least 8 characters) and press Save. Every device will need the new password to reconnect.
+
+RESETTING TO FACTORY SETTINGS
+
+If you have forgotten the admin password, hold the Reset button on the back for 10 seconds with a paper clip, until all lights flash. The router restarts with the settings on the label. Your Wi-Fi names and passwords will be lost.
+
+LIGHTS
+
+Power solid white: the router is on.
+Internet solid white: connected. Blinking orange: no connection to the fibre terminal. Solid orange: connected to the terminal but no Internet; call your provider.
+Wi-Fi blinking: data is being sent.
+
+GUEST NETWORK
+
+A separate guest network can be switched on in Wireless → Guest. Guests get Internet access but cannot see devices on your home network.
+
+SUPPORT
+
+NetLink support: 900 818 818, every day from 8:00 to 22:00. The router has a 2-year warranty.

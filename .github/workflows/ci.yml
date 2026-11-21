@@ -401,3 +401,10 @@ jobs:
           for model in voyage-4 @cf/baai/bge-large-en-v1.5 @cf/baai/bge-m3; do
             uv run --locked search-evals score --model "$model"
           done
+
+      # The pieces of text a question is answered from, at each size compared
+      # (docs/decisions/0019): whether the first five hold the answer.
+      - run: |
+          for model in voyage-4 @cf/baai/bge-m3; do
+            uv run --locked search-evals score-chunks --model "$model"
+          done

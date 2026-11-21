@@ -10,7 +10,21 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **The eval measures what a question would be answered from.** Asking a
+  question of one's files needs the text, not the sentence the index keeps per
+  file, so the text is cut into pieces and the nearest ones are read. `evals/`
+  now holds fifteen made-up files in three languages, pairs of them alike on
+  purpose, and 75 questions: 65 whose answers are marked by exact quotes, 10
+  with no answer in the files. `chunks.py` is the cut the app will follow
+  (whole paragraphs, then sentences, then words; each piece a slice of the
+  text), and `score-chunks` compares sizes. With `bge-m3`, pieces of 400
+  characters hold every answer in the first three, across languages too, at a
+  third of the reading of 1,600. CI prints the table for both models. See ADR
+  0019, which decides the rest of the work.
+- **The eval waits out a rate limit.** Voyage without a payment method allows
+  three requests a minute; `embed` waits and goes on instead of failing.
 
 ## [4.16.0] — 2026-11-21
 

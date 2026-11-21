@@ -115,6 +115,58 @@ number in its column is the same. MRR and nDCG@10 tell the same story (all queri
   harder queries, and summaries written by the describe step rather than for
   the test.
 
+## Answering from pieces of text
+
+Asking a question of one's files ([decision 0019](../docs/decisions/0019-questions-are-answered-from-pieces-of-the-files.md))
+needs more than the sentence the index keeps per file: "until when does my
+lease run" is answered by a clause. A file's text is cut into pieces
+(`src/search_evals/chunks.py`, the specification the app will follow), each
+piece is embedded with the file's name in front of it, and a model answers
+from the pieces nearest to the question. This measures the first half: whether
+those pieces hold the answer.
+
+**The data.** `data/documents/` holds fifteen made-up files, seven in English
+and four each in Spanish and Russian: a lease, two electricity bills a month apart, a trip and a flight,
+two insurance policies, a blood test, an offer letter, two manuals, a recipe,
+meeting notes, a warranty and a gym's terms. The pairs are alike on purpose.
+`data/questions.jsonl` asks 75 questions of them. Each of 65 names where its
+answer is written, as **evidence**: quotes copied exactly from a document. A
+piece answers when it holds a whole quote, so the same labels score every size
+of piece. 36 are asked in another language than their answer is written in.
+The other 10 have no answer in these files, for the eval of the answers.
+
+**What is reported**, for each size: **recall@k**, the share of a question's
+quotes that are whole in one of the first k pieces; **all@k**, the share of
+questions with every quote there; **MRR**, one over the position of the first
+piece holding any quote; **context@k**, the characters in the first k pieces,
+which a model reads on every question; **split**, quotes that no piece holds
+because a border fell through them.
+
+**Results** (2026-11-21, overlap 15%, the first five pieces read):
+
+| Model | Size | recall@3 | all@5 | MRR | context@5 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Workers AI `bge-m3` | **400** | **1.000** | **1.000** | **0.928** | **1,575** |
+| | 800 | 0.954 | 0.985 | 0.880 | 3,030 |
+| | 1200 | 0.969 | 0.969 | 0.909 | 4,072 |
+| | 1600 | 0.938 | 0.985 | 0.912 | 4,905 |
+| Voyage `voyage-4` | **400** | **1.000** | **1.000** | 0.936 | **1,504** |
+| | 800 | 1.000 | 1.000 | 0.985 | 3,018 |
+| | 1200 | 1.000 | 1.000 | 0.977 | 4,108 |
+| | 1600 | 1.000 | 1.000 | 0.992 | 5,281 |
+
+- **400 characters.** For `bge-m3`, the model production runs, it is the best
+  size on every measure and the cheapest: all 65 answers are in the first
+  three pieces, across languages too. Voyage finds every answer at every size
+  and puts it first slightly more often with larger pieces, at three and a half
+  times the reading.
+- **No quote was split** at any size: a fact is a sentence or two, and the
+  pieces are built from whole paragraphs and sentences.
+- **Fifteen files is an easy haystack.** Recall at the ceiling says the pieces
+  hold the answers and the model finds them among these; it does not say how
+  it holds among a thousand. The answers' eval will say whether 400 characters
+  are enough context to answer from.
+
 ## Running it
 
 uv brings the Python in `.python-version` and the locked dependencies:
@@ -133,7 +185,14 @@ uv run --env-file ../.env search-evals embed --model @cf/baai/bge-m3
 # Offline, from cache/, as often as you like.
 uv run search-evals score --model voyage-4             # at the app's floor for it
 uv run search-evals score --model @cf/baai/bge-m3 --min-similarity 0.50
+
+# The pieces: vectors for every size compared, then the table.
+uv run --env-file ../.env search-evals embed-chunks --model @cf/baai/bge-m3
+uv run search-evals score-chunks --model @cf/baai/bge-m3 --k 3
 ```
+
+Voyage on an account without a payment method allows three requests a minute;
+`embed` waits a rate limit out and goes on.
 
 Vectors are kept in `cache/`, one file per model, filed under a hash of the
 text and the side of the search, and committed: anyone, CI included, can score

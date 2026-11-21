@@ -1,0 +1,42 @@
+LUZ DEL TURIA, S.A. — FACTURA DE ELECTRICIDAD
+
+Número de factura: LT-2026-0331-48120
+Fecha de emisión: 2 de abril de 2026
+Periodo de facturación: del 1 al 31 de marzo de 2026 (31 días)
+
+Titular del contrato: Andrei Kotov
+Dirección de suministro: Calle San Vicente Mártir 87, 5B, 46007 Valencia
+CUPS: ES0021000012345678AB
+Tarifa: 2.0TD, potencia contratada 4,6 kW
+
+RESUMEN DE LA FACTURA
+
+Importe total a pagar: 86,40 euros
+Fecha de cargo en cuenta: 15 de abril de 2026
+Forma de pago: domiciliación bancaria
+
+DETALLE DEL CONSUMO
+
+Lectura anterior (28 de febrero): 12.418 kWh
+Lectura actual (31 de marzo): 12.703 kWh
+Consumo del periodo: 285 kWh
+
+Consumo en punta: 96 kWh
+Consumo en llano: 88 kWh
+Consumo en valle: 101 kWh
+
+Su consumo medio diario ha sido de 9,2 kWh, un 7% menos que en el mismo periodo del año anterior.
+
+DESGLOSE DEL IMPORTE
+
+Término de potencia: 14,23 euros
+Término de energía: 53,11 euros
+Impuesto sobre la electricidad: 3,45 euros
+Alquiler del contador: 0,83 euros
+IVA (21%): 14,78 euros
+
+ATENCIÓN AL CLIENTE
+
+Para averías, llame al 900 112 233, disponible las 24 horas. Para consultas sobre esta factura, escriba a clientes@luzdelturia.example o llame al 963 400 500 de lunes a viernes, de 9:00 a 19:00.
+
+Si no está de acuerdo con esta factura, puede presentar una reclamación en el plazo de un mes desde la fecha de emisión.
