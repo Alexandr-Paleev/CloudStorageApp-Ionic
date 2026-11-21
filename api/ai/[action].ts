@@ -2,10 +2,7 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
 import {
-  CHUNK_OVERLAP,
-  CHUNK_SIZE,
   MAX_DESCRIBE_BYTES,
-  MAX_PIECES_PER_FILE,
   ProviderNotConfigured,
   TEXT_SAMPLE_BYTES,
   embeddingInput,
@@ -14,7 +11,7 @@ import {
   type IndexPlan,
   type IndexableFile,
 } from '../../libs/core/src/ai';
-import { chunkText, pieceInput } from '../../libs/core/src/chunks';
+import { pieceInput } from '../../libs/core/src/chunks';
 import { FileTooLarge, fetchBytes } from '../../libs/server/src/fetch-bytes';
 import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
@@ -22,7 +19,8 @@ import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
 import { activeBackend, type AiBackend } from '../../libs/server/src/ai-provider';
 import { isConfigured as cloudflareConfigured } from '../../libs/server/src/cloudflare-ai';
 import { pdfText } from '../../libs/server/src/to-markdown';
-import { decodeText, withoutNul } from '../../libs/server/src/decode-text';
+import { decodeText } from '../../libs/server/src/decode-text';
+import { piecesOf } from '../../libs/server/src/pieces';
 import { BudgetSpent, claimAiCall, secondsUntilTomorrow } from '../../libs/server/src/ai-budget';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
@@ -151,24 +149,6 @@ async function readFile(
      read by its mark, and no NUL is kept (libs/server/src/decode-text.ts). */
   const text = decodeText(bytes);
   return { source: { kind: 'text', text: sample(text) }, text };
-}
-
-/**
- * The pieces a question is answered from (ADR 0019), cut from the file's text
- * or, for a file with none, from its description, so that every indexed file
- * has at least one. A file longer than MAX_PIECES_PER_FILE pieces is kept as
- * far as that goes.
- */
-function piecesOf(text: string | null, summary: string): string[] {
-  /* No NUL, which Postgres will not store, whatever the text came from. And
-     not all of an 8 MB file, to keep the first 200 pieces of it: they hold
-     about 200 × 400 characters of text, and the cut reads twice that. Only a
-     file with more space between its paragraphs than words in them would
-     keep a different, still valid, set of pieces. */
-  const clean = withoutNul(text ?? '');
-  const source = clean.trim() ? clean : summary;
-  const reach = MAX_PIECES_PER_FILE * CHUNK_SIZE * 2;
-  return chunkText(source.slice(0, reach), CHUNK_SIZE, CHUNK_OVERLAP).slice(0, MAX_PIECES_PER_FILE);
 }
 
 /** Replaces a file's pieces with these, under this backend's model. */

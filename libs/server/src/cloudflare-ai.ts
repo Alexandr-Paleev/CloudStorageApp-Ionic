@@ -192,14 +192,21 @@ export function parseCaption(text: string): { summary: string; tags: string[] } 
     .filter(Boolean);
 
   const tagLine = lines.find((line) => /^tags\s*:/i.test(line));
-  const summaryLine = lines.find((line) => !/^tags\s*:/i.test(line)) ?? '';
+  let summaryLine = lines.find((line) => !/^tags\s*:/i.test(line)) ?? '';
+  let tagText = tagLine?.replace(/^tags\s*:/i, '');
 
-  const tags = tagLine
-    ? tagLine
-        .replace(/^tags\s*:/i, '')
-        .split(',')
-        .map((tag) => tag.trim())
-    : [];
+  /* Sometimes the two lines come as one: "A bill for March. Tags: a, b". Read
+     as a sentence, the tags were kept in it, shown under the result and
+     searched as prose, and the file had none (the demo's bill, 2026-11-21). */
+  if (tagLine === undefined) {
+    const joined = /^(.+?)\s*\btags\s*:\s*(.*)$/i.exec(summaryLine);
+    if (joined) {
+      summaryLine = joined[1] as string;
+      tagText = joined[2];
+    }
+  }
+
+  const tags = tagText ? tagText.split(',').map((tag) => tag.trim()) : [];
 
   return { summary: clampSummary(summaryLine), tags: normalizeTags(tags) };
 }

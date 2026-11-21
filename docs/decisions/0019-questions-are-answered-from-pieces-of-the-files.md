@@ -133,6 +133,17 @@ What follows, decided here and amended as each part ships:
   Notepad could otherwise never be indexed. The dashboard counts a file as
   indexed by its first piece.
 
+- **Step 2c (2026-11-21).** A demo account comes with its pieces, since a
+  demo cannot index. `public/demo/search-index.json` carries each file's
+  pieces and their vectors, cut by the same `piecesOf` the route uses
+  (`libs/server/src/pieces.ts`), and `/api/demo/session` writes them with the
+  sentence. Rebuilt with the free path: seven files and twelve pieces,
+  `welcome.pdf` among them for the first time, read by `toMarkdown`. A test
+  holds a text file's pieces to its cut and a picture's to its description's.
+  The rebuild showed the free path's caption parser keeping "Tags: …" in the
+  sentence when the model wrote both on one line; it splits there now, and the
+  test refuses an index with tags in a sentence or a file with none.
+
 ## Alternatives
 
 - **Answer from the sentence per file.** It answers what a file is, which

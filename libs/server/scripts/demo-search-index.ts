@@ -1,7 +1,8 @@
 /**
  * Writes public/demo/search-index.json: the description and the vector of each
- * demo file, made by the same functions `/api/ai/index` calls, so that a demo
- * account can search by meaning without one paid call
+ * demo file, and its pieces with theirs, made by the same functions
+ * `/api/ai/index` calls, so that a demo account can search by meaning, and
+ * ask its files a question, without one paid call
  * (libs/server/src/demo-search-index.ts).
  *
  * Run it when the seed changes, or the model the free path describes or
@@ -17,6 +18,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TEXT_SAMPLE_BYTES, embeddingInput, planFor } from '../../core/src/ai';
+import { pieceInput } from '../../core/src/chunks';
+import { piecesOf } from '../src/pieces';
 import type { DescribeSource } from '../src/describe';
 import { activeBackend } from '../src/ai-provider';
 import { decodeText } from '../src/decode-text';
@@ -53,13 +56,20 @@ async function main(): Promise<void> {
        one, and as its text, read by toMarkdown, to one that does not. */
     const sample = (text: string) =>
       Buffer.from(text, 'utf8').subarray(0, TEXT_SAMPLE_BYTES).toString('utf8');
+    // The text the pieces are cut from: none for a picture, cut from its description.
+    const text =
+      plan.kind === 'text'
+        ? decodeText(bytes)
+        : plan.kind === 'pdf'
+          ? await pdfText(bytes, item.name)
+          : null;
     const source: DescribeSource =
       plan.kind === 'text'
-        ? { kind: 'text', text: sample(decodeText(bytes)) }
+        ? { kind: 'text', text: sample(text ?? '') }
         : plan.kind === 'pdf'
           ? backend.readsPdf
             ? { kind: 'pdf', data: bytes.toString('base64') }
-            : { kind: 'text', text: sample(await pdfText(bytes, item.name)) }
+            : { kind: 'text', text: sample(text ?? '') }
           : {
               kind: 'image',
               url: `data:${item.type};base64,${bytes.toString('base64')}`,
@@ -72,13 +82,25 @@ async function main(): Promise<void> {
       'document'
     );
 
+    const pieces = piecesOf(text, description.summary);
+    const pieceVectors = await backend.embedMany(
+      pieces.map((piece) => pieceInput(item.name, piece)),
+      'document'
+    );
+
     index.files[item.asset] = {
       summary: description.summary,
       tags: description.tags,
       summary_model: description.model,
       embedding: vector.map(round),
+      pieces: pieces.map((content, i) => ({
+        content,
+        embedding: (pieceVectors[i] as number[]).map(round),
+      })),
     };
-    console.log(`${item.asset}: ${description.summary} [${description.tags.join(', ')}]`);
+    console.log(
+      `${item.asset}: ${description.summary} [${description.tags.join(', ')}], ${pieces.length} pieces`
+    );
   }
 
   writeFileSync(join(DEMO_DIR, DEMO_SEARCH_INDEX_ASSET), `${JSON.stringify(index)}\n`);
