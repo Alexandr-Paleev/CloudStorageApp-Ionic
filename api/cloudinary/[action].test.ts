@@ -666,3 +666,75 @@ describe('cloudinary confirm: the server weighs an upload and records it', () =>
     expect(res.statusCode).toBe(201);
   });
 });
+
+describe('cloudinary confirm: what a failure may say', () => {
+  const ASSET = 'users/user-1/abc123';
+  const confirm = () =>
+    mockRequest({
+      query: { action: 'confirm' },
+      body: { publicId: ASSET, resourceType: 'image', name: 'photo.png', type: 'image/png' },
+    });
+
+  /* The SDK rejects a failed Admin API call with the request it made. Its
+     `auth` is the key and the secret unless `hide_sensitive` is set, and the
+     function writes what it catches to the console, which Vercel keeps. */
+  it('tells Cloudinary to leave the secret out of a rejection', async () => {
+    resource.mockResolvedValue({ bytes: 1, secure_url: 'https://res.cloudinary.com/x' });
+    db.client = mockSupabase({ files: { data: [{ id: 'f1' }] } }).client;
+
+    await handler(confirm(), mockResponse());
+
+    expect(config).toHaveBeenCalledWith(expect.objectContaining({ hide_sensitive: true }));
+  });
+
+  it('logs and reports an unexpected Admin API failure without the request in it', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    resource.mockRejectedValue({
+      error: { http_code: 500, message: 'General Error' },
+      request_options: { auth: 'test-key:test-secret' },
+    });
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(500);
+    const logged = JSON.stringify(consoleError.mock.calls, (_key, value) =>
+      value instanceof Error ? value.message : value
+    );
+    expect(logged).toContain('General Error');
+    expect(logged).not.toContain('test-secret');
+    const reported = report.mock.calls.map(([error]) => (error as Error).message).join(' ');
+    expect(reported).toContain('General Error');
+    expect(reported).not.toContain('test-secret');
+    consoleError.mockRestore();
+  });
+
+  it('still answers 413 when destroying the unrecorded asset fails, and reports that', async () => {
+    resource.mockResolvedValue({ bytes: 40_000_000, secure_url: 'https://res.cloudinary.com/x' });
+    destroy.mockRejectedValue({ error: { http_code: 500, message: 'destroy failed' } });
+    db.client = mockSupabase({
+      files: { error: { message: 'Storage limit exceeded', code: 'PT413' } } as TableAnswer,
+      profiles: { data: [{ storage_limit: 10_000_000, bytes_used: 0 }] } as TableAnswer,
+    }).client;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(413);
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('destroy failed') }),
+      expect.objectContaining({ route: 'cloudinary/confirm' })
+    );
+  });
+
+  it("tells the owner when the hour's Admin API requests are spent", async () => {
+    resource.mockRejectedValue({ error: { http_code: 420, message: 'Rate Limit Exceeded' } });
+
+    await handler(confirm(), mockResponse());
+
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Admin API limit') }),
+      expect.objectContaining({ route: 'cloudinary/confirm' })
+    );
+  });
+});

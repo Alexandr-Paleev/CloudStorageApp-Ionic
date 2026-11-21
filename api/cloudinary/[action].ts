@@ -81,14 +81,28 @@ function publicIdFor(fileName: string, resourceType: 'raw' | 'image'): string {
   return resourceType === 'raw' && extension ? `${id}.${extension}` : id;
 }
 
-function configureCloudinary(cloudinary: { config: (options: Record<string, string>) => void }) {
+function configureCloudinary(cloudinary: {
+  config: (options: Record<string, string | boolean>) => void;
+}) {
   // Server-side names only: a VITE_ prefixed fallback would be inlined into
   // the public client bundle by Vite.
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
     api_key: process.env.CLOUDINARY_API_KEY || '',
     api_secret: process.env.CLOUDINARY_API_SECRET || '',
+    /* A failed Admin API call (confirm asks one) rejects with the request it
+       made, and without this the key and the secret are in it, as they were
+       in the erase's log before erase-providers.ts set the same. */
+    hide_sensitive: true,
   });
+}
+
+/** What a rejection from Cloudinary's SDK says, and nothing else of it: the
+ *  rest is the request, which a log or a report has no business holding. */
+function cloudinaryMessage(error: unknown): string {
+  const body = error as { message?: unknown; error?: { message?: unknown } } | null;
+  const message = body?.error?.message ?? body?.message;
+  return typeof message === 'string' ? message : 'no message';
 }
 
 /**
@@ -215,7 +229,23 @@ async function confirmUpload(req: VercelRequest, res: VercelResponse, userId: st
 
   const cloudinary = (await import('cloudinary')).v2;
   configureCloudinary(cloudinary);
-  const discard = () => cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+  /* An asset that is not recorded is destroyed. A failure to destroy it is
+     reported and does not replace the answer: the browser still needs to hear
+     why its upload was refused, and the nightly reconciliation will find the
+     asset either way. */
+  const discard = async () => {
+    try {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    } catch (error) {
+      await report(
+        new Error(`Could not destroy an unrecorded asset: ${cloudinaryMessage(error)}`),
+        {
+          route: 'cloudinary/confirm',
+          userId,
+        }
+      );
+    }
+  };
 
   let asset: { bytes: number; secure_url: string };
   try {
@@ -229,14 +259,20 @@ async function confirmUpload(req: VercelRequest, res: VercelResponse, userId: st
     }
     if (status === 420 || status === 429) {
       // The hour's Admin API requests are spent. An asset that cannot be
-      // weighed is not recorded, so it is not kept either.
+      // weighed is not recorded, so it is not kept either, and the owner
+      // hears of it: every upload to Cloudinary fails until the hour turns.
       await discard();
+      await report(new Error("Cloudinary's Admin API limit is spent; uploads are refused"), {
+        route: 'cloudinary/confirm',
+        userId,
+      });
       res
         .status(503)
         .json({ message: 'The upload could not be checked right now. Try again later.' });
       return;
     }
-    throw error;
+    // Rethrown as its message alone: the rejection carries the request.
+    throw new Error(`Cloudinary could not describe the asset: ${cloudinaryMessage(error)}`);
   }
 
   try {

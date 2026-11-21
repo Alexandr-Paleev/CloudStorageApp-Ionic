@@ -70,10 +70,15 @@ test.describe('Storage quota', () => {
 test.describe('Two uploads at once', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
-  /* The object first, as an upload stores it: since migration 020 the
-     database takes a Storage row's size from the object at its path. */
-  async function insertFile(user: TestUser, name: string, size: number) {
-    await storeObject(`${user.id}/${name}`, size);
+  /* Since migration 020 the database takes a Storage row's size from the
+     object at its path, so the objects go in first, both of them, before
+     either row: storing one inside the race would stagger the two inserts
+     and leave nothing racing. */
+  async function storeBoth(user: TestUser, names: [string, string], size: number) {
+    await Promise.all(names.map((name) => storeObject(`${user.id}/${name}`, size)));
+  }
+
+  function insertFile(user: TestUser, name: string, size: number) {
     return fetch(`${SUPABASE_URL}/rest/v1/files`, {
       method: 'POST',
       headers: {
@@ -97,6 +102,7 @@ test.describe('Two uploads at once', () => {
   test('cannot both fit into the same remaining space', async ({ user }) => {
     // Room for one of them, not for two.
     await setStorageLimit(user.id, 1000);
+    await storeBoth(user, ['race-a.txt', 'race-b.txt'], 600);
 
     const [first, second] = await Promise.all([
       insertFile(user, 'race-a.txt', 600),
@@ -118,6 +124,7 @@ test.describe('Two uploads at once', () => {
   test('the counter still matches the rows after one is refused', async ({ user }) => {
     await setStorageLimit(user.id, 1000);
 
+    await storeBoth(user, ['count-a.txt', 'count-b.txt'], 600);
     await Promise.all([insertFile(user, 'count-a.txt', 600), insertFile(user, 'count-b.txt', 600)]);
 
     const profile = await fetch(

@@ -422,7 +422,11 @@ async function confirmUpload(req: VercelRequest, res: VercelResponse, userId: st
     });
     return res.status(201).json(row);
   } catch (error) {
-    await client.send(new DeleteObjectCommand({ Bucket, Key: key }));
+    /* Not kept, so not left in the bucket. A failed delete is reported and
+       does not replace the answer the browser needs to hear. */
+    await client
+      .send(new DeleteObjectCommand({ Bucket, Key: key }))
+      .catch((deleteError) => report(deleteError, { route: 'r2/confirm', userId }));
     if (error instanceof QuotaExceeded) {
       return res.status(413).json({
         message: quotaRejection(await readQuota(userId), size) ?? error.message,

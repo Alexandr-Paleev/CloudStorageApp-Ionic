@@ -70,7 +70,11 @@ and its test holds the policy in `020` to it.
   use, is not limited. Past the 500, an upload is refused with 503 and its
   asset deleted, rather than recorded unweighed.
 - **The order of the rollout matters.** The functions ship first; `020` is
-  applied after, or the app's own uploads are refused. A tab opened before the
+  applied after, or the app's own uploads are refused. The deploy alone
+  already moves every Cloudinary upload to `confirm`, before `020` asks for
+  it, so a real upload is tried on production right after the deploy: the
+  migration is what keeps a browser from going around `confirm`, not what
+  keeps `confirm` working. A tab opened before the
   deploy writes its Cloudinary rows itself until it takes the update the app
   offers, and after `020` those inserts are refused. Few people use the app;
   the update asks once, and a refusal leaves no bytes behind (the browser
@@ -86,6 +90,11 @@ and its test holds the policy in `020` to it.
   bucket's 50 MB per object (018) and the signing limits bound how fast; a
   nightly reconciliation, next, deletes what has no row after a day and
   recounts `bytes_used`.
+- **A Storage object replaced after its row.** Storage has no update policy,
+  so an object cannot be overwritten, but its owner may delete it, and a new
+  object may then be put at the same path: the row keeps the first size. The
+  reconciliation weighs the Storage rows against their objects as well, which
+  the database can do for all of them in one query.
 - **Google Drive and Dropbox** rows are still the browser's: those bytes are in
   the person's own cloud and count against nothing of ours.
 

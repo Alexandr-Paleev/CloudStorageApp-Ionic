@@ -10,11 +10,16 @@ import { PRESIGN_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit
 
 const MB = 1024 * 1024;
 
-const { FakeAuthError, authenticateUser, db, send } = vi.hoisted(() => ({
+const { FakeAuthError, authenticateUser, db, send, report } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
   authenticateUser: vi.fn(),
   db: { client: null as { from: (table: string) => unknown } | null },
   send: vi.fn(),
+  report: vi.fn(),
+}));
+
+vi.mock('../../libs/server/src/report', () => ({
+  report: (...args: unknown[]) => report(...args),
 }));
 
 vi.mock('../../libs/server/src/auth', () => ({
@@ -172,5 +177,26 @@ describe('r2 confirm: the server weighs an upload and records it', () => {
     await handler(confirm(), res);
 
     expect(res.statusCode).toBe(201);
+  });
+
+  it('still answers 413 when deleting the unrecorded object fails, and reports that', async () => {
+    send.mockImplementation((command: unknown) => {
+      if (command instanceof HeadObjectCommand) return Promise.resolve({ ContentLength: 40 * MB });
+      if (command instanceof DeleteObjectCommand) return Promise.reject(new Error('delete failed'));
+      return Promise.resolve({});
+    });
+    db.client = mockSupabase({
+      files: { error: { message: 'Storage limit exceeded', code: 'PT413' } } as TableAnswer,
+      profiles: { data: [{ storage_limit: 10 * MB, bytes_used: 0 }] } as TableAnswer,
+    }).client;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(413);
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'delete failed' }),
+      expect.objectContaining({ route: 'r2/confirm' })
+    );
   });
 });
