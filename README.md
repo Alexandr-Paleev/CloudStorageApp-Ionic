@@ -197,11 +197,17 @@ render — and the banner says the deletion has not reached the server yet:
   Storage file's size from the bucket when its row is written, and the row of
   a Cloudinary or R2 file is written by a function that asks the provider
   first. A browser may not insert those rows at all.
-- ⚠️ Bytes stored with no row are counted by nothing: an upload to Cloudinary
-  or R2 that is never confirmed, or an object put into Storage and never
-  recorded. Each object is at most 50 MB in Storage, and the routes that sign
-  Cloudinary and R2 uploads are rate-limited, but neither bounds the total; a
-  nightly reconciliation that deletes them is next.
+- ✅ What a row does not say is found at night
+  ([decision 0018](docs/decisions/0018-a-nightly-reconciliation.md)). Once a
+  day `/api/account/reconcile`, called by Vercel Cron, holds each provider
+  against the rows: an object with no row is removed after a day, a row whose
+  size is not its object's is given the object's, and `bytes_used` is
+  recounted from the rows. It runs dry until the deployment says otherwise
+  (`RECONCILE_APPLY=true`), and it will not remove most of a provider at once.
+- ⚠️ Until that night, bytes stored with no row are counted by nothing: an
+  upload never confirmed, or an object put into Storage and never recorded.
+  Each object is at most 50 MB in Storage, and the routes that sign Cloudinary
+  and R2 uploads are rate-limited.
 
 ### 💳 Billing
 
@@ -457,6 +463,11 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      refuses them. `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT` (optional)
      set the deployment's daily limits, 300 descriptions and 5,000 searches by
      default; `0` stops the spending without removing the keys
+   - `CRON_SECRET`, a random string of 16 characters or more: Vercel Cron sends
+     it to the nightly reconciliation, which answers `503` without one. Apply
+     `migrations/021_reconcile_hosted_storage.sql` first. The reconciliation
+     only reports until `RECONCILE_APPLY=true` is set; read a night's report
+     before setting it
 4. After deployment, copy the API URL and add it to `.env`:
    - `VITE_CLOUDINARY_DELETE_API_URL=https://your-project.vercel.app/api/cloudinary/delete`
 
@@ -1033,7 +1044,7 @@ cloud-storage-app/
 │   ├── App.tsx                    # Main component
 │   └── main.tsx                   # Entry point
 ├── api/                           # Vercel Functions — anything holding a secret
-│   ├── account/delete.ts          # Erases the caller's account and everything under it
+│   ├── account/[action].ts        # delete: erases the caller's account; reconcile: the nightly check of storage
 │   ├── ai/[action].ts             # Search by meaning: describe a file, embed a query
 │   ├── cloudinary/[action].ts     # sign (quota-checked) and delete (ownership-checked)
 │   ├── demo/session.ts            # Throwaway account for "Try the demo"

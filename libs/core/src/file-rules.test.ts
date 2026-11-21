@@ -61,3 +61,38 @@ describe('the rows only a server writes', () => {
     expect(confirmed).toMatch(/NEW\.storage_type = 'supabase_storage'/);
   });
 });
+
+describe('the nightly reconciliation (021)', () => {
+  const night = migration('021_reconcile_hosted_storage.sql');
+  const quotaFunction = (sql: string) =>
+    /CREATE OR REPLACE FUNCTION public\.enforce_storage_quota\(\)[\s\S]*?\n\$\$;/.exec(sql)?.[0];
+
+  it('counts the hosted providers, in the trigger it replaces and in its recount', () => {
+    const lists = [...night.matchAll(/HOSTED CONSTANT TEXT\[\] := ARRAY\[([^\]]*)\]/g)].map(
+      (match) => [...(match[1] ?? '').matchAll(/'([^']+)'/g)].map((word) => word[1])
+    );
+    expect(lists).toEqual([[...HOSTED_PROVIDERS], [...HOSTED_PROVIDERS]]);
+  });
+
+  /* 021 writes 007's trigger out again to change one condition. Anything
+     else that differs is a change nobody meant. */
+  it('keeps the quota trigger 007 wrote, but for refusing on UPDATE', () => {
+    const before = quotaFunction(migration('007_enforce_storage_quota.sql'));
+    const after = quotaFunction(night)
+      ?.replace(/ {4}-- On INSERT only \(021\)\.[\s\S]*?refused\.\n/, '')
+      .replace("IF TG_OP = 'INSERT' AND v_delta > 0", 'IF v_delta > 0');
+
+    expect(before).toBeDefined();
+    expect(after).toBe(before);
+    expect(night).toContain("IF TG_OP = 'INSERT' AND v_delta > 0 AND v_used + v_delta > v_limit");
+  });
+
+  it('lets only the service role call what it adds', () => {
+    for (const fn of ['reconcile_storage_bucket(TIMESTAMPTZ)', 'reconcile_bytes_used(BOOLEAN)']) {
+      expect(night).toContain(
+        `REVOKE ALL ON FUNCTION public.${fn} FROM PUBLIC, anon, authenticated;`
+      );
+      expect(night).toContain(`GRANT EXECUTE ON FUNCTION public.${fn} TO service_role;`);
+    }
+  });
+});

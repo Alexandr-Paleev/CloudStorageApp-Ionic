@@ -445,7 +445,7 @@ describe('webhook: subscription cancelled', () => {
   });
 });
 
-/* Deleting an account deletes its Stripe customer first (api/account/delete.ts),
+/* Deleting an account deletes its Stripe customer first (api/account/[action].ts),
    and that sends events about a customer whose profile is already gone. They
    are done, not failed: answered with a 500, Stripe would deliver each again
    for three days, and no delivery could ever succeed. */

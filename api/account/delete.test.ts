@@ -43,7 +43,12 @@ vi.mock('../../libs/server/src/report', () => ({
   report: (...args: unknown[]) => report(...args),
 }));
 
-import handler from './delete';
+import route from './[action]';
+import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
+
+/* The file serves two actions; every request in this one is for `delete`. */
+const handler = (req: VercelRequest, res: VercelResponse) =>
+  route(Object.assign(req, { query: { action: 'delete' } }), res);
 import { BillingNotClosed } from '../../libs/server/src/account-erase';
 
 /* The limiter allows five an hour and keys on the client IP, which is
