@@ -7,7 +7,15 @@ import {
 } from '../../libs/server/src/test-utils';
 import { AI_INDEX_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit';
 import { AI_DAILY_LIMITS } from '../../libs/server/src/ai-budget';
-import { EMBEDDING_MODEL, ProviderNotConfigured, TEXT_SAMPLE_BYTES } from '../../libs/core/src/ai';
+import {
+  CHUNK_OVERLAP,
+  CHUNK_SIZE,
+  EMBEDDING_MODEL,
+  MAX_PIECES_PER_FILE,
+  ProviderNotConfigured,
+  TEXT_SAMPLE_BYTES,
+} from '../../libs/core/src/ai';
+import { chunkText } from '../../libs/core/src/chunks';
 
 const {
   FakeAuthError,
@@ -15,7 +23,11 @@ const {
   db,
   describeFile,
   embed,
+  embedMany,
   supports,
+  readsPdf,
+  cloudflareReady,
+  pdfText,
   activeBackend,
   createSignedUrl,
   presign,
@@ -30,7 +42,11 @@ const {
   },
   describeFile: vi.fn(),
   embed: vi.fn(),
+  embedMany: vi.fn(),
   supports: vi.fn(),
+  readsPdf: { value: true },
+  cloudflareReady: vi.fn(),
+  pdfText: vi.fn(),
   activeBackend: vi.fn(),
   createSignedUrl: vi.fn(),
   presign: vi.fn(),
@@ -55,6 +71,15 @@ vi.mock('../../libs/server/src/auth', () => ({
 // deployment is configured for; the route's job is to pick one and use it.
 vi.mock('../../libs/server/src/ai-provider', () => ({
   activeBackend: () => activeBackend(),
+}));
+
+// Whether the deployment has a Cloudflare account to read a PDF's text with,
+// and what toMarkdown says a PDF holds (libs/server/src/to-markdown.ts).
+vi.mock('../../libs/server/src/cloudflare-ai', () => ({
+  isConfigured: () => cloudflareReady(),
+}));
+vi.mock('../../libs/server/src/to-markdown', () => ({
+  pdfText: (...args: unknown[]) => pdfText(...args),
 }));
 
 // The S3 client wants credentials at construction, and none of this test is
@@ -86,10 +111,15 @@ const FILE = {
   download_url: 'https://res.cloudinary.com/demo/image/upload/v1/users/user-1/photo.jpg',
 };
 
-function withFile(overrides: Partial<typeof FILE> = {}, embeddings: TableAnswer = { data: [] }) {
+function withFile(
+  overrides: Partial<typeof FILE> = {},
+  embeddings: TableAnswer = { data: [] },
+  pieces: TableAnswer = { data: [] }
+) {
   const mock = mockSupabase({
     files: { data: [{ ...FILE, ...overrides }] } as TableAnswer,
     file_embeddings: embeddings,
+    file_chunks: pieces,
   });
   db.client = mock.client;
   db.calls = mock.calls;
@@ -99,6 +129,32 @@ const index = (fileId?: string) =>
   mockRequest({ query: { action: 'index' }, body: fileId ? { fileId } : {} });
 
 const search = (text?: unknown) => mockRequest({ query: { action: 'embed' }, body: { text } });
+
+/** A file this model has described and cut, as the two tables answer for it. */
+const SAID_BEFORE: TableAnswer = {
+  data: [{ summary: 'Said before.', tags: ['earlier'], summary_model: 'claude-opus-5-5' }],
+};
+const HAS_PIECES: TableAnswer = { data: [{ chunk_index: 0 }] };
+
+/** The pieces the handler inserted, as they were handed to Supabase. */
+function insertedPieces(): Record<string, unknown>[] {
+  const call = db.calls.find((c) => c.table === 'file_chunks' && c.op === 'insert');
+  return (call?.args?.[0] ?? []) as Record<string, unknown>[];
+}
+
+/** A download of `body`, for a file the indexer reads. */
+function serving(body: string | Uint8Array) {
+  const bytes = typeof body === 'string' ? new TextEncoder().encode(body) : body;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => String(bytes.byteLength) },
+      arrayBuffer: async () =>
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    })
+  );
+}
 
 /** The row the handler upserted, as it was handed to Supabase. */
 function upsertedRow(): Record<string, unknown> {
@@ -117,13 +173,21 @@ beforeEach(() => {
     model: 'claude-opus-5-5',
   });
   embed.mockResolvedValue(VECTOR);
+  embedMany.mockImplementation(async (texts: string[]) => texts.map(() => VECTOR));
   rpc.mockResolvedValue({ data: 'ok', error: null });
   supports.mockReturnValue(true);
+  readsPdf.value = true;
+  cloudflareReady.mockReturnValue(false);
+  pdfText.mockResolvedValue('');
   activeBackend.mockReturnValue({
     embeddingModel: EMBEDDING_MODEL,
     supports: (kind: string) => supports(kind),
+    get readsPdf() {
+      return readsPdf.value;
+    },
     describe: (...args: unknown[]) => describeFile(...args),
     embed: (...args: unknown[]) => embed(...args),
+    embedMany: (...args: unknown[]) => embedMany(...(args as [string[]])),
   });
   presign.mockResolvedValue('https://r2.example/signed');
   createSignedUrl.mockResolvedValue({
@@ -248,14 +312,7 @@ describe('index', () => {
 
   it('reads a text file and sends only the sample', async () => {
     const body = 'x'.repeat(TEXT_SAMPLE_BYTES + 500);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: { get: () => String(body.length) },
-        arrayBuffer: async () => new TextEncoder().encode(body).buffer,
-      })
-    );
+    serving(body);
     withFile({ name: 'notes.txt', type: 'text/plain' });
 
     await handler(index('file-1'), mockResponse());
@@ -332,8 +389,8 @@ describe('index', () => {
   });
 
   it('skips a file the configured backend cannot read', async () => {
-    // The free backend has no way to render a PDF page. Storing a confident
-    // sentence about a file nobody looked at would be worse than saying so.
+    // Storing a confident sentence about a file nobody looked at would be
+    // worse than saying so.
     supports.mockReturnValue(false);
     withFile({ name: 'invoice.pdf', type: 'application/pdf' });
     const res = mockResponse();
@@ -359,12 +416,7 @@ describe('index', () => {
      but the route can be called without it, and before this every call was a
      description paid for again: one file was enough to spend without end. */
   it('gives a file this model has indexed its stored description, and pays for nothing', async () => {
-    withFile(
-      {},
-      {
-        data: [{ summary: 'Said before.', tags: ['earlier'], summary_model: 'claude-opus-5-5' }],
-      }
-    );
+    withFile({}, SAID_BEFORE, HAS_PIECES);
     const res = mockResponse();
     await handler(index('file-1'), res);
 
@@ -526,5 +578,254 @@ describe('embed', () => {
 
     expect(res.statusCode).toBe(501);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('the pieces a question is answered from (ADR 0019)', () => {
+  it('cuts a text file whole, not the sample the description reads', async () => {
+    const body = 'Clause one says the rent is 950 euros.\n\n'.repeat(400);
+    serving(body);
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    const res = mockResponse();
+    await handler(index('file-1'), res);
+
+    const expected = chunkText(body, CHUNK_SIZE, CHUNK_OVERLAP).slice(0, MAX_PIECES_PER_FILE);
+    expect(expected.length).toBeGreaterThan(TEXT_SAMPLE_BYTES / CHUNK_SIZE);
+    expect(insertedPieces().map((row) => row.content)).toEqual(expected);
+    expect(res.body).toMatchObject({ indexed: true, pieces: expected.length });
+  });
+
+  it('keeps at most MAX_PIECES_PER_FILE pieces of a long file', async () => {
+    serving('A sentence of the file that goes on. '.repeat(5000));
+    withFile({ name: 'book.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces()).toHaveLength(MAX_PIECES_PER_FILE);
+    // Read only as far as the kept pieces reach, and the same pieces.
+    expect(insertedPieces().map((row) => row.content)).toEqual(
+      chunkText(
+        'A sentence of the file that goes on. '.repeat(5000),
+        CHUNK_SIZE,
+        CHUNK_OVERLAP
+      ).slice(0, MAX_PIECES_PER_FILE)
+    );
+    expect(insertedPieces().map((row) => row.chunk_index)).toEqual([
+      ...Array(MAX_PIECES_PER_FILE).keys(),
+    ]);
+  });
+
+  it('embeds each piece under the file\u2019s name, as a document, and stores it with the model', async () => {
+    serving('The rent is 950 euros.');
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(embedMany).toHaveBeenCalledWith(['lease.txt\nThe rent is 950 euros.'], 'document');
+    expect(insertedPieces()).toEqual([
+      {
+        file_id: 'file-1',
+        chunk_index: 0,
+        user_id: 'user-1',
+        content: 'The rent is 950 euros.',
+        embedding: `[${VECTOR.join(',')}]`,
+        embedding_model: EMBEDDING_MODEL,
+      },
+    ]);
+  });
+
+  it('replaces a file\u2019s pieces rather than adding to them', async () => {
+    serving('The rent is 950 euros.');
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    const writes = db.calls.filter(
+      (c) => c.table === 'file_chunks' && (c.op === 'delete' || c.op === 'insert')
+    );
+    expect(writes.map((c) => c.op)).toEqual(['delete', 'insert']);
+    const owner = db.calls.filter((c) => c.table === 'file_chunks' && c.op === 'eq');
+    expect(owner.map((c) => c.args)).toEqual(
+      expect.arrayContaining([
+        ['file_id', 'file-1'],
+        ['user_id', 'user-1'],
+      ])
+    );
+  });
+
+  it('cuts a picture\u2019s pieces from its description', async () => {
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces().map((row) => row.content)).toEqual([
+      'Two people on a bridge in Prague.',
+    ]);
+  });
+
+  it('gives a described file its pieces without describing it again', async () => {
+    withFile({}, SAID_BEFORE);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(embed).not.toHaveBeenCalled();
+    expect(db.calls.some((c) => c.table === 'file_embeddings' && c.op === 'upsert')).toBe(false);
+    expect(insertedPieces().map((row) => row.content)).toEqual(['Said before.']);
+    expect(rpc).toHaveBeenCalledWith(
+      'claim_ai_call',
+      expect.objectContaining({ p_action: 'index' })
+    );
+    expect(res.body).toMatchObject({ indexed: true, summary: 'Said before.', pieces: 1 });
+  });
+
+  it('reads a described text file again for its pieces', async () => {
+    serving('The deposit is 1900 euros.');
+    withFile({ name: 'lease.txt', type: 'text/plain' }, SAID_BEFORE);
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(insertedPieces().map((row) => row.content)).toEqual(['The deposit is 1900 euros.']);
+  });
+
+  /* What Notepad saves as "Unicode". Read as UTF-8 it was a NUL after every
+     letter, and Postgres refuses a NUL: the file could never be indexed. */
+  it('reads a UTF-16 text file as its text, with no NUL to refuse', async () => {
+    serving(
+      new Uint8Array(
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('The rent is 950 euros.', 'utf16le')])
+      )
+    );
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces().map((row) => row.content)).toEqual(['The rent is 950 euros.']);
+    expect(describeFile).toHaveBeenCalledWith('lease.txt', {
+      kind: 'text',
+      text: 'The rent is 950 euros.',
+    });
+  });
+
+  it('keeps no NUL in a piece', async () => {
+    serving('The rent\u0000 is 950 euros.');
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces().map((row) => row.content)).toEqual(['The rent is 950 euros.']);
+  });
+
+  it('names migration 022 when the table for the pieces is missing', async () => {
+    const mock = mockSupabase({
+      files: { data: [FILE] } as TableAnswer,
+      file_embeddings: { data: [] },
+      file_chunks: { error: { message: 'relation "public.file_chunks" does not exist' } },
+    });
+    db.client = mock.client;
+    db.calls = mock.calls;
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('migrations/022') });
+  });
+});
+
+describe('a PDF', () => {
+  const PDF = { name: 'factura.pdf', type: 'application/pdf' };
+  const TEXT = 'Importe total a pagar: 86,40 euros.\n\nFecha de cargo: 15 de abril.';
+
+  beforeEach(() => serving(new Uint8Array([37, 80, 68, 70])));
+
+  it('is described from its text on a backend that cannot read one, and cut from it', async () => {
+    readsPdf.value = false;
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockResolvedValue(TEXT);
+    withFile(PDF);
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(pdfText).toHaveBeenCalledWith(expect.any(Buffer), 'factura.pdf');
+    expect(describeFile).toHaveBeenCalledWith('factura.pdf', { kind: 'text', text: TEXT });
+    expect(insertedPieces().map((row) => row.content)).toEqual(
+      chunkText(TEXT, CHUNK_SIZE, CHUNK_OVERLAP)
+    );
+  });
+
+  it('with no text is refused for free on a backend that cannot read one', async () => {
+    readsPdf.value = false;
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockResolvedValue('   ');
+    withFile(PDF);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.body).toMatchObject({ indexed: false, reason: expect.stringContaining('scanned') });
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    expect(insertedPieces()).toEqual([]);
+  });
+
+  it('goes to Claude as it is, and is cut from its text when Cloudflare can read it', async () => {
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockResolvedValue(TEXT);
+    withFile(PDF);
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(describeFile).toHaveBeenCalledWith('factura.pdf', { kind: 'pdf', data: 'JVBERg==' });
+    // Two short paragraphs fit in one piece.
+    expect(insertedPieces().map((row) => row.content)).toEqual([TEXT]);
+  });
+
+  /* Claude reads the PDF itself; the text is only for the pieces, which the
+     description can give. A converter that is down must not leave the file
+     unindexed. */
+  it('goes to Claude even when toMarkdown fails, reported, and is cut from the description', async () => {
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockRejectedValue(new Error('toMarkdown answered 503'));
+    withFile(PDF);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(describeFile).toHaveBeenCalledWith('factura.pdf', { kind: 'pdf', data: 'JVBERg==' });
+    expect(insertedPieces().map((row) => row.content)).toEqual([
+      'Two people on a bridge in Prague.',
+    ]);
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'toMarkdown answered 503' }),
+      expect.objectContaining({ route: 'ai/index', level: 'warning' })
+    );
+  });
+
+  it('fails on the free path when toMarkdown fails, having nothing else to read', async () => {
+    readsPdf.value = false;
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockRejectedValue(new Error('toMarkdown answered 503'));
+    withFile(PDF);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('is cut from Claude\u2019s description when there is no Cloudflare account to read it', async () => {
+    withFile(PDF);
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(pdfText).not.toHaveBeenCalled();
+    expect(insertedPieces().map((row) => row.content)).toEqual([
+      'Two people on a bridge in Prague.',
+    ]);
   });
 });

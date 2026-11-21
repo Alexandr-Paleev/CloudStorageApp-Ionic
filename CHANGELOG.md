@@ -33,6 +33,18 @@ reasoning behind the larger decisions lives in
   it yet. Cloudflare's `toMarkdown` was tried for the free path's PDFs: all 19
   quotes of four PDFs in three languages came back word for word. ADR 0019,
   step 2a.
+- **PDFs are searched on the free path, and every indexed file is cut into
+  pieces.** The free path refused PDFs, since no model on it takes one; now
+  `toMarkdown` gives a PDF's text on the same Cloudflare account, free for a
+  PDF, and the file is described from it. A scan with no text is refused
+  before the day's budget is spent. Indexing a file also writes the pieces a
+  question will be answered from: a text file cut whole, a PDF from its text,
+  a picture from its description, at most 200 pieces, embedded in batches.
+  A text file saved as UTF-16 is read as such, and no NUL is kept, which
+  Postgres would refuse.
+  The dashboard counts a file as indexed by its first piece, so a file
+  described before is offered again and gets its pieces without a second
+  description. ADR 0019, step 2b; an update to ADR 0013.
 - **The eval waits out a rate limit.** Voyage without a payment method allows
   three requests a minute; `embed` waits and goes on instead of failing.
 

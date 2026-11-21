@@ -19,6 +19,8 @@ import { join } from 'node:path';
 import { TEXT_SAMPLE_BYTES, embeddingInput, planFor } from '../../core/src/ai';
 import type { DescribeSource } from '../src/describe';
 import { activeBackend } from '../src/ai-provider';
+import { decodeText } from '../src/decode-text';
+import { pdfText } from '../src/to-markdown';
 import { DEMO_SEED } from '../src/demo';
 import { DEMO_SEARCH_INDEX_ASSET, type DemoSearchIndex } from '../src/demo-search-index';
 
@@ -47,11 +49,17 @@ async function main(): Promise<void> {
       continue;
     }
 
+    /* As /api/ai/index reads a file: a PDF goes as it is to a model that takes
+       one, and as its text, read by toMarkdown, to one that does not. */
+    const sample = (text: string) =>
+      Buffer.from(text, 'utf8').subarray(0, TEXT_SAMPLE_BYTES).toString('utf8');
     const source: DescribeSource =
       plan.kind === 'text'
-        ? { kind: 'text', text: bytes.subarray(0, TEXT_SAMPLE_BYTES).toString('utf8') }
+        ? { kind: 'text', text: sample(decodeText(bytes)) }
         : plan.kind === 'pdf'
-          ? { kind: 'pdf', data: bytes.toString('base64') }
+          ? backend.readsPdf
+            ? { kind: 'pdf', data: bytes.toString('base64') }
+            : { kind: 'text', text: sample(await pdfText(bytes, item.name)) }
           : {
               kind: 'image',
               url: `data:${item.type};base64,${bytes.toString('base64')}`,

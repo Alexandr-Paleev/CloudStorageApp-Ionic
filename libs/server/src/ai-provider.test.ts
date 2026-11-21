@@ -60,13 +60,24 @@ describe('activeBackend', () => {
     expect(() => activeBackend()).toThrow(ProviderNotConfigured);
   });
 
-  it('admits that the free backend cannot read a PDF', () => {
+  /* It refused PDFs until toMarkdown could read their text on the same
+     account (ADR 0019); its model still cannot take one as it is. */
+  it('reads a PDF on the free backend as its text', () => {
     process.env.CLOUDFLARE_AI_TOKEN = 'cf-test';
     process.env.CLOUDFLARE_ACCOUNT_ID = 'abc123';
     const backend = activeBackend();
 
-    expect(backend.supports('image')).toBe(true);
-    expect(backend.supports('text')).toBe(true);
-    expect(backend.supports('pdf')).toBe(false);
+    expect(['image', 'text', 'pdf'].map((kind) => backend.supports(kind as 'pdf'))).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(backend.readsPdf).toBe(false);
+  });
+
+  it('hands Claude a PDF as it is', () => {
+    process.env.ANTHROPIC_API_KEY = 'a';
+    process.env.VOYAGE_API_KEY = 'v';
+    expect(activeBackend().readsPdf).toBe(true);
   });
 });
