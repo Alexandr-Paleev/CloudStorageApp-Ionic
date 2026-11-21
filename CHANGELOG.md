@@ -45,11 +45,23 @@ reasoning behind the larger decisions lives in
   The dashboard counts a file as indexed by its first piece, so a file
   described before is offered again and gets its pieces without a second
   description. ADR 0019, step 2b; an update to ADR 0013.
+- **A demo account comes with its pieces.** A demo cannot index, so the seed
+  carries them: `public/demo/search-index.json` now holds each file cut as
+  `/api/ai/index` cuts it, with a vector per piece, and `/api/demo/session`
+  writes them beside the sentence. `welcome.pdf` is indexed in the demo for
+  the first time. ADR 0019, step 2c.
 - **The eval waits out a rate limit.** Voyage without a payment method allows
   three requests a minute; `embed` waits and goes on instead of failing.
 
 ### Fixed
 
+- **A caption written on one line keeps its tags.** The free path's model is
+  asked for a sentence and a line of tags, and sometimes writes them as one
+  line: "A mock electricity bill for March 2026. Tags: electricity bill, …".
+  The parser took the whole line for the sentence, so the tags were shown
+  under the result and searched as prose, and the file had none. It splits at
+  "Tags:" now. Found rebuilding the demo's index; no description on
+  production had it.
 - **A picture too large for the free path is skipped, not failed.** The free
   path's model takes a picture of up to 3 MB. A larger one, a 3.4 MB photo on
   production on 2026-11-21, failed with a 500, and both the function and the

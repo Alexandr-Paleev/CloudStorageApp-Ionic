@@ -247,6 +247,19 @@ async function seed(userId: string, appUrl: string): Promise<void> {
           embedding_model: index.model,
           indexed_at: new Date().toISOString(),
         });
+        /* And its pieces, for a question (ADR 0019): one insert for the file. */
+        if (indexed.pieces?.length) {
+          await supabase.from('file_chunks').insert(
+            indexed.pieces.map((piece, i) => ({
+              file_id: fileId,
+              chunk_index: i,
+              user_id: userId,
+              content: piece.content,
+              embedding: toVectorLiteral(piece.embedding),
+              embedding_model: index.model,
+            }))
+          );
+        }
       }
     } catch {
       /* one asset short of a full demo is still a demo */

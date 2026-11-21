@@ -1,5 +1,6 @@
 /**
- * What a demo account's files come indexed with.
+ * What a demo account's files come indexed with: the sentence per file that
+ * search reads, and the pieces a question is answered from (ADR 0019).
  *
  * `/api/ai/index` refuses demo accounts: a description is the one call this
  * deployment pays for, and anyone can open a demo. Without an index the
@@ -21,6 +22,13 @@ export interface DemoIndexedFile {
   tags: string[];
   /** The model that wrote the summary, as `/api/ai/index` records it. */
   summary_model: string;
+  embedding: number[];
+  /** The file cut as /api/ai/index cuts it (`piecesOf`), each with its vector. */
+  pieces: DemoPiece[];
+}
+
+export interface DemoPiece {
+  content: string;
   embedding: number[];
 }
 
