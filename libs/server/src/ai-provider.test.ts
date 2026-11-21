@@ -73,6 +73,8 @@ describe('activeBackend', () => {
       true,
     ]);
     expect(backend.readsPdf).toBe(false);
+    // It sends a picture as bytes, and Workers AI takes no more than this.
+    expect(backend.maxImageBytes).toBe(3 * 1024 * 1024);
   });
 
   it('hands Claude a PDF as it is', () => {

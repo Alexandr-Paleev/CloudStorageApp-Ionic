@@ -1,4 +1,4 @@
-import { EMBEDDING_MODEL, ProviderNotConfigured } from '../../core/src/ai';
+import { EMBEDDING_MODEL, MAX_VISION_BYTES, ProviderNotConfigured } from '../../core/src/ai';
 import {
   describeFile as describeWithClaude,
   type Description,
@@ -54,6 +54,8 @@ export interface AiBackend {
   embed(text: string, inputType: InputType): Promise<number[]>;
   /** One vector per text, in order: the pieces of a file (ADR 0019). */
   embedMany(texts: string[], inputType: InputType): Promise<number[][]>;
+  /** The largest picture `describe` takes, when it has a limit of its own. */
+  readonly maxImageBytes?: number;
 }
 
 const anthropicBackend: AiBackend = {
@@ -73,6 +75,8 @@ const cloudflareBackend: AiBackend = {
   // name alone.
   supports: () => true,
   readsPdf: false,
+  // The picture goes to the model as bytes, and Workers AI takes no more.
+  maxImageBytes: MAX_VISION_BYTES,
   describe: describeWithWorkersAi,
   embed: (text) => embedWithWorkersAi(text),
   embedMany: (texts) => embedManyWithWorkersAi(texts),

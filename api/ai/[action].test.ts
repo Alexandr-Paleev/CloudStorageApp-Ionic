@@ -26,6 +26,7 @@ const {
   embedMany,
   supports,
   readsPdf,
+  maxImageBytes,
   cloudflareReady,
   pdfText,
   activeBackend,
@@ -45,6 +46,7 @@ const {
   embedMany: vi.fn(),
   supports: vi.fn(),
   readsPdf: { value: true },
+  maxImageBytes: { value: undefined as number | undefined },
   cloudflareReady: vi.fn(),
   pdfText: vi.fn(),
   activeBackend: vi.fn(),
@@ -177,6 +179,7 @@ beforeEach(() => {
   rpc.mockResolvedValue({ data: 'ok', error: null });
   supports.mockReturnValue(true);
   readsPdf.value = true;
+  maxImageBytes.value = undefined;
   cloudflareReady.mockReturnValue(false);
   pdfText.mockResolvedValue('');
   activeBackend.mockReturnValue({
@@ -184,6 +187,9 @@ beforeEach(() => {
     supports: (kind: string) => supports(kind),
     get readsPdf() {
       return readsPdf.value;
+    },
+    get maxImageBytes() {
+      return maxImageBytes.value;
     },
     describe: (...args: unknown[]) => describeFile(...args),
     embed: (...args: unknown[]) => embed(...args),
@@ -827,5 +833,46 @@ describe('a PDF', () => {
     expect(insertedPieces().map((row) => row.content)).toEqual([
       'Two people on a bridge in Prague.',
     ]);
+  });
+});
+
+/* The 3.4 MB photo of 2026-11-21 failed with a 500 and an error in Sentry:
+   the free path's model takes pictures up to 3 MB, and saying so is a reason,
+   not a failure. */
+describe('a picture larger than the model takes', () => {
+  it('is skipped with the reason, before anything is paid for', async () => {
+    maxImageBytes.value = 3 * 1024 * 1024;
+    withFile({ size: 3_459_911 });
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      indexed: false,
+      reason: "this file is larger than the 3 MB this deployment's model can look at",
+    });
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('is skipped too when it turns out larger as it is read, and nothing is reported', async () => {
+    const { FileTooLarge } = await import('../../libs/server/src/fetch-bytes');
+    describeFile.mockRejectedValue(new FileTooLarge(3 * 1024 * 1024));
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ indexed: false, reason: expect.stringContaining('3 MB') });
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('goes to a model with no limit of its own', async () => {
+    withFile({ size: 3_459_911 });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(describeFile).toHaveBeenCalled();
   });
 });

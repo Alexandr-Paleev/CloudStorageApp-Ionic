@@ -15,7 +15,7 @@ import {
   type IndexableFile,
 } from '../../libs/core/src/ai';
 import { chunkText, pieceInput } from '../../libs/core/src/chunks';
-import { fetchBytes } from '../../libs/server/src/fetch-bytes';
+import { FileTooLarge, fetchBytes } from '../../libs/server/src/fetch-bytes';
 import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
 import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
@@ -89,6 +89,10 @@ async function readableUrl(file: FileRow, userId: string): Promise<string> {
     throw new AccessError('that file does not point at your own Cloudinary folder');
   }
   return file.download_url;
+}
+
+function tooLarge(maxBytes: number): string {
+  return `this file is larger than the ${Math.round(maxBytes / (1024 * 1024))} MB this deployment's model can look at`;
 }
 
 /** What a file is described from, and the text its pieces are cut from. */
@@ -286,6 +290,15 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
      property of the environment, and a module read once at cold start would
      survive a variable being added in the dashboard. */
   const backend = activeBackend();
+
+  /* A picture larger than this backend's model takes is skipped with the
+     reason, before anything is paid for. The size on the row is the
+     provider's since migration 020, not the browser's; `fetchBytes` still
+     refuses a larger file when it arrives, and that is a skip too. */
+  if (plan.kind === 'image' && backend.maxImageBytes && file.size > backend.maxImageBytes) {
+    res.status(200).json({ indexed: false, reason: tooLarge(backend.maxImageBytes) });
+    return;
+  }
 
   if (!backend.supports(plan.kind)) {
     // The same shape of answer as a skip, because that is what it is — this
@@ -507,6 +520,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         await report(error, { route, level: 'warning' });
       }
       tooManyRequests(res, secondsUntilTomorrow(), error.message);
+      return;
+    }
+
+    /* A file over a ceiling is a reason not to index it, said as the skips
+       are, not a failure of the server: nothing went wrong, and nothing is
+       reported. */
+    if (error instanceof FileTooLarge) {
+      res.status(200).json({ indexed: false, reason: tooLarge(error.maxBytes) });
       return;
     }
 
