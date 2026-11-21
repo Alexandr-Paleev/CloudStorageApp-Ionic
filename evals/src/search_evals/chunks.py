@@ -17,8 +17,10 @@ The rules, in order:
    longer than `size` into runs of words; a single word longer than `size`
    is cut at `size`. Nothing is dropped.
 3. Each piece after the first starts with the last units of the one before,
-   up to `overlap` characters of them, so that a fact on the border of two
-   pieces is whole in at least one when it is shorter than the overlap.
+   up to `overlap` characters of them. Units are repeated whole or not at
+   all: a fact that runs from one unit into the next is whole in the next
+   piece when the unit before the border fits in the overlap, and split
+   when it does not. `split` in retrieval.py counts the quotes this cuts.
 4. A piece is a slice of the original text, from the start of its first unit
    to the end of its last, so that whatever it says can be found in the file
    exactly as it is written there.

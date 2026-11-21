@@ -125,8 +125,8 @@ piece is embedded with the file's name in front of it, and a model answers
 from the pieces nearest to the question. This measures the first half: whether
 those pieces hold the answer.
 
-**The data.** `data/documents/` holds fifteen made-up files, five in each
-language: a lease, two electricity bills a month apart, a trip and a flight,
+**The data.** `data/documents/` holds fifteen made-up files, seven in English
+and four each in Spanish and Russian: a lease, two electricity bills a month apart, a trip and a flight,
 two insurance policies, a blood test, an offer letter, two manuals, a recipe,
 meeting notes, a warranty and a gym's terms. The pairs are alike on purpose.
 `data/questions.jsonl` asks 75 questions of them. Each of 65 names where its

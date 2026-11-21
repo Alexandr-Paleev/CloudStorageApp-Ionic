@@ -45,7 +45,7 @@ answered from the pieces nearest to it.**
 - **The cut follows the text's own shape.** A piece is whole paragraphs; a
   paragraph too long for one splits into sentences, a sentence into runs of
   words. A piece is a slice of the text as written, so what it says can be
-  found in the file. No quote of the 65 was split at any size.
+  found in the file. No quote was split at any size.
 - **Characters, not tokens.** The size has to mean the same in the Python that
   measures it and in the TypeScript that runs it, without a tokenizer in a
   function. `chunks.py` is the specification, and its tests are the cases the

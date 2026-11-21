@@ -12,6 +12,12 @@ a whole quote, whatever size the pieces are, so the same labels score every
 size. A question with no evidence has no answer in these files; it is there to
 see whether the answer says so (`answer` is null for it).
 
+A reference answer says nothing its quotes do not: the answers' eval holds a
+model's answer to the quotes, and a reference that knew more would mark a
+faithful answer as missing something. A quote counts wherever it is found,
+and one is in two files on purpose: both bills give the same number for a
+power cut.
+
 The documents and everyone in them are made up. Pairs of them are alike on
 purpose, as a person's files are: two electricity bills a month apart, two
 insurance policies, two trips. A question about one should not be answered
