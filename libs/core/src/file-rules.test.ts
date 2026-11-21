@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MAX_NAME_LENGTH, SERVER_RECORDED, STORAGE_TYPES, isServerRecorded } from './file-rules';
 import { HOSTED_PROVIDERS } from './stored-path';
+import { CHUNK_SIZE, MAX_PIECES_PER_FILE } from './ai';
 
 /* SQL cannot import a constant, so the migrations write these a second time,
    and this is what notices when the two stop agreeing. */
@@ -94,5 +95,34 @@ describe('the nightly reconciliation (021)', () => {
       );
       expect(night).toContain(`GRANT EXECUTE ON FUNCTION public.${fn} TO service_role;`);
     }
+  });
+});
+
+describe('the pieces of a file (022)', () => {
+  const pieces = migration('022_add_file_chunks.sql');
+
+  it('are no longer than the cut makes them, and no more than a file may have', () => {
+    expect(pieces).toContain(`CHECK (char_length(content) BETWEEN 1 AND ${CHUNK_SIZE})`);
+    expect(pieces).toContain(`CHECK (chunk_index >= 0 AND chunk_index < ${MAX_PIECES_PER_FILE})`);
+  });
+
+  it('are read by their owner, written by the server, and searched by the caller alone', () => {
+    expect(pieces).toContain('FOR SELECT USING ((SELECT auth.uid()) = user_id)');
+    expect(pieces).toContain('REVOKE ALL ON public.file_chunks FROM PUBLIC, anon, authenticated;');
+    expect(pieces).toContain('GRANT SELECT ON public.file_chunks TO authenticated;');
+    expect(pieces).toContain('GRANT ALL ON public.file_chunks TO service_role;');
+    expect(pieces).toMatch(
+      /FROM PUBLIC, anon, service_role;\nGRANT EXECUTE ON FUNCTION public\.match_chunks\([^)]*\) TO authenticated;/
+    );
+    expect(pieces).not.toMatch(/SECURITY DEFINER/);
+  });
+
+  it('go with their file, and belong to its owner', () => {
+    expect(pieces).toContain(
+      'FOREIGN KEY (file_id, user_id) REFERENCES public.files (id, user_id) ON DELETE CASCADE'
+    );
+    expect(pieces).toContain(
+      'ALTER TABLE public.files ADD CONSTRAINT files_id_user_id_key UNIQUE (id, user_id);'
+    );
   });
 });

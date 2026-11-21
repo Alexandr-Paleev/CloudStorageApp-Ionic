@@ -23,6 +23,16 @@ reasoning behind the larger decisions lives in
   characters hold every answer in the first three, across languages too, at a
   third of the reading of 1,600. CI prints the table for both models. See ADR
   0019, which decides the rest of the work.
+- **The app cuts a file's text as the eval does, and has a table for the
+  pieces.** `libs/core/src/chunks.ts` is the cut `evals/` measured, and twenty
+  cases in `ai.eval-contract.json` hold Python and TypeScript to the same
+  pieces, an emoji and a no-break space included. Migration 022 adds
+  `file_chunks`, readable by its owner and written by the server alone, whose
+  owner is held to the file's by a key, and `match_chunks`, which searches the
+  caller's own pieces. Nothing writes to
+  it yet. Cloudflare's `toMarkdown` was tried for the free path's PDFs: all 19
+  quotes of four PDFs in three languages came back word for word. ADR 0019,
+  step 2a.
 - **The eval waits out a rate limit.** Voyage without a payment method allows
   three requests a minute; `embed` waits and goes on instead of failing.
 

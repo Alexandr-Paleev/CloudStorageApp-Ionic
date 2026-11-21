@@ -1,5 +1,5 @@
 {
-  "description": "What the search eval in evals/ must agree with the app on. ai.test.ts holds libs/core/src/ai.ts to these values and evals/tests/test_contract.py holds the Python side to them, so a change on one side fails a test on the other.",
+  "description": "What the search eval in evals/ must agree with the app on: the constants, how a file is embedded, and how its text is cut into pieces. ai.test.ts holds libs/core/src/ai.ts to these values and evals/tests/test_contract.py holds the Python side to them, so a change on one side fails a test on the other.",
   "constants": {
     "EMBEDDING_MODEL": "voyage-4",
     "EMBEDDING_DIMENSIONS": 1024,
@@ -8,7 +8,12 @@
     "MAX_TAG_CHARS": 40,
     "SEARCH_RESULTS": 15,
     "SEARCH_MIN_SIMILARITY": 0.25,
-    "SEARCH_FLOORS": { "voyage-4": 0.25, "@cf/baai/bge-m3": 0.4 }
+    "SEARCH_FLOORS": {
+      "voyage-4": 0.25,
+      "@cf/baai/bge-m3": 0.4
+    },
+    "CHUNK_SIZE": 400,
+    "CHUNK_OVERLAP": 60
   },
   "embeddingInput": [
     {
@@ -40,6 +45,166 @@
       "summary": "Factura de la luz de marzo.",
       "tags": [" ", "factura"],
       "expected": "factura-marzo.pdf\nFactura de la luz de marzo.\n, factura"
+    }
+  ],
+  "chunks": [
+    {
+      "name": "whole when it fits",
+      "text": "First paragraph.\n\nSecond one here.\n\nThird.",
+      "size": 100,
+      "overlap": 0,
+      "pieces": ["First paragraph.\n\nSecond one here.\n\nThird."]
+    },
+    {
+      "name": "whole paragraphs while they fit",
+      "text": "First paragraph.\n\nSecond one here.\n\nThird.",
+      "size": 34,
+      "overlap": 0,
+      "pieces": ["First paragraph.\n\nSecond one here.", "Third."]
+    },
+    {
+      "name": "a long paragraph splits into sentences",
+      "text": "One two three. Four five six! Seven eight nine?",
+      "size": 20,
+      "overlap": 0,
+      "pieces": ["One two three.", "Four five six!", "Seven eight nine?"]
+    },
+    {
+      "name": "a long sentence splits into runs of words",
+      "text": "alpha beta gamma delta epsilon",
+      "size": 11,
+      "overlap": 0,
+      "pieces": ["alpha beta", "gamma delta", "epsilon"]
+    },
+    {
+      "name": "a word longer than the size is cut",
+      "text": "abcdefghij",
+      "size": 4,
+      "overlap": 0,
+      "pieces": ["abcd", "efgh", "ij"]
+    },
+    {
+      "name": "overlap repeats the last units that fit",
+      "text": "Aa.\n\nBb.\n\nCc.\n\nDd.",
+      "size": 8,
+      "overlap": 3,
+      "pieces": ["Aa.\n\nBb.", "Bb.\n\nCc.", "Cc.\n\nDd."]
+    },
+    {
+      "name": "overlap never holds a piece in place",
+      "text": "Aa.\n\nBb.\n\nCc.",
+      "size": 3,
+      "overlap": 2,
+      "pieces": ["Aa.", "Bb.", "Cc."]
+    },
+    {
+      "name": "overlap leaves room for something new",
+      "text": "Aa.\n\nBb.\n\nCccccccc.",
+      "size": 10,
+      "overlap": 8,
+      "pieces": ["Aa.\n\nBb.", "Cccccccc."]
+    },
+    {
+      "name": "overlap repeats a unit when both fit",
+      "text": "Aa.\n\nBbbbbbbb.\n\nCc.",
+      "size": 14,
+      "overlap": 10,
+      "pieces": ["Aa.\n\nBbbbbbbb.", "Bbbbbbbb.\n\nCc."]
+    },
+    {
+      "name": "windows line endings",
+      "text": "One.\r\n\r\nTwo.",
+      "size": 5,
+      "overlap": 0,
+      "pieces": ["One.", "Two."]
+    },
+    {
+      "name": "nothing but space",
+      "text": " \n\n ",
+      "size": 10,
+      "overlap": 0,
+      "pieces": []
+    },
+    {
+      "name": "pieces are trimmed slices",
+      "text": "  Lead.\n\n\n  Indented line\nwith a break.\n \nEnd.  ",
+      "size": 20,
+      "overlap": 0,
+      "pieces": ["Lead.", "Indented line\nwith a", "break.\n \nEnd."]
+    },
+    {
+      "name": "an ellipsis ends a sentence",
+      "text": "Wait… then go. Done!",
+      "size": 10,
+      "overlap": 0,
+      "pieces": ["Wait…", "then go.", "Done!"]
+    },
+    {
+      "name": "an emoji is one character",
+      "text": "😀😀😀😀😀 ok.\n\nnext 😀 para.",
+      "size": 8,
+      "overlap": 0,
+      "pieces": ["😀😀😀😀😀", "ok.", "next 😀", "para."]
+    },
+    {
+      "name": "a run of emoji is cut by characters",
+      "text": "😀😀😀😀😀😀",
+      "size": 4,
+      "overlap": 0,
+      "pieces": ["😀😀😀😀", "😀😀"]
+    },
+    {
+      "name": "a no-break space is space",
+      "text": "a b c",
+      "size": 3,
+      "overlap": 0,
+      "pieces": ["a b", "c"]
+    },
+    {
+      "name": "U+FEFF is not space",
+      "text": "a﻿b c",
+      "size": 3,
+      "overlap": 0,
+      "pieces": ["a﻿b", "c"]
+    },
+    {
+      "name": "U+001F is not space",
+      "text": "a\u001fb c",
+      "size": 3,
+      "overlap": 0,
+      "pieces": ["a\u001fb", "c"]
+    },
+    {
+      "name": "text as toMarkdown gives a PDF",
+      "text": "ДОГОВОР АРЕНДЫ КВАРТИРЫ № 14/2026\nг. Валенсия, 1 февраля 2026 г.\nАрендодатель: Марина Сольер Гарсия, именуемая далее «Арендодатель».\nАрендатор: Андрей Котов, именуемый далее «Арендатор».\n1. ПРЕДМЕТ ДОГОВОРА\n1.1. Арендодатель передаёт Арендатору во временное пользование квартиру по адресу:\nВаленсия, улица Сан-Висенте-Мартир, дом 87, квартира 5Б, общей площадью 68 квадратных\nметров, с двумя спальнями и балконом.\n1.2. Квартира передаётся с мебелью и бытовой техникой согласно описи в Приложении 1:\nхолодильник, стиральная машина, духовой шкаф, кондиционер в гостиной.\n2. СРОК АРЕНДЫ\n2.1. Договор заключён на 12 месяцев: с 1 февраля 2026 года по 31 января 2027 года\nвключительно.\n2.2. Договор продлевается на тот же срок, если ни одна из сторон не заявит о расторжении\nписьменно не позднее чем за 30 дней до окончания срока.\n3. АРЕНДНАЯ ПЛАТА\n3.1. Ежемесячная арендная плата составляет 950 (девятьсот",
+      "size": 400,
+      "overlap": 60,
+      "pieces": [
+        "ДОГОВОР АРЕНДЫ КВАРТИРЫ № 14/2026\nг. Валенсия, 1 февраля 2026 г.\nАрендодатель: Марина Сольер Гарсия, именуемая далее «Арендодатель».\nАрендатор: Андрей Котов, именуемый далее «Арендатор».\n1. ПРЕДМЕТ ДОГОВОРА\n1.1.",
+        "1. ПРЕДМЕТ ДОГОВОРА\n1.1. Арендодатель передаёт Арендатору во временное пользование квартиру по адресу:\nВаленсия, улица Сан-Висенте-Мартир, дом 87, квартира 5Б, общей площадью 68 квадратных\nметров, с двумя спальнями и балконом.\n1.2. Квартира передаётся с мебелью и бытовой техникой согласно описи в Приложении 1:\nхолодильник, стиральная машина, духовой шкаф, кондиционер в гостиной.\n2.",
+        "2. СРОК АРЕНДЫ\n2.1. Договор заключён на 12 месяцев: с 1 февраля 2026 года по 31 января 2027 года\nвключительно.\n2.2. Договор продлевается на тот же срок, если ни одна из сторон не заявит о расторжении\nписьменно не позднее чем за 30 дней до окончания срока.\n3. АРЕНДНАЯ ПЛАТА\n3.1. Ежемесячная арендная плата составляет 950 (девятьсот"
+      ]
+    },
+    {
+      "name": "a document at the app's size",
+      "text": "OFFER OF EMPLOYMENT\n\nBrightfield Analytics S.L.\nAvenida de Aragón 30, 46021 Valencia\n\nValencia, 20 January 2026\n\nDear Andrei,\n\nWe are pleased to offer you the position of Senior Frontend Engineer in our Product Platform team, reporting to Clara Ibáñez, Head of Engineering.\n\nSTART DATE AND PLACE OF WORK\n\nYour employment will begin on Monday 2 March 2026. The role is hybrid: you are expected in our Valencia office on Tuesdays and Thursdays, and may work from home on the other days.\n\nSALARY AND BENEFITS\n\nYour gross annual salary will be 62,000 euros, paid in 14 instalments: twelve monthly payments and two extra payments in June and December.\n\nYou will also receive private health insurance for yourself and your spouse, a meal allowance of 11 euros per working day, and an annual training budget of 1,200 euros for courses, books and conferences.\n\nPROBATION PERIOD\n\nThe first six months are a probation period, during which either party may end the contract without notice.\n\nWORKING HOURS AND HOLIDAYS\n\nThe working week is 38 hours, with flexible start between 8:00 and 10:00. You are entitled to 23 working days of paid holiday per year, in addition to public holidays. Holidays not taken by 31 March of the following year are lost.\n\nNOTICE PERIOD\n\nAfter the probation period, you must give 30 days' written notice if you decide to leave. The company will give you the notice set out in the applicable collective agreement.\n\nEQUIPMENT\n\nYou will receive a laptop of your choice (up to 2,500 euros) and a monitor. Equipment remains company property and must be returned when the employment ends.\n\nPlease confirm your acceptance by signing and returning this letter by 31 January 2026.\n\nKind regards,\nClara Ibáñez\nHead of Engineering\n",
+      "size": 400,
+      "overlap": 60,
+      "pieces": [
+        "OFFER OF EMPLOYMENT\n\nBrightfield Analytics S.L.\nAvenida de Aragón 30, 46021 Valencia\n\nValencia, 20 January 2026\n\nDear Andrei,\n\nWe are pleased to offer you the position of Senior Frontend Engineer in our Product Platform team, reporting to Clara Ibáñez, Head of Engineering.\n\nSTART DATE AND PLACE OF WORK",
+        "START DATE AND PLACE OF WORK\n\nYour employment will begin on Monday 2 March 2026. The role is hybrid: you are expected in our Valencia office on Tuesdays and Thursdays, and may work from home on the other days.\n\nSALARY AND BENEFITS\n\nYour gross annual salary will be 62,000 euros, paid in 14 instalments: twelve monthly payments and two extra payments in June and December.",
+        "You will also receive private health insurance for yourself and your spouse, a meal allowance of 11 euros per working day, and an annual training budget of 1,200 euros for courses, books and conferences.\n\nPROBATION PERIOD\n\nThe first six months are a probation period, during which either party may end the contract without notice.\n\nWORKING HOURS AND HOLIDAYS",
+        "WORKING HOURS AND HOLIDAYS\n\nThe working week is 38 hours, with flexible start between 8:00 and 10:00. You are entitled to 23 working days of paid holiday per year, in addition to public holidays. Holidays not taken by 31 March of the following year are lost.\n\nNOTICE PERIOD",
+        "NOTICE PERIOD\n\nAfter the probation period, you must give 30 days' written notice if you decide to leave. The company will give you the notice set out in the applicable collective agreement.\n\nEQUIPMENT\n\nYou will receive a laptop of your choice (up to 2,500 euros) and a monitor. Equipment remains company property and must be returned when the employment ends.",
+        "Please confirm your acceptance by signing and returning this letter by 31 January 2026.\n\nKind regards,\nClara Ibáñez\nHead of Engineering"
+      ]
+    }
+  ],
+  "pieceInput": [
+    {
+      "name": "factura-luz-marzo-2026.pdf",
+      "text": "Importe total a pagar: 86,40 euros",
+      "expected": "factura-luz-marzo-2026.pdf\nImporte total a pagar: 86,40 euros"
     }
   ]
 }

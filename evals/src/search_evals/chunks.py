@@ -27,7 +27,14 @@ The rules, in order:
 
 Characters rather than tokens: the size has to mean the same in Python and in
 TypeScript without either loading a tokenizer, and the models this runs on
-count Cyrillic and Latin text differently anyway.
+count Cyrillic and Latin text differently anyway. A character is a code point,
+as Python and Postgres' `char_length` count; JavaScript counts an emoji as
+two, so `libs/core/src/chunks.ts` counts code points itself.
+
+Whitespace is the set in `SPACE`, written out: Python and JavaScript disagree
+on a few rare characters (Python calls the separators U+001C to U+001F space,
+JavaScript calls U+FEFF space), and a cut that differs on one of them would
+differ everywhere after it.
 """
 
 from __future__ import annotations
@@ -35,12 +42,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# A blank line, possibly with spaces on it, ends a paragraph.
+# Every character both languages take for space, and no other.
+SPACE = "\t\n\v\f\r \u00a0\u1680" + "".join(map(chr, range(0x2000, 0x200B))) + "\u2028\u2029\u202f\u205f\u3000"
+_SPACE_CLASS = "[" + "".join(re.escape(c) for c in SPACE) + "]"
+
+# A blank line, possibly with spaces or tabs on it, ends a paragraph.
 _PARAGRAPH_BREAK = re.compile(r"\n[ \t]*\n")
 # A sentence ends at . ! ? or … followed by space. Abbreviations split too
 # early sometimes; that costs a slightly smaller unit, never lost text.
-_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
-_WORD = re.compile(r"\S+")
+_SENTENCE_END = re.compile(r"(?<=[.!?…])" + _SPACE_CLASS + "+")
+_WORD = re.compile("[^" + _SPACE_CLASS[1:-1] + "]+")
+_SPACE_RUN = re.compile(_SPACE_CLASS + "+")
 
 
 @dataclass(frozen=True)
@@ -53,9 +65,9 @@ class Chunk:
 
 def _trimmed(text: str, start: int, end: int) -> tuple[int, int] | None:
     """The span without its leading and trailing whitespace, or None if empty."""
-    while start < end and text[start].isspace():
+    while start < end and text[start] in SPACE:
         start += 1
-    while end > start and text[end - 1].isspace():
+    while end > start and text[end - 1] in SPACE:
         end -= 1
     return (start, end) if start < end else None
 
@@ -146,7 +158,7 @@ def chunk(text: str, size: int, overlap: int) -> list[Chunk]:
 
 
 def _squeezed(text: str) -> str:
-    return " ".join(text.split())
+    return _SPACE_RUN.sub(" ", text).strip(" ")
 
 
 def contains(piece: str, quote: str) -> bool:

@@ -34,4 +34,4 @@ piece ships.
 | [0016](0016-the-free-path-searches-with-bge-m3.md) | The free path searches with `bge-m3`, and each model has its own floor | v4.15.0 |
 | [0017](0017-the-server-weighs-an-upload.md)      | The server weighs an upload before it counts                     | v4.16.0  |
 | [0018](0018-a-nightly-reconciliation.md)         | A nightly reconciliation holds the providers to the rows         | v4.16.0  |
-| [0019](0019-questions-are-answered-from-pieces-of-the-files.md) | Questions are answered from pieces of the files, 400 characters each | step 1 of 5 |
+| [0019](0019-questions-are-answered-from-pieces-of-the-files.md) | Questions are answered from pieces of the files, 400 characters each | step 2a of 5 |
