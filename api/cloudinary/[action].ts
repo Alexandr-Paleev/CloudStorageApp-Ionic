@@ -13,10 +13,16 @@ import {
 import { applyCors } from '../../libs/server/src/cors';
 import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
 import { report } from '../../libs/server/src/report';
+import {
+  QuotaExceeded,
+  UnknownFolder,
+  readUploadDescription,
+  recordUpload,
+} from '../../libs/server/src/record-upload';
 
 /**
- * Two actions, one serverless function: /api/cloudinary/sign and
- * /api/cloudinary/delete.
+ * Three actions, one serverless function: /api/cloudinary/sign,
+ * /api/cloudinary/confirm and /api/cloudinary/delete.
  *
  * They share a file because Vercel turns every file under api/ into its own
  * function and the Hobby plan allows twelve — which this repository already
@@ -29,7 +35,7 @@ import { report } from '../../libs/server/src/report';
  * A limit per address and one per account, as on /api/r2/presign-upload —
  * this is the same act on the provider most of this account's files go to.
  *
- * The two actions are counted apart because they are not the same shape of
+ * Signing and deleting are counted apart because they are not the same shape of
  * work: signing authorizes bytes that count against the quota, while deleting
  * gives bytes back and is the thing a person does in a run of ten. Both of
  * them reach outside this deployment, which is what the address limit in
@@ -37,6 +43,10 @@ import { report } from '../../libs/server/src/report';
  */
 const byAddress = new RateLimiter(CLOUDINARY_IP_LIMIT);
 const bySigningUser = new RateLimiter(CLOUDINARY_SIGN_LIMIT);
+/* Its own counter at the signing limit: every upload is signed once and
+   confirmed once, and one shared counter would halve what an account may
+   upload in a minute. */
+const byConfirmingUser = new RateLimiter(CLOUDINARY_SIGN_LIMIT);
 const byDeletingUser = new RateLimiter(CLOUDINARY_DELETE_LIMIT);
 
 /**
@@ -157,6 +167,105 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
 }
 
 /**
+ * Records an upload Cloudinary holds, with the size Cloudinary reports.
+ *
+ * The row used to be written by the browser, and the quota trigger counted
+ * the size it named: an account could store 40 MB and record a kilobyte. The
+ * signature does not bind the size, so nothing before this point knows what
+ * arrived. Since migration 020 the browser may not insert a Cloudinary row;
+ * this asks Cloudinary's Admin API for the asset and writes the row with the
+ * service role. One Admin API request per upload, of the 500 an hour the free
+ * plan allows; the Upload API, which `sign` and `delete` use, has no such
+ * limit. See docs/decisions/0017-the-server-weighs-an-upload.md.
+ *
+ * Whatever is not recorded is destroyed: an asset over the quota, in a folder
+ * that is not there, or that could not be weighed, would otherwise stay in
+ * the account uncounted, and the browser is about to be told it failed.
+ */
+async function confirmUpload(req: VercelRequest, res: VercelResponse, userId: string) {
+  const { publicId, resourceType } = req.body as { publicId?: string; resourceType?: string };
+
+  if (!publicId) {
+    res.status(400).json({ message: 'publicId is required' });
+    return;
+  }
+  // The two `sign` hands out. The value names the endpoint the asset is asked
+  // for, and the one it is destroyed through if it is not kept.
+  if (resourceType !== 'image' && resourceType !== 'raw') {
+    res.status(400).json({ message: 'resourceType must be image or raw' });
+    return;
+  }
+  const read = readUploadDescription(req.body);
+  if ('problem' in read) {
+    res.status(400).json({ message: read.problem });
+    return;
+  }
+  if (!ownsAsset(userId, publicId)) {
+    res.status(403).json({ message: 'Access denied' });
+    return;
+  }
+  if (
+    !process.env.CLOUDINARY_API_SECRET ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_CLOUD_NAME
+  ) {
+    res.status(501).json({ message: 'Cloudinary is not configured on the server' });
+    return;
+  }
+
+  const cloudinary = (await import('cloudinary')).v2;
+  configureCloudinary(cloudinary);
+  const discard = () => cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+
+  let asset: { bytes: number; secure_url: string };
+  try {
+    asset = await cloudinary.api.resource(publicId, { resource_type: resourceType });
+  } catch (error) {
+    // The SDK rejects with Cloudinary's answer, not an Error.
+    const status = (error as { error?: { http_code?: number } })?.error?.http_code;
+    if (status === 404) {
+      res.status(404).json({ message: 'Cloudinary holds no such upload' });
+      return;
+    }
+    if (status === 420 || status === 429) {
+      // The hour's Admin API requests are spent. An asset that cannot be
+      // weighed is not recorded, so it is not kept either.
+      await discard();
+      res
+        .status(503)
+        .json({ message: 'The upload could not be checked right now. Try again later.' });
+      return;
+    }
+    throw error;
+  }
+
+  try {
+    const row = await recordUpload({
+      userId,
+      description: read.description,
+      size: asset.bytes,
+      downloadUrl: asset.secure_url,
+      storagePath: publicId,
+      storageType: 'cloudinary',
+    });
+    res.status(201).json(row);
+  } catch (error) {
+    await discard();
+    if (error instanceof QuotaExceeded) {
+      res.status(413).json({
+        message: quotaRejection(await readQuota(userId), asset.bytes) ?? error.message,
+      });
+      return;
+    }
+    if (error instanceof UnknownFolder) {
+      res.status(400).json({ message: error.message });
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
  * Whether the asset sits in the caller's own folder — and the folder alone
  * decides.
  *
@@ -168,7 +277,7 @@ async function signUpload(req: VercelRequest, res: VercelResponse, userId: strin
  * notice.
  *
  * There used to be a second way in, for accounts on dynamic folders: a
- * public_id that matched one of the caller's `files` rows. Those rows are
+ * public_id that matched one of the caller's `files` rows. Those rows were
  * written by the browser — RLS decides whose row it is, never what it says —
  * so a caller could store another account's public_id in a row of their own
  * and delete that account's asset with it. Nor is a public_id a secret: one is
@@ -203,9 +312,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
-  /* What a report says the failure was in: one of the two actions, or the
+  /* What a report says the failure was in: one of the three actions, or the
      function for a segment that is neither. */
-  const route = action === 'sign' || action === 'delete' ? `cloudinary/${action}` : 'cloudinary';
+  const route =
+    action === 'sign' || action === 'confirm' || action === 'delete'
+      ? `cloudinary/${action}`
+      : 'cloudinary';
 
   try {
     const userId = await authenticateUser(req);
@@ -220,6 +332,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
       await signUpload(req, res, userId);
+      return;
+    }
+    if (action === 'confirm') {
+      if (!byConfirmingUser.allow(userId)) {
+        tooManyRequests(
+          res,
+          byConfirmingUser.retryAfterSeconds(userId),
+          'Too many upload requests. Try again in a minute.'
+        );
+        return;
+      }
+      await confirmUpload(req, res, userId);
       return;
     }
     if (action !== 'delete') {
@@ -300,7 +424,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
   } catch (error) {
-    // Shared by both actions, so it says neither "upload" nor "delete". The
+    // Shared by every action, so it says neither "upload" nor "delete". The
     // key is `message` throughout: httpErrorFrom() on the client reads that
     // one, and a mismatch turned every failure here — an expired session, a
     // missing migration — into a bare "Failed to authorize the upload".

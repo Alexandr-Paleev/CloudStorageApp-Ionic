@@ -5,6 +5,8 @@ import { ownerPrefix } from '@cloud-storage/core/stored-path';
 import { createMultipartUploader, type PartUploadOptions } from './multipart.upload';
 import { uploadStore, type PendingUpload } from './upload-store';
 import { apiUrl } from '../utils/api.utils';
+import type { FileMetadata } from './storage.service';
+import type { UploadDescription } from '../providers/storage.provider';
 import { sendUpload } from './xhr-upload';
 
 const r2BucketName = import.meta.env.VITE_R2_BUCKET_NAME;
@@ -187,6 +189,17 @@ const r2Service = {
     }
 
     await callApi('delete', { key });
+  },
+
+  /**
+   * Has the server record the upload: it asks R2 for the object's size and
+   * writes the row, which the browser may not (migration 020). Over the quota
+   * it answers 413 and the object is gone.
+   */
+  async confirmUpload(key: string, description: UploadDescription): Promise<FileMetadata> {
+    const row = await callApi('confirm', { key, ...description });
+    const { FileMetadataSchema } = await import('../schemas/file.schema');
+    return FileMetadataSchema.parse(row);
   },
 
   /** An hour's address for one of the account's own objects; the server sets the hour. */

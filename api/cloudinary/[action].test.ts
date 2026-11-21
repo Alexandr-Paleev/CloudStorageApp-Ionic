@@ -13,17 +13,17 @@ import {
   resetRateLimits,
 } from '../../libs/server/src/rate-limit';
 
-const { FakeAuthError, authenticateUser, db, destroy, config, apiSignRequest, report } = vi.hoisted(
-  () => ({
+const { FakeAuthError, authenticateUser, db, destroy, resource, config, apiSignRequest, report } =
+  vi.hoisted(() => ({
     FakeAuthError: class FakeAuthError extends Error {},
     authenticateUser: vi.fn(),
     db: { client: null as { from: (table: string) => unknown } | null },
     destroy: vi.fn(),
+    resource: vi.fn(),
     config: vi.fn(),
     apiSignRequest: vi.fn((_params: Record<string, unknown>, _secret: string) => 'the-signature'),
     report: vi.fn(),
-  })
-);
+  }));
 
 vi.mock('../../libs/server/src/auth', () => ({
   AuthError: FakeAuthError,
@@ -35,6 +35,7 @@ vi.mock('cloudinary', () => ({
   v2: {
     config,
     uploader: { destroy },
+    api: { resource: (...args: unknown[]) => resource(...args) },
     utils: {
       api_sign_request: (params: Record<string, unknown>, secret: string) =>
         apiSignRequest(params, secret),
@@ -518,5 +519,150 @@ describe('cloudinary: rate limiting', () => {
     await handler(del('users/user-1/photo'), res);
 
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('cloudinary confirm: the server weighs an upload and records it', () => {
+  const ASSET = 'users/user-1/abc123';
+
+  function confirm(body: Record<string, unknown> = {}) {
+    return mockRequest({
+      query: { action: 'confirm' },
+      body: {
+        publicId: ASSET,
+        resourceType: 'image',
+        name: 'photo.png',
+        type: 'image/png',
+        folderId: null,
+        ...body,
+      },
+    });
+  }
+
+  function recorded(mock: ReturnType<typeof mockSupabase>) {
+    return mock.calls.find((call) => call.table === 'files' && call.op === 'insert')?.args?.[0];
+  }
+
+  beforeEach(() => {
+    resource.mockResolvedValue({
+      bytes: 40_000_000,
+      secure_url: 'https://res.cloudinary.com/test-cloud/image/upload/abc123.png',
+    });
+  });
+
+  it('records the size Cloudinary holds, not one the browser names', async () => {
+    const mock = mockSupabase({ files: { data: [{ id: 'f1', size: 40_000_000 }] } });
+    db.client = mock.client;
+    const res = mockResponse();
+
+    await handler(confirm({ size: 1 }), res);
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toMatchObject({ id: 'f1' });
+    expect(resource).toHaveBeenCalledWith(ASSET, { resource_type: 'image' });
+    expect(recorded(mock)).toMatchObject({
+      size: 40_000_000,
+      storage_type: 'cloudinary',
+      storage_path: ASSET,
+      download_url: 'https://res.cloudinary.com/test-cloud/image/upload/abc123.png',
+      user_id: 'user-1',
+      name: 'photo.png',
+    });
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('refuses an asset outside the caller own folder, before asking Cloudinary', async () => {
+    const res = mockResponse();
+
+    await handler(confirm({ publicId: 'users/user-2/abc123' }), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(resource).not.toHaveBeenCalled();
+    expect(destroy).not.toHaveBeenCalled();
+  });
+
+  it('destroys the asset and answers 413 when the bytes do not fit', async () => {
+    db.client = mockSupabase({
+      files: { error: { message: 'Storage limit exceeded', code: 'PT413' } } as TableAnswer,
+      profiles: { data: [{ storage_limit: 10_000_000, bytes_used: 0 }] } as TableAnswer,
+    }).client;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(413);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('Storage limit exceeded') });
+    expect(destroy).toHaveBeenCalledWith(ASSET, { resource_type: 'image' });
+  });
+
+  it('destroys the asset and answers 400 when the folder is not the caller own', async () => {
+    db.client = mockSupabase({
+      files: { error: { message: 'violates foreign key', code: '23503' } } as TableAnswer,
+    }).client;
+    const res = mockResponse();
+
+    await handler(confirm({ folderId: '3f2b8c1e-4d5a-4e6f-8a9b-0c1d2e3f4a5b' }), res);
+
+    expect(res.statusCode).toBe(400);
+    expect(destroy).toHaveBeenCalledWith(ASSET, { resource_type: 'image' });
+  });
+
+  it('answers 404, and records nothing, for an asset Cloudinary does not hold', async () => {
+    resource.mockRejectedValue({ error: { http_code: 404, message: 'Resource not found' } });
+    const mock = mockSupabase({});
+    db.client = mock.client;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(404);
+    expect(recorded(mock)).toBeUndefined();
+  });
+
+  it("destroys what it cannot weigh once the hour's Admin API requests are spent", async () => {
+    resource.mockRejectedValue({ error: { http_code: 420, message: 'Rate Limit Exceeded' } });
+    const mock = mockSupabase({});
+    db.client = mock.client;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(503);
+    expect(destroy).toHaveBeenCalledWith(ASSET, { resource_type: 'image' });
+    expect(recorded(mock)).toBeUndefined();
+  });
+
+  it.each([
+    [{ publicId: undefined }, 'publicId is required'],
+    [{ resourceType: 'video' }, 'resourceType must be image or raw'],
+    [{ name: '' }, 'name is required'],
+  ])('refuses a body that cannot be a row: %j', async (body, message) => {
+    const res = mockResponse();
+
+    await handler(confirm(body), res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ message });
+    expect(resource).not.toHaveBeenCalled();
+  });
+
+  it('answers 501 when the server has no Cloudinary secret', async () => {
+    delete process.env.CLOUDINARY_API_SECRET;
+    const res = mockResponse();
+
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(501);
+  });
+
+  it('counts confirming apart from signing, so an upload is not charged twice', async () => {
+    account(TIER_LIMITS.pro.storage_limit, 0);
+    for (let i = 0; i < CLOUDINARY_SIGN_LIMIT; i++) await handler(sign(), mockResponse());
+
+    db.client = mockSupabase({ files: { data: [{ id: 'f1' }] } }).client;
+    const res = mockResponse();
+    await handler(confirm(), res);
+
+    expect(res.statusCode).toBe(201);
   });
 });

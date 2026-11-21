@@ -1,4 +1,11 @@
-import { UploadProgress } from '../services/storage.service';
+import type { FileMetadata, UploadProgress } from '../services/storage.service';
+
+/** What the browser says about a file it uploaded: never how large it is. */
+export interface UploadDescription {
+  name: string;
+  type: string;
+  folderId: string | null;
+}
 
 export interface StorageUploadResult {
   url: string;
@@ -9,10 +16,14 @@ export interface StorageUploadResult {
    *
    * Preferred over File.size for the row: it is the size of the thing that
    * actually exists, and Cloudinary in particular can hand back a different
-   * number than what was sent. It is still a figure this browser reports —
-   * see the quota note in README.md for what that does and does not buy.
+   * number than what was sent. It is still a figure this browser reports, so
+   * a row it writes counts it only where the database can check it (Supabase
+   * Storage, migration 020); Cloudinary and R2 rows are weighed by `record`.
    */
   bytes?: number;
+  /** Cloudinary only: the endpoint the asset went to, which the server chose
+   *  when it signed the upload and asks again when it records it. */
+  resourceType?: 'image' | 'raw';
 }
 
 export interface IStorageProvider {
@@ -49,6 +60,14 @@ export interface IStorageProvider {
      *  long enough to be worth pausing and resuming. The rest ignore them. */
     options?: { signal?: AbortSignal; folderId?: string | null }
   ): Promise<StorageUploadResult>;
+
+  /**
+   * Records an upload through the server, which asks the provider how many
+   * bytes it holds and writes the row itself (migration 020,
+   * docs/decisions/0017-the-server-weighs-an-upload.md). A provider without
+   * this has its row written by the browser.
+   */
+  record?(result: StorageUploadResult, description: UploadDescription): Promise<FileMetadata>;
 
   /**
    * Delete a file

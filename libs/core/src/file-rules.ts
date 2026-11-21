@@ -26,3 +26,21 @@ export type StorageType = (typeof STORAGE_TYPES)[number];
  * stricter of the two, and nothing it lets through is refused by the database.
  */
 export const MAX_NAME_LENGTH = 255;
+
+/**
+ * Providers whose rows only a server function writes (migration 020).
+ *
+ * The size of a file there is a number the quota is counted in, and a browser
+ * that names it can name less than it stored. These two are weighed by the
+ * function that confirms the upload, which asks the provider and writes the
+ * row itself. Supabase Storage is not here: the database can see that bucket,
+ * and 020 has it take the size from the object when the browser writes the
+ * row. Google Drive and Dropbox count against nothing of ours.
+ */
+export const SERVER_RECORDED = ['cloudinary', 'r2'] as const;
+
+export type ServerRecorded = (typeof SERVER_RECORDED)[number];
+
+export function isServerRecorded(storageType: string): storageType is ServerRecorded {
+  return (SERVER_RECORDED as readonly string[]).includes(storageType);
+}

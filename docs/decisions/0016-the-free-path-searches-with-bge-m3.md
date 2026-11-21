@@ -1,6 +1,6 @@
 # 0016 — The free path searches with `bge-m3`, and each model has its own floor
 
-Accepted · not released yet ·
+Accepted · v4.15.0 ·
 [`libs/server/src/cloudflare-ai.ts`](../../libs/server/src/cloudflare-ai.ts),
 [`libs/core/src/ai.ts`](../../libs/core/src/ai.ts),
 [`evals/`](../../evals/README.md)

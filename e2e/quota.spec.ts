@@ -3,6 +3,7 @@ import {
   expect,
   submitUpload,
   setStorageLimit,
+  storeObject,
   supabaseReady,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -69,7 +70,10 @@ test.describe('Storage quota', () => {
 test.describe('Two uploads at once', () => {
   test.skip(!supabaseReady, 'needs Supabase credentials in .env');
 
-  function insertFile(user: TestUser, name: string, size: number) {
+  /* The object first, as an upload stores it: since migration 020 the
+     database takes a Storage row's size from the object at its path. */
+  async function insertFile(user: TestUser, name: string, size: number) {
+    await storeObject(`${user.id}/${name}`, size);
     return fetch(`${SUPABASE_URL}/rest/v1/files`, {
       method: 'POST',
       headers: {

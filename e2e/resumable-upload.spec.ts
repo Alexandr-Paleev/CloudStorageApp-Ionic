@@ -1,4 +1,4 @@
-import { test, expect, supabaseReady } from './fixtures';
+import { test, expect, recordFileAsServer, supabaseReady } from './fixtures';
 import type { Page, Route } from '@playwright/test';
 
 /**
@@ -38,6 +38,8 @@ interface StubCalls {
   completed: { partNumber: number; etag: string }[][];
   aborted: number;
   signed: number[][];
+  /** The keys the page asked the server to record. */
+  confirmed: string[];
 }
 
 /**
@@ -50,7 +52,7 @@ interface StubCalls {
  * any other folder, and the `users/e2e/` this used to invent was exactly that.
  */
 async function stubR2(page: Page, userId: string, options: StubOptions = {}): Promise<StubCalls> {
-  const calls: StubCalls = { parts: [], completed: [], aborted: 0, signed: [] };
+  const calls: StubCalls = { parts: [], completed: [], aborted: 0, signed: [], confirmed: [] };
   const failed = new Set<number>();
   const key = `users/${userId}/1700000000_large.bin`;
 
@@ -100,6 +102,30 @@ async function stubR2(page: Page, userId: string, options: StubOptions = {}): Pr
   await page.route('**/api/r2/multipart-abort', (route) => {
     calls.aborted += 1;
     return json(route, { aborted: true });
+  });
+
+  /* What the real route does once R2 has the object: weigh it and write the
+     row, which the browser may not do itself (migration 020). The stub has
+     no object to weigh, so it records the size the file was made with. */
+  await page.route('**/api/r2/confirm', async (route) => {
+    const body = route.request().postDataJSON() as {
+      key: string;
+      name: string;
+      type: string;
+      folderId: string | null;
+    };
+    calls.confirmed.push(body.key);
+    const row = await recordFileAsServer({
+      name: body.name,
+      size: FILE_SIZE,
+      type: body.type,
+      download_url: 'https://r2.example.test/large.bin?signature=stub',
+      storage_path: body.key,
+      storage_type: 'r2',
+      folder_id: body.folderId,
+      user_id: userId,
+    });
+    return json(route, row, 201);
   });
 
   await page.route('**/api/r2/presign-download', (route) =>
@@ -155,6 +181,8 @@ test.describe('A large file, in parts', () => {
       { partNumber: 2, etag: '"etag-2"' },
       { partNumber: 3, etag: '"etag-3"' },
     ]);
+    // Recorded by the server, once, and not by the browser (migration 020).
+    expect(calls.confirmed).toEqual([`users/${user.id}/1700000000_large.bin`]);
   });
 
   test('survives a pause and a reload, and finishes what is left', async ({ page, user }) => {

@@ -1,3 +1,4 @@
+import { HttpError } from './http.utils';
 /** The storage meter as the dashboard draws it. */
 export type StorageMeter = {
   /** Fraction of the plan in use. Not clamped — it can exceed 1. */
@@ -42,7 +43,9 @@ export function storageMeter(usedBytes: number, storageLimit: number): StorageMe
 
 /**
  * The database refuses an over-quota insert with PT413 — the trigger in
- * migrations/007 — and PostgREST turns that SQLSTATE into HTTP 413.
+ * migrations/007 — and PostgREST turns that SQLSTATE into HTTP 413. A
+ * Cloudinary or R2 upload is recorded by a function since migration 020, and
+ * the function answers 413 for the same refusal.
  *
  * It is an expected answer, not a fault. Both layers that touch the failed
  * insert have to agree on that: the service that reports it and the one that
@@ -50,7 +53,9 @@ export function storageMeter(usedBytes: number, storageLimit: number): StorageMe
  * of space.
  */
 export function isQuotaRejection(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
   return (
-    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'PT413'
+    (error as { code?: string }).code === 'PT413' ||
+    (error instanceof HttpError && error.status === 413)
   );
 }

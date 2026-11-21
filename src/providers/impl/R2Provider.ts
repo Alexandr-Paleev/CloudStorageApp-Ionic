@@ -1,4 +1,4 @@
-import { IStorageProvider, StorageUploadResult } from '../storage.provider';
+import { IStorageProvider, StorageUploadResult, UploadDescription } from '../storage.provider';
 import r2Service from '../../services/r2.service';
 import { UploadProgress } from '../../services/storage.service';
 import { shouldUseMultipart } from '@cloud-storage/core/multipart';
@@ -41,6 +41,11 @@ export class R2Provider implements IStorageProvider {
       path: result.key,
       type: 'r2',
     };
+  }
+
+  /** The server weighs the object and writes the row (migration 020). */
+  record(result: StorageUploadResult, description: UploadDescription) {
+    return r2Service.confirmUpload(result.path, description);
   }
 
   async delete(path: string, _metadata?: { type?: string; name?: string }): Promise<void> {

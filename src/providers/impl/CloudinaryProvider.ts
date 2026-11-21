@@ -1,4 +1,4 @@
-import { IStorageProvider, StorageUploadResult } from '../storage.provider';
+import { IStorageProvider, StorageUploadResult, UploadDescription } from '../storage.provider';
 import cloudinaryService from '../../services/cloudinary.service';
 import { UploadProgress } from '../../services/storage.service';
 
@@ -23,7 +23,16 @@ export class CloudinaryProvider implements IStorageProvider {
       // Cloudinary stores what it stores; the file that left the browser is
       // not always the same size as the asset that arrives.
       bytes: result.bytes,
+      resourceType: result.resourceType,
     };
+  }
+
+  /** The server weighs the asset and writes the row (migration 020). */
+  record(result: StorageUploadResult, description: UploadDescription) {
+    if (!result.resourceType) {
+      throw new Error('A Cloudinary upload came back without its resource type');
+    }
+    return cloudinaryService.confirmUpload(result.path, result.resourceType, description);
   }
 
   async delete(path: string, metadata?: { type?: string; name?: string }): Promise<void> {

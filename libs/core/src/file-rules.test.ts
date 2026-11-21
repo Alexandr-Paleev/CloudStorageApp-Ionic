@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { MAX_NAME_LENGTH, STORAGE_TYPES } from './file-rules';
+import { MAX_NAME_LENGTH, SERVER_RECORDED, STORAGE_TYPES, isServerRecorded } from './file-rules';
 import { HOSTED_PROVIDERS } from './stored-path';
 
 /* SQL cannot import a constant, so the migrations write these a second time,
@@ -42,5 +42,22 @@ describe('the providers the quota counts', () => {
 
   it('are providers a row may name', () => {
     for (const hosted of HOSTED_PROVIDERS) expect(STORAGE_TYPES).toContain(hosted);
+  });
+});
+
+describe('the rows only a server writes', () => {
+  const confirmed = migration('020_server_records_hosted_uploads.sql');
+
+  it('are the ones the browser may not insert, in the policy and in the code', () => {
+    const browser = quotedIn(confirmed, /storage_type IN \(([^)]*)\)/);
+    expect([...browser, ...SERVER_RECORDED].sort()).toEqual([...STORAGE_TYPES].sort());
+    for (const provider of SERVER_RECORDED) expect(browser).not.toContain(provider);
+  });
+
+  it('are hosted, and every hosted provider is weighed by someone', () => {
+    for (const provider of SERVER_RECORDED) expect(HOSTED_PROVIDERS).toContain(provider);
+    const weighedByTheDatabase = HOSTED_PROVIDERS.filter((p) => !isServerRecorded(p));
+    expect(weighedByTheDatabase).toEqual(['supabase_storage']);
+    expect(confirmed).toMatch(/NEW\.storage_type = 'supabase_storage'/);
   });
 });
