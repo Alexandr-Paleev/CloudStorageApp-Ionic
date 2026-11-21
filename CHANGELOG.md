@@ -48,6 +48,16 @@ reasoning behind the larger decisions lives in
 - **The eval waits out a rate limit.** Voyage without a payment method allows
   three requests a minute; `embed` waits and goes on instead of failing.
 
+### Fixed
+
+- **A picture too large for the free path is skipped, not failed.** The free
+  path's model takes a picture of up to 3 MB. A larger one, a 3.4 MB photo on
+  production on 2026-11-21, failed with a 500 and an error in Sentry, and was
+  offered for indexing again every time. Now the route answers "not indexed,
+  larger than the 3 MB this deployment's model can look at" before the day's
+  budget is touched, by the size the provider recorded (migration 020); a file
+  found too large as it is read is the same answer, and nothing is reported.
+
 ## [4.16.0] — 2026-11-21
 
 ### Security
