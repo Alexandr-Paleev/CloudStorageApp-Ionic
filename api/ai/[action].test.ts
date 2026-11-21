@@ -603,6 +603,14 @@ describe('the pieces a question is answered from (ADR 0019)', () => {
     await handler(index('file-1'), mockResponse());
 
     expect(insertedPieces()).toHaveLength(MAX_PIECES_PER_FILE);
+    // Read only as far as the kept pieces reach, and the same pieces.
+    expect(insertedPieces().map((row) => row.content)).toEqual(
+      chunkText(
+        'A sentence of the file that goes on. '.repeat(5000),
+        CHUNK_SIZE,
+        CHUNK_OVERLAP
+      ).slice(0, MAX_PIECES_PER_FILE)
+    );
     expect(insertedPieces().map((row) => row.chunk_index)).toEqual([
       ...Array(MAX_PIECES_PER_FILE).keys(),
     ]);
@@ -681,6 +689,34 @@ describe('the pieces a question is answered from (ADR 0019)', () => {
     expect(insertedPieces().map((row) => row.content)).toEqual(['The deposit is 1900 euros.']);
   });
 
+  /* What Notepad saves as "Unicode". Read as UTF-8 it was a NUL after every
+     letter, and Postgres refuses a NUL: the file could never be indexed. */
+  it('reads a UTF-16 text file as its text, with no NUL to refuse', async () => {
+    serving(
+      new Uint8Array(
+        Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('The rent is 950 euros.', 'utf16le')])
+      )
+    );
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces().map((row) => row.content)).toEqual(['The rent is 950 euros.']);
+    expect(describeFile).toHaveBeenCalledWith('lease.txt', {
+      kind: 'text',
+      text: 'The rent is 950 euros.',
+    });
+  });
+
+  it('keeps no NUL in a piece', async () => {
+    serving('The rent\u0000 is 950 euros.');
+    withFile({ name: 'lease.txt', type: 'text/plain' });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(insertedPieces().map((row) => row.content)).toEqual(['The rent is 950 euros.']);
+  });
+
   it('names migration 022 when the table for the pieces is missing', async () => {
     const mock = mockSupabase({
       files: { data: [FILE] } as TableAnswer,
@@ -744,6 +780,42 @@ describe('a PDF', () => {
     expect(describeFile).toHaveBeenCalledWith('factura.pdf', { kind: 'pdf', data: 'JVBERg==' });
     // Two short paragraphs fit in one piece.
     expect(insertedPieces().map((row) => row.content)).toEqual([TEXT]);
+  });
+
+  /* Claude reads the PDF itself; the text is only for the pieces, which the
+     description can give. A converter that is down must not leave the file
+     unindexed. */
+  it('goes to Claude even when toMarkdown fails, reported, and is cut from the description', async () => {
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockRejectedValue(new Error('toMarkdown answered 503'));
+    withFile(PDF);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(describeFile).toHaveBeenCalledWith('factura.pdf', { kind: 'pdf', data: 'JVBERg==' });
+    expect(insertedPieces().map((row) => row.content)).toEqual([
+      'Two people on a bridge in Prague.',
+    ]);
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'toMarkdown answered 503' }),
+      expect.objectContaining({ route: 'ai/index', level: 'warning' })
+    );
+  });
+
+  it('fails on the free path when toMarkdown fails, having nothing else to read', async () => {
+    readsPdf.value = false;
+    cloudflareReady.mockReturnValue(true);
+    pdfText.mockRejectedValue(new Error('toMarkdown answered 503'));
+    withFile(PDF);
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(describeFile).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it('is cut from Claude\u2019s description when there is no Cloudflare account to read it', async () => {

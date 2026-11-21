@@ -40,6 +40,8 @@ reasoning behind the larger decisions lives in
   before the day's budget is spent. Indexing a file also writes the pieces a
   question will be answered from: a text file cut whole, a PDF from its text,
   a picture from its description, at most 200 pieces, embedded in batches.
+  A text file saved as UTF-16 is read as such, and no NUL is kept, which
+  Postgres would refuse.
   The dashboard counts a file as indexed by its first piece, so a file
   described before is offered again and gets its pieces without a second
   description. ADR 0019, step 2b; an update to ADR 0013.

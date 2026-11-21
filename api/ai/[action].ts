@@ -22,6 +22,7 @@ import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
 import { activeBackend, type AiBackend } from '../../libs/server/src/ai-provider';
 import { isConfigured as cloudflareConfigured } from '../../libs/server/src/cloudflare-ai';
 import { pdfText } from '../../libs/server/src/to-markdown';
+import { decodeText, withoutNul } from '../../libs/server/src/decode-text';
 import { BudgetSpent, claimAiCall, secondsUntilTomorrow } from '../../libs/server/src/ai-budget';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
@@ -124,16 +125,27 @@ async function readFile(
        the account: the free path needs it to describe the file at all, and
        both need it for the pieces. Claude without Cloudflare reads the PDF
        itself, and its pieces are cut from the description. */
-    const text = cloudflareConfigured() ? await pdfText(bytes, file.name) : null;
+    const text = cloudflareConfigured()
+      ? await pdfText(bytes, file.name).catch(async (error: unknown) => {
+          /* Claude reads the PDF itself and needs the text only for the
+             pieces, which can be cut from its description instead: a
+             converter that is down is reported, not a file left unindexed.
+             The free path has nothing else to describe the file from. */
+          if (!backend.readsPdf) throw error;
+          await report(error, { route: 'ai/index', userId, level: 'warning' });
+          return null;
+        })
+      : null;
     if (backend.readsPdf) {
       return { source: { kind: 'pdf', data: bytes.toString('base64') }, text };
     }
     return { source: { kind: 'text', text: sample(text ?? '') }, text };
   }
 
-  /* Sliced as bytes for the description, decoded whole for the pieces: a
-     description reads the start of a file, a question may be about its end. */
-  const text = bytes.toString('utf8');
+  /* Decoded whole for the pieces, sliced for the description: a description
+     reads the start of a file, a question may be about its end. UTF-16 is
+     read by its mark, and no NUL is kept (libs/server/src/decode-text.ts). */
+  const text = decodeText(bytes);
   return { source: { kind: 'text', text: sample(text) }, text };
 }
 
@@ -144,8 +156,15 @@ async function readFile(
  * far as that goes.
  */
 function piecesOf(text: string | null, summary: string): string[] {
-  const source = text?.trim() ? text : summary;
-  return chunkText(source, CHUNK_SIZE, CHUNK_OVERLAP).slice(0, MAX_PIECES_PER_FILE);
+  /* No NUL, which Postgres will not store, whatever the text came from. And
+     not all of an 8 MB file, to keep the first 200 pieces of it: they hold
+     about 200 × 400 characters of text, and the cut reads twice that. Only a
+     file with more space between its paragraphs than words in them would
+     keep a different, still valid, set of pieces. */
+  const clean = withoutNul(text ?? '');
+  const source = clean.trim() ? clean : summary;
+  const reach = MAX_PIECES_PER_FILE * CHUNK_SIZE * 2;
+  return chunkText(source.slice(0, reach), CHUNK_SIZE, CHUNK_OVERLAP).slice(0, MAX_PIECES_PER_FILE);
 }
 
 /** Replaces a file's pieces with these, under this backend's model. */

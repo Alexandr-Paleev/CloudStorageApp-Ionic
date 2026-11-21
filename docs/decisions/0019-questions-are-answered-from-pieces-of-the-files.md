@@ -127,7 +127,10 @@ What follows, decided here and amended as each part ships:
   pieces without being described again. The free path, which refused PDFs,
   now describes one from its text; Claude still reads one as it is, and its
   pieces are cut from `toMarkdown`'s text when the deployment has Cloudflare,
-  from its description when it does not. The dashboard counts a file as
+  from its description when it does not, or when `toMarkdown` fails for it. A
+  text file is read as UTF-8 or, by its byte-order mark, UTF-16, and no NUL
+  reaches a piece: Postgres refuses one, and a file saved as "Unicode" by
+  Notepad could otherwise never be indexed. The dashboard counts a file as
   indexed by its first piece.
 
 ## Alternatives
