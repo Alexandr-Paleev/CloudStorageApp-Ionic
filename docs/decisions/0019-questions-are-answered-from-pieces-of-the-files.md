@@ -1,0 +1,106 @@
+# 0019 — Questions are answered from pieces of the files
+
+Accepted · not released yet · written before most of the work it decides, like
+[0014](0014-the-public-pages-are-a-second-app.md), and amended as each piece
+ships ·
+[`evals/src/search_evals/chunks.py`](../../evals/src/search_evals/chunks.py),
+[`evals/src/search_evals/retrieval.py`](../../evals/src/search_evals/retrieval.py)
+
+## Context
+
+Search by meaning ([0013](0013-search-by-meaning-is-indexed-on-demand.md),
+[0016](0016-the-free-path-searches-with-bge-m3.md)) finds a file by what it is
+about. The next thing a person wants is to ask what a file says: "until when
+does my lease run", "how much was the electricity in March". The usual name
+for this is retrieval-augmented generation: find the passages that hold the
+answer, and have a model answer from them and from nothing else.
+
+The index cannot do that as it is. It keeps one sentence per file, at most 500
+characters, written by a model to say what the file is about. "A lease for a
+flat in Valencia for 12 months at 950 euros a month" answers two questions
+about the lease, and not the twenty others its clauses answer.
+
+## Decision
+
+**A file's text is cut into pieces, each piece is embedded, and a question is
+answered from the pieces nearest to it.**
+
+- **Pieces of at most 400 characters, each repeating about 15% of the one
+  before.** Measured, not chosen: `evals/` compared 400, 800, 1200 and 1600
+  over fifteen files in three languages and 65 questions whose answers are
+  marked by exact quotes. With `bge-m3`, the model production embeds with, 400
+  is the best size on every measure, and the cheapest to read:
+
+  | Size | recall@3 | all@5 | MRR | context@5 |
+  | ---: | ---: | ---: | ---: | ---: |
+  | **400** | **1.000** | **1.000** | **0.928** | **1,575** |
+  | 800 | 0.954 | 0.985 | 0.880 | 3,030 |
+  | 1200 | 0.969 | 0.969 | 0.909 | 4,072 |
+  | 1600 | 0.938 | 0.985 | 0.912 | 4,905 |
+
+  Voyage, the paid path, finds every answer in the first three pieces at every
+  size; with larger pieces it puts the answer first a little more often (MRR
+  0.936 at 400, 0.985 at 800) for twice the reading and more. One size for
+  both paths.
+- **The cut follows the text's own shape.** A piece is whole paragraphs; a
+  paragraph too long for one splits into sentences, a sentence into runs of
+  words. A piece is a slice of the text as written, so what it says can be
+  found in the file. No quote of the 65 was split at any size.
+- **Characters, not tokens.** The size has to mean the same in the Python that
+  measures it and in the TypeScript that runs it, without a tokenizer in a
+  function. `chunks.py` is the specification, and its tests are the cases the
+  app's cut is held to.
+- **A piece is embedded with the file's name in front.** "Importe total a
+  pagar: 86,40 euros" does not say it is electricity, or March;
+  `factura-luz-marzo-2026.pdf` does.
+
+What follows, decided here and amended as each part ships:
+
+- **Pieces are rows of their own** (migration 022), beside the sentence per
+  file, under the same row-level security, written when a file is indexed and
+  deleted with it. The demo gets its pieces from a prepared index, as it gets
+  its sentences now.
+- **The answer comes from a model told to use the pieces and nothing else**:
+  Workers AI on the free path production runs, Claude on the paid one. It names
+  the files it used, and the app shows them as links. With nothing to answer
+  from, it says so.
+- **A file's text is data, never instructions.** The model has no tools, so a
+  file that tries to give it orders can change only the answer its own owner
+  reads; the answer is shown as text, never as HTML.
+- **Each question claims a unit of the daily budget** of
+  [migration 017](../../migrations/017_bound_ai_spend.sql), and the action has
+  a per-account limit.
+- **The answers are measured too**, in `evals/`: whether every claim is in the
+  pieces read, whether the files named hold the answer, whether a question with
+  no answer gets "not in your files", and how close the answer is to the
+  reference. The model's answers are recorded, like the vectors, so CI scores
+  them without a key.
+
+## Consequences
+
+- **Fifteen files is an easy haystack.** Recall at the ceiling says the cut
+  keeps answers whole and the model finds them among these; it does not say how
+  it holds among a thousand files. The set grows when the answers' eval shows
+  where it is too easy.
+- **400 characters may be too little to answer from.** A clause without the
+  paragraph around it can be found and still be misread. The answers' eval
+  decides that; reading eight pieces instead of five still costs less than five
+  of 800.
+- **The free path still cannot read a PDF** ([0016](0016-the-free-path-searches-with-bge-m3.md)).
+  Most of what people ask about is a PDF, so the pieces need its text, and how
+  it is extracted is decided with migration 022.
+- **Indexing a file costs more**: one vector per piece, about ten for a page,
+  rather than one per file.
+
+## Alternatives
+
+- **Answer from the sentence per file.** It answers what a file is, which
+  search already does.
+- **Give the model whole files.** A question would read every file a search
+  returned, most of it beside the point, at many times the cost; and a long
+  file would not fit.
+- **Cut by tokens.** It matches what a model counts, but needs the same
+  tokenizer on both sides of the measurement, and the two models of the two
+  paths count differently anyway.
+- **Larger pieces for Voyage.** Its MRR is higher at 800, but its recall is
+  already 1.000 at 400, and one size keeps one index format.

@@ -58,3 +58,53 @@ def test_score_uses_the_apps_floor_for_the_model_unless_told(capsys: pytest.Capt
     assert "min similarity 0.4\n" in capsys.readouterr().out
     assert main(["score", "--model", "@cf/baai/bge-m3", "--min-similarity", "0.5"]) == 0
     assert "min similarity 0.5\n" in capsys.readouterr().out
+
+
+def test_score_chunks_says_which_command_fetches_what_is_missing(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["score-chunks", "--model", "voyage-none"]) == 2
+    captured = capsys.readouterr()
+    assert "run `search-evals embed-chunks --model voyage-none`" in captured.err
+    assert captured.out == ""
+
+
+def test_score_chunks_scores_every_size_from_the_cache(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A stand-in model that embeds every text as the letters it holds: crude,
+    # but deterministic, so the table can be checked for shape and bounds.
+    import numpy as np
+
+    from search_evals import cli
+
+    class Letters:
+        def __init__(self, model: str) -> None:
+            pass
+
+        def get(self, text: str, side: str) -> np.ndarray:
+            vector = np.zeros(64, dtype=np.float32)
+            for char in text.lower():
+                vector[ord(char) % 64] += 1
+            return vector
+
+    monkeypatch.setattr(cli, "VectorCache", Letters)
+
+    assert main(["score-chunks", "--model", "letters", "--sizes", "400,1600"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    sizes = [line.split()[0] for line in lines[2:] if line.split()[1] == "all"]
+    assert sizes == ["400", "1600"]
+    for line in lines[2:]:
+        recall_3, recall_k, complete, mrr = (float(value) for value in line.split()[-6:-2])
+        assert 0 <= recall_3 <= recall_k <= 1 and 0 <= complete <= 1 and 0 <= mrr <= 1
+
+
+def test_check_reads_the_documents_and_their_questions_too(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from search_evals import cli
+    from search_evals.documents import Evidence, Question
+
+    wrong = Question(id="a1", text="rent?", lang="en", evidence=(Evidence("d01", "the rent is 9999"),), answer="x")
+    monkeypatch.setattr(cli, "load_questions", lambda: [wrong])
+
+    assert main(["check"]) == 1
+    assert "d01 does not say 'the rent is 9999'" in capsys.readouterr().err
