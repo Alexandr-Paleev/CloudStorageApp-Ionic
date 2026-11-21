@@ -794,21 +794,24 @@ table onto the run page:
 | --- | ---: | ---: |
 | First load (JS + CSS) | 377.4 kB | 385 kB |
 | Largest chunk (Ionic) | 178.0 kB | 185 kB |
-| All assets, route chunks included | 472.6 kB | 480 kB |
+| All assets, route chunks included | 472.9 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.15.0, as CI measured them. Its first load is 0.5 kB
-over 4.14.0's, and all of it is the updates of supabase-js, TanStack Query
-and Vite: built with the same packages, 4.14.0's code and 4.15.0's give the
-same first load, since search lives in the dashboard's chunk. All assets grew
-0.7 kB, 0.2 of them this release's code (the offer to search by meaning, the
-type tabs in that search, a floor for each model) and 0.5 the same updates.
-4.14.0's first load was 0.6 kB
-over 4.13.0's: 0.2 kB for the sign-in page saying that an account is gone, and
-when some of its files could not be erased straight away; 0.2 kB for the reload
+Those are the figures of 4.16.0, as CI measured them. Its first load and its
+Ionic chunk are 4.15.0's to the tenth of a kilobyte: what it adds is on the
+server, and in the browser it is one request after an upload to Cloudinary or
+R2, in the chunks that upload. All assets grew 0.3 kB, that request.
+4.15.0's first load was 0.5 kB over 4.14.0's, and all of it is the updates of
+supabase-js, TanStack Query and Vite: built with the same packages, 4.14.0's
+code and 4.15.0's give the same first load, since search lives in the
+dashboard's chunk. All assets grew 0.7 kB, 0.2 of them that release's code (the
+offer to search by meaning, the type tabs in that search, a floor for each
+model) and 0.5 the same updates. 4.14.0's first load was 0.6 kB over 4.13.0's:
+0.2 kB for the sign-in page saying that an account is gone, and when some of its
+files could not be erased straight away; 0.2 kB for the reload
 that brings a tab a deploy left behind onto the new version, and for the update
 that waits to be asked; 0.1 kB for telling Google Analytics of every failed
 query and mutation, and Sentry of a preview; and the last tenth Ionic 9.0.10,
@@ -1222,8 +1225,8 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,890 statements under `src/`, the
-unit tests do not reach 648. The largest share, 293, is in `src/services`, most
+a long way, and it is meant to be. Of the 2,906 statements under `src/`, the
+unit tests do not reach 652. The largest share, 293, is in `src/services`, most
 of it in the code that talks to Supabase and Dropbox and in what keeps state in
 IndexedDB: `supabase.service.ts` and the two Dropbox services hold 132,
 `upload-store.ts` and `idb.ts` 69. The pages come next. With the page a share
