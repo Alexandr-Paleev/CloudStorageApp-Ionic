@@ -27,8 +27,9 @@ reasoning behind the larger decisions lives in
   pieces.** `libs/core/src/chunks.ts` is the cut `evals/` measured, and twenty
   cases in `ai.eval-contract.json` hold Python and TypeScript to the same
   pieces, an emoji and a no-break space included. Migration 022 adds
-  `file_chunks`, readable by its owner and written by the server alone, and
-  `match_chunks`, which searches the caller's own pieces. Nothing writes to
+  `file_chunks`, readable by its owner and written by the server alone, whose
+  owner is held to the file's by a key, and `match_chunks`, which searches the
+  caller's own pieces. Nothing writes to
   it yet. Cloudflare's `toMarkdown` was tried for the free path's PDFs: all 19
   quotes of four PDFs in three languages came back word for word. ADR 0019,
   step 2a.

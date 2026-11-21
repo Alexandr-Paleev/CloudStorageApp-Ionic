@@ -16,6 +16,11 @@
 --     the API with the service-role key, and the default grants go (002, 012);
 --   * a piece goes with its file, by cascade: an erase, a delete and the demo
 --     sweep delete `files` rows and need not know this table exists;
+--   * one thing 011 does not do: a piece's owner is its file's owner, by a
+--     key on both columns, as 018 made a file's folder its owner's. The
+--     policy reads `user_id` alone, and these rows are the text of a file,
+--     not a sentence about it; a writer that put the wrong owner on a piece
+--     would hand that text to someone else, and the key refuses the row;
 --   * the model that made a vector is written on it, and the search filters
 --     by it, so switching models is a re-index and not a silent mixture;
 --   * no vector index: an exact scan over one account's pieces is cheap, and
@@ -31,7 +36,22 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
--- 1. The pieces.
+-- 1. A file's id and owner, as one key a piece can point at.
+--
+-- `id` is already unique, so this adds an index and no rule a row could break.
+-- Added only when missing: once `file_chunks` points at it, it cannot be
+-- dropped and added again, which is how 018 makes its own run twice.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.files'::regclass AND conname = 'files_id_user_id_key'
+    ) THEN
+        ALTER TABLE public.files ADD CONSTRAINT files_id_user_id_key UNIQUE (id, user_id);
+    END IF;
+END $$;
+
+-- 2. The pieces.
 --
 -- Keyed by the file and the piece's place in it: re-indexing a file replaces
 -- its pieces rather than adding to them. The CHECKs are the limits of
@@ -39,7 +59,7 @@ SET LOCAL search_path = public, extensions;
 -- `libs/core/src/file-rules.test.ts`: a model and a parser write what goes
 -- in, and a constraint is the one limit no writer can skip (010).
 CREATE TABLE IF NOT EXISTS public.file_chunks (
-    file_id         UUID NOT NULL REFERENCES public.files(id) ON DELETE CASCADE,
+    file_id         UUID NOT NULL,
     chunk_index     INT  NOT NULL CHECK (chunk_index >= 0 AND chunk_index < 200),
     user_id         UUID NOT NULL,
     -- `char_length` counts code points, as the cut does.
@@ -47,13 +67,15 @@ CREATE TABLE IF NOT EXISTS public.file_chunks (
     embedding       vector(1024) NOT NULL,
     embedding_model TEXT NOT NULL,
     indexed_at      TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-    PRIMARY KEY (file_id, chunk_index)
+    PRIMARY KEY (file_id, chunk_index),
+    CONSTRAINT file_chunks_file_is_owners
+        FOREIGN KEY (file_id, user_id) REFERENCES public.files (id, user_id) ON DELETE CASCADE
 );
 
 COMMENT ON TABLE public.file_chunks IS
   'The pieces of an indexed file''s text, each with its vector, that a question is answered from (ADR 0019). Written server-side only.';
 
--- 2. Who may read it, and who may write.
+-- 3. Who may read it, and who may write.
 ALTER TABLE public.file_chunks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own file chunks" ON public.file_chunks;
@@ -67,11 +89,11 @@ REVOKE ALL ON public.file_chunks FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.file_chunks TO authenticated;
 GRANT ALL ON public.file_chunks TO service_role;
 
--- 3. The RLS predicate and the model filter, together.
+-- 4. The RLS predicate and the model filter, together.
 CREATE INDEX IF NOT EXISTS idx_file_chunks_user_model
     ON public.file_chunks(user_id, embedding_model);
 
--- 4. The search.
+-- 5. The search.
 --
 -- As `match_files`, and for its reasons: run by the caller, under both
 -- tables' policies; joined to `files`, so a piece whose file is gone cannot

@@ -110,11 +110,14 @@ What follows, decided here and amended as each part ships:
   own sets differ on U+FEFF and U+001C–U+001F. `CHUNK_SIZE` 400 and
   `CHUNK_OVERLAP` 60 are constants of the contract, and a file keeps at most
   200 pieces (`MAX_PIECES_PER_FILE`). Migration 022 adds `file_chunks` and
-  `match_chunks`, as 011 added the sentence per file, and was tried on
-  production in a transaction that rolled back: the owner's search found the
-  probe's pieces and another account's found none, the browser could not
-  write, `anon` could not search, a piece of 401 characters was refused, and
-  deleting the file took its pieces with it. Nothing writes to the table yet.
+  `match_chunks`, as 011 added the sentence per file, with one thing more: a
+  piece's owner is its file's owner by a key on both columns, as 018 made a
+  file's folder its owner's, since these rows are the text itself. It was
+  tried on production, twice over in a transaction that rolled back: the
+  owner's search found the probe's pieces and another account's found none,
+  the browser could not write, `anon` could not search, a piece of 401
+  characters and a piece put under another owner were refused, and deleting
+  the file took its pieces with it. Nothing writes to the table yet.
 
 ## Alternatives
 

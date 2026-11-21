@@ -117,7 +117,12 @@ describe('the pieces of a file (022)', () => {
     expect(pieces).not.toMatch(/SECURITY DEFINER/);
   });
 
-  it('go with their file', () => {
-    expect(pieces).toContain('REFERENCES public.files(id) ON DELETE CASCADE');
+  it('go with their file, and belong to its owner', () => {
+    expect(pieces).toContain(
+      'FOREIGN KEY (file_id, user_id) REFERENCES public.files (id, user_id) ON DELETE CASCADE'
+    );
+    expect(pieces).toContain(
+      'ALTER TABLE public.files ADD CONSTRAINT files_id_user_id_key UNIQUE (id, user_id);'
+    );
   });
 });
