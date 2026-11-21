@@ -16,6 +16,8 @@ import {
   searchFloor,
   toVectorLiteral,
   type IndexableFile,
+  CHUNK_SIZE,
+  CHUNK_OVERLAP,
 } from './ai';
 
 function file(overrides: Partial<IndexableFile> = {}): IndexableFile {
@@ -183,6 +185,8 @@ describe('the contract with the search eval', () => {
       SEARCH_RESULTS,
       SEARCH_MIN_SIMILARITY,
       SEARCH_FLOORS,
+      CHUNK_SIZE,
+      CHUNK_OVERLAP,
     });
   });
 

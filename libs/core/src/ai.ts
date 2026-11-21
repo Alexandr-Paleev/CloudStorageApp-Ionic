@@ -74,6 +74,22 @@ export const SEARCH_FLOORS: Readonly<Record<string, number>> = {
   '@cf/baai/bge-m3': 0.4,
 };
 
+/**
+ * The pieces a question is answered from (ADR 0019, chunks.ts): at most this
+ * many characters each, the size the eval chose over 800, 1,200 and 1,600, and
+ * the overlap it measured them with, 15% of it.
+ */
+export const CHUNK_SIZE = 400;
+export const CHUNK_OVERLAP = 60;
+
+/**
+ * The pieces kept of one file: 80,000 characters, some twenty-five pages. A
+ * piece costs a vector to make and a row to keep, and a question reads a
+ * handful of them; a file longer than this is indexed as far as this goes.
+ * The CHECK on `file_chunks.chunk_index` (migration 022) is this number.
+ */
+export const MAX_PIECES_PER_FILE = 200;
+
 /** The floor a search with this model's vectors uses. */
 export function searchFloor(model: string): number {
   // Own keys only: a name such as "constructor" must not find Object's.

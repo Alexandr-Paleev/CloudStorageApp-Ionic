@@ -4,7 +4,9 @@ Accepted · not released yet · written before most of the work it decides, like
 [0014](0014-the-public-pages-are-a-second-app.md), and amended as each piece
 ships ·
 [`evals/src/search_evals/chunks.py`](../../evals/src/search_evals/chunks.py),
-[`evals/src/search_evals/retrieval.py`](../../evals/src/search_evals/retrieval.py)
+[`evals/src/search_evals/retrieval.py`](../../evals/src/search_evals/retrieval.py),
+[`libs/core/src/chunks.ts`](../../libs/core/src/chunks.ts),
+[`migrations/022`](../../migrations/022_add_file_chunks.sql)
 
 ## Context
 
@@ -87,10 +89,32 @@ What follows, decided here and amended as each part ships:
   decides that; reading eight pieces instead of five still costs less than five
   of 800.
 - **The free path still cannot read a PDF** ([0016](0016-the-free-path-searches-with-bge-m3.md)).
-  Most of what people ask about is a PDF, so the pieces need its text, and how
-  it is extracted is decided with migration 022.
+  Most of what people ask about is a PDF, so the pieces need its text.
+  Cloudflare's `toMarkdown` gives it, on the account the free path already
+  uses, free for a PDF and with no package of ours: four PDFs made from the
+  eval's documents in three languages came back with all 19 of their quotes
+  word for word. It reads a PDF's text layer and is not documented to read a
+  scan. Its text has no blank lines between paragraphs, only the PDF's line
+  breaks, so the cut works through sentences; no quote was split at 400. It
+  also reads Word, Excel and PowerPoint files, which nothing on the free path
+  reads today.
 - **Indexing a file costs more**: one vector per piece, about ten for a page,
   rather than one per file.
+
+## Amendments
+
+- **Step 2a (2026-11-21).** The cut is in the app, `libs/core/src/chunks.ts`,
+  and `ai.eval-contract.json` holds twenty cases both sides must cut the same:
+  an emoji is one character, as Python and `char_length` count it and
+  JavaScript does not; space is a set written out, since the two languages'
+  own sets differ on U+FEFF and U+001C–U+001F. `CHUNK_SIZE` 400 and
+  `CHUNK_OVERLAP` 60 are constants of the contract, and a file keeps at most
+  200 pieces (`MAX_PIECES_PER_FILE`). Migration 022 adds `file_chunks` and
+  `match_chunks`, as 011 added the sentence per file, and was tried on
+  production in a transaction that rolled back: the owner's search found the
+  probe's pieces and another account's found none, the browser could not
+  write, `anon` could not search, a piece of 401 characters was refused, and
+  deleting the file took its pieces with it. Nothing writes to the table yet.
 
 ## Alternatives
 
