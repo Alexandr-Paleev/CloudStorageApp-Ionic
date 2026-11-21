@@ -288,6 +288,32 @@ describe('a failure', () => {
     expect(failed(outcome)).toBe(true);
   });
 
+  /* What was removed is the one thing the owner has to be told, and a failure
+     after it must not take it out of the report. */
+  it('keeps what was already done when a later step fails', async () => {
+    const cloudinary = store([
+      object(`users/${OWNER}/a.png`, 1),
+      object(`users/${OWNER}/b.png`, 9),
+    ]);
+    const d = deps({
+      rows: vi.fn(async () => [row('b', `users/${OWNER}/b.png`, 1)]),
+      cloudinary,
+      resize: vi.fn(async () => Promise.reject(new Error('connection reset'))),
+    });
+
+    const outcome = await reconcile(d, { now: NOW, apply: true });
+
+    expect(cloudinary.remove).toHaveBeenCalledOnce();
+    expect(outcome.providers.cloudinary).toMatchObject({
+      orphans: 1,
+      removed: 1,
+      misweighed: 1,
+      resized: 0,
+      failure: 'connection reset',
+    });
+    expect(summarize(outcome)).toContain('1 objects with no row (1 bytes), 1 removed');
+  });
+
   /* The Cloudinary SDK rejects with a plain object that carries the request
      it made; only its message is kept. */
   it('keeps a provider’s message and nothing of its request', async () => {

@@ -77,6 +77,14 @@ path holds an owner's id and a file's name.
   two days.
 - **Each night lists Cloudinary**: one Admin API request per 500 assets of each
   of three types, out of 500 an hour.
+- **One database to a Cloudinary cloud, an R2 bucket and a Storage project.**
+  What has no row in this database is taken for nobody's. A second
+  environment with a database of its own and the same Cloudinary cloud, a
+  staging copy or a fork run on the owner's keys, would have its assets
+  removed by the first one's night. Here there is one database, which the
+  e2e suite and local runs share.
+- **A night's report is grouped by its text in Sentry**, so a night with
+  other counts opens another issue. The counts are the report.
 - **The deployment needs a secret it did not have**, `CRON_SECRET`, and a
   second step to act, `RECONCILE_APPLY`. Turning that on deletes from
   production, and is a decision made after reading a dry night's report.

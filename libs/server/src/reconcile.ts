@@ -153,14 +153,13 @@ async function resizeAll(
 }
 
 async function reconcileListed(
+  outcome: ProviderOutcome,
   provider: 'cloudinary' | 'r2',
   store: ListedStore,
   deps: ReconcileDeps,
   cutoff: number,
   apply: boolean
-): Promise<ProviderOutcome> {
-  const outcome = empty();
-
+): Promise<void> {
   /* The rows first, then the objects. A row is written after its object, so
      every row read here has its object by the time the list is made, and a
      row with no object is one whose object is really gone. The other way
@@ -189,7 +188,7 @@ async function reconcileListed(
   ).length;
   outcome.held = heldBecause(orphans.length, objects.length, outcome.missing);
 
-  if (!apply) return outcome;
+  if (!apply) return;
 
   if (!outcome.held && orphans.length > 0) {
     const batch = orphans.slice(0, MAX_REMOVALS);
@@ -197,15 +196,14 @@ async function reconcileListed(
     outcome.removed = batch.length;
   }
   await resizeAll(deps, changes, outcome);
-  return outcome;
 }
 
 async function reconcileBucket(
+  outcome: ProviderOutcome,
   deps: ReconcileDeps,
   cutoff: number,
   apply: boolean
-): Promise<ProviderOutcome> {
-  const outcome = empty();
+): Promise<void> {
   const findings = await deps.storageBucket(new Date(cutoff));
 
   const orphans = findings.filter((finding) => finding.kind === 'orphan');
@@ -225,7 +223,7 @@ async function reconcileBucket(
 
   /* No hold here: the database compares the bucket with the rows in one
      query, and there is no list of rows of ours that could come back short. */
-  if (!apply) return outcome;
+  if (!apply) return;
 
   if (orphans.length > 0) {
     const batch = orphans.slice(0, MAX_REMOVALS).map((finding) => finding.path);
@@ -233,7 +231,6 @@ async function reconcileBucket(
     outcome.removed = batch.length;
   }
   await resizeAll(deps, changes, outcome);
-  return outcome;
 }
 
 /**
@@ -252,26 +249,34 @@ export async function reconcile(
     quota: { drifted: 0, corrected: 0 },
   };
 
-  const runs: [ReconciledProvider, () => Promise<ProviderOutcome>][] = [
-    ['supabase_storage', () => reconcileBucket(deps, cutoff, options.apply)],
+  /* Each provider fills an outcome made before it starts: one that fails
+     halfway keeps what it had already done, which is the part the owner most
+     needs to read. */
+  const runs: [ReconciledProvider, (result: ProviderOutcome) => Promise<void>][] = [
+    ['supabase_storage', (result) => reconcileBucket(result, deps, cutoff, options.apply)],
   ];
   if (deps.cloudinary) {
     const store = deps.cloudinary;
     runs.push([
       'cloudinary',
-      () => reconcileListed('cloudinary', store, deps, cutoff, options.apply),
+      (result) => reconcileListed(result, 'cloudinary', store, deps, cutoff, options.apply),
     ]);
   }
   if (deps.r2) {
     const store = deps.r2;
-    runs.push(['r2', () => reconcileListed('r2', store, deps, cutoff, options.apply)]);
+    runs.push([
+      'r2',
+      (result) => reconcileListed(result, 'r2', store, deps, cutoff, options.apply),
+    ]);
   }
 
   for (const [provider, run] of runs) {
+    const result = empty();
+    outcome.providers[provider] = result;
     try {
-      outcome.providers[provider] = await run();
+      await run(result);
     } catch (error) {
-      outcome.providers[provider] = { ...empty(), failure: messageOf(error) };
+      result.failure = messageOf(error);
     }
   }
 
