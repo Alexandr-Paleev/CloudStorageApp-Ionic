@@ -183,7 +183,7 @@ async function syncCustomer(customerId: string) {
     }));
   } catch (error) {
     /* A customer that is no longer there was deleted with its account
-       (api/account/delete.ts), and so was the profile this would write to. */
+       (api/account/[action].ts), and so was the profile this would write to. */
     if (isMissingInStripe(error)) {
       console.warn(`Webhook: customer ${customerId} no longer exists, so nothing to sync`);
       return;

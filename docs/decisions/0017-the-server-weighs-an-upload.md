@@ -87,14 +87,15 @@ and its test holds the policy in `020` to it.
 
 - **Bytes with no row.** An upload that is signed and never confirmed, or an
   object put into Storage and never recorded, is counted by nothing. The
-  bucket's 50 MB per object (018) and the signing limits bound how fast; a
-  nightly reconciliation, next, deletes what has no row after a day and
-  recounts `bytes_used`.
+  bucket's 50 MB per object (018) and the signing limits bound how fast; the
+  nightly reconciliation ([0018](0018-a-nightly-reconciliation.md)) removes
+  what has no row after a day and recounts `bytes_used`.
 - **A Storage object replaced after its row.** Storage has no update policy,
   so an object cannot be overwritten, but its owner may delete it, and a new
-  object may then be put at the same path: the row keeps the first size. The
-  reconciliation weighs the Storage rows against their objects as well, which
-  the database can do for all of them in one query.
+  object may then be put at the same path: the row keeps the first size. So
+  may a Cloudinary asset, with its upload signature used again within the
+  hour. The reconciliation ([0018](0018-a-nightly-reconciliation.md)) weighs
+  the rows against their objects and corrects them.
 - **Google Drive and Dropbox** rows are still the browser's: those bytes are in
   the person's own cloud and count against nothing of ours.
 

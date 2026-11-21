@@ -23,6 +23,18 @@ reasoning behind the larger decisions lives in
   quota the object is deleted and the upload refused with 413. Cloudinary's
   Admin API allows 500 such questions an hour on the free plan, one per
   upload. See ADR 0017.
+- **A nightly reconciliation holds the providers to the rows.** Once a day
+  Vercel Cron calls `/api/account/reconcile`, which removes an object no row
+  names once it is a day old, gives a row whose size is not its object's the
+  object's (an object can be deleted and put again at the same path after its
+  row was written), reports a row with no object, and recounts `bytes_used`
+  with each profile locked. Migration 021 adds the two queries it needs and
+  stops the quota trigger refusing an UPDATE, which only the reconciliation
+  makes now. It reports to Sentry and acts only with `RECONCILE_APPLY=true`;
+  without `CRON_SECRET` it does not run. It removes nothing when most of a
+  provider has no row, or when rows and objects disagree on both sides at
+  once. `api/account/delete.ts` is now `api/account/[action].ts`, at the same
+  address. See ADR 0018.
 
 ### Fixed
 

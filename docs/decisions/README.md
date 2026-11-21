@@ -33,3 +33,4 @@ piece ships.
 | [0015](0015-collectors-are-told-paths.md)        | Collectors are told paths, and two of them wait for a bare address | v4.10.1  |
 | [0016](0016-the-free-path-searches-with-bge-m3.md) | The free path searches with `bge-m3`, and each model has its own floor | v4.15.0 |
 | [0017](0017-the-server-weighs-an-upload.md)      | The server weighs an upload before it counts                     | not yet    |
+| [0018](0018-a-nightly-reconciliation.md)         | A nightly reconciliation holds the providers to the rows         | not yet    |

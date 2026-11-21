@@ -109,30 +109,42 @@ function closeBillingWith(key: string): (customerId: string) => Promise<void> {
   };
 }
 
+/** Whether this deployment has R2. */
+export function r2Configured(): boolean {
+  return Boolean(process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME);
+}
+
+/**
+ * Configures the Cloudinary SDK for the Admin API, if this deployment has
+ * Cloudinary, and says whether it does. Shared with the nightly
+ * reconciliation (`reconcile-providers.ts`), which lists and deletes the same
+ * way.
+ */
+export function configureCloudinaryAdmin(): boolean {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? process.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) return false;
+
+  /* hide_sensitive: a failed admin call rejects with the request it made,
+     and without it the key and the secret are in that request. The erase
+     writes the rejection to the console as it is. */
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    hide_sensitive: true,
+  });
+  return true;
+}
+
 /** Absent rather than failing where a provider is not configured: a deployment
  *  with no R2 has no R2 objects to erase, and must still delete the account. */
 export function configuredProviders(): Omit<EraseDeps, 'supabase'> {
   const deps: Omit<EraseDeps, 'supabase'> = {};
 
-  if (process.env.R2_ENDPOINT && process.env.R2_BUCKET_NAME) {
-    deps.eraseR2 = eraseR2;
-  }
-
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? process.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  if (cloudName && apiKey && apiSecret) {
-    /* hide_sensitive: a failed admin call rejects with the request it made,
-       and without it the key and the secret are in that request. The erase
-       writes the rejection to the console as it is. */
-    cloudinary.config({
-      cloud_name: cloudName,
-      api_key: apiKey,
-      api_secret: apiSecret,
-      hide_sensitive: true,
-    });
-    deps.eraseCloudinary = eraseCloudinary;
-  }
+  if (r2Configured()) deps.eraseR2 = eraseR2;
+  if (configureCloudinaryAdmin()) deps.eraseCloudinary = eraseCloudinary;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (stripeKey) deps.closeBilling = closeBillingWith(stripeKey);
