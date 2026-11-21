@@ -1,6 +1,6 @@
 # 0018 — A nightly reconciliation holds the providers to the rows
 
-Accepted · not released yet ·
+Accepted · v4.16.0 ·
 [`migrations/021`](../../migrations/021_reconcile_hosted_storage.sql),
 [`libs/server/src/reconcile.ts`](../../libs/server/src/reconcile.ts),
 [`libs/server/src/reconcile-providers.ts`](../../libs/server/src/reconcile-providers.ts),

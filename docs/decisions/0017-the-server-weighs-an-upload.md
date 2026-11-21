@@ -1,6 +1,6 @@
 # 0017 — The server weighs an upload before it counts
 
-Accepted · not released yet ·
+Accepted · v4.16.0 ·
 [`migrations/020`](../../migrations/020_server_records_hosted_uploads.sql),
 [`libs/server/src/record-upload.ts`](../../libs/server/src/record-upload.ts),
 [`api/cloudinary/[action].ts`](../../api/cloudinary/[action].ts),
