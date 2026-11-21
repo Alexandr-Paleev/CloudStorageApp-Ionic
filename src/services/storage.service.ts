@@ -12,6 +12,7 @@ import { needsDriveConnected } from './googledrive-auth.service';
 import type { PendingUpload } from './upload-store';
 import { isSearching, type FileQuery } from '../utils/file-query';
 import { isHostedProvider } from '@cloud-storage/core/stored-path';
+import type { IStorageProvider, StorageUploadResult } from '../providers/storage.provider';
 
 export type { FileMetadata, Folder };
 export type { PendingUpload };
@@ -115,17 +116,26 @@ const storageService = {
    * that never lands would leave it there uncounted and invisible. The delete
    * below is a compensating transaction — the bucket and the database cannot
    * share one.
+   *
+   * A provider that records its own uploads (Cloudinary, R2) has the server
+   * weigh the object and write the row, and deletes the object itself when it
+   * refuses; the delete here then finds nothing, which both providers answer
+   * as done. Only the rest are written from here (migration 020).
    */
   async finalizeUpload(
     userId: string,
     file: { name: string; type: string; size: number },
-    result: { url: string; path: string; type: string; bytes?: number },
-    provider: { delete: (path: string) => Promise<void> },
+    result: StorageUploadResult,
+    provider: Pick<IStorageProvider, 'delete' | 'record'>,
     folderId: string | null
   ): Promise<FileMetadata> {
     try {
       const { validateAndSanitizeName } = await import('../schemas/file.schema');
       const sanitizedName = validateAndSanitizeName(file.name);
+
+      if (provider.record) {
+        return await provider.record(result, { name: sanitizedName, type: file.type, folderId });
+      }
 
       return await supabaseService.saveFileMetadata({
         name: sanitizedName,

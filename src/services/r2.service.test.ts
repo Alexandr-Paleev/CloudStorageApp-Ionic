@@ -314,3 +314,36 @@ describe('when R2 is not configured', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('confirmUpload', () => {
+  it('asks the server to record the object, naming no size, and returns its row', async () => {
+    const row = {
+      id: '6b1f3c2e-1d4a-4b5c-8e7f-9a0b1c2d3e4f',
+      name: 'big.bin',
+      size: 40_000_000,
+      type: 'application/octet-stream',
+      download_url: 'https://r2.test/get',
+      storage_path: 'users/u1/big.bin',
+      storage_type: 'r2',
+      folder_id: null,
+      user_id: 'u1',
+    };
+    fetchMock.mockResolvedValue(jsonOk(row));
+
+    const recorded = await r2Service.confirmUpload('users/u1/big.bin', {
+      name: 'big.bin',
+      type: 'application/octet-stream',
+      folderId: null,
+    });
+
+    expect(recorded).toEqual(row);
+    expect(actionsCalled()).toEqual(['confirm']);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      key: 'users/u1/big.bin',
+      name: 'big.bin',
+      type: 'application/octet-stream',
+      folderId: null,
+    });
+  });
+});

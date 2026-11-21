@@ -711,3 +711,58 @@ describe('uploadFile — whether the upload can be paused', () => {
     expect(onStart).toHaveBeenCalledWith({ resumable: false });
   });
 });
+
+/* Cloudinary and R2 rows are written by the server since migration 020: it
+   asks the provider how many bytes it holds, so the browser names no size. */
+describe('uploadFile — a provider whose uploads the server records', () => {
+  const serverRow = { id: 'file-2', name: 'photo.png', size: 40_000_000 };
+
+  it('has the server record it, and writes no row from here', async () => {
+    const record = vi.fn(async () => serverRow);
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(provider({ record }));
+
+    const result = await storageService.uploadFile(
+      'user-1',
+      file('../photo.png', 'image/png', 1),
+      undefined,
+      'folder-9'
+    );
+
+    expect(result).toBe(serverRow);
+    expect(record).toHaveBeenCalledWith(uploaded, {
+      name: '.._photo.png',
+      type: 'image/png',
+      folderId: 'folder-9',
+    });
+    expect(supabaseService.saveFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it('says the storage is full when the server refuses with 413, and reports nothing', async () => {
+    const r2 = provider({
+      record: vi.fn(async () => {
+        throw new HttpError('Storage limit exceeded. Using 10 MB of 10 MB', 413);
+      }),
+    });
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+
+    await expect(storageService.uploadFile('user-1', file())).rejects.toThrow(
+      'Storage limit exceeded. The file was not kept'
+    );
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('removes the object and reports a failure that is not about room', async () => {
+    const r2 = provider({
+      record: vi.fn(async () => {
+        throw new HttpError('Could not record the upload', 500);
+      }),
+    });
+    vi.mocked(providerManager.selectProvider).mockResolvedValue(r2);
+
+    await expect(storageService.uploadFile('user-1', file())).rejects.toThrow(
+      'Failed to finalize upload: Could not record the upload'
+    );
+    expect(r2.delete).toHaveBeenCalledWith(uploaded.path);
+    expect(Sentry.captureException).toHaveBeenCalled();
+  });
+});

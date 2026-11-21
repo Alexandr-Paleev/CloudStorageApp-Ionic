@@ -388,21 +388,67 @@ export async function seedFolder(
   return folder.id;
 }
 
+/**
+ * Writes a file row as a server function does, with the service role, and
+ * returns it. For a stand-in for /api/r2/confirm or /api/cloudinary/confirm:
+ * since migration 020 a browser may not insert a Cloudinary or R2 row.
+ */
+export async function recordFileAsServer(row: {
+  name: string;
+  size: number;
+  type: string;
+  download_url: string;
+  storage_path: string;
+  storage_type: 'r2' | 'cloudinary';
+  folder_id: string | null;
+  user_id: string;
+}): Promise<Record<string, unknown>> {
+  const response = await admin('/rest/v1/files', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  });
+  if (!response.ok) throw new Error(`could not record a file: ${await response.text()}`);
+  const [recorded] = (await response.json()) as Record<string, unknown>[];
+  if (!recorded) throw new Error('the file was recorded but came back with no row');
+  return recorded;
+}
+
+/**
+ * Puts an object of exactly `size` bytes into the bucket, at `path`.
+ *
+ * A Storage row needs one behind it since migration 020: the database takes
+ * the row's size from the object and refuses a row that has none. deleteUser
+ * removes it with the rest of the owner's folder.
+ */
+export async function storeObject(path: string, size: number): Promise<void> {
+  const response = await admin(`/storage/v1/object/files/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: new Uint8Array(size),
+  });
+  if (!response.ok) throw new Error(`could not store an object: ${await response.text()}`);
+}
+
 export async function seedFile(
   userId: string,
   file: { name: string; type?: string; size?: number; folderId?: string | null }
 ): Promise<void> {
+  // Small on purpose: the trigger from migration 007 counts these against the
+  // account's quota exactly as it counts a real upload.
+  const size = file.size ?? 1024;
+  const storagePath = `${userId}/seeded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await storeObject(storagePath, size);
+
   const response = await admin('/rest/v1/files', {
     method: 'POST',
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({
       name: file.name,
-      // Small on purpose: the trigger from migration 007 counts these against
-      // the account's quota exactly as it counts a real upload.
-      size: file.size ?? 1024,
+      size,
       type: file.type ?? 'application/pdf',
       download_url: 'https://example.test/seeded',
-      storage_path: `${userId}/seeded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      storage_path: storagePath,
       storage_type: 'supabase_storage',
       folder_id: file.folderId ?? null,
       user_id: userId,

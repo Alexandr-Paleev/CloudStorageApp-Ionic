@@ -1,5 +1,6 @@
 import * as Sentry from '../observability/sentry';
-import { UploadProgress } from './storage.service';
+import type { FileMetadata, UploadProgress } from './storage.service';
+import type { UploadDescription } from '../providers/storage.provider';
 import { supabase } from '../supabase/supabase.config';
 import { HttpError, httpErrorFrom } from '../utils/http.utils';
 import { apiUrl } from '../utils/api.utils';
@@ -83,6 +84,7 @@ export type CloudinaryUploadResult = {
   url: string;
   format: string;
   bytes: number;
+  resourceType: 'raw' | 'image';
 };
 
 const cloudinaryService = {
@@ -161,7 +163,29 @@ const cloudinaryService = {
       url: response.secure_url,
       format: response.format,
       bytes: response.bytes,
+      resourceType: auth.resourceType,
     };
+  },
+
+  /**
+   * Has the server record the upload: it asks Cloudinary for the asset's size
+   * and writes the row, which the browser may not (migration 020). Over the
+   * quota it answers 413 and the asset is gone.
+   */
+  async confirmUpload(
+    publicId: string,
+    resourceType: 'raw' | 'image',
+    description: UploadDescription
+  ): Promise<FileMetadata> {
+    const response = await fetch(apiUrl('/api/cloudinary/confirm'), {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ publicId, resourceType, ...description }),
+    });
+    if (!response.ok) throw await httpErrorFrom(response, 'Failed to record the upload');
+
+    const { FileMetadataSchema } = await import('../schemas/file.schema');
+    return FileMetadataSchema.parse(await response.json());
   },
 
   /**

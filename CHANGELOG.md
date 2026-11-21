@@ -10,7 +10,23 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Security
+
+- **The quota counts the bytes a file has, not the number its browser
+  names.** The trigger that holds the quota counted `files.size`, and the
+  browser wrote it: an account could upload 40 MB and record a kilobyte, and
+  018 wrote down that it could. Migration 020 has the database take a Supabase
+  Storage file's size from the object at its path, and refuses a row with no
+  object behind it. A Cloudinary or R2 file is recorded by
+  `/api/cloudinary/confirm` or `/api/r2/confirm`, which ask the provider what
+  it holds and write the row; a browser may no longer insert one. Over the
+  quota the object is deleted and the upload refused with 413. Cloudinary's
+  Admin API allows 500 such questions an hour on the free plan, one per
+  upload. See ADR 0017.
+
+### Fixed
+
+- **ADR 0016 is marked as released in 4.15.0**, where it said "not yet".
 
 ## [4.15.0] — 2026-11-20
 

@@ -26,6 +26,12 @@ import {
 import { applyCors } from '../../libs/server/src/cors';
 import { ownerPrefix, ownsStoredPath } from '../../libs/core/src/stored-path';
 import { report } from '../../libs/server/src/report';
+import {
+  QuotaExceeded,
+  UnknownFolder,
+  readUploadDescription,
+  recordUpload,
+} from '../../libs/server/src/record-upload';
 
 /**
  * Everything R2, behind one serverless function.
@@ -37,6 +43,7 @@ import { report } from '../../libs/server/src/report';
  *   POST /api/r2/multipart-sign       URLs for a batch of parts
  *   POST /api/r2/multipart-complete   assemble the parts into the object
  *   POST /api/r2/multipart-abort      give up and release what was stored
+ *   POST /api/r2/confirm              weigh what arrived and record the file
  *
  * These were three files until multipart needed four more routes and the Hobby
  * plan's twelve functions were already spoken for. The paths are unchanged:
@@ -55,6 +62,9 @@ const PART_URL_TTL = 6 * 3600;
 
 const byAddress = new RateLimiter(PRESIGN_IP_LIMIT);
 const byUploadingUser = new RateLimiter(PRESIGN_LIMIT);
+/* Every upload is presigned once and confirmed once: a counter of its own,
+   or the two would share, and halve, what an account may upload a minute. */
+const byConfirmingUser = new RateLimiter(PRESIGN_LIMIT);
 const byPartSigningUser = new RateLimiter(R2_PART_SIGN_LIMIT);
 
 /**
@@ -306,10 +316,11 @@ async function multipartComplete(req: VercelRequest, res: VercelResponse, userId
    * match — and the comment there says so. This path was added later and did not
    * inherit it.
    *
-   * The row that records the file is written by the browser too, under RLS, so
-   * the quota trigger sums a number the account also chooses. That is a bigger
-   * change than this one. What this closes is the part that costs money: bytes
-   * that are actually in the bucket, past a limit, with nothing to notice them.
+   * What this closes is the part that costs money: bytes that are actually in
+   * the bucket, past a limit, with nothing to notice them. The row that
+   * records the file is written by `confirm`, which weighs the object again:
+   * this check comes first only so that an upload over the limit is refused
+   * before its parts are left to anyone.
    */
   const stored = await client.send(new HeadObjectCommand({ Bucket, Key: key }));
   const size = stored.ContentLength ?? 0;
@@ -351,6 +362,81 @@ async function multipartAbort(req: VercelRequest, res: VercelResponse, userId: s
   return res.status(200).json({ aborted: true });
 }
 
+/**
+ * Records an object R2 holds, with the size R2 reports.
+ *
+ * The row used to be written by the browser, with a size it named. The single
+ * PUT binds its `ContentLength` and `multipart-complete` weighs what arrived,
+ * but neither wrote the row, so the quota trigger still counted the browser's
+ * number. Since migration 020 the browser may not insert an R2 row; this asks
+ * R2 for the object and writes it with the service role, for a single PUT and
+ * a multipart upload alike. See docs/decisions/0017-the-server-weighs-an-upload.md.
+ *
+ * An object that is not recorded is deleted: over the quota, or filed into a
+ * folder that is not there, it would otherwise stay in the bucket, billable.
+ */
+async function confirmUpload(req: VercelRequest, res: VercelResponse, userId: string) {
+  const { key } = req.body as { key?: string };
+
+  if (!key) return bad(res, 'key is required');
+  const read = readUploadDescription(req.body);
+  if ('problem' in read) return bad(res, read.problem);
+  if (!ownsKey(userId, key)) return res.status(403).json({ message: 'Access denied' });
+
+  if (!byConfirmingUser.allow(userId)) {
+    return tooManyRequests(
+      res,
+      byConfirmingUser.retryAfterSeconds(userId),
+      'Too many upload requests. Try again in a minute.'
+    );
+  }
+
+  const client = getS3Client();
+  const Bucket = getR2BucketName();
+
+  let size: number;
+  try {
+    const stored = await client.send(new HeadObjectCommand({ Bucket, Key: key }));
+    size = stored.ContentLength ?? 0;
+  } catch (error) {
+    if ((error as { name?: string })?.name === 'NotFound') {
+      return res.status(404).json({ message: 'R2 holds no such upload' });
+    }
+    throw error;
+  }
+
+  /* The address the row keeps is signed, as presign-download signs one; the
+     app signs a fresh one from the key whenever it opens the file. */
+  const downloadUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket, Key: key }), {
+    expiresIn: DEFAULT_DOWNLOAD_TTL,
+  });
+
+  try {
+    const row = await recordUpload({
+      userId,
+      description: read.description,
+      size,
+      downloadUrl,
+      storagePath: key,
+      storageType: 'r2',
+    });
+    return res.status(201).json(row);
+  } catch (error) {
+    /* Not kept, so not left in the bucket. A failed delete is reported and
+       does not replace the answer the browser needs to hear. */
+    await client
+      .send(new DeleteObjectCommand({ Bucket, Key: key }))
+      .catch((deleteError) => report(deleteError, { route: 'r2/confirm', userId }));
+    if (error instanceof QuotaExceeded) {
+      return res.status(413).json({
+        message: quotaRejection(await readQuota(userId), size) ?? error.message,
+      });
+    }
+    if (error instanceof UnknownFolder) return bad(res, error.message);
+    throw error;
+  }
+}
+
 const ACTIONS: Record<
   string,
   (req: VercelRequest, res: VercelResponse, userId: string) => Promise<unknown>
@@ -362,6 +448,7 @@ const ACTIONS: Record<
   'multipart-sign': multipartSign,
   'multipart-complete': multipartComplete,
   'multipart-abort': multipartAbort,
+  confirm: confirmUpload,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

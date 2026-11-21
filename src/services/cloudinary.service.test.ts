@@ -195,6 +195,8 @@ describe('uploadFile', () => {
       url: 'https://res.cloudinary.com/photo.png',
       format: 'png',
       bytes: 1024,
+      // The endpoint the server signed it for, which recording it asks again.
+      resourceType: 'image',
     });
   });
 });
@@ -273,5 +275,60 @@ describe('deleteFile', () => {
     await fresh.deleteFile('users/user-1/photo');
 
     expect(fetchMock.mock.calls[0]![0]).toBe('https://example.invalid/api/cloudinary/delete');
+  });
+});
+
+describe('confirmUpload', () => {
+  const row = {
+    id: '6b1f3c2e-1d4a-4b5c-8e7f-9a0b1c2d3e4f',
+    name: 'photo.png',
+    size: 40_000_000,
+    type: 'image/png',
+    download_url: 'https://res.cloudinary.com/photo.png',
+    storage_path: 'users/user-1/photo',
+    storage_type: 'cloudinary',
+    folder_id: null,
+    user_id: 'user-1',
+  };
+
+  it('asks the server to record the asset, naming no size, and returns its row', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 201, json: async () => row }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const recorded = await cloudinaryService.confirmUpload('users/user-1/photo', 'image', {
+      name: 'photo.png',
+      type: 'image/png',
+      folderId: null,
+    });
+
+    expect(recorded).toEqual(row);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toMatch(/\/api\/cloudinary\/confirm$/);
+    expect(JSON.parse(init.body as string)).toEqual({
+      publicId: 'users/user-1/photo',
+      resourceType: 'image',
+      name: 'photo.png',
+      type: 'image/png',
+      folderId: null,
+    });
+  });
+
+  it('carries the status of a refusal, so a full quota reads as one', async () => {
+    authorizeWith({
+      ok: false,
+      status: 413,
+      json: async () => ({ message: 'Storage limit exceeded' }),
+    } as unknown as Response);
+
+    const error = await cloudinaryService
+      .confirmUpload('users/user-1/photo', 'image', {
+        name: 'p.png',
+        type: 'image/png',
+        folderId: null,
+      })
+      .catch((e) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({ status: 413, message: 'Storage limit exceeded' });
   });
 });

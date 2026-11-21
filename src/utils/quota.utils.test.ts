@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { storageMeter } from './quota.utils';
+import { isQuotaRejection, storageMeter } from './quota.utils';
+import { HttpError } from './http.utils';
 import { TIER_LIMITS } from '@cloud-storage/core/tiers';
 
 const FREE = TIER_LIMITS.free.storage_limit;
@@ -65,5 +66,23 @@ describe('storageMeter', () => {
     // getTotalStorageUsed() returning undefined once put "NaN%" on the page.
     expect(storageMeter(NaN, FREE).percentage).toBe('0.0');
     expect(storageMeter(undefined as unknown as number, FREE).percentage).toBe('0.0');
+  });
+});
+
+describe('isQuotaRejection', () => {
+  it('knows the database refusing a row it wrote', () => {
+    expect(isQuotaRejection({ code: 'PT413', message: 'Storage limit exceeded' })).toBe(true);
+  });
+
+  it('knows a function refusing a row it records (migration 020)', () => {
+    expect(isQuotaRejection(new HttpError('Storage limit exceeded', 413))).toBe(true);
+  });
+
+  it.each([
+    ['a failure of another kind', new HttpError('Bad gateway', 502)],
+    ['another database error', { code: '23503' }],
+    ['nothing', null],
+  ])('does not take %s for one', (_label, error) => {
+    expect(isQuotaRejection(error)).toBe(false);
   });
 });

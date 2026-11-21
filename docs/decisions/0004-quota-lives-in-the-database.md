@@ -87,3 +87,14 @@ bucket with no row at all. A visitor who finds them all taken gets the place
 of the oldest once it is an hour old (`api/demo/session.ts`): with a day's
 life each, one address could otherwise take every place at once and keep the
 demo closed for the day.
+
+## Update — 2026-11-20
+
+The size is no longer the browser's word for a hosted file
+([0017](0017-the-server-weighs-an-upload.md)). [`020`](../../migrations/020_server_records_hosted_uploads.sql)
+has the database take a Storage row's size from the object at its path, and
+refuses a row with no object behind it. Cloudinary and R2 rows are written by
+the function that confirms the upload, with the size the provider reports; a
+browser may no longer insert one. The trigger above counts the same column,
+which now holds a number nobody chose. What stays open is bytes put in a
+bucket with no row at all, for the nightly reconciliation.

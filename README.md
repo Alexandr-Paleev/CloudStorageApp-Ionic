@@ -190,12 +190,18 @@ render — and the banner says the deletion has not reached the server yet:
   before the bytes travel; the trigger is what makes that refusal binding.
   Google Drive and Dropbox are not counted: those files live in the user's own
   cloud, which is what makes overflowing into a connected Drive work at all.
-- ⚠️ The size the trigger checks is the one written on the row, and the row is
-  written by the browser. No path can skip the check, and no two uploads can
-  claim the same free space — but a caller crafting the insert by hand can
-  declare a smaller number than it uploaded. Closing that needs a size the
-  server has verified, which needs the server to see the bytes, which is the
-  4.5 MB request limit these direct uploads exist to avoid.
+- ✅ The size the trigger checks is the provider's, not the browser's
+  ([decision 0017](docs/decisions/0017-the-server-weighs-an-upload.md)). The
+  bytes still go from the browser straight to the provider, under Vercel's
+  4.5 MB request limit, and nothing has to see them: the database reads a
+  Storage file's size from the bucket when its row is written, and the row of
+  a Cloudinary or R2 file is written by a function that asks the provider
+  first. A browser may not insert those rows at all.
+- ⚠️ Bytes stored with no row are counted by nothing: an upload to Cloudinary
+  or R2 that is never confirmed, or an object put into Storage and never
+  recorded. Each object is at most 50 MB in Storage, and the routes that sign
+  Cloudinary and R2 uploads are rate-limited, but neither bounds the total; a
+  nightly reconciliation that deletes them is next.
 
 ### 💳 Billing
 
