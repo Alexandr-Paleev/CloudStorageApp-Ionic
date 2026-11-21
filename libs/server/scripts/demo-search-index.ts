@@ -24,6 +24,7 @@ import type { DescribeSource } from '../src/describe';
 import { activeBackend } from '../src/ai-provider';
 import { decodeText } from '../src/decode-text';
 import { pdfText } from '../src/to-markdown';
+import { isConfigured as cloudflareConfigured } from '../src/cloudflare-ai';
 import { DEMO_SEED } from '../src/demo';
 import { DEMO_SEARCH_INDEX_ASSET, type DemoSearchIndex } from '../src/demo-search-index';
 
@@ -56,11 +57,14 @@ async function main(): Promise<void> {
        one, and as its text, read by toMarkdown, to one that does not. */
     const sample = (text: string) =>
       Buffer.from(text, 'utf8').subarray(0, TEXT_SAMPLE_BYTES).toString('utf8');
-    // The text the pieces are cut from: none for a picture, cut from its description.
+    /* The text the pieces are cut from, as /api/ai/index reads it: none for a
+       picture, cut from its description; a PDF's from toMarkdown where the
+       deployment has Cloudflare, and from Claude's description where it does
+       not. */
     const text =
       plan.kind === 'text'
         ? decodeText(bytes)
-        : plan.kind === 'pdf'
+        : plan.kind === 'pdf' && cloudflareConfigured()
           ? await pdfText(bytes, item.name)
           : null;
     const source: DescribeSource =
