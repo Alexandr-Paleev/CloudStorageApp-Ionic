@@ -2,7 +2,10 @@ import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel
 import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
 import { isDemoEmail } from '../../libs/server/src/demo';
 import {
+  CHUNK_OVERLAP,
+  CHUNK_SIZE,
   MAX_DESCRIBE_BYTES,
+  MAX_PIECES_PER_FILE,
   ProviderNotConfigured,
   TEXT_SAMPLE_BYTES,
   embeddingInput,
@@ -11,11 +14,14 @@ import {
   type IndexPlan,
   type IndexableFile,
 } from '../../libs/core/src/ai';
+import { chunkText, pieceInput } from '../../libs/core/src/chunks';
 import { fetchBytes } from '../../libs/server/src/fetch-bytes';
 import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
 import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
-import { activeBackend } from '../../libs/server/src/ai-provider';
+import { activeBackend, type AiBackend } from '../../libs/server/src/ai-provider';
+import { isConfigured as cloudflareConfigured } from '../../libs/server/src/cloudflare-ai';
+import { pdfText } from '../../libs/server/src/to-markdown';
 import { BudgetSpent, claimAiCall, secondsUntilTomorrow } from '../../libs/server/src/ai-budget';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
@@ -32,7 +38,7 @@ import { report } from '../../libs/server/src/report';
 /**
  * The two halves of semantic search that need a secret:
  *
- *   POST /api/ai/index   describe one file and store its vector
+ *   POST /api/ai/index   describe one file, cut its text into pieces, store the vectors
  *   POST /api/ai/embed   turn a search box into a vector
  *
  * One file for both, because Vercel makes a function out of every file under
@@ -84,33 +90,99 @@ async function readableUrl(file: FileRow, userId: string): Promise<string> {
   return file.download_url;
 }
 
-async function sourceFor(
+/** What a file is described from, and the text its pieces are cut from. */
+interface Reading {
+  source: DescribeSource;
+  /** The file's text; null for a picture, which is cut from its description. */
+  text: string | null;
+}
+
+/** The start of a text, as much as a description is given: whole bytes. */
+function sample(text: string): string {
+  return Buffer.from(text, 'utf8').subarray(0, TEXT_SAMPLE_BYTES).toString('utf8');
+}
+
+async function readFile(
   file: FileRow,
   plan: IndexPlan & { kind: 'image' | 'pdf' | 'text' },
-  userId: string
-) {
+  userId: string,
+  backend: AiBackend
+): Promise<Reading> {
   const url = await readableUrl(file, userId);
 
   if (plan.kind === 'image') {
     // By link rather than by value: the bytes are already behind a URL that
     // outlives this request, and a photograph held in a serverless function
     // is memory and a round trip spent to say the same thing.
-    return { kind: 'image', url, mediaType: file.type } satisfies DescribeSource;
+    return { source: { kind: 'image', url, mediaType: file.type }, text: null };
   }
 
   const bytes = await fetchBytes(url, MAX_DESCRIBE_BYTES);
 
   if (plan.kind === 'pdf') {
-    return { kind: 'pdf', data: bytes.toString('base64') } satisfies DescribeSource;
+    /* The text comes from Cloudflare's toMarkdown wherever the deployment has
+       the account: the free path needs it to describe the file at all, and
+       both need it for the pieces. Claude without Cloudflare reads the PDF
+       itself, and its pieces are cut from the description. */
+    const text = cloudflareConfigured() ? await pdfText(bytes, file.name) : null;
+    if (backend.readsPdf) {
+      return { source: { kind: 'pdf', data: bytes.toString('base64') }, text };
+    }
+    return { source: { kind: 'text', text: sample(text ?? '') }, text };
   }
 
-  /* Sliced as bytes, decoded after: cutting a UTF-8 string by character count
-     would still send the whole file through the decoder, and cutting the
-     buffer mid-codepoint only costs the last character. */
-  return {
-    kind: 'text',
-    text: bytes.subarray(0, TEXT_SAMPLE_BYTES).toString('utf8'),
-  } satisfies DescribeSource;
+  /* Sliced as bytes for the description, decoded whole for the pieces: a
+     description reads the start of a file, a question may be about its end. */
+  const text = bytes.toString('utf8');
+  return { source: { kind: 'text', text: sample(text) }, text };
+}
+
+/**
+ * The pieces a question is answered from (ADR 0019), cut from the file's text
+ * or, for a file with none, from its description, so that every indexed file
+ * has at least one. A file longer than MAX_PIECES_PER_FILE pieces is kept as
+ * far as that goes.
+ */
+function piecesOf(text: string | null, summary: string): string[] {
+  const source = text?.trim() ? text : summary;
+  return chunkText(source, CHUNK_SIZE, CHUNK_OVERLAP).slice(0, MAX_PIECES_PER_FILE);
+}
+
+/** Replaces a file's pieces with these, under this backend's model. */
+async function storePieces(
+  file: FileRow,
+  userId: string,
+  backend: AiBackend,
+  pieces: string[]
+): Promise<void> {
+  const vectors = await backend.embedMany(
+    pieces.map((piece) => pieceInput(file.name, piece)),
+    'document'
+  );
+
+  /* Delete, then insert: a re-index under another model, or of a file that
+     changed, can leave fewer pieces than before, and an upsert would keep the
+     rest. Between the two statements the file has no pieces, and the
+     dashboard offers it again, which is the honest state of a half-written
+     index. */
+  const { error: deleteError } = await supabase
+    .from('file_chunks')
+    .delete()
+    .eq('file_id', file.id)
+    .eq('user_id', userId);
+  if (deleteError) throw indexTableError('Could not replace the pieces', deleteError);
+
+  const { error: insertError } = await supabase.from('file_chunks').insert(
+    pieces.map((content, index) => ({
+      file_id: file.id,
+      chunk_index: index,
+      user_id: userId,
+      content,
+      embedding: toVectorLiteral(vectors[index] as number[]),
+      embedding_model: backend.embeddingModel,
+    }))
+  );
+  if (insertError) throw indexTableError('Could not store the pieces', insertError);
 }
 
 /**
@@ -125,16 +197,23 @@ function indexTableError(doing: string, error: { message: string }): Error {
       `${doing}: ${error.message} — has migrations/011_add_file_embeddings.sql been run?`
     );
   }
+  if (/file_chunks/.test(error.message)) {
+    return new Error(
+      `${doing}: ${error.message} — has migrations/022_add_file_chunks.sql been run?`
+    );
+  }
   return new Error(`${doing}: ${error.message}`);
 }
 
 /**
- * Describes one file and keeps the result.
+ * Describes one file, cuts its text into pieces, and keeps both.
  *
  * Idempotent by design, in rows and in money. A file this embedding model has
- * indexed gets its stored description back without a model being asked again;
- * under another model the row, keyed by the file, is overwritten rather than
- * added to. A run can be repeated without thinking about it.
+ * indexed, sentence and pieces, gets its stored description back without a
+ * model being asked again. A file with the sentence and no pieces, indexed
+ * before the pieces existed or interrupted between the two writes, gets its
+ * pieces and keeps its sentence. Under another model both are replaced rather
+ * than added to. A run can be repeated without thinking about it.
  */
 async function indexFile(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
   const { fileId } = req.body as { fileId?: string };
@@ -205,20 +284,32 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
      every description is paid for: a row that is already here is the answer
      to give again, not a reason to ask a model again. A row another model
      made is not, because the search cannot compare it (migrations/011). */
-  const { data: rows, error: readError } = await supabase
-    .from('file_embeddings')
-    .select('summary, tags, summary_model')
-    .eq('file_id', file.id)
-    .eq('user_id', userId)
-    .eq('embedding_model', backend.embeddingModel)
-    .limit(1);
+  const [{ data: rows, error: readError }, { data: pieceRows, error: piecesError }] =
+    await Promise.all([
+      supabase
+        .from('file_embeddings')
+        .select('summary, tags, summary_model')
+        .eq('file_id', file.id)
+        .eq('user_id', userId)
+        .eq('embedding_model', backend.embeddingModel)
+        .limit(1),
+      supabase
+        .from('file_chunks')
+        .select('chunk_index')
+        .eq('file_id', file.id)
+        .eq('user_id', userId)
+        .eq('embedding_model', backend.embeddingModel)
+        .eq('chunk_index', 0)
+        .limit(1),
+    ]);
 
   if (readError) throw indexTableError('Could not read the index', readError);
+  if (piecesError) throw indexTableError('Could not read the pieces', piecesError);
 
   const indexed = (
     rows as { summary: string; tags: string[]; summary_model: string }[] | null
   )?.[0];
-  if (indexed) {
+  if (indexed && (pieceRows as unknown[] | null)?.length) {
     res.status(200).json({
       indexed: true,
       summary: indexed.summary,
@@ -228,37 +319,62 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
     return;
   }
 
+  /* A picture already described needs nothing read again: its pieces are cut
+     from the description. Anything else is read for its text, before the
+     budget is touched, since reading costs nothing and a scan with no text
+     is refused here rather than paid for. */
+  const reading =
+    indexed && plan.kind === 'image' ? null : await readFile(file, plan, userId, backend);
+
+  if (plan.kind === 'pdf' && !backend.readsPdf && !reading?.text?.trim()) {
+    res.status(200).json({
+      indexed: false,
+      reason: 'this PDF has no text to read; a scanned page is a picture of text',
+    });
+    return;
+  }
+
   /* The last check before the money, after every refusal that costs nothing
-     (libs/server/src/ai-budget.ts). */
+     (libs/server/src/ai-budget.ts). One unit a file, its pieces included. */
   await claimAiCall(userId, 'index');
 
-  const description = await backend.describe(file.name, await sourceFor(file, plan, userId));
-  const vector = await backend.embed(
-    embeddingInput(file, description.summary, description.tags),
-    'document'
-  );
+  let description: { summary: string; tags: string[]; model: string };
+  if (indexed) {
+    description = { summary: indexed.summary, tags: indexed.tags, model: indexed.summary_model };
+  } else {
+    const described = await backend.describe(file.name, (reading as Reading).source);
+    const vector = await backend.embed(
+      embeddingInput(file, described.summary, described.tags),
+      'document'
+    );
 
-  const { error: writeError } = await supabase.from('file_embeddings').upsert(
-    {
-      file_id: file.id,
-      user_id: userId,
-      summary: description.summary,
-      tags: description.tags,
-      embedding: toVectorLiteral(vector),
-      summary_model: description.model,
-      embedding_model: backend.embeddingModel,
-      indexed_at: new Date().toISOString(),
-    },
-    { onConflict: 'file_id' }
-  );
+    const { error: writeError } = await supabase.from('file_embeddings').upsert(
+      {
+        file_id: file.id,
+        user_id: userId,
+        summary: described.summary,
+        tags: described.tags,
+        embedding: toVectorLiteral(vector),
+        summary_model: described.model,
+        embedding_model: backend.embeddingModel,
+        indexed_at: new Date().toISOString(),
+      },
+      { onConflict: 'file_id' }
+    );
 
-  if (writeError) throw indexTableError('Could not store the index', writeError);
+    if (writeError) throw indexTableError('Could not store the index', writeError);
+    description = described;
+  }
+
+  const pieces = piecesOf(reading?.text ?? null, description.summary);
+  await storePieces(file, userId, backend, pieces);
 
   res.status(200).json({
     indexed: true,
     summary: description.summary,
     tags: description.tags,
     model: description.model,
+    pieces: pieces.length,
   });
 }
 

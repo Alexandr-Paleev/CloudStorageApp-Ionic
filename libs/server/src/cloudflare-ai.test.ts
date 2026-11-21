@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EMBEDDING_DIMENSIONS, MAX_VISION_BYTES } from '../../core/src/ai';
-import { describeFile, embed, parseCaption } from './cloudflare-ai';
+import { describeFile, embed, embedMany, parseCaption } from './cloudflare-ai';
 
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.01);
 
@@ -188,5 +188,39 @@ describe('describeFile, on a text file', () => {
     expect(sent).toContain('list.txt');
     expect(sent).toContain('--- file contents ---');
     expect(sent).toContain('milk, bread');
+  });
+});
+
+describe('embedMany', () => {
+  function workersAi() {
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const { text } = JSON.parse(String(init.body)) as { text: string[] };
+      const data = text.map((t) => VECTOR.map((v, i) => (i === 0 ? Number(t) : v)));
+      return { ok: true, status: 200, json: async () => ({ success: true, result: { data } }) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('sends the texts a hundred at a time and keeps their order', async () => {
+    const fetchMock = workersAi();
+    const texts = Array.from({ length: 150 }, (_, n) => String(n));
+
+    const vectors = await embedMany(texts);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const sizes = fetchMock.mock.calls.map(
+      ([, init]) =>
+        (JSON.parse(String((init as RequestInit).body)) as { text: string[] }).text.length
+    );
+    expect(sizes).toEqual([100, 50]);
+    expect(vectors.map((v) => v[0])).toEqual(texts.map(Number));
+  });
+
+  it('refuses an answer with fewer vectors than texts', async () => {
+    answers({ success: true, result: { data: [VECTOR] } });
+    await expect(embedMany(['a', 'b'])).rejects.toThrow(
+      'Workers AI returned 1 embeddings for 2 texts'
+    );
   });
 });

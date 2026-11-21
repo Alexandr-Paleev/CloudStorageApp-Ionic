@@ -125,12 +125,37 @@ async function run(model: string, body: unknown): Promise<Record<string, unknown
 }
 
 export async function embed(text: string): Promise<number[]> {
-  // No input_type here. Voyage embeds a query and a document differently and
-  // has to be told which is which; bge makes no such distinction, so the
-  // parameter the interface carries is simply not passed on.
-  const result = await run(CF_EMBEDDING_MODEL, { text: [text] });
-  const vector = (result.data as unknown[] | undefined)?.[0];
+  return (await embedMany([text]))[0] as number[];
+}
 
+/** Texts per request: Workers AI's embedding models take a hundred at most. */
+const EMBED_BATCH = 100;
+
+/**
+ * One vector per text, in the order given.
+ *
+ * No input_type here. Voyage embeds a query and a document differently and has
+ * to be told which is which; bge makes no such distinction, so the parameter
+ * the interface carries is simply not passed on.
+ */
+export async function embedMany(texts: string[]): Promise<number[][]> {
+  const vectors: number[][] = [];
+  for (let start = 0; start < texts.length; start += EMBED_BATCH) {
+    const chunk = texts.slice(start, start + EMBED_BATCH);
+    const result = await run(CF_EMBEDDING_MODEL, { text: chunk });
+    const data = result.data as unknown[] | undefined;
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Workers AI returned no embedding');
+    }
+    if (data.length !== chunk.length) {
+      throw new Error(`Workers AI returned ${data.length} embeddings for ${chunk.length} texts`);
+    }
+    vectors.push(...data.map(checked));
+  }
+  return vectors;
+}
+
+function checked(vector: unknown): number[] {
   if (!Array.isArray(vector) || vector.some((value) => typeof value !== 'number')) {
     throw new Error('Workers AI returned no embedding');
   }

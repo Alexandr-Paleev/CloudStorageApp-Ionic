@@ -159,3 +159,19 @@ account. Only when this deployment searches with the model the vectors were
 made with: otherwise the rows would be ones `match_files` never compares, and
 none are written. A test holds the file to the free path's models and to the
 seed.
+
+## Update — 2026-11-21, PDFs and pieces
+
+- **The free path reads a PDF now.** "It also cannot read a PDF" above was
+  true until Cloudflare's `toMarkdown` could give the text of one on the same
+  account (`libs/server/src/to-markdown.ts`, [0019](0019-questions-are-answered-from-pieces-of-the-files.md)).
+  A PDF is described from its text on that path, and Claude still reads one
+  as it is. A scan, a PDF with no text layer, is refused with a reason before
+  the day's budget is touched.
+- **Indexing a file also cuts its text into pieces** (`file_chunks`,
+  migration 022), for the questions of [0019](0019-questions-are-answered-from-pieces-of-the-files.md).
+  A picture's pieces are cut from its description, so every indexed file has
+  at least one. "Indexed" now means a file has its first piece under the
+  model on screen: a file described before the pieces existed is offered
+  again, and the route cuts it without describing it twice. One unit of the
+  day's budget still pays for a file, its pieces included.

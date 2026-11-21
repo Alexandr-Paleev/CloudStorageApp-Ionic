@@ -1,7 +1,7 @@
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL, ProviderNotConfigured } from '../../core/src/ai';
 
 /**
- * Text in, one vector out.
+ * Texts in, one vector each.
  *
  * Voyage publishes no TypeScript SDK, so this is the HTTP API directly — the
  * request is three fields and the response is one array, and a hand-rolled
@@ -30,10 +30,27 @@ const TIMEOUT_MS = 20_000;
  */
 export type InputType = 'document' | 'query';
 
+/** Texts per request. Voyage takes up to 1,000; a file has at most 200
+ *  pieces (MAX_PIECES_PER_FILE), so one request is the usual case. */
+const BATCH = 128;
+
 export async function embed(text: string, inputType: InputType): Promise<number[]> {
+  return (await embedMany([text], inputType))[0] as number[];
+}
+
+/** One vector per text, in the order given. */
+export async function embedMany(texts: string[], inputType: InputType): Promise<number[][]> {
   const key = process.env.VOYAGE_API_KEY;
   if (!key) throw new ProviderNotConfigured('VOYAGE_API_KEY is not configured on the server');
 
+  const vectors: number[][] = [];
+  for (let start = 0; start < texts.length; start += BATCH) {
+    vectors.push(...(await batch(key, texts.slice(start, start + BATCH), inputType)));
+  }
+  return vectors;
+}
+
+async function batch(key: string, texts: string[], inputType: InputType): Promise<number[][]> {
   const response = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -41,7 +58,7 @@ export async function embed(text: string, inputType: InputType): Promise<number[
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      input: [text],
+      input: texts,
       model: EMBEDDING_MODEL,
       input_type: inputType,
     }),
@@ -55,9 +72,16 @@ export async function embed(text: string, inputType: InputType): Promise<number[
     throw new Error(`Voyage answered ${response.status}${body ? `: ${body}` : ''}`);
   }
 
-  const payload = (await response.json()) as { data?: { embedding?: unknown }[] };
-  const vector = payload.data?.[0]?.embedding;
+  const payload = (await response.json()) as { data?: { embedding?: unknown; index?: number }[] };
+  const rows = [...(payload.data ?? [])].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  if (rows.length === 0) throw new Error('Voyage returned no embedding');
+  if (rows.length !== texts.length) {
+    throw new Error(`Voyage returned ${rows.length} embeddings for ${texts.length} texts`);
+  }
+  return rows.map((row) => checked(row.embedding));
+}
 
+function checked(vector: unknown): number[] {
   if (!Array.isArray(vector) || vector.some((value) => typeof value !== 'number')) {
     throw new Error('Voyage returned no embedding');
   }

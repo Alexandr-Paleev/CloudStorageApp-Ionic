@@ -4,11 +4,16 @@ import {
   type Description,
   type DescribeSource,
 } from './describe';
-import { embed as embedWithVoyage, type InputType } from './embeddings';
+import {
+  embed as embedWithVoyage,
+  embedMany as embedManyWithVoyage,
+  type InputType,
+} from './embeddings';
 import {
   CF_EMBEDDING_MODEL,
   describeFile as describeWithWorkersAi,
   embed as embedWithWorkersAi,
+  embedMany as embedManyWithWorkersAi,
   isConfigured as cloudflareConfigured,
 } from './cloudflare-ai';
 
@@ -40,24 +45,37 @@ export interface AiBackend {
   readonly embeddingModel: string;
   /** Whether this backend can look at that kind of file at all. */
   supports(kind: 'image' | 'pdf' | 'text'): boolean;
+  /**
+   * Whether `describe` takes a PDF as it is. When it does not, it is given the
+   * PDF's text, read by Cloudflare's `toMarkdown` (libs/server/src/to-markdown.ts).
+   */
+  readonly readsPdf: boolean;
   describe(name: string, source: DescribeSource): Promise<Description>;
   embed(text: string, inputType: InputType): Promise<number[]>;
+  /** One vector per text, in order: the pieces of a file (ADR 0019). */
+  embedMany(texts: string[], inputType: InputType): Promise<number[][]>;
 }
 
 const anthropicBackend: AiBackend = {
   embeddingModel: EMBEDDING_MODEL,
   supports: () => true,
+  readsPdf: true,
   describe: describeWithClaude,
   embed: embedWithVoyage,
+  embedMany: embedManyWithVoyage,
 };
 
 const cloudflareBackend: AiBackend = {
   embeddingModel: CF_EMBEDDING_MODEL,
-  // No PDF: nothing on this path renders a page, and describing a PDF by its
-  // name alone would put a confident sentence about nothing into the index.
-  supports: (kind) => kind !== 'pdf',
+  // A PDF too, since its text can be read on the same account: no model on
+  // this path takes a PDF, so it is described from the text `toMarkdown`
+  // gives (ADR 0019). Until then it was refused, rather than described by its
+  // name alone.
+  supports: () => true,
+  readsPdf: false,
   describe: describeWithWorkersAi,
   embed: (text) => embedWithWorkersAi(text),
+  embedMany: (texts) => embedManyWithWorkersAi(texts),
 };
 
 /**

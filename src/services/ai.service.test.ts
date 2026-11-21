@@ -187,15 +187,39 @@ describe('indexMany', () => {
 
 describe('unindexedFileIds', () => {
   const files = table(['a', 'b', 'c'].map((id) => ({ id, user_id: 'user-1' })));
-  const row = (file_id: string, embedding_model: string) => ({
+  /** A file's first piece, which is what makes it indexed (ADR 0019). */
+  const row = (file_id: string, embedding_model: string, chunk_index = 0) => ({
     file_id,
     user_id: 'user-1',
     embedding_model,
+    chunk_index,
   });
 
   it('returns the files the index has never seen', async () => {
     from.mockImplementation((name: string) =>
       name === 'files' ? files : table([row('b', 'voyage-4')])
+    );
+
+    await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+  });
+
+  it('reads the pieces, so a file described before they existed is offered again', async () => {
+    const read: string[] = [];
+    from.mockImplementation((name: string) => {
+      read.push(name);
+      return name === 'files' ? files : table([row('b', 'voyage-4')]);
+    });
+
+    await aiService.unindexedFileIds('user-1', 'voyage-4');
+
+    expect(read.sort()).toEqual(['file_chunks', 'files']);
+  });
+
+  it('counts a file once, by its first piece', async () => {
+    from.mockImplementation((name: string) =>
+      name === 'files'
+        ? files
+        : table([row('b', 'voyage-4', 0), row('b', 'voyage-4', 1), row('c', 'voyage-4', 3)])
     );
 
     await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
@@ -252,7 +276,7 @@ describe('unindexedFileIds', () => {
 
       await aiService.unindexedFileIds('user-1', 'voyage-4');
 
-      expect(from.mock.calls.map(([name]) => name).sort()).toEqual(['file_embeddings', 'files']);
+      expect(from.mock.calls.map(([name]) => name).sort()).toEqual(['file_chunks', 'files']);
     });
   });
 });

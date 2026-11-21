@@ -119,6 +119,17 @@ What follows, decided here and amended as each part ships:
   characters and a piece put under another owner were refused, and deleting
   the file took its pieces with it. Nothing writes to the table yet.
 
+- **Step 2b (2026-11-21).** Indexing a file writes its pieces: `/api/ai/index`
+  cuts a text file whole (the description reads only its start), a PDF from
+  the text `toMarkdown` gives it, and a picture from its description; at most
+  `MAX_PIECES_PER_FILE`, embedded in batches under the file's name, replacing
+  whatever the file had. A file with a description and no pieces gets its
+  pieces without being described again. The free path, which refused PDFs,
+  now describes one from its text; Claude still reads one as it is, and its
+  pieces are cut from `toMarkdown`'s text when the deployment has Cloudflare,
+  from its description when it does not. The dashboard counts a file as
+  indexed by its first piece.
+
 ## Alternatives
 
 - **Answer from the sentence per file.** It answers what a file is, which

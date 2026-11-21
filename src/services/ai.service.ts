@@ -88,6 +88,12 @@ const aiService = {
   /**
    * Files this account has that the index does not, as `model` sees it.
    *
+   * A file is indexed when it has its first piece (`file_chunks`, ADR 0019):
+   * the index route writes a file's sentence and then its pieces, every
+   * indexed file has at least one, and a file described before the pieces
+   * existed is offered again so that it gets them. The route then cuts it
+   * without describing it twice.
+   *
    * Two reads and a subtraction in the browser rather than a view or an RPC:
    * an account holds tens of files, both tables are already readable by their
    * owner, and a database object exists forever once it is written.
@@ -109,10 +115,11 @@ const aiService = {
       ),
       readAll<{ file_id: string }>((from, to) =>
         supabase
-          .from('file_embeddings')
+          .from('file_chunks')
           .select('file_id', { count: 'exact' })
           .eq('user_id', userId)
           .eq('embedding_model', model)
+          .eq('chunk_index', 0)
           .order('file_id')
           .range(from, to)
       ),
