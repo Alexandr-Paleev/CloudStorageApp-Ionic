@@ -224,15 +224,21 @@ export class RateLimiter {
  * The refusal itself.
  *
  * With Retry-After, because a 429 that does not say when to come back invites
- * the client to keep asking — the behaviour the limit exists to stop.
+ * the client to keep asking — the behaviour the limit exists to stop. And with
+ * the moment itself in the body, `retryAt`, so that a screen can say "you can
+ * go on after 01:00" in the reader's own time zone: only the browser knows it,
+ * and a day's budget turns over at midnight UTC, which is a different hour
+ * everywhere.
  */
 export function tooManyRequests(
   res: VercelResponse,
   retryAfterSeconds: number,
-  message: string
+  message: string,
+  now: Date = new Date()
 ): VercelResponse {
   res.setHeader('Retry-After', String(retryAfterSeconds));
-  return res.status(429).json({ message });
+  const retryAt = new Date(now.getTime() + retryAfterSeconds * 1000).toISOString();
+  return res.status(429).json({ message, retryAt });
 }
 
 /**

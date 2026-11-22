@@ -55,6 +55,11 @@ reasoning behind the larger decisions lives in
   account, 100 in all, `AI_ASK_DAILY_LIMIT`), which migration 023 lets the
   database count. A deployment with Anthropic's key answers with Claude Opus
   5.5 at low effort. The screen to ask it from comes next. ADR 0019, step 3.
+- **A refusal for too many requests says when to come back.** Every 429 the
+  functions send carries `retryAt` beside its message: the moment the limit
+  turns over, so that a screen can say "you can go on after 01:00" in the
+  reader's own time zone. A day's budget turns over at midnight UTC, a
+  different hour everywhere, and only the browser knows which.
 - **A demo account comes with its pieces.** A demo cannot index, so the seed
   carries them: `public/demo/search-index.json` now holds each file cut as
   `/api/ai/index` cuts it, with a vector per piece, and `/api/demo/session`

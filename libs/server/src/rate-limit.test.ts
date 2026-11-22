@@ -83,12 +83,12 @@ describe('resetRateLimits', () => {
 });
 
 describe('tooManyRequests', () => {
-  it('answers 429 with the message', () => {
+  it('answers 429 with the message, and the moment to come back', () => {
     const res = mockResponse();
-    tooManyRequests(res, 30, 'Slow down');
+    tooManyRequests(res, 30, 'Slow down', new Date('2026-11-22T23:59:30.000Z'));
 
     expect(res.statusCode).toBe(429);
-    expect(res.body).toEqual({ message: 'Slow down' });
+    expect(res.body).toEqual({ message: 'Slow down', retryAt: '2026-11-23T00:00:00.000Z' });
   });
 
   it('says when to come back', () => {

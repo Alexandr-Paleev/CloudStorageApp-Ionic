@@ -1075,6 +1075,14 @@ describe('ask (ADR 0019)', () => {
 
     expect(res.statusCode).toBe(429);
     expect(res.body).toMatchObject({ message: expect.stringContaining('questions') });
+    // The moment the day's budget turns over, midnight UTC, for the screen to
+    // show in the reader's own time. Retry-After is whole seconds, rounded up,
+    // so it lands within a second after midnight and never before.
+    const retryAt = new Date((res.body as { retryAt: string }).retryAt).getTime();
+    const now = new Date();
+    const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+    expect(retryAt).toBeGreaterThanOrEqual(midnight);
+    expect(retryAt).toBeLessThan(midnight + 1000);
     expect(embed).not.toHaveBeenCalled();
     expect(res.written).toEqual([]);
   });
