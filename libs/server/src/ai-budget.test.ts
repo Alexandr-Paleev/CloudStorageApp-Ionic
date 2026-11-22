@@ -122,3 +122,23 @@ describe('secondsUntilTomorrow', () => {
     expect(secondsUntilTomorrow(new Date('2026-11-01T23:59:59.999Z'))).toBe(1);
   });
 });
+
+/* SQL cannot import a type: the CHECK on ai_usage.action, last written by
+   migration 023, lists the actions a second time, and a claim for one it does
+   not list fails in production with 23514. */
+describe('the actions the database counts', () => {
+  it('are the actions the code claims', async () => {
+    const { readFileSync } = await import('node:fs');
+    const sql = readFileSync(
+      new URL('../../../migrations/023_count_questions.sql', import.meta.url),
+      'utf8'
+    );
+    const listed = /CHECK \(action IN \(([^)]*)\)\)/.exec(sql)?.[1] ?? '';
+    const actions = [...listed.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    expect(actions.sort()).toEqual(Object.keys(AI_DAILY_LIMITS).sort());
+  });
+
+  it('keep a question inside the free allocation of a day', () => {
+    expect(AI_DAILY_LIMITS.ask).toEqual({ perAccount: 20, total: 100 });
+  });
+});

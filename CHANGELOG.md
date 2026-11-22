@@ -45,6 +45,16 @@ reasoning behind the larger decisions lives in
   The dashboard counts a file as indexed by its first piece, so a file
   described before is offered again and gets its pieces without a second
   description. ADR 0019, step 2b; an update to ADR 0013.
+- **Ask your files a question.** `POST /api/ai/ask` answers from the eight
+  pieces of the caller's files nearest to the question, found by the caller's
+  own search under the database's policies, and streams the answer as lines
+  of JSON: the numbered sources first, then the words, citing them as [1],
+  [2]. It answers in the question's language, and says "Your files don't say"
+  when they don't. Production answers on Workers AI for free, for any account,
+  a demo's included; a question is one unit of a new daily budget (20 an
+  account, 100 in all, `AI_ASK_DAILY_LIMIT`), which migration 023 lets the
+  database count. A deployment with Anthropic's key answers with Claude Opus
+  5.5 at low effort. The screen to ask it from comes next. ADR 0019, step 3.
 - **A demo account comes with its pieces.** A demo cannot index, so the seed
   carries them: `public/demo/search-index.json` now holds each file cut as
   `/api/ai/index` cuts it, with a vector per piece, and `/api/demo/session`

@@ -145,7 +145,16 @@ export const AI_INDEX_LIMIT = 30;
  */
 export const AI_EMBED_LIMIT = 60;
 
-/** Both AI actions, per address, before the token check — as PRESIGN_IP_LIMIT. */
+/**
+ * Questions asked of one's files per user per minute (ADR 0019).
+ *
+ * Each is a model reading several pieces and writing an answer, the costliest
+ * call there is per request; ten a minute is faster than anyone reads the
+ * answers, and the day is bounded by the budget in ai-budget.ts.
+ */
+export const AI_ASK_LIMIT = 10;
+
+/** The AI actions, per address, before the token check — as PRESIGN_IP_LIMIT. */
 export const AI_IP_LIMIT = 120;
 
 /**

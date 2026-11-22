@@ -6,7 +6,9 @@ ships ·
 [`evals/src/search_evals/chunks.py`](../../evals/src/search_evals/chunks.py),
 [`evals/src/search_evals/retrieval.py`](../../evals/src/search_evals/retrieval.py),
 [`libs/core/src/chunks.ts`](../../libs/core/src/chunks.ts),
-[`migrations/022`](../../migrations/022_add_file_chunks.sql)
+[`migrations/022`](../../migrations/022_add_file_chunks.sql),
+[`libs/server/src/answer.ts`](../../libs/server/src/answer.ts),
+[`migrations/023`](../../migrations/023_count_questions.sql)
 
 ## Context
 
@@ -143,6 +145,27 @@ What follows, decided here and amended as each part ships:
   The rebuild showed the free path's caption parser keeping "Tags: …" in the
   sentence when the model wrote both on one line; it splits there now, and the
   test refuses an index with tags in a sentence or a file with none.
+
+- **Step 3 (2026-11-22).** `POST /api/ai/ask` answers. It claims a unit of
+  the day's budget (a third action, `ask`, which migration 023 lets the table
+  count: 20 an account and 100 for the deployment, inside Cloudflare's free
+  allocation, for any account, a demo's included), embeds the question, and
+  reads the eight nearest pieces through `match_chunks` as the caller, with
+  their token, so that the database's policies decide whose pieces they are
+  (`supabaseAsCaller`). The answer comes as lines of JSON: the numbered
+  sources first, then the words as the model writes them, then `done`, or
+  `error` once the stream has begun. With nothing indexed no model is asked.
+  On the free path, mistral-small reads the pieces as text in a fence a file
+  cannot close; on the paid one, Claude Opus 5.5 at low effort reads them as
+  document blocks, with the server-side fallback on should it decline.
+  Tried on Workers AI with the eval's documents before writing this: the
+  first word in 0.4–1 s, every fact right, and a question with no answer
+  answered "Your files don't say." Two things it took: told to answer "in the
+  question's language", the model used the excerpts' instead, so the server
+  names the language it reads from the question (`questionLanguage`, right
+  for all 75 of the eval's questions); and one citation of five pointed at
+  the piece next to the one holding the fact, which the answers' eval will
+  count.
 
 ## Alternatives
 

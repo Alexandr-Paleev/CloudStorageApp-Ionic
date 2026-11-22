@@ -134,7 +134,7 @@ docs/decisions/      # ADRs — read these before changing a decision they cover
 
 - `.env` is gitignored — must be set up manually with Supabase, Cloudinary, R2 keys
 - Vercel env vars must use `VITE_` prefix for client-side access
-- Server-only Vercel env vars (no `VITE_` prefix) are read in `api/` and `libs/server` alone: Stripe's three, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, Cloudinary's three, R2's four, the AI keys (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, Cloudflare's two), `DROPBOX_APP_KEY`, `DEMO_ENABLED`, `SENTRY_DSN`, `CRON_SECRET`, `RECONCILE_APPLY`. `grep -rhoE 'process\.env\.[A-Z0-9_]+' api libs/server | sort -u` lists every name read there, Vercel's own and a few `VITE_` fallbacks included.
+- Server-only Vercel env vars (no `VITE_` prefix) are read in `api/` and `libs/server` alone: Stripe's three, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, Cloudinary's three, R2's four, the AI keys (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, Cloudflare's two), `DROPBOX_APP_KEY`, `DEMO_ENABLED`, `SENTRY_DSN`, `CRON_SECRET`, `RECONCILE_APPLY`. Optional limits: `AI_INDEX_DAILY_LIMIT`, `AI_EMBED_DAILY_LIMIT`, `AI_ASK_DAILY_LIMIT`. `grep -rhoE 'process\.env\.[A-Z0-9_]+' api libs/server | sort -u` lists every name read there, Vercel's own and a few `VITE_` fallbacks included.
 - Stripe webhook endpoint: `/api/stripe/webhook` — configure in Stripe Dashboard
 - A new Supabase project takes every file in `migrations/`, in number order; `001` (`profiles`) is only the first
 - Supabase project can pause after inactivity — restore from dashboard if login fails with DNS error

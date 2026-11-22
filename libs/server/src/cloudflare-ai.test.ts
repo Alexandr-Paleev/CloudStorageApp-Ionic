@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EMBEDDING_DIMENSIONS, MAX_VISION_BYTES } from '../../core/src/ai';
-import { describeFile, embed, embedMany, parseCaption } from './cloudflare-ai';
+import {
+  CF_ANSWER_MODEL,
+  answer,
+  describeFile,
+  embed,
+  embedMany,
+  parseCaption,
+  readEventStream,
+} from './cloudflare-ai';
 
 const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.01);
 
@@ -239,5 +247,97 @@ describe('embedMany', () => {
     await expect(embedMany(['a', 'b'])).rejects.toThrow(
       'Workers AI returned 1 embeddings for 2 texts'
     );
+  });
+});
+
+describe('readEventStream', () => {
+  const bytes = (...chunks: string[]) =>
+    (async function* () {
+      for (const chunk of chunks) yield new TextEncoder().encode(chunk);
+    })();
+  const read = async (stream: AsyncIterable<Uint8Array>) => {
+    const out: string[] = [];
+    for await (const text of readEventStream(stream)) out.push(text);
+    return out;
+  };
+
+  it('reads the text of each event, until [DONE]', async () => {
+    expect(
+      await read(
+        bytes(
+          'data: {"response":"The rent"}\n\n',
+          'data: {"response":" is 950."}\n\n',
+          'data: [DONE]\n\n',
+          'data: {"response":"after"}\n'
+        )
+      )
+    ).toEqual(['The rent', ' is 950.']);
+  });
+
+  it('reads the shape of chat completions too', async () => {
+    expect(await read(bytes('data: {"choices":[{"delta":{"content":"Hola"}}]}\n'))).toEqual([
+      'Hola',
+    ]);
+  });
+
+  /* The network cuts where it likes: a line may arrive in two chunks, and a
+     character in two as well. */
+  it('joins a line, and a character, split across chunks', async () => {
+    const line = new TextEncoder().encode('data: {"response":"Ж"}\n');
+    const cut = line.length - 4;
+    const stream = (async function* () {
+      yield line.slice(0, cut);
+      yield line.slice(cut);
+    })();
+    expect(await read(stream)).toEqual(['Ж']);
+  });
+
+  it('passes over what is not a data line, or not JSON, or has no text', async () => {
+    expect(
+      await read(
+        bytes(
+          ': keep-alive\n',
+          'event: ping\n',
+          'data: not json\n',
+          'data: {"p":"abc"}\n',
+          'data: {"response":"ok"}\n'
+        )
+      )
+    ).toEqual(['ok']);
+  });
+});
+
+describe('answer', () => {
+  it('streams from the free model, with the instruction as the system turn', async () => {
+    const body = (async function* () {
+      yield new TextEncoder().encode('data: {"response":"Yes [1]."}\ndata: [DONE]\n');
+    })();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out: string[] = [];
+    for await (const text of answer('SYSTEM', 'USER')) out.push(text);
+
+    expect(out).toEqual(['Yes [1].']);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      `https://api.cloudflare.com/client/v4/accounts/abc123/ai/run/${CF_ANSWER_MODEL}`
+    );
+    expect(JSON.parse(String(init.body))).toEqual({
+      messages: [
+        { role: 'system', content: 'SYSTEM' },
+        { role: 'user', content: 'USER' },
+      ],
+      max_tokens: 600,
+      stream: true,
+    });
+  });
+
+  it('says what Workers AI said when it refuses', async () => {
+    answers({ errors: [{ message: 'Capacity temporarily exceeded' }] }, false);
+    const run = async () => {
+      for await (const text of answer('S', 'U')) void text;
+    };
+    await expect(run()).rejects.toThrow(/Workers AI answered 500: .*Capacity/);
   });
 });

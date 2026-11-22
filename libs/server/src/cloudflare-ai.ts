@@ -5,6 +5,7 @@ import {
   clampSummary,
   normalizeTags,
 } from '../../core/src/ai';
+import { MAX_ANSWER_TOKENS } from './answer';
 import { fetchBytes } from './fetch-bytes';
 import type { Description, DescribeSource } from './describe';
 
@@ -275,4 +276,85 @@ export async function describeFile(name: string, source: DescribeSource): Promis
   const { summary, tags } = parseCaption((result.response ?? '') as string);
   if (!summary) throw new Error(`${CF_TEXT_MODEL} returned an empty description`);
   return { summary, tags, model: CF_TEXT_MODEL };
+}
+
+/** What answers a question on this path (ADR 0019): the model that already
+ *  writes descriptions, which reads Russian, Spanish and English. */
+export const CF_ANSWER_MODEL = CF_TEXT_MODEL;
+
+/** The text one server-sent event carries, in either shape Workers AI sends. */
+function eventText(data: string): string {
+  try {
+    const payload = JSON.parse(data) as {
+      response?: unknown;
+      choices?: { delta?: { content?: unknown } }[];
+    };
+    if (typeof payload.response === 'string') return payload.response;
+    const content = payload.choices?.[0]?.delta?.content;
+    return typeof content === 'string' ? content : '';
+  } catch {
+    // A line that is not JSON carries no text; the stream goes on.
+    return '';
+  }
+}
+
+/**
+ * The text of a stream of server-sent events, piece by piece.
+ *
+ * `data:` lines only, one JSON object each, and `data: [DONE]` ends it. The
+ * text is in `response`, the shape Workers AI's own models stream, or in
+ * `choices[0].delta.content`, the shape some of its newer ones use; the
+ * documentation names the stream and not its lines, so both are read.
+ */
+export async function* readEventStream(body: AsyncIterable<Uint8Array>): AsyncGenerator<string> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for await (const chunk of body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let end: number;
+    while ((end = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, end).trim();
+      buffer = buffer.slice(end + 1);
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice('data:'.length).trim();
+      if (data === '[DONE]') return;
+      const text = eventText(data);
+      if (text) yield text;
+    }
+  }
+}
+
+/** An answer from the pieces, as it is written (ADR 0019). */
+export async function* answer(system: string, user: string): AsyncGenerator<string> {
+  const token = process.env.CLOUDFLARE_AI_TOKEN;
+  const account = cloudflareAccountId();
+  if (!token || !account) {
+    throw new ProviderNotConfigured(
+      'CLOUDFLARE_AI_TOKEN and an account id (CLOUDFLARE_ACCOUNT_ID or R2_ENDPOINT) are not configured'
+    );
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${CF_ANSWER_MODEL}`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        max_tokens: MAX_ANSWER_TOKENS,
+        stream: true,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    }
+  );
+
+  if (!response.ok || !response.body) {
+    const text = (await response.text().catch(() => '')).slice(0, 200);
+    throw new Error(`Workers AI answered ${response.status}${text ? `: ${text}` : ''}`);
+  }
+
+  yield* readEventStream(response.body as unknown as AsyncIterable<Uint8Array>);
 }
