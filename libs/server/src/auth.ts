@@ -48,4 +48,24 @@ export async function authenticateUser(req: VercelRequest): Promise<string> {
   return (await authenticate(req)).id;
 }
 
+/**
+ * The database as the caller sees it: their token, the public key, and every
+ * policy applied. For a read that must be the caller's and nobody else's by
+ * the database's own rule rather than by a filter this code remembers to add:
+ * `match_chunks` (migration 022) is not granted to the service role at all,
+ * which would rank every account's pieces together.
+ *
+ * Call after `authenticate`, which has already checked the token.
+ */
+export function supabaseAsCaller(req: VercelRequest) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) throw new AuthError('Missing authorization token');
+  // The same public key the browser holds; the demo's sign-in reads it too.
+  const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
+  return createClient(requireEnv('SUPABASE_URL'), anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export { supabase };

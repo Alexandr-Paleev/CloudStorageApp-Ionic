@@ -33,6 +33,8 @@ const {
   createSignedUrl,
   presign,
   rpc,
+  callerRpc,
+  answer,
   report,
 } = vi.hoisted(() => ({
   FakeAuthError: class FakeAuthError extends Error {},
@@ -53,6 +55,8 @@ const {
   createSignedUrl: vi.fn(),
   presign: vi.fn(),
   rpc: vi.fn(),
+  callerRpc: vi.fn(),
+  answer: vi.fn(),
   report: vi.fn(),
 }));
 
@@ -67,6 +71,8 @@ vi.mock('../../libs/server/src/auth', () => ({
       from: () => ({ createSignedUrl: (...args: unknown[]) => createSignedUrl(...args) }),
     },
   },
+  // The database as the caller sees it, for match_chunks (migration 022).
+  supabaseAsCaller: () => ({ rpc: (...args: unknown[]) => callerRpc(...args) }),
 }));
 
 // The backend is the seam between this route and whichever pair of models the
@@ -194,6 +200,13 @@ beforeEach(() => {
     describe: (...args: unknown[]) => describeFile(...args),
     embed: (...args: unknown[]) => embed(...args),
     embedMany: (...args: unknown[]) => embedMany(...(args as [string[]])),
+    answerModel: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+    answer: (...args: unknown[]) => answer(...args),
+  });
+  callerRpc.mockResolvedValue({ data: [], error: null });
+  answer.mockImplementation(async function* () {
+    yield 'The rent is 950 euros ';
+    yield '[1].';
   });
   presign.mockResolvedValue('https://r2.example/signed');
   createSignedUrl.mockResolvedValue({
@@ -874,5 +887,225 @@ describe('a picture larger than the model takes', () => {
     await handler(index('file-1'), mockResponse());
 
     expect(describeFile).toHaveBeenCalled();
+  });
+});
+
+describe('ask (ADR 0019)', () => {
+  const ask = (question?: unknown, email = 'alex@example.com') => {
+    authenticate.mockResolvedValue({ id: 'user-1', email });
+    return mockRequest({ query: { action: 'ask' }, body: { question } });
+  };
+  const PIECES = [
+    {
+      file_id: 'f-1',
+      file_name: 'lease.pdf',
+      chunk_index: 2,
+      content: 'The rent is 950 euros.',
+      similarity: 0.71,
+    },
+    {
+      file_id: 'f-2',
+      file_name: 'bill.pdf',
+      chunk_index: 0,
+      content: 'Total: 86,40 euros.',
+      similarity: 0.42,
+    },
+  ];
+  /** The lines of the streamed answer, read back as the browser reads them. */
+  const lines = (res: ReturnType<typeof mockResponse>) =>
+    res.written
+      .join('')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+  it('refuses an empty question, and one too long, before anything is claimed', async () => {
+    for (const question of [undefined, '   ', 'x'.repeat(501)]) {
+      const res = mockResponse();
+      await handler(ask(question), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it('claims the question, embeds it as a query, and searches as the caller', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+
+    await handler(ask('  How much is the rent?  '), mockResponse());
+
+    expect(rpc).toHaveBeenCalledWith('claim_ai_call', expect.objectContaining({ p_action: 'ask' }));
+    expect(embed).toHaveBeenCalledWith('How much is the rent?', 'query');
+    expect(callerRpc).toHaveBeenCalledWith('match_chunks', {
+      query_embedding: `[${VECTOR.join(',')}]`,
+      model_name: EMBEDDING_MODEL,
+      match_count: 8,
+      min_similarity: 0,
+    });
+    // The pieces are never read with the service role, which bypasses RLS.
+    expect(db.calls.some((c) => c.table === 'file_chunks')).toBe(false);
+  });
+
+  it('streams the numbered sources first, then the answer, then done', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'application/x-ndjson; charset=utf-8'
+    );
+    expect(lines(res)).toEqual([
+      {
+        type: 'sources',
+        model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+        sources: [
+          {
+            n: 1,
+            fileId: 'f-1',
+            fileName: 'lease.pdf',
+            chunkIndex: 2,
+            content: 'The rent is 950 euros.',
+          },
+          {
+            n: 2,
+            fileId: 'f-2',
+            fileName: 'bill.pdf',
+            chunkIndex: 0,
+            content: 'Total: 86,40 euros.',
+          },
+        ],
+      },
+      { type: 'text', text: 'The rent is 950 euros ' },
+      { type: 'text', text: '[1].' },
+      { type: 'done' },
+    ]);
+    expect(answer).toHaveBeenCalledWith(
+      [
+        {
+          n: 1,
+          fileId: 'f-1',
+          fileName: 'lease.pdf',
+          chunkIndex: 2,
+          content: 'The rent is 950 euros.',
+        },
+        {
+          n: 2,
+          fileId: 'f-2',
+          fileName: 'bill.pdf',
+          chunkIndex: 0,
+          content: 'Total: 86,40 euros.',
+        },
+      ],
+      'How much is the rent?'
+    );
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it('asks no model when nothing is indexed to read', async () => {
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(lines(res)).toEqual([
+      { type: 'sources', model: '@cf/mistralai/mistral-small-3.1-24b-instruct', sources: [] },
+      { type: 'done', empty: true },
+    ]);
+    expect(answer).not.toHaveBeenCalled();
+  });
+
+  it('ends a broken answer with an error line, and reports it', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    answer.mockImplementation(async function* () {
+      yield 'The rent';
+      throw new Error('Workers AI answered 500');
+    });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(lines(res).slice(-2)).toEqual([
+      { type: 'text', text: 'The rent' },
+      { type: 'error', message: 'The answer could not be finished. Try asking again.' },
+    ]);
+    expect(report).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ route: 'ai/ask' })
+    );
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it('says a refusal as it is, and reports nothing', async () => {
+    const { AnswerRefused } = await import('../../libs/server/src/claude-answer');
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    answer.mockImplementation(async function* () {
+      // Refused before a word: nothing to yield.
+      yield* [];
+      throw new AnswerRefused('The model would not answer this question.');
+    });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(lines(res).at(-1)).toEqual({
+      type: 'error',
+      message: 'The model would not answer this question.',
+    });
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  /* Every account may ask, as free as the rest of the app on the path
+     production runs; the day's budget is what keeps it so. */
+  it('answers a demo account too', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?', 'demo-1700000000-ab12@example.com'), res);
+
+    expect(lines(res).at(-1)).toEqual({ type: 'done' });
+  });
+
+  it('stops at the day\u2019s budget before the stream begins', async () => {
+    rpc.mockResolvedValue({ data: 'account', error: null });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(res.statusCode).toBe(429);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('questions') });
+    // The moment the day's budget turns over, midnight UTC, for the screen to
+    // show in the reader's own time. Retry-After is whole seconds, rounded up,
+    // so it lands within a second after midnight and never before.
+    const retryAt = new Date((res.body as { retryAt: string }).retryAt).getTime();
+    const now = new Date();
+    const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+    expect(retryAt).toBeGreaterThanOrEqual(midnight);
+    expect(retryAt).toBeLessThan(midnight + 1000);
+    expect(embed).not.toHaveBeenCalled();
+    expect(res.written).toEqual([]);
+  });
+
+  it('allows ten questions a minute', async () => {
+    for (let i = 0; i < 10; i++) await handler(ask('Rent?'), mockResponse());
+    const res = mockResponse();
+
+    await handler(ask('Rent?'), res);
+
+    expect(res.statusCode).toBe(429);
+  });
+
+  it('names migration 022 when the search for pieces is missing', async () => {
+    callerRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'Could not find the function public.match_chunks' },
+    });
+    const res = mockResponse();
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({ message: expect.stringContaining('migrations/022') });
   });
 });

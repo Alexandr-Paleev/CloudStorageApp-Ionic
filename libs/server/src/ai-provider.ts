@@ -9,8 +9,12 @@ import {
   embedMany as embedManyWithVoyage,
   type InputType,
 } from './embeddings';
+import { ANSWER_SYSTEM, excerptsAsText, type Excerpt } from './answer';
+import { ANSWER_MODEL, answerWithClaude } from './claude-answer';
 import {
+  CF_ANSWER_MODEL,
   CF_EMBEDDING_MODEL,
+  answer as answerWithWorkersAi,
   describeFile as describeWithWorkersAi,
   embed as embedWithWorkersAi,
   embedMany as embedManyWithWorkersAi,
@@ -56,6 +60,10 @@ export interface AiBackend {
   embedMany(texts: string[], inputType: InputType): Promise<number[][]>;
   /** The largest picture `describe` takes, when it has a limit of its own. */
   readonly maxImageBytes?: number;
+  /** The model that answers a question from the pieces (ADR 0019). */
+  readonly answerModel: string;
+  /** The answer, as it is written, citing the excerpts as [n]. */
+  answer(excerpts: Excerpt[], question: string): AsyncIterable<string>;
 }
 
 const anthropicBackend: AiBackend = {
@@ -65,6 +73,8 @@ const anthropicBackend: AiBackend = {
   describe: describeWithClaude,
   embed: embedWithVoyage,
   embedMany: embedManyWithVoyage,
+  answerModel: ANSWER_MODEL,
+  answer: answerWithClaude,
 };
 
 const cloudflareBackend: AiBackend = {
@@ -80,6 +90,9 @@ const cloudflareBackend: AiBackend = {
   describe: describeWithWorkersAi,
   embed: (text) => embedWithWorkersAi(text),
   embedMany: (texts) => embedManyWithWorkersAi(texts),
+  answerModel: CF_ANSWER_MODEL,
+  answer: (excerpts, question) =>
+    answerWithWorkersAi(ANSWER_SYSTEM, excerptsAsText(excerpts, question)),
 };
 
 /**

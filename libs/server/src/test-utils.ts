@@ -43,6 +43,8 @@ export interface MockResponse extends VercelResponse {
   statusCode: number;
   /** Body passed to res.json() */
   body: unknown;
+  /** Everything passed to res.write(), in order: a streamed answer */
+  written: string[];
 }
 
 export function mockResponse(): MockResponse {
@@ -56,6 +58,11 @@ export function mockResponse(): MockResponse {
     json(payload: unknown) {
       res.body = payload;
       return res;
+    },
+    written: [] as string[],
+    write(chunk: string) {
+      res.written.push(chunk);
+      return true;
     },
     setHeader: vi.fn(),
     end: vi.fn(),

@@ -16,7 +16,7 @@ import { supabase } from './auth';
  * to anyone who opens the site.
  */
 
-export type AiAction = 'index' | 'embed';
+export type AiAction = 'index' | 'embed' | 'ask';
 
 export interface DailyLimit {
   perAccount: number;
@@ -31,6 +31,13 @@ export const AI_DAILY_LIMITS: Record<AiAction, DailyLimit> = {
   /* A search is one line of text embedded, a fraction of a description. The
      searchbar debounces at 300ms, so a sentence typed slowly is several. */
   embed: { perAccount: 300, total: 5000 },
+  /* A question is a model reading the pieces nearest to it and writing an
+     answer (ADR 0019): on the free path some 65 of Cloudflare's 10,000 free
+     neurons a day, against the 32 and 50 per thousand tokens it lists for
+     mistral-small. A hundred leaves room for indexing and searching inside
+     the free allocation, and twenty an account lets anyone try it, a demo
+     included, without one visitor taking the day. */
+  ask: { perAccount: 20, total: 100 },
 };
 
 /**
@@ -41,6 +48,7 @@ export const AI_DAILY_LIMITS: Record<AiAction, DailyLimit> = {
 const TOTAL_VARIABLE: Record<AiAction, string> = {
   index: 'AI_INDEX_DAILY_LIMIT',
   embed: 'AI_EMBED_DAILY_LIMIT',
+  ask: 'AI_ASK_DAILY_LIMIT',
 };
 
 export function dailyLimit(action: AiAction): DailyLimit {
@@ -82,6 +90,12 @@ const SPENT: Record<AiAction, Record<BudgetSpent['scope'], string>> = {
       'You have searched by meaning as many times today as a day allows. Searching by name still works.',
     deployment:
       'Search by meaning has reached this site’s limit for today. Searching by name still works.',
+  },
+  ask: {
+    account:
+      'You have asked as many questions today as a day allows. Ask again tomorrow; searching still works.',
+    deployment:
+      'Questions have reached this site’s free limit for today. Ask again tomorrow; searching still works.',
   },
 };
 

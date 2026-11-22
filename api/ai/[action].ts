@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from '../../libs/server/src/vercel';
-import { authenticate, AuthError, supabase } from '../../libs/server/src/auth';
+import { authenticate, AuthError, supabase, supabaseAsCaller } from '../../libs/server/src/auth';
+import {
+  EXCERPTS_PER_QUESTION,
+  MAX_QUESTION_CHARS,
+  type Excerpt,
+} from '../../libs/server/src/answer';
+import { AnswerRefused } from '../../libs/server/src/claude-answer';
 import { isDemoEmail } from '../../libs/server/src/demo';
 import {
   MAX_DESCRIBE_BYTES,
@@ -24,6 +30,7 @@ import { piecesOf } from '../../libs/server/src/pieces';
 import { BudgetSpent, claimAiCall, secondsUntilTomorrow } from '../../libs/server/src/ai-budget';
 import type { DescribeSource } from '../../libs/server/src/describe';
 import {
+  AI_ASK_LIMIT,
   AI_EMBED_LIMIT,
   AI_INDEX_LIMIT,
   AI_IP_LIMIT,
@@ -35,10 +42,11 @@ import { applyCors } from '../../libs/server/src/cors';
 import { report } from '../../libs/server/src/report';
 
 /**
- * The two halves of semantic search that need a secret:
+ * What search by meaning, and asking one's files, need a secret for:
  *
  *   POST /api/ai/index   describe one file, cut its text into pieces, store the vectors
  *   POST /api/ai/embed   turn a search box into a vector
+ *   POST /api/ai/ask     answer a question from the pieces nearest to it (ADR 0019)
  *
  * One file for both, because Vercel makes a function out of every file under
  * api/ and the Hobby plan allows twelve — this is the twelfth. See
@@ -59,6 +67,7 @@ class AccessError extends Error {}
 const byAddress = new RateLimiter(AI_IP_LIMIT);
 const byIndexingUser = new RateLimiter(AI_INDEX_LIMIT);
 const byEmbeddingUser = new RateLimiter(AI_EMBED_LIMIT);
+const byAskingUser = new RateLimiter(AI_ASK_LIMIT);
 
 /** Long enough to fetch a file, short enough that nothing else can use it. */
 const READ_URL_TTL = 300;
@@ -200,7 +209,7 @@ function indexTableError(doing: string, error: { message: string }): Error {
       `${doing}: ${error.message} — has migrations/011_add_file_embeddings.sql been run?`
     );
   }
-  if (/file_chunks/.test(error.message)) {
+  if (/file_chunks|match_chunks/.test(error.message)) {
     return new Error(
       `${doing}: ${error.message} — has migrations/022_add_file_chunks.sql been run?`
     );
@@ -390,6 +399,121 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
   });
 }
 
+/**
+ * The pieces nearest to a question, numbered as the answer cites them, found
+ * by the caller's own search under the database's policies: `match_chunks` is
+ * not the service role's to call (migration 022).
+ */
+async function nearestPieces(
+  req: VercelRequest,
+  vector: number[],
+  model: string
+): Promise<Excerpt[]> {
+  const { data, error } = await supabaseAsCaller(req).rpc('match_chunks', {
+    query_embedding: toVectorLiteral(vector),
+    model_name: model,
+    match_count: EXCERPTS_PER_QUESTION,
+    min_similarity: 0,
+  });
+  if (error) throw indexTableError('Could not search the pieces', error);
+
+  const rows = (data ?? []) as {
+    file_id: string;
+    file_name: string;
+    chunk_index: number;
+    content: string;
+  }[];
+  return rows.map((row, i) => ({
+    n: i + 1,
+    fileId: row.file_id,
+    fileName: row.file_name,
+    chunkIndex: row.chunk_index,
+    content: row.content,
+  }));
+}
+
+/**
+ * Answers a question from the caller's files, as it is written.
+ *
+ * The answer comes as lines of JSON (`application/x-ndjson`), so that the
+ * browser can show the sources at once and the words as they arrive:
+ *
+ *   {"type":"sources","model":…,"sources":[{"n":1,"fileId":…,"fileName":…,"chunkIndex":…,"content":…}]}
+ *   {"type":"text","text":"…"}            any number of these
+ *   {"type":"done"}                       or {"type":"error","message":…}
+ *
+ * Everything that can refuse does so before the first line, with a status
+ * the handler chooses. Once the stream has begun the status is spent, so a
+ * failure in the middle of an answer is a line of its own.
+ *
+ * Any account may ask, a demo's included: the answer is free on the path
+ * production runs, and the day's budget is what keeps one visitor from
+ * spending everyone's share.
+ */
+async function askQuestion(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
+  const { question } = req.body as { question?: unknown };
+  const text = typeof question === 'string' ? question.trim() : '';
+
+  if (!text) {
+    res.status(400).json({ message: 'question is required' });
+    return;
+  }
+  if ([...text].length > MAX_QUESTION_CHARS) {
+    res.status(400).json({ message: 'question is too long' });
+    return;
+  }
+
+  const backend = activeBackend();
+
+  /* One unit a question, its search included, claimed before the first call
+     that costs (libs/server/src/ai-budget.ts). */
+  await claimAiCall(userId, 'ask');
+
+  const vector = await backend.embed(text, 'query');
+  const excerpts = await nearestPieces(req, vector, backend.embeddingModel);
+
+  res.status(200);
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  const send = (event: Record<string, unknown>) => res.write(`${JSON.stringify(event)}\n`);
+
+  send({
+    type: 'sources',
+    model: backend.answerModel,
+    sources: excerpts.map(({ n, fileId, fileName, chunkIndex, content }) => ({
+      n,
+      fileId,
+      fileName,
+      chunkIndex,
+      content,
+    })),
+  });
+
+  /* Nothing indexed to read: no model is asked to answer from nothing, and
+     the browser says what to do instead. */
+  if (excerpts.length === 0) {
+    send({ type: 'done', empty: true });
+    res.end();
+    return;
+  }
+
+  try {
+    for await (const piece of backend.answer(excerpts, text)) send({ type: 'text', text: piece });
+    send({ type: 'done' });
+  } catch (error) {
+    console.error('[ai]', error);
+    if (!(error instanceof AnswerRefused)) await report(error, { route: 'ai/ask', userId });
+    send({
+      type: 'error',
+      message:
+        error instanceof AnswerRefused
+          ? error.message
+          : 'The answer could not be finished. Try asking again.',
+    });
+  }
+  res.end();
+}
+
 /** Turns what someone typed into the vector the database can compare. */
 async function embedQuery(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
   const { text } = req.body as { text?: string };
@@ -442,7 +566,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
   /* What a report says the failure was in: one of the two actions, or the
      function for a segment that is neither. */
-  const route = action === 'index' || action === 'embed' ? `ai/${action}` : 'ai';
+  const route =
+    action === 'index' || action === 'embed' || action === 'ask' ? `ai/${action}` : 'ai';
 
   try {
     const user = await authenticate(req);
@@ -469,6 +594,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
       await indexFile(req, res, userId);
+      return;
+    }
+
+    if (action === 'ask') {
+      if (!byAskingUser.allow(userId)) {
+        tooManyRequests(
+          res,
+          byAskingUser.retryAfterSeconds(userId),
+          'Too many questions at once. Try again in a minute.'
+        );
+        return;
+      }
+      await askQuestion(req, res, userId);
       return;
     }
 

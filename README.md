@@ -460,9 +460,12 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      `/api/ai/*` answers `501` to anything that asks anyway. Apply
      `migrations/017_bound_ai_spend.sql` before adding the keys: every paid call
      claims a unit of a daily budget there, and a deployment without the table
-     refuses them. `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT` (optional)
-     set the deployment's daily limits, 300 descriptions and 5,000 searches by
-     default; `0` stops the spending without removing the keys
+     refuses them. `AI_INDEX_DAILY_LIMIT`, `AI_EMBED_DAILY_LIMIT` and
+     `AI_ASK_DAILY_LIMIT` (optional) set the deployment's daily limits, 300
+     descriptions, 5,000 searches and 100 questions by default; `0` stops the
+     spending without removing the keys. Apply
+     `migrations/023_count_questions.sql` before the deployment that answers
+     questions
    - `CRON_SECRET`, a random string of 16 characters or more: Vercel Cron sends
      it to the nightly reconciliation, which answers `503` without one. Apply
      `migrations/021_reconcile_hosted_storage.sql` first. The reconciliation
@@ -1109,6 +1112,9 @@ only ever read server-side.
   searches a day (UTC); the deployment as a whole, 300 and 5,000, set by
   `AI_INDEX_DAILY_LIMIT` and `AI_EMBED_DAILY_LIMIT`. A file is described once
   per embedding model. Demo accounts can search but are never indexed.
+- **Questions to one's files**: 20 an account a day and 100 for the
+  deployment (`AI_ASK_DAILY_LIMIT`), every account alike, demo accounts
+  included; the free path answers inside Cloudflare's free allocation.
 
 ### Cloudinary (Free Plan)
 
