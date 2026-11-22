@@ -15,9 +15,11 @@ import {
   isDemoEmail,
   isExpiredDemoUser,
 } from './demo';
-import { EMBEDDING_DIMENSIONS, planFor } from '../../core/src/ai';
+import { CHUNK_SIZE, EMBEDDING_DIMENSIONS, MAX_PIECES_PER_FILE, planFor } from '../../core/src/ai';
 import { CF_EMBEDDING_MODEL, CF_TEXT_MODEL, CF_VISION_MODEL } from './cloudflare-ai';
 import type { DemoSearchIndex } from './demo-search-index';
+import { piecesOf } from './pieces';
+import { decodeText } from './decode-text';
 
 describe('demoEmail', () => {
   it('carries the prefix the sweep looks for', () => {
@@ -163,7 +165,8 @@ describe('DEMO_SEED', () => {
         size: 1,
         storage_type: 'supabase_storage',
       });
-      return plan.kind === 'image' || plan.kind === 'text';
+      // A PDF too: the free path reads one's text with toMarkdown (ADR 0019).
+      return plan.kind !== 'skip';
     }).map((item) => item.asset);
     expect(Object.keys(index.files).sort()).toEqual([...readable].sort());
 
@@ -171,6 +174,43 @@ describe('DEMO_SEED', () => {
       expect(file.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
       expect(file.summary.length).toBeGreaterThan(0);
       expect([CF_TEXT_MODEL, CF_VISION_MODEL]).toContain(file.summary_model);
+      // A caption read wrong keeps its tags in the sentence and has none.
+      expect(file.summary).not.toMatch(/\btags\s*:/i);
+      expect(file.tags.length).toBeGreaterThan(0);
+    }
+  });
+
+  /* The pieces a question is answered from (ADR 0019), cut as /api/ai/index
+     cuts a file: a text file's from its text, a picture's from its
+     description. A PDF's text comes from toMarkdown, which this test cannot
+     call, so its pieces are held to the limits only. */
+  it('comes with each file cut into pieces as /api/ai/index cuts it', () => {
+    const index = JSON.parse(
+      readFileSync(new URL('../../../public/demo/search-index.json', import.meta.url), 'utf8')
+    ) as DemoSearchIndex;
+
+    for (const item of DEMO_SEED) {
+      const file = index.files[item.asset];
+      if (!file) continue;
+      expect(file.pieces.length).toBeGreaterThan(0);
+      expect(file.pieces.length).toBeLessThanOrEqual(MAX_PIECES_PER_FILE);
+      for (const piece of file.pieces) {
+        expect(piece.embedding).toHaveLength(EMBEDDING_DIMENSIONS);
+        expect([...piece.content].length).toBeLessThanOrEqual(CHUNK_SIZE);
+      }
+
+      const plan = planFor({
+        name: item.name,
+        type: item.type,
+        size: 1,
+        storage_type: 'supabase_storage',
+      });
+      const contents = file.pieces.map((piece) => piece.content);
+      if (plan.kind === 'text') {
+        const bytes = readFileSync(new URL(`../../../public/demo/${item.asset}`, import.meta.url));
+        expect(contents).toEqual(piecesOf(decodeText(bytes), file.summary));
+      }
+      if (plan.kind === 'image') expect(contents).toEqual(piecesOf(null, file.summary));
     }
   });
 });

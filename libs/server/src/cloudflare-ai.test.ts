@@ -46,6 +46,23 @@ describe('parseCaption', () => {
     const { summary } = parseCaption('Tags: a, b\nA scanned receipt.');
     expect(summary).toBe('A scanned receipt.');
   });
+
+  it('reads the tags out of the sentence when the two lines came as one', () => {
+    expect(
+      parseCaption('A mock electricity bill for March 2026. Tags: electricity bill, march 2026')
+    ).toEqual({
+      summary: 'A mock electricity bill for March 2026.',
+      tags: ['electricity bill', 'march 2026'],
+    });
+  });
+
+  it('keeps a sentence that only starts with the word', () => {
+    expect(parseCaption('Tags: a, b')).toEqual({ summary: '', tags: ['a', 'b'] });
+    expect(parseCaption('Price tags on a shelf.\nTags: shop')).toEqual({
+      summary: 'Price tags on a shelf.',
+      tags: ['shop'],
+    });
+  });
 });
 
 describe('embed', () => {

@@ -228,6 +228,10 @@ describe('POST /api/demo/session', () => {
       tags: ['electricity', 'bill'],
       summary_model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
       embedding: [0.5, -0.25],
+      pieces: [
+        { content: 'Importe total a pagar: 86,40 euros.', embedding: [0.1, 0.2] },
+        { content: 'Fecha de cargo: 15 de abril.', embedding: [0.3, 0.4] },
+      ],
     };
 
     /** The seed assets as before, and an index made with `model`. */
@@ -279,12 +283,42 @@ describe('POST /api/demo/session', () => {
       });
     });
 
+    /* The pieces a question is answered from (ADR 0019): a demo cannot index,
+       so without them a demo's questions would have nothing to read. */
+    it('writes the pieces of each indexed file, in order, under the model', async () => {
+      withIndex('@cf/baai/bge-m3');
+
+      await handler(post(), mockResponse());
+
+      const inserts = table.calls.filter((c) => c.table === 'file_chunks' && c.op === 'insert');
+      expect(inserts).toHaveLength(1);
+      expect(inserts[0]!.args?.[0]).toEqual([
+        {
+          file_id: 'folder-1',
+          chunk_index: 0,
+          user_id: 'user-1',
+          content: 'Importe total a pagar: 86,40 euros.',
+          embedding: '[0.1,0.2]',
+          embedding_model: '@cf/baai/bge-m3',
+        },
+        {
+          file_id: 'folder-1',
+          chunk_index: 1,
+          user_id: 'user-1',
+          content: 'Fecha de cargo: 15 de abril.',
+          embedding: '[0.3,0.4]',
+          embedding_model: '@cf/baai/bge-m3',
+        },
+      ]);
+    });
+
     it('writes none when this deployment searches with another model', async () => {
       withIndex('voyage-4');
 
       await handler(post(), mockResponse());
 
       expect(table.calls.filter((c) => c.table === 'file_embeddings')).toHaveLength(0);
+      expect(table.calls.filter((c) => c.table === 'file_chunks')).toHaveLength(0);
       expect(table.calls.filter((c) => c.table === 'files').length).toBeGreaterThan(1);
     });
 
