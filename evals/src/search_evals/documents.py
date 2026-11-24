@@ -10,7 +10,8 @@ A question in `data/questions.jsonl` says where its answer is written, as
 the labels independent of how the text is cut. A piece "answers" when it holds
 a whole quote, whatever size the pieces are, so the same labels score every
 size. A question with no evidence has no answer in these files; it is there to
-see whether the answer says so (`answer` is null for it).
+see whether the answer says so (`answer` is null for it). `facts` say what a
+correct answer must contain, for the answers' eval (`grading.py`).
 
 A reference answer says nothing its quotes do not: the answers' eval holds a
 model's answer to the quotes, and a reference that knew more would mark a
@@ -31,6 +32,7 @@ from pathlib import Path
 
 from .chunks import contains
 from .data import DATA, LANGUAGES, _lines
+from .grading import says
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,10 @@ class Question:
     lang: str
     evidence: tuple[Evidence, ...]
     answer: str | None
+    # What a correct answer must say: each fact a set of ways of saying it
+    # (grading.says). Empty for a question with no answer, where the answer
+    # must say that instead.
+    facts: tuple[tuple[str, ...], ...] = ()
 
     @property
     def answerable(self) -> bool:
@@ -80,6 +86,7 @@ def load_questions(path: Path = DATA / "questions.jsonl") -> list[Question]:
             lang=row["lang"],
             evidence=tuple(Evidence(doc=e["doc"], quote=e["quote"]) for e in row["evidence"]),
             answer=row["answer"],
+            facts=tuple(tuple(alternatives) for alternatives in row.get("facts", [])),
         )
         for row in _lines(path)
     ]
@@ -109,6 +116,17 @@ def problems(documents: list[Document], questions: list[Question]) -> list[str]:
             found.append(f"question {q.id}: language {q.lang!r} is not one of {LANGUAGES}")
         if q.answerable != (q.answer is not None):
             found.append(f"question {q.id}: evidence and a reference answer go together, or neither")
+        if q.answerable and not q.facts:
+            found.append(f"question {q.id}: an answerable question says what its answer must contain")
+        if not q.answerable and q.facts:
+            found.append(f"question {q.id}: a question with no answer has no facts to find")
+        for alternatives in q.facts:
+            if not alternatives or not all(a.strip("* ") for a in alternatives):
+                found.append(f"question {q.id}: a fact has an empty way of saying it")
+            # The reference answer is the first answer the grading reads: one
+            # that fails its own facts would mark a right answer wrong.
+            elif q.answer is not None and not says(q.answer, alternatives):
+                found.append(f"question {q.id}: the reference answer does not say {list(alternatives)}")
         for e in q.evidence:
             document = by_id.get(e.doc)
             if document is None:

@@ -123,3 +123,27 @@ def embedder(model: str) -> Embedder:
     if model == CLOUDFLARE_MODEL or model in CLOUDFLARE_FORMER:
         return cloudflare
     raise ValueError(f"no backend for {model!r}: voyage-*, {CLOUDFLARE_MODEL} or one of {CLOUDFLARE_FORMER}")
+
+
+def cloudflare_answer(system: str, user: str, model: str, max_tokens: int) -> str:
+    """One answer, as `answer` in libs/server/src/cloudflare-ai.ts asks for it.
+
+    The same messages and the same token limit; no temperature, since the app
+    sets none. Not streamed: the words are the same either way, and the eval
+    reads the whole answer.
+    """
+    token = os.environ.get("CLOUDFLARE_AI_TOKEN")
+    account = _cloudflare_account()
+    if not token or not account:
+        raise MissingKey("CLOUDFLARE_AI_TOKEN and CLOUDFLARE_ACCOUNT_ID (or R2_ENDPOINT) are needed")
+    payload = _post(
+        f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}",
+        token,
+        {
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "max_tokens": max_tokens,
+        },
+    )
+    if not payload.get("success", True):
+        raise RuntimeError(f"Workers AI refused the question: {str(payload.get('errors'))[:200]}")
+    return str(payload["result"]["response"]).strip()

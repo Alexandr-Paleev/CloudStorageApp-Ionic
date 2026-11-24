@@ -7,6 +7,10 @@ and it is the one run again and again while a threshold or a ranking is tuned.
 
 `embed-chunks` and `score-chunks` are the same pair for the pieces of text a
 question is answered from (`retrieval.py`), at each size compared.
+
+`answer` and `score-answers` are the pair for the answers themselves: the
+first asks the model every question from the pieces the app would give it,
+the second grades what it said (`grading.py`).
 """
 
 from __future__ import annotations
@@ -18,10 +22,23 @@ import sys
 import numpy as np
 
 from . import metrics, retrieval
-from .backends import MissingKey, embedder
-from .contract import EMBEDDING_MODEL, SEARCH_RESULTS, embedding_input, search_floor
+from .answers import Answer, AnswerCache, message_hash
+from .backends import MissingKey, cloudflare_answer, embedder
+from .contract import (
+    ANSWER_MODEL,
+    ANSWER_SYSTEM,
+    CHUNK_SIZE,
+    EMBEDDING_MODEL,
+    EXCERPTS_PER_QUESTION,
+    MAX_ANSWER_TOKENS,
+    SEARCH_RESULTS,
+    embedding_input,
+    search_floor,
+)
 from .data import LANGUAGES, load_files, load_queries, only_across_languages, problems
-from .documents import across_languages, load_documents, load_questions
+from .documents import Question, across_languages, load_documents, load_questions
+from .grading import Grade, grade
+from .prompt import Excerpt, excerpts_as_text
 from .documents import problems as document_problems
 from .rank import rank
 from .vectors import VectorCache
@@ -175,6 +192,165 @@ def _score_chunks(model: str, sizes: list[int], k: int) -> int:
     return 0
 
 
+# The free path's embedding model, the one production searches the pieces with.
+PIECES_MODEL = "@cf/baai/bge-m3"
+
+
+def _asked(embedding_model: str) -> list[tuple[Question, list[retrieval.Piece], str]] | None:
+    """Every question with the pieces the app would give it and the message it would send.
+
+    The pieces are those `match_chunks` returns: the nearest of all the files'
+    pieces at the app's size, no floor, the first EXCERPTS_PER_QUESTION.
+    """
+    documents, questions = load_documents(), load_questions()
+    by_id = {d.id: d for d in documents}
+    all_pieces = retrieval.pieces(documents, CHUNK_SIZE)
+    cache = VectorCache(embedding_model)
+    vectors = [cache.get(p.input, "document") for p in all_pieces]
+    query_vectors = [cache.get(q.text, "query") for q in questions]
+    if any(v is None for v in vectors) or any(v is None for v in query_vectors):
+        print(f"{embedding_model}: vectors are missing; run `search-evals embed-chunks --model {embedding_model}`", file=sys.stderr)
+        return None
+    matrix = np.stack(vectors)
+    piece_by_id = {p.id: p for p in all_pieces}
+    out = []
+    for q, vector in zip(questions, query_vectors, strict=True):
+        nearest = rank(vector, matrix, [p.id for p in all_pieces], limit=EXCERPTS_PER_QUESTION, min_similarity=0.0)
+        given = [piece_by_id[piece_id] for piece_id, _ in nearest]
+        excerpts = [Excerpt(n=i, file_name=by_id[p.doc].name, content=p.text) for i, p in enumerate(given, start=1)]
+        out.append((q, given, excerpts_as_text(excerpts, q.text)))
+    return out
+
+
+def _answer(model: str, embedding_model: str, dry_run: bool) -> int:
+    # Workers AI is the one backend this asks; Claude, the paid path, costs
+    # money per run and is not wired in.
+    if not model.startswith("@cf/"):
+        print(f"{model}: only Workers AI models (@cf/…) can answer here", file=sys.stderr)
+        return 2
+    asked = _asked(embedding_model)
+    if asked is None:
+        return 2
+    cache = AnswerCache(model)
+    todo = [(q, given, user) for q, given, user in asked if cache.get(q.id, message_hash(model, ANSWER_SYSTEM, user, MAX_ANSWER_TOKENS)) is None]
+    if not todo:
+        print(f"{model}: all {len(asked)} answers are cached in {cache.path.name}")
+        return 0
+    if dry_run:
+        # About four characters a token in English, fewer in Russian: a ceiling, not a bill.
+        characters = sum(len(ANSWER_SYSTEM) + len(user) for _, _, user in todo)
+        print(f"{model}: {len(todo)} questions to ask, about {characters:,} characters of input")
+        return 0
+    asked_now = 0
+    try:
+        for q, given, user in todo:
+            digest = message_hash(model, ANSWER_SYSTEM, user, MAX_ANSWER_TOKENS)
+            text = cloudflare_answer(ANSWER_SYSTEM, user, model, MAX_ANSWER_TOKENS)
+            cache.put(Answer(id=q.id, message_hash=digest, pieces=[p.id for p in given], answer=text))
+            asked_now += 1
+            # Kept as it comes: a run stopped halfway is not paid for twice.
+            cache.save()
+            print(f"{q.id}: {text[:100]!r}")
+    except MissingKey as error:
+        print(f"{model}: {error}", file=sys.stderr)
+        return 2
+    print(f"{model}: asked {asked_now}, {len(cache)} in {cache.path.name}")
+    return 0
+
+
+def _mean(values: list[float]) -> str:
+    return f"{statistics.fmean(values):.3f}" if values else "—"
+
+
+def _score_answers(model: str, embedding_model: str, verbose: bool) -> int:
+    documents, questions = load_documents(), load_questions()
+    found = document_problems(documents, questions)
+    if found:
+        print(f"data/ has {len(found)} problems; run `search-evals check`", file=sys.stderr)
+        return 1
+    asked = _asked(embedding_model)
+    if asked is None:
+        return 2
+    by_id = {d.id: d for d in documents}
+    cache = AnswerCache(model)
+    graded: list[tuple[Question, Grade, str]] = []
+    missing = 0
+    for q, given, user in asked:
+        row = cache.get(q.id, message_hash(model, ANSWER_SYSTEM, user, MAX_ANSWER_TOKENS))
+        if row is None:
+            missing += 1
+            continue
+        g = grade(
+            row.answer,
+            q.text,
+            [list(alternatives) for alternatives in q.facts],
+            [e.quote for e in q.evidence],
+            [p.text for p in given],
+        )
+        graded.append((q, g, row.answer))
+    if missing:
+        print(f"{model}: {missing} answers are missing or stale; run `search-evals answer --model {model}`", file=sys.stderr)
+        return 2
+
+    print(f"{model}, from the first {EXCERPTS_PER_QUESTION} pieces of {CHUNK_SIZE} characters by {embedding_model}")
+    print("Questions the files answer:")
+    print(
+        f"{'':8}{'questions':>10}{'correct':>9}{'refused':>9}{'evidence':>10}"
+        f"{'precision':>11}{'numbers':>9}{'language':>10}"
+    )
+    answerable = [(q, g) for q, g, _ in graded if q.answerable]
+    groups: dict[str, list[tuple[Question, Grade]]] = {lang: [] for lang in LANGUAGES}
+    groups |= {"same": [], "across": []}
+    for q, g in answerable:
+        groups[q.lang].append((q, g))
+        groups["across" if across_languages(q, by_id) else "same"].append((q, g))
+    groups["all"] = answerable
+    for label, rows in groups.items():
+        if not rows:
+            continue
+        told = [(q, g) for q, g in rows if g.language is not None]
+        print(
+            f"{label:8}{len(rows):>10}"
+            f"{_mean([float(g.correct) for _, g in rows]):>9}"
+            f"{sum(g.refused for _, g in rows):>9}"
+            f"{_mean([g.evidence_cited for _, g in rows if g.evidence_cited is not None]):>10}"
+            f"{_mean([g.citation_precision for _, g in rows if g.citation_precision is not None]):>11}"
+            f"{sum(bool(g.numbers_not_in_excerpts) for _, g in rows):>9}"
+            f"{_mean([float(g.language == q.lang) for q, g in told]):>10}"
+        )
+    print("Questions the files do not answer:")
+    print(f"{'':8}{'questions':>10}{'refused':>9}{'numbers':>9}{'language':>10}")
+    unanswerable = [(q, g) for q, g, _ in graded if not q.answerable]
+    for label in (*LANGUAGES, "all"):
+        rows = unanswerable if label == "all" else [(q, g) for q, g in unanswerable if q.lang == label]
+        if not rows:
+            continue
+        told = [(q, g) for q, g in rows if g.language is not None]
+        print(
+            f"{label:8}{len(rows):>10}{sum(g.refused for _, g in rows):>9}"
+            f"{sum(bool(g.numbers_not_in_excerpts) for _, g in rows):>9}"
+            f"{_mean([float(g.language == q.lang) for q, g in told]):>10}"
+        )
+
+    if verbose:
+        print("\nWhat fell short:")
+        for q, g, text in graded:
+            flaws = []
+            if not g.correct:
+                flaws.append("refused" if g.refused and q.answerable else "answered" if not q.answerable else f"facts {g.facts_said}/{g.facts}")
+            if g.evidence_cited is not None and g.evidence_cited < 1:
+                flaws.append(f"evidence cited {g.evidence_cited:.2f}")
+            if g.citations_out_of_range:
+                flaws.append(f"{g.citations_out_of_range} citations past the last piece")
+            if g.numbers_not_in_excerpts:
+                flaws.append(f"numbers not in the excerpts {list(g.numbers_not_in_excerpts)}")
+            if g.language is not None and g.language != q.lang:
+                flaws.append(f"answered in {g.language}")
+            if flaws:
+                print(f"{q.id} ({q.lang}) {'; '.join(flaws)}\n    Q: {q.text}\n    A: {text}")
+    return 0
+
+
 def _sizes(text: str) -> list[int]:
     return [int(part) for part in text.split(",") if part.strip()]
 
@@ -199,7 +375,22 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--sizes", type=_sizes, default=list(retrieval.SIZES))
         if name == "score-chunks":
             command.add_argument("--k", type=int, default=5)
+    for name, text in (
+        ("answer", "ask the model every question; needs a key"),
+        ("score-answers", "grade the cached answers"),
+    ):
+        command = commands.add_parser(name, help=text)
+        command.add_argument("--model", default=ANSWER_MODEL)
+        command.add_argument("--embedding-model", default=PIECES_MODEL)
+        if name == "answer":
+            command.add_argument("--dry-run", action="store_true", help="count what would be asked")
+        else:
+            command.add_argument("--verbose", action="store_true", help="show every answer that fell short")
     args = parser.parse_args(argv)
+    if args.command == "answer":
+        return _answer(args.model, args.embedding_model, args.dry_run)
+    if args.command == "score-answers":
+        return _score_answers(args.model, args.embedding_model, args.verbose)
     if args.command == "check":
         return _check()
     if args.command == "embed-chunks":

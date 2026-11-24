@@ -78,6 +78,18 @@ reasoning behind the larger decisions lives in
   `/api/ai/index` cuts it, with a vector per piece, and `/api/demo/session`
   writes them beside the sentence. `welcome.pdf` is indexed in the demo for
   the first time. ADR 0019, step 2c.
+- **The eval grades the answers.** `search-evals answer` asks the model
+  every question from the pieces the app would give it, with the same
+  instruction and message, which a contract beside `answer.ts` holds both
+  sides to; the answers are kept in `evals/cache/` and graded in CI with no
+  key. Each question lists the facts a right answer must say, and the
+  grading counts refusals, what the citations point at, numbers the pieces
+  do not hold, and the answer's language, by rules rather than another
+  model. The free path's `mistral-small-3.1` answered 62 of 65 right,
+  refused 9 of the 10 it should, answered every question in its language
+  and made up no number. ADR 0019, step 5.
+- **The question box on `/ask` sits under the answers** on a wide screen,
+  in their column, instead of running across the page.
 - **The eval waits out a rate limit.** Voyage without a payment method allows
   three requests a minute; `embed` waits and goes on instead of failing.
 
