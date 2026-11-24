@@ -10,7 +10,18 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **A photo larger than the free path's model takes is described from a
+  smaller copy.** A photo from a phone is 3 to 8 MB and the model takes 3 MB,
+  so since 4.17.0 most real photos were listed as files that cannot be
+  indexed. A picture on Cloudinary is now described from a copy Cloudinary
+  makes on request, written into the delivery address: 2048 pixels on the
+  longest side, a JPEG, turned the way its EXIF says. The original is not
+  touched. The 3.46 MB photo that was skipped comes to 180 kB. Supabase
+  Storage makes such copies only on a paid plan, so a large picture there is
+  still skipped with its reason. A file already listed as one that cannot be
+  indexed is offered again by "Try these again".
 
 ## [4.17.0] — 2026-11-24
 

@@ -883,9 +883,14 @@ describe('a PDF', () => {
    the free path's model takes pictures up to 3 MB, and saying so is a reason,
    not a failure. */
 describe('a picture larger than the model takes', () => {
+  /* Supabase Storage makes smaller copies only on a paid plan. */
   it('is skipped with the reason, before anything is paid for', async () => {
     maxImageBytes.value = 3 * 1024 * 1024;
-    withFile({ size: 3_459_911 });
+    withFile({
+      size: 3_459_911,
+      storage_type: 'supabase_storage',
+      storage_path: 'user-1/1700000000_photo.jpg',
+    });
     const res = mockResponse();
 
     await handler(index('file-1'), res);
@@ -909,6 +914,37 @@ describe('a picture larger than the model takes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ indexed: false, reason: expect.stringContaining('3 MB') });
     expect(report).not.toHaveBeenCalled();
+  });
+
+  /* The 3.4 MB photo again: on Cloudinary, it is described from a copy of
+     2048 pixels at most, about 180 kB, and the original is not touched. */
+  it('is described from a smaller copy where it is on Cloudinary', async () => {
+    maxImageBytes.value = 3 * 1024 * 1024;
+    withFile({ size: 3_459_911, type: 'image/heic' });
+    const res = mockResponse();
+
+    await handler(index('file-1'), res);
+
+    expect(describeFile).toHaveBeenCalledWith('photo.jpg', {
+      kind: 'image',
+      url: 'https://res.cloudinary.com/demo/image/upload/c_limit,w_2048,h_2048,q_auto,f_jpg/v1/users/user-1/photo.jpg',
+      // The copy is a JPEG whatever the original was: f_jpg.
+      mediaType: 'image/jpeg',
+    });
+    expect(res.body).toMatchObject({ indexed: true });
+  });
+
+  it('is described as it is while it fits, with no copy asked for', async () => {
+    maxImageBytes.value = 3 * 1024 * 1024;
+    withFile({ size: 3 * 1024 * 1024 });
+
+    await handler(index('file-1'), mockResponse());
+
+    expect(describeFile).toHaveBeenCalledWith('photo.jpg', {
+      kind: 'image',
+      url: FILE.download_url,
+      mediaType: 'image/jpeg',
+    });
   });
 
   it('goes to a model with no limit of its own', async () => {
