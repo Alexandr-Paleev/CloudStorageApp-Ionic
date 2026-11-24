@@ -78,12 +78,14 @@ export class BudgetSpent extends Error {
   }
 }
 
+/* What happened, and what still works, but not when to come back: the day
+   turns over at midnight UTC, which is "tomorrow" in one place and "at one in
+   the morning" in another. The 429 carries the moment (`retryAt`), and the
+   app says it in the reader's own time. */
 const SPENT: Record<AiAction, Record<BudgetSpent['scope'], string>> = {
   index: {
-    account:
-      'You have indexed as many files today as a day allows. The rest can be indexed tomorrow.',
-    deployment:
-      'This site has indexed as many files today as it allows in a day. Try again tomorrow.',
+    account: 'You have indexed as many files today as a day allows.',
+    deployment: 'This site has indexed as many files today as it allows in a day.',
   },
   embed: {
     account:
@@ -92,10 +94,8 @@ const SPENT: Record<AiAction, Record<BudgetSpent['scope'], string>> = {
       'Search by meaning has reached this site’s limit for today. Searching by name still works.',
   },
   ask: {
-    account:
-      'You have asked as many questions today as a day allows. Ask again tomorrow; searching still works.',
-    deployment:
-      'Questions have reached this site’s free limit for today. Ask again tomorrow; searching still works.',
+    account: 'You have asked as many questions today as a day allows. Searching still works.',
+    deployment: 'Questions have reached this site’s free limit for today. Searching still works.',
   },
 };
 

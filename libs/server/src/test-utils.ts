@@ -45,6 +45,10 @@ export interface MockResponse extends VercelResponse {
   body: unknown;
   /** Everything passed to res.write(), in order: a streamed answer */
   written: string[];
+  /** True once the handler called res.end(), as Node's own flag is */
+  writableEnded: boolean;
+  /** The connection closing, as it does when the browser goes away */
+  disconnect(): void;
 }
 
 export function mockResponse(): MockResponse {
@@ -65,7 +69,19 @@ export function mockResponse(): MockResponse {
       return true;
     },
     setHeader: vi.fn(),
-    end: vi.fn(),
+    writableEnded: false,
+    end: vi.fn(() => {
+      res.writableEnded = true;
+      res.closeListeners.forEach((listener) => listener());
+    }),
+    closeListeners: [] as (() => void)[],
+    on(event: string, listener: () => void) {
+      if (event === 'close') res.closeListeners.push(listener);
+      return res;
+    },
+    disconnect() {
+      res.closeListeners.forEach((listener) => listener());
+    },
   };
   return res as unknown as MockResponse;
 }

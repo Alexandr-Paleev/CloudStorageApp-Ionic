@@ -62,8 +62,10 @@ export interface AiBackend {
   readonly maxImageBytes?: number;
   /** The model that answers a question from the pieces (ADR 0019). */
   readonly answerModel: string;
-  /** The answer, as it is written, citing the excerpts as [n]. */
-  answer(excerpts: Excerpt[], question: string): AsyncIterable<string>;
+  /** The answer, as it is written, citing the excerpts as [n]. `signal` stops
+   *  the model mid-answer: the person left, and every word after that is
+   *  spent on nobody. */
+  answer(excerpts: Excerpt[], question: string, signal?: AbortSignal): AsyncIterable<string>;
 }
 
 const anthropicBackend: AiBackend = {
@@ -91,8 +93,8 @@ const cloudflareBackend: AiBackend = {
   embed: (text) => embedWithWorkersAi(text),
   embedMany: (texts) => embedManyWithWorkersAi(texts),
   answerModel: CF_ANSWER_MODEL,
-  answer: (excerpts, question) =>
-    answerWithWorkersAi(ANSWER_SYSTEM, excerptsAsText(excerpts, question)),
+  answer: (excerpts, question, signal) =>
+    answerWithWorkersAi(ANSWER_SYSTEM, excerptsAsText(excerpts, question), signal),
 };
 
 /**

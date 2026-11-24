@@ -497,10 +497,24 @@ async function askQuestion(req: VercelRequest, res: VercelResponse, userId: stri
     return;
   }
 
+  /* The person closed the screen or pressed Stop: the connection closes
+     before the answer is written, and the model is told to stop rather than
+     finish a reply nobody reads, out of the same free allocation. */
+  const left = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) left.abort();
+  });
+
   try {
-    for await (const piece of backend.answer(excerpts, text)) send({ type: 'text', text: piece });
+    for await (const piece of backend.answer(excerpts, text, left.signal)) {
+      if (left.signal.aborted) break;
+      send({ type: 'text', text: piece });
+    }
+    if (left.signal.aborted) return;
     send({ type: 'done' });
   } catch (error) {
+    // Nobody is there to tell, and a stop asked for is not a failure.
+    if (left.signal.aborted) return;
     console.error('[ai]', error);
     if (!(error instanceof AnswerRefused)) await report(error, { route: 'ai/ask', userId });
     send({
@@ -567,7 +581,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   /* What a report says the failure was in: one of the two actions, or the
      function for a segment that is neither. */
   const route =
-    action === 'index' || action === 'embed' || action === 'ask' ? `ai/${action}` : 'ai';
+    action === 'index' || action === 'embed' || action === 'ask' || action === 'model'
+      ? `ai/${action}`
+      : 'ai';
 
   try {
     const user = await authenticate(req);
@@ -594,6 +610,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
       await indexFile(req, res, userId);
+      return;
+    }
+
+    /* Which model this deployment indexes with. The dashboard needs it to
+       tell which files are missing from the index (one indexed by another
+       model is), and until now learned it only from a search's answer, so
+       "Index them" appeared only after a search by meaning. Costs nothing:
+       no model is asked, nothing is claimed. */
+    if (action === 'model') {
+      res.status(200).json({ model: activeBackend().embeddingModel });
       return;
     }
 

@@ -12,8 +12,8 @@ vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
     beta = {
       messages: {
-        stream: (params: unknown) => {
-          stream(params);
+        stream: (params: unknown, options?: unknown) => {
+          stream(params, options);
           return {
             async *[Symbol.asyncIterator]() {
               yield* events.value;
@@ -84,7 +84,8 @@ describe('answerWithClaude', () => {
             ],
           },
         ],
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -96,8 +97,16 @@ describe('answerWithClaude', () => {
         output_config: { effort: 'low' },
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
-      })
+      }),
+      expect.anything()
     );
+  });
+
+  it('passes the signal on, so that a person leaving ends the turn at Anthropic too', async () => {
+    const left = new AbortController();
+    for await (const text of answerWithClaude(EXCERPTS, 'Rent?', left.signal)) void text;
+
+    expect(stream).toHaveBeenCalledWith(expect.anything(), { signal: left.signal });
   });
 
   it('says so when the answer was refused, rather than ending with nothing', async () => {

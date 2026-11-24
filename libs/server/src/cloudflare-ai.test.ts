@@ -333,6 +333,22 @@ describe('answer', () => {
     });
   });
 
+  it('stops the request when the person goes away', async () => {
+    const body = (async function* () {
+      yield new TextEncoder().encode('data: {"response":"Yes"}\n');
+    })();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body });
+    vi.stubGlobal('fetch', fetchMock);
+    const left = new AbortController();
+
+    for await (const text of answer('S', 'U', left.signal)) void text;
+    const { signal } = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(signal?.aborted).toBe(false);
+
+    left.abort();
+    expect(signal?.aborted).toBe(true);
+  });
+
   it('says what Workers AI said when it refuses', async () => {
     answers({ errors: [{ message: 'Capacity temporarily exceeded' }] }, false);
     const run = async () => {

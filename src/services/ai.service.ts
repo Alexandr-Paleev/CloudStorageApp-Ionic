@@ -23,6 +23,34 @@ export interface SmartResult extends FileMetadata {
   similarity: number;
 }
 
+/** A file of the account's that the index does not have. */
+export interface UnindexedFile {
+  id: string;
+  name: string;
+}
+
+/** A file the route would not index, and the reason it gave. */
+export interface IndexSkip {
+  fileId: string;
+  reason: string;
+}
+
+/** One piece an answer was read from, numbered as the answer cites it. */
+export interface AnswerSource {
+  n: number;
+  fileId: string;
+  fileName: string;
+  chunkIndex: number;
+  content: string;
+}
+
+/** One line of the answer as `/api/ai/ask` streams it (ADR 0019). */
+export type AnswerEvent =
+  | { type: 'sources'; model: string; sources: AnswerSource[] }
+  | { type: 'text'; text: string }
+  | { type: 'done'; empty?: boolean }
+  | { type: 'error'; message: string };
+
 export interface SmartMatches {
   files: SmartResult[];
   /** The model that embedded the query, and so the only one whose rows it
@@ -67,7 +95,71 @@ async function authHeaders(): Promise<Record<string, string>> {
   };
 }
 
+/**
+ * The lines of a streamed answer, each as it arrives.
+ *
+ * A line can arrive in two chunks, and a character in two as well: the
+ * decoder keeps the half of a character, and the buffer the half of a line.
+ */
+export async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<AnswerEvent> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = done ? '' : (lines.pop() ?? '');
+      for (const line of lines) if (line.trim()) yield JSON.parse(line) as AnswerEvent;
+      if (done) return;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 const aiService = {
+  /**
+   * The model this deployment indexes with, which is what "indexed" means
+   * (`unindexedFiles`). Costs no budget: the route asks no model.
+   */
+  async indexModel(): Promise<string> {
+    const response = await fetch(apiUrl('/api/ai/model'), {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+    if (!response.ok) throw await httpErrorFrom(response, 'Failed to read the index model');
+    const { model } = (await response.json()) as { model: string };
+    return model;
+  },
+
+  /**
+   * A question asked of the account's own files, answered as it is written.
+   *
+   * Every line goes to `onEvent` as it arrives: the sources first, then the
+   * words. A refusal before the answer begins (a spent limit, a question too
+   * long, no model on this deployment) is thrown, as from any other route;
+   * once it has begun, a failure is an `error` line. `signal` stops it, here
+   * and on the server, which stops the model in turn.
+   */
+  async ask(
+    question: string,
+    onEvent: (event: AnswerEvent) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const response = await fetch(apiUrl('/api/ai/ask'), {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ question }),
+      signal,
+    });
+    if (!response.ok) throw await httpErrorFrom(response, 'Failed to ask the question');
+    if (!response.body) throw new Error('The answer came without a body');
+
+    for await (const event of readLines(response.body)) onEvent(event);
+  },
+
   /**
    * Describes one file and stores its vector.
    *
@@ -103,12 +195,12 @@ const aiService = {
    * file is one the search cannot return, and offering it again is the only
    * way it comes back: the index route replaces the row, keyed by the file.
    */
-  async unindexedFileIds(userId: string, model: string): Promise<string[]> {
+  async unindexedFiles(userId: string, model: string): Promise<UnindexedFile[]> {
     const [files, indexed] = await Promise.all([
-      readAll<{ id: string }>((from, to) =>
+      readAll<UnindexedFile>((from, to) =>
         supabase
           .from('files')
-          .select('id', { count: 'exact' })
+          .select('id, name', { count: 'exact' })
           .eq('user_id', userId)
           .order('id')
           .range(from, to)
@@ -126,7 +218,7 @@ const aiService = {
     ]);
 
     const done = new Set(indexed.map((row) => row.file_id));
-    return files.map((row) => row.id).filter((id) => !done.has(id));
+    return files.filter((file) => !done.has(file.id));
   },
 
   /**
@@ -141,18 +233,31 @@ const aiService = {
    * route's 429 says that the day's budget, or the minute's, is spent, and
    * every file after this one would be told the same. `stopped` is what the
    * route said.
+   *
+   * `skips` are the files the route would not index, with its reason: a ZIP,
+   * a scan with no text, a picture too large. They are the same next time,
+   * so the dashboard lists them rather than offering them again.
    */
   async indexMany(
     fileIds: string[],
     onProgress?: (done: number, total: number) => void
-  ): Promise<{ indexed: number; skipped: number; failed: number; stopped?: string }> {
-    const result = { indexed: 0, skipped: 0, failed: 0 };
+  ): Promise<{
+    indexed: number;
+    skipped: number;
+    failed: number;
+    skips: IndexSkip[];
+    stopped?: string;
+  }> {
+    const result = { indexed: 0, skipped: 0, failed: 0, skips: [] as IndexSkip[] };
 
     for (const [i, fileId] of fileIds.entries()) {
       try {
         const outcome = await this.indexFile(fileId);
         if (outcome.indexed) result.indexed += 1;
-        else result.skipped += 1;
+        else {
+          result.skipped += 1;
+          result.skips.push({ fileId, reason: outcome.reason ?? 'it cannot be read' });
+        }
       } catch (error) {
         if (error instanceof HttpError && error.status === 429) {
           return { ...result, stopped: error.message };
