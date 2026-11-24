@@ -76,7 +76,11 @@ class TestRefused:
 
 class TestCitations:
     def test_each_number_once_in_the_order_first_cited(self) -> None:
-        assert citations("A [2]. B [1][2]. C [3, 1].") == [2, 1, 3]
+        assert citations("A [2]. B [1][2]. C [3], [1].") == [2, 1, 3]
+
+    def test_only_what_the_screen_links(self) -> None:
+        # Ask.tsx turns [n] into a link and leaves "[1, 2]" as text.
+        assert citations("Both say so [1, 2].") == []
 
     def test_none(self) -> None:
         assert citations("Your files don't say.") == []

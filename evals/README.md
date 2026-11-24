@@ -199,6 +199,11 @@ No model grades another. A judge would read meaning these rules miss, and
 would also move between two runs of the same answers; a rule moves only
 when an answer does. What the rules cannot see is below.
 
+Each answer is one sample. The app sets no temperature, so neither does
+this, and asking again can change an answer or two; the cache keeps the one
+graded, and CI grades that one. A difference of a question or two between
+two models or two instructions is within that.
+
 **Results** (2026-11-24, Workers AI `mistral-small-3.1-24b-instruct`, the
 model production answers with, free):
 

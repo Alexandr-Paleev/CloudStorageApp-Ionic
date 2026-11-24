@@ -223,6 +223,11 @@ def _asked(embedding_model: str) -> list[tuple[Question, list[retrieval.Piece], 
 
 
 def _answer(model: str, embedding_model: str, dry_run: bool) -> int:
+    # Workers AI is the one backend this asks; Claude, the paid path, costs
+    # money per run and is not wired in.
+    if not model.startswith("@cf/"):
+        print(f"{model}: only Workers AI models (@cf/…) can answer here", file=sys.stderr)
+        return 2
     asked = _asked(embedding_model)
     if asked is None:
         return 2

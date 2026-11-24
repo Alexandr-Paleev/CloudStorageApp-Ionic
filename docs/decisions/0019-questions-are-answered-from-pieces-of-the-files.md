@@ -190,9 +190,9 @@ What follows, decided here and amended as each part ships:
   AI's `mistral-small-3.1`, the free path: 62 of 65 answered right, 9 of the
   10 with no answer refused, every answer in the question's language, and
   no number in any of the 75 that the pieces do not hold. 400 characters
-  were enough: the eight pieces held the evidence for every question, and
-  every miss was the model's, three of them on a question asked in another
-  language than its answer is written in. The fifteen files stay: the eval
+  were enough: the eight pieces held the evidence for every question, so
+  every miss was the model's, and each of the three wrong answers was to a
+  question asked in another language than its answer is written in. The fifteen files stay: the eval
   shows where the model fails, not where the search is too easy.
 
 ## Alternatives

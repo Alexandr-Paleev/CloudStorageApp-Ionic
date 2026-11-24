@@ -32,8 +32,10 @@ from dataclasses import dataclass
 from .chunks import contains
 from .contract import REFUSALS
 
-# A citation as the instruction asks for it, [2], and as a model sometimes writes it, [1, 2].
-_CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+# A citation as the instruction asks for it and as the screen links it: [2].
+# "[1, 2]" is not one: src/pages/Ask.tsx shows it as text, so the reader
+# could not open either piece, and the grading counts what the reader gets.
+_CITATION = re.compile(r"\[(\d+)\]")
 
 
 def normalize(text: str) -> str:
@@ -68,11 +70,9 @@ def refused(answer: str) -> bool:
 def citations(answer: str) -> list[int]:
     """The numbers the answer cites, each once, in the order first cited."""
     out: list[int] = []
-    for group in _CITATION.findall(answer):
-        for part in group.split(","):
-            n = int(part)
-            if n not in out:
-                out.append(n)
+    for number in _CITATION.findall(answer):
+        if int(number) not in out:
+            out.append(int(number))
     return out
 
 

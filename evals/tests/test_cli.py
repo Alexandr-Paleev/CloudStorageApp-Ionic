@@ -129,6 +129,10 @@ class TestAnswers:
         assert main(["score-answers"]) == 2
         assert "75 answers are missing or stale; run `search-evals answer" in capsys.readouterr().err
 
+    def test_asks_only_a_model_it_can_reach(self, answers_in, capsys: pytest.CaptureFixture[str]) -> None:
+        assert main(["answer", "--model", "claude-opus-5-5"]) == 2
+        assert "only Workers AI models" in capsys.readouterr().err
+
     def test_a_dry_run_asks_nothing(self, answers_in, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         from search_evals import cli
 
