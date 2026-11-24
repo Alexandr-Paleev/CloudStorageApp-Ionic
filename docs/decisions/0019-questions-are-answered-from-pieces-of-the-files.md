@@ -176,7 +176,11 @@ What follows, decided here and amended as each part ships:
   tells a function that its caller left only when `vercel.json` says
   `supportsCancellation` for it, so `api/ai/*.ts` does; the function is then
   ended on a disconnect, and an index of one file in flight when the tab is
-  closed is lost with it, its unit spent, as it would be on a timeout. A spent
+  closed is lost with it, its unit spent, as it would be on a timeout.
+  Checked in production on 2026-11-24, from a demo account: the same
+  question, answered whole, ran 7.87 s (Execution Duration in Vercel's
+  request log); aborted by the client after the first word, as Stop aborts
+  it, 1.46 s. A spent
   limit says when the person can go on in their own time ("after 01:00"),
   from the moment every 429 now carries. The question, the answer and the
   files' names are kept from Hotjar and Sentry. The dashboard learns the
