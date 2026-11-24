@@ -41,8 +41,8 @@ _CITATION = re.compile(r"\[(\d+)\]")
 def normalize(text: str) -> str:
     """Lower case, one kind of apostrophe and space, ё as е, and numbers written one way."""
     text = unicodedata.normalize("NFC", text).casefold().replace("ё", "е")
-    text = re.sub(r"[‘’ʼ]", "'", text)
-    text = re.sub(r"[   ]", " ", text)
+    text = re.sub(r"[\u2018\u2019\u02bc]", "'", text)  # ‘ ’ ʼ
+    text = re.sub(r"[\u00a0\u202f\u2009]", " ", text)  # no-break, narrow and thin spaces
     # A thousands separator: between digits, before exactly three of them.
     text = re.sub(r"(?<=\d)[ .,](?=\d{3}(?!\d))", "", text)
     # What is left between digits after a comma is a decimal part.

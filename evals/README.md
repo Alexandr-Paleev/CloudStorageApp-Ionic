@@ -247,8 +247,11 @@ question's language.
   `data/questions.jsonl`; no answer was changed.
 
 What the rules do not see: a mistranslation inside a right answer ("prospecto
-Blasco Ibañez" for проспект, an avenue, read as a leaflet), and a true
-statement the pieces do not make, unless it carries a number. A share near
+Blasco Ibañez" for проспект, an avenue, read as a leaflet); a true
+statement the pieces do not make, unless it carries a number; and a wrong
+answer that happens to hold a fact that is a bare number, such as "30" or
+"12", for another reason. `--verbose` lists every answer that fell short, and
+reading the answers in the cache is still the check of last resort. A share near
 0.95 measured on 65 questions moves by about ±0.05 at 95%: enough to see a
 model fail a language or start making up amounts, not to rank two close
 models.

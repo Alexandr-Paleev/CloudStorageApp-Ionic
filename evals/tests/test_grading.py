@@ -26,7 +26,7 @@ class TestNormalize:
             ("900 112 233", "900112233"),
             ("Свёкла", "свекла"),
             ("Your files don’t say.", "your files don't say."),
-            ("a b   c", "a b c"),
+            ("a\u00a0b   c", "a b c"),
         ],
     )
     def test_writes_each_number_one_way(self, text: str, expected: str) -> None:
