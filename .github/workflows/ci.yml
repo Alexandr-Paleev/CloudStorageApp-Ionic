@@ -408,3 +408,8 @@ jobs:
           for model in voyage-4 @cf/baai/bge-m3; do
             uv run --locked search-evals score-chunks --model "$model"
           done
+
+      # The answers to those questions (docs/decisions/0019, step 5), graded
+      # from evals/cache/answers-*.jsonl. An answer missing or asked of an
+      # older message exits 2 and fails the step.
+      - run: uv run --locked search-evals score-answers

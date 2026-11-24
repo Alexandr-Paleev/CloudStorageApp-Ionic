@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from search_evals.cli import main
@@ -108,3 +110,58 @@ def test_check_reads_the_documents_and_their_questions_too(
 
     assert main(["check"]) == 1
     assert "d01 does not say 'the rent is 9999'" in capsys.readouterr().err
+
+
+class TestAnswers:
+    """`answer` and `score-answers`, with the model stood in for and the cache in a temporary folder."""
+
+    @pytest.fixture
+    def answers_in(self, tmp_path, monkeypatch: pytest.MonkeyPatch):
+        from search_evals import cli
+        from search_evals.answers import AnswerCache
+
+        monkeypatch.setattr(cli, "AnswerCache", lambda model: AnswerCache(model, root=tmp_path))
+        return tmp_path
+
+    def test_score_answers_says_which_command_fetches_them(
+        self, answers_in, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(["score-answers"]) == 2
+        assert "75 answers are missing or stale; run `search-evals answer" in capsys.readouterr().err
+
+    def test_a_dry_run_asks_nothing(self, answers_in, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+        from search_evals import cli
+
+        monkeypatch.setattr(cli, "cloudflare_answer", lambda *args: pytest.fail("asked the model"))
+        assert main(["answer", "--dry-run"]) == 0
+        assert "75 questions to ask" in capsys.readouterr().out
+
+    def test_asks_each_question_once_then_grades_from_the_cache(
+        self, answers_in, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from search_evals import cli
+        from search_evals.contract import ANSWER_SYSTEM, MAX_ANSWER_TOKENS
+
+        seen: list[str] = []
+
+        def model(system: str, user: str, name: str, max_tokens: int) -> str:
+            assert (system, max_tokens) == (ANSWER_SYSTEM, MAX_ANSWER_TOKENS)
+            seen.append(user)
+            return "Your files don't say."
+
+        monkeypatch.setattr(cli, "cloudflare_answer", model)
+        assert main(["answer"]) == 0
+        assert len(seen) == 75
+        # The message names the pieces it was given and the language to answer in.
+        assert seen[0].startswith("<excerpts>\n[1] ") and seen[0].endswith("Answer in Russian.")
+
+        assert main(["answer"]) == 0
+        assert len(seen) == 75  # nothing asked twice
+
+        capsys.readouterr()
+        assert main(["score-answers", "--verbose"]) == 0
+        out = capsys.readouterr().out
+        # A model that refuses everything is right ten times and wrong sixty-five.
+        assert re.search(r"^all\s+65\s+0\.000\s+65\s", out, re.MULTILINE)
+        assert re.search(r"^all\s+10\s+10\s", out, re.MULTILINE)
+        assert "a01 (ru) refused" in out

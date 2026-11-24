@@ -167,6 +167,87 @@ because a border fell through them.
   it holds among a thousand. The answers' eval will say whether 400 characters
   are enough context to answer from.
 
+## The answers
+
+The second half: given those pieces, does the model answer right? `answer`
+asks every question as the app does: the nearest 8 pieces of 400 characters
+by `bge-m3`, no floor, and the same instruction and message, which
+`libs/server/src/answer.eval-contract.json` holds both sides to. The answers
+are kept in `cache/answers-<model>.jsonl`, one line each, and graded with no
+model and no network (`src/search_evals/grading.py`, specified by
+`tests/test_grading.py`):
+
+- **correct**: the answer says every fact its question lists in
+  `data/questions.jsonl`, and does not refuse. A fact is a few ways of saying
+  it, matched as whole words, with numbers written one way: "1,900", "1.900"
+  and "1 900" are the same. `check` fails a reference answer that does not
+  pass its own facts.
+- **refused**: it says one of the three sentences the instruction gives for
+  "not in your files". Right for the ten questions the files do not answer,
+  wrong for the rest.
+- **evidence**: the share of a question's quotes that a piece the answer cites
+  holds. **precision**: the share of cited pieces that hold a quote. It
+  counts an extra citation of a piece with a true detail beyond the quote
+  as a miss, so it is a floor.
+- **numbers**: answers that state a number that neither their pieces nor the
+  question contains. Invented amounts and dates are the harm here, and they
+  are cheap to catch.
+- **language**: the share of answers in the question's language, told by
+  script and common words; a bare code or name is not counted.
+
+No model grades another. A judge would read meaning these rules miss, and
+would also move between two runs of the same answers; a rule moves only
+when an answer does. What the rules cannot see is below.
+
+**Results** (2026-11-24, Workers AI `mistral-small-3.1-24b-instruct`, the
+model production answers with, free):
+
+| | questions | correct | refused | evidence | precision | numbers | language |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| en | 26 | 0.962 | 1 | 1.000 | 0.880 | 0 | 1.000 |
+| es | 16 | 1.000 | 0 | 0.938 | 0.906 | 0 | 1.000 |
+| ru | 23 | 0.913 | 1 | 1.000 | 0.856 | 0 | 1.000 |
+| same language | 29 | 1.000 | 0 | 1.000 | 0.897 | 0 | 1.000 |
+| across languages | 36 | 0.917 | 2 | 0.971 | 0.863 | 0 | 1.000 |
+| all | 65 | **0.954** | 2 | 0.984 | 0.878 | **0** | **1.000** |
+
+Of the ten questions with no answer, nine were refused, each in the
+question's language.
+
+- **Every miss is the model's.** The eight pieces held the evidence for all
+  65 questions. Every question asked in the language its answer is written
+  in was answered right.
+- **The two wrong refusals cross languages.** "What number do I call if the
+  power goes out?" and "На какую сумму застрахованы вещи в квартире?" each had
+  their answer in the first piece, in Spanish: "Para averías, llame al…",
+  "Contenido: 25.000 euros". The model did not tie *averías* to a power cut,
+  nor *contenido* to one's belongings.
+- **One answer is true and does not answer.** Asked whether baggage is in
+  the Berlin fare, it said what is: one personal item. The piece's next line,
+  "Not included: cabin bag and checked baggage", went unsaid.
+- **One refusal was not given.** Asked for the Wi-Fi password, which no file
+  holds, it said where the router's label prints it. That is in the manual,
+  and useful, and still not what the instruction asks for when the answer is
+  missing.
+- **One citation points at the wrong piece.** The broth's 1.5 hours came
+  from [3], and the answer cited [5], the list of ingredients. 13 answers
+  cite more than one piece; most extra ones hold a true detail the answer
+  adds.
+- **No number was made up.** Every amount, date and time in the 75 answers
+  is in the pieces the model read, or in the question.
+- **Two facts were loosened after this run**, each because a right answer
+  failed it: "how many components are migrated" asked for 41 and the fact
+  also wanted the 58 there are; "no tiene conexión a Internet" was not among
+  the ways of saying "no Internet". Both are in the diff of
+  `data/questions.jsonl`; no answer was changed.
+
+What the rules do not see: a mistranslation inside a right answer ("prospecto
+Blasco Ibañez" for проспект, an avenue, read as a leaflet), and a true
+statement the pieces do not make, unless it carries a number. A share near
+0.95 measured on 65 questions moves by about ±0.05 at 95%: enough to see a
+model fail a language or start making up amounts, not to rank two close
+models.
+
 ## Running it
 
 uv brings the Python in `.python-version` and the locked dependencies:
@@ -189,6 +270,12 @@ uv run search-evals score --model @cf/baai/bge-m3 --min-similarity 0.50
 # The pieces: vectors for every size compared, then the table.
 uv run --env-file ../.env search-evals embed-chunks --model @cf/baai/bge-m3
 uv run search-evals score-chunks --model @cf/baai/bge-m3 --k 3
+
+# The answers: about 3,000 to 4,000 neurons of Workers AI's free 10,000 a day
+# for all 75, and only questions whose message changed are asked again.
+uv run search-evals answer --dry-run
+uv run --env-file ../.env search-evals answer
+uv run search-evals score-answers --verbose   # offline; --verbose lists every miss
 ```
 
 Voyage on an account without a payment method allows three requests a minute;
@@ -214,6 +301,13 @@ values both sides depend on are written once, in
 limits of the table, the result count, the floors, and the cases of
 `embeddingInput`. `libs/core/src/ai.test.ts` holds the app to that file, and
 `tests/test_contract.py` holds this to it.
+
+The answers have their own, beside the code it describes:
+`libs/server/src/answer.eval-contract.json` holds the answering model, the
+number of pieces and the token limit, the instruction word for word, its
+three refusals, and cases of `questionLanguage` and `excerptsAsText` with
+the message each one writes. `libs/server/src/answer.test.ts` holds the app
+to it; `src/search_evals/prompt.py` is the Python copy those cases test.
 
 ## Dependencies
 

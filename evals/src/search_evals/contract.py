@@ -53,3 +53,20 @@ def embedding_input(name: str, summary: str, tags: Sequence[str]) -> str:
     if tags:
         parts.append(", ".join(tags))
     return "\n".join(part.strip() for part in parts if part.strip())
+
+
+# What the answers eval agrees with the app on: libs/server/src/answer.ts and
+# its contract, which libs/server/src/answer.test.ts holds the app to.
+ANSWER_CONTRACT_PATH = REPO / "libs" / "server" / "src" / "answer.eval-contract.json"
+
+_answer_contract = json.loads(ANSWER_CONTRACT_PATH.read_text(encoding="utf-8"))
+ANSWER_CONSTANTS: dict[str, str | int] = _answer_contract["constants"]
+ANSWER_MODEL = str(ANSWER_CONSTANTS["ANSWER_MODEL"])
+EXCERPTS_PER_QUESTION = int(ANSWER_CONSTANTS["EXCERPTS_PER_QUESTION"])
+MAX_ANSWER_TOKENS = int(ANSWER_CONSTANTS["MAX_ANSWER_TOKENS"])
+ANSWER_SYSTEM = str(_answer_contract["system"])
+# The sentence the instruction asks for when the excerpts do not hold the answer,
+# one per language the app speaks.
+REFUSALS: list[str] = list(_answer_contract["refusals"])
+QUESTION_LANGUAGE_CASES: list[dict] = _answer_contract["questionLanguage"]
+EXCERPTS_AS_TEXT_CASES: list[dict] = _answer_contract["excerptsAsText"]

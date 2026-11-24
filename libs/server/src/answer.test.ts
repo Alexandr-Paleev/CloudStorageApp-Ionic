@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   ANSWER_SYSTEM,
+  EXCERPTS_PER_QUESTION,
+  MAX_ANSWER_TOKENS,
+  MAX_QUESTION_CHARS,
   excerptTitle,
   excerptsAsText,
   questionLanguage,
   type Excerpt,
 } from './answer';
+import { CF_ANSWER_MODEL } from './cloudflare-ai';
 
 const EXCERPTS: Excerpt[] = [
   { n: 1, fileId: 'f-1', fileName: 'lease.pdf', chunkIndex: 2, content: 'The rent is 950 euros.' },
@@ -82,8 +87,7 @@ describe('questionLanguage', () => {
   });
 
   /* Every question of the eval is read as the language it is labelled with. */
-  it('agrees with the language of every question in the eval', async () => {
-    const { readFileSync } = await import('node:fs');
+  it('agrees with the language of every question in the eval', () => {
     const names = { en: 'English', es: 'Spanish', ru: 'Russian' } as const;
     const rows = readFileSync(
       new URL('../../../evals/data/questions.jsonl', import.meta.url),
@@ -97,4 +101,56 @@ describe('questionLanguage', () => {
       .map((row) => row.id);
     expect(wrong).toEqual([]);
   });
+});
+
+/* The answers eval in evals/ is Python and cannot import this file. What it
+   has to agree with the app on is written once, in answer.eval-contract.json:
+   a model answering a message the app never sends would be a measurement of
+   something that does not ship. Here the app is held to that file, in
+   evals/tests/test_contract.py the Python copies. */
+describe('the contract with the answers eval', () => {
+  const contract = JSON.parse(
+    readFileSync(new URL('./answer.eval-contract.json', import.meta.url), 'utf8')
+  ) as {
+    constants: Record<string, string | number>;
+    system: string;
+    refusals: string[];
+    questionLanguage: { name: string; question: string; language: string | null }[];
+    excerptsAsText: {
+      name: string;
+      question: string;
+      excerpts: { n: number; fileName: string; content: string }[];
+      text: string;
+    }[];
+  };
+
+  it('names the model and the limits this side uses', () => {
+    expect(contract.constants).toEqual({
+      ANSWER_MODEL: CF_ANSWER_MODEL,
+      EXCERPTS_PER_QUESTION,
+      MAX_ANSWER_TOKENS,
+      MAX_QUESTION_CHARS,
+    });
+  });
+
+  it('holds the instruction word for word', () => {
+    expect(contract.system).toBe(ANSWER_SYSTEM);
+  });
+
+  /* The eval tells a refusal by these sentences; the instruction must ask for them. */
+  it.each(contract.refusals)('asks for the refusal %s', (refusal) => {
+    expect(ANSWER_SYSTEM).toContain(refusal);
+  });
+
+  it.each(contract.questionLanguage)('reads $name as the eval does', ({ question, language }) => {
+    expect(questionLanguage(question)).toBe(language);
+  });
+
+  it.each(contract.excerptsAsText)(
+    'writes $name as the eval does',
+    ({ question, excerpts, text }) => {
+      const full = excerpts.map((e) => ({ ...e, fileId: 'f', chunkIndex: 0 }));
+      expect(excerptsAsText(full, question)).toBe(text);
+    }
+  );
 });

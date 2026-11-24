@@ -4,6 +4,8 @@ import pytest
 
 from search_evals.chunks import chunk
 from search_evals.contract import (
+    ANSWER_MODEL,
+    ANSWER_SYSTEM,
     CHUNK_CASES,
     CHUNK_OVERLAP,
     CHUNK_SIZE,
@@ -11,12 +13,18 @@ from search_evals.contract import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_INPUT_CASES,
     EMBEDDING_MODEL,
+    EXCERPTS_AS_TEXT_CASES,
+    EXCERPTS_PER_QUESTION,
+    MAX_ANSWER_TOKENS,
+    QUESTION_LANGUAGE_CASES,
+    REFUSALS,
     SEARCH_FLOORS,
     SEARCH_MIN_SIMILARITY,
     SEARCH_RESULTS,
     embedding_input,
     search_floor,
 )
+from search_evals.prompt import Excerpt, excerpts_as_text, question_language
 from search_evals.retrieval import SIZES, overlap_for, piece_input
 
 
@@ -56,3 +64,22 @@ def test_the_app_cuts_at_the_size_the_eval_chose() -> None:
     assert CHUNK_SIZE == 400
     assert CHUNK_SIZE in SIZES
     assert CHUNK_OVERLAP == overlap_for(CHUNK_SIZE)
+
+
+# The answers eval (docs/decisions/0019, step 5): the same message the app sends.
+def test_the_answers_contract_is_read_rather_than_copied() -> None:
+    assert ANSWER_MODEL == "@cf/mistralai/mistral-small-3.1-24b-instruct"
+    assert (EXCERPTS_PER_QUESTION, MAX_ANSWER_TOKENS) == (8, 600)
+    assert all(refusal in ANSWER_SYSTEM for refusal in REFUSALS)
+    assert len(REFUSALS) == 3
+
+
+@pytest.mark.parametrize("case", QUESTION_LANGUAGE_CASES, ids=lambda case: case["name"])
+def test_a_question_is_read_as_the_app_reads_it(case: dict) -> None:
+    assert question_language(case["question"]) == case["language"]
+
+
+@pytest.mark.parametrize("case", EXCERPTS_AS_TEXT_CASES, ids=lambda case: case["name"])
+def test_the_message_is_the_one_the_app_sends(case: dict) -> None:
+    excerpts = [Excerpt(n=e["n"], file_name=e["fileName"], content=e["content"]) for e in case["excerpts"]]
+    assert excerpts_as_text(excerpts, case["question"]) == case["text"]

@@ -100,7 +100,10 @@
   display: flex;
   align-items: flex-end;
   gap: 4px;
-  padding: 8px 8px calc(8px + var(--ion-safe-area-bottom, 0px)) 16px;
+  /* The box sits in the thread's column (.ask-thread, 720px) on a wide
+     screen, rather than running from one edge to the other under it. */
+  padding: 8px max(8px, calc((100% - 720px) / 2)) calc(8px + var(--ion-safe-area-bottom, 0px))
+    max(16px, calc((100% - 720px) / 2));
   border-top: 1px solid var(--ion-color-light-shade);
   background: var(--ion-background-color, #ffffff);
 }
