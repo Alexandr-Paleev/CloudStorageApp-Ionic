@@ -22,6 +22,10 @@ import { FileTooLarge, fetchBytes } from '../../libs/server/src/fetch-bytes';
 import { ownsStoredPath } from '../../libs/core/src/stored-path';
 import { signOwnedPath } from '../../libs/server/src/sign-owned-path';
 import { cloudinaryUrlIsOwned } from '../../libs/server/src/stored-url';
+import {
+  DESCRIBE_COPY_TYPE,
+  cloudinaryCopyForDescribing,
+} from '../../libs/server/src/cloudinary-resize';
 import { activeBackend, type AiBackend } from '../../libs/server/src/ai-provider';
 import { isConfigured as cloudflareConfigured } from '../../libs/server/src/cloudflare-ai';
 import { pdfText } from '../../libs/server/src/to-markdown';
@@ -98,6 +102,15 @@ async function readableUrl(file: FileRow, userId: string): Promise<string> {
   return file.download_url;
 }
 
+/**
+ * Whether a picture is larger than this backend's model takes and must be
+ * described from a smaller copy, which only Cloudinary makes for free
+ * (libs/server/src/cloudinary-resize.ts).
+ */
+function overModelLimit(file: FileRow, backend: AiBackend): boolean {
+  return backend.maxImageBytes !== undefined && file.size > backend.maxImageBytes;
+}
+
 function tooLarge(maxBytes: number): string {
   return `this file is larger than the ${Math.round(maxBytes / (1024 * 1024))} MB this deployment's model can look at`;
 }
@@ -126,7 +139,15 @@ async function readFile(
     // By link rather than by value: the bytes are already behind a URL that
     // outlives this request, and a photograph held in a serverless function
     // is memory and a round trip spent to say the same thing.
-    return { source: { kind: 'image', url, mediaType: file.type }, text: null };
+    const copy =
+      overModelLimit(file, backend) && file.storage_type === 'cloudinary'
+        ? cloudinaryCopyForDescribing(url)
+        : null;
+    /* A copy still over the limit when it arrives is refused by fetchBytes,
+       and that is a skip with the reason, as before. */
+    return copy
+      ? { source: { kind: 'image', url: copy, mediaType: DESCRIBE_COPY_TYPE }, text: null }
+      : { source: { kind: 'image', url, mediaType: file.type }, text: null };
   }
 
   const bytes = await fetchBytes(url, MAX_DESCRIBE_BYTES);
@@ -281,11 +302,18 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
   const backend = activeBackend();
 
   /* A picture larger than this backend's model takes is skipped with the
-     reason, before anything is paid for. The size on the row is the
-     provider's since migration 020, not the browser's; `fetchBytes` still
-     refuses a larger file when it arrives, and that is a skip too. */
-  if (plan.kind === 'image' && backend.maxImageBytes && file.size > backend.maxImageBytes) {
-    res.status(200).json({ indexed: false, reason: tooLarge(backend.maxImageBytes) });
+     reason, before anything is paid for, unless it is on Cloudinary, which
+     makes a smaller copy to describe instead (readFile). The size on the row
+     is the provider's since migration 020, not the browser's; `fetchBytes`
+     still refuses a larger file when it arrives, and that is a skip too. */
+  const limit = backend.maxImageBytes;
+  if (
+    plan.kind === 'image' &&
+    limit !== undefined &&
+    file.size > limit &&
+    file.storage_type !== 'cloudinary'
+  ) {
+    res.status(200).json({ indexed: false, reason: tooLarge(limit) });
     return;
   }
 
