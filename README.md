@@ -800,19 +800,25 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 377.4 kB | 385 kB |
-| Largest chunk (Ionic) | 178.0 kB | 185 kB |
-| All assets, route chunks included | 472.9 kB | 480 kB |
+| First load (JS + CSS) | 378.7 kB | 385 kB |
+| Largest chunk (Ionic) | 179.2 kB | 185 kB |
+| All assets, route chunks included | 478.9 kB | 480 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.16.0, as CI measured them. Its first load and its
-Ionic chunk are 4.15.0's to the tenth of a kilobyte: what it adds is on the
-server, and in the browser it is one request after an upload to Cloudinary or
-R2, in the chunks that upload. All assets grew 0.3 kB, that request.
-4.15.0's first load was 0.5 kB over 4.14.0's, and all of it is the updates of
+Those are the figures of 4.17.0, as CI measured them. Its first load is
+1.3 kB over 4.16.0's: 1.2 kB is Ionic 9.0.11, in the Ionic chunk, and 0.1 kB
+the route to the page that asks. All assets grew 6.0 kB: 2.8 kB is the page to
+ask from, loaded when first opened; 2.0 kB is `ai.service` and `http.utils`,
+now chunks of their own because two pages import them, with the reading of a
+streamed answer and the time a spent limit ends; and 1.2 kB the Ionic update.
+That leaves 1.1 kB under the budget for all assets, so the next pull request
+that adds a page raises it and says why. 4.16.0's first load and its Ionic
+chunk were 4.15.0's to the tenth of a kilobyte, and its assets 0.3 kB more,
+one request after an upload to Cloudinary or R2. 4.15.0's first load was
+0.5 kB over 4.14.0's, and all of it is the updates of
 supabase-js, TanStack Query and Vite: built with the same packages, 4.14.0's
 code and 4.15.0's give the same first load, since search lives in the
 dashboard's chunk. All assets grew 0.7 kB, 0.2 of them that release's code (the
@@ -1236,14 +1242,14 @@ browser ran the script, and it was the test that was fixed.
 
 The two badges at the top of this file are those two numbers, and they are
 deliberately not averaged into one. The client badge is the lower of the two by
-a long way, and it is meant to be. Of the 2,906 statements under `src/`, the
-unit tests do not reach 652. The largest share, 293, is in `src/services`, most
+a long way, and it is meant to be. Of the 3,078 statements under `src/`, the
+unit tests do not reach 662. The largest share, 295, is in `src/services`, most
 of it in the code that talks to Supabase and Dropbox and in what keeps state in
 IndexedDB: `supabase.service.ts` and the two Dropbox services hold 132,
 `upload-store.ts` and `idb.ts` 69. The pages come next. With the page a share
 link opens gone to the site, and the dashboard's dialogs, data and markup gone
-to components and hooks of their own, `src/pages` is 643 statements and the
-unit tests reach 494 of them. `Upload.tsx` is the largest at 190, with 146
+to components and hooks of their own, `src/pages` is 730 statements and the
+unit tests reach 577 of them. `Upload.tsx` is the largest at 190, with 146
 reached, and `FileView.tsx` is next at 162, with 108. Three small pages have no
 unit test at all, 27 statements between them: the Dropbox callback, the way on
 to the legal pages, and the 404. All of it is named here rather than

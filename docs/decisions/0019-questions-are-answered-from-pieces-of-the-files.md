@@ -1,6 +1,6 @@
 # 0019 — Questions are answered from pieces of the files
 
-Accepted · not released yet · written before most of the work it decides, like
+Accepted · v4.17.0 · written before most of the work it decides, like
 [0014](0014-the-public-pages-are-a-second-app.md), and amended as each piece
 ships ·
 [`evals/src/search_evals/chunks.py`](../../evals/src/search_evals/chunks.py),
