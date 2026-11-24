@@ -33,6 +33,7 @@ import type { Folder } from '../services/storage.service';
 import { useProfile } from '../hooks/useProfile';
 import UpgradeBanner from '../components/UpgradeBanner';
 import { isDemoEmail } from '@cloud-storage/core/demo-address';
+import { smartSearchIsOffered } from '../utils/smart-search.utils';
 import { useState } from 'react';
 import './Dashboard.css';
 
@@ -47,6 +48,9 @@ const Dashboard: React.FC = () => {
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
   const [folderMenu, setFolderMenu] = useState<Folder | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  /* News rather than a fault, so not red: a file the model cannot read is
+     a normal file. */
+  const [notice, setNotice] = useState<string | null>(null);
   const [filters, setFilters] = useState<FileFiltersValue>({
     search: '',
     sort: DEFAULT_SORT,
@@ -62,20 +66,22 @@ const Dashboard: React.FC = () => {
     items,
     searching,
     smartSearching,
-    smartModel,
     loading: listLoading,
     error: listError,
     hasNextPage,
     fetchNextPage,
     refreshPicture,
   } = listing;
-  const { unindexed, indexing, indexMissing } = useSearchIndex({
-    /* Not for a demo account. /api/ai/index refuses it, since anyone can open
-       one and a description is paid for, so "Index them" could do nothing
-       there; its files come indexed instead (ADR 0013). */
-    enabled: smartSearching && !isDemoEmail(profile?.email),
-    model: smartModel,
+  const { pending, unreadable, indexing, indexMissing, retryUnreadable } = useSearchIndex({
+    /* Wherever search by meaning is offered, not only while one is on screen:
+       a file nobody indexed is one that search and questions cannot find,
+       and the button was out of sight until a search by meaning had run.
+       Not for a demo account, once the profile says which this is.
+       /api/ai/index refuses one, since anyone can open it, so "Index them"
+       could do nothing there; its files come indexed instead (ADR 0013). */
+    enabled: smartSearchIsOffered() && !!profile && !isDemoEmail(profile.email),
     onProblem: setErrorToast,
+    onNotice: setNotice,
   });
   const { folder: currentFolder, path: folderPath, parentId } = useFolderTrail(folderId);
   const usage = useStorageUsage();
@@ -163,15 +169,37 @@ const Dashboard: React.FC = () => {
             searchFailed={!!listError}
           />
 
-          {smartSearching && (unindexed?.length ?? 0) > 0 && (
+          {(pending?.length ?? 0) > 0 && (
             <div className="smart-index-row">
               <IonText color="medium">
-                {unindexed!.length} file{unindexed!.length === 1 ? '' : 's'} not indexed yet
+                {pending!.length} file{pending!.length === 1 ? '' : 's'} not indexed yet
               </IonText>
               <IonButton size="small" fill="outline" disabled={!!indexing} onClick={indexMissing}>
                 {indexing ? `Indexing ${indexing.done}/${indexing.total}` : 'Index them'}
               </IonButton>
             </div>
+          )}
+
+          {/* The files indexing will not take, said once with the reason, in
+              place of a count that pressing "Index them" never lowered. Names
+              are the owner's, so Hotjar does not record them. */}
+          {unreadable.length > 0 && (
+            <details className="smart-unreadable" data-testid="unreadable-files">
+              <summary>
+                {unreadable.length} file{unreadable.length === 1 ? '' : 's'} cannot be indexed
+              </summary>
+              <ul data-hj-suppress="">
+                {unreadable.map((file) => (
+                  <li key={file.id}>
+                    <span className="smart-unreadable-name">{file.name}</span>
+                    <span className="smart-unreadable-reason">{file.reason}</span>
+                  </li>
+                ))}
+              </ul>
+              <IonButton size="small" fill="clear" disabled={!!indexing} onClick={retryUnreadable}>
+                Try these again
+              </IonButton>
+            </details>
           )}
 
           <FolderGrid
@@ -236,6 +264,14 @@ const Dashboard: React.FC = () => {
           duration={3000}
           color="danger"
           onDidDismiss={() => setErrorToast(null)}
+        />
+
+        <IonToast
+          isOpen={!!notice}
+          message={notice ?? ''}
+          duration={4000}
+          color="dark"
+          onDidDismiss={() => setNotice(null)}
         />
       </IonContent>
     </IonPage>

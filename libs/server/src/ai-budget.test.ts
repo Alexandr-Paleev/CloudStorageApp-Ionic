@@ -49,7 +49,9 @@ describe('claimAiCall', () => {
     const account = await claimAiCall('user-1', 'index').catch((error: unknown) => error);
 
     expect(account).toBeInstanceOf(BudgetSpent);
-    expect(account).toMatchObject({ scope: 'account', message: expect.stringMatching(/tomorrow/) });
+    expect(account).toMatchObject({ scope: 'account', message: expect.stringMatching(/today/) });
+    // Never "tomorrow": at half past midnight in Valencia the day turns over at one, the same day.
+    expect((account as Error).message).not.toMatch(/tomorrow/);
 
     rpc.mockResolvedValue({ data: 'deployment', error: null });
     const site = await claimAiCall('user-1', 'embed').catch((error: unknown) => error);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import aiService from './ai.service';
+import aiService, { readLines, type AnswerEvent } from './ai.service';
 import { HttpError } from '../utils/http.utils';
 import { EMBEDDING_DIMENSIONS } from '@cloud-storage/core/ai';
 import * as Sentry from '../observability/sentry';
@@ -162,7 +162,13 @@ describe('indexMany', () => {
     const progress: number[] = [];
     const result = await aiService.indexMany(['a', 'b', 'c'], (done) => progress.push(done));
 
-    expect(result).toEqual({ indexed: 1, skipped: 1, failed: 1 });
+    expect(result).toEqual({
+      indexed: 1,
+      skipped: 1,
+      failed: 1,
+      // The reason travels, for the dashboard to list it rather than offer the file again.
+      skips: [{ fileId: 'c', reason: 'nothing to read' }],
+    });
     // Sequential on purpose: a folder of photographs sent at once is how an
     // account gets throttled by the provider.
     expect(progress).toEqual([1, 2, 3]);
@@ -179,14 +185,17 @@ describe('indexMany', () => {
 
     const result = await aiService.indexMany(['a', 'b', 'c']);
 
-    expect(result).toEqual({ indexed: 1, skipped: 0, failed: 0, stopped: said });
+    expect(result).toEqual({ indexed: 1, skipped: 0, failed: 0, skips: [], stopped: said });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
 
-describe('unindexedFileIds', () => {
-  const files = table(['a', 'b', 'c'].map((id) => ({ id, user_id: 'user-1' })));
+describe('unindexedFiles', () => {
+  const files = table(['a', 'b', 'c'].map((id) => ({ id, name: `${id}.pdf`, user_id: 'user-1' })));
+  /** Which files came back, by id: what most of these tests are about. */
+  const unindexedIds = (userId: string, model: string) =>
+    aiService.unindexedFiles(userId, model).then((rows) => rows.map((row) => row.id));
   /** A file's first piece, which is what makes it indexed (ADR 0019). */
   const row = (file_id: string, embedding_model: string, chunk_index = 0) => ({
     file_id,
@@ -200,7 +209,18 @@ describe('unindexedFileIds', () => {
       name === 'files' ? files : table([row('b', 'voyage-4')])
     );
 
-    await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+    await expect(unindexedIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+  });
+
+  it('names each file, for the dashboard to list', async () => {
+    from.mockImplementation((name: string) =>
+      name === 'files' ? files : table([row('b', 'voyage-4')])
+    );
+
+    await expect(aiService.unindexedFiles('user-1', 'voyage-4')).resolves.toEqual([
+      { id: 'a', name: 'a.pdf', user_id: 'user-1' },
+      { id: 'c', name: 'c.pdf', user_id: 'user-1' },
+    ]);
   });
 
   it('reads the pieces, so a file described before they existed is offered again', async () => {
@@ -210,7 +230,7 @@ describe('unindexedFileIds', () => {
       return name === 'files' ? files : table([row('b', 'voyage-4')]);
     });
 
-    await aiService.unindexedFileIds('user-1', 'voyage-4');
+    await unindexedIds('user-1', 'voyage-4');
 
     expect(read.sort()).toEqual(['file_chunks', 'files']);
   });
@@ -222,7 +242,7 @@ describe('unindexedFileIds', () => {
         : table([row('b', 'voyage-4', 0), row('b', 'voyage-4', 1), row('c', 'voyage-4', 3)])
     );
 
-    await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+    await expect(unindexedIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
   });
 
   /* After the server changes backend, match_files compares only rows of the
@@ -235,7 +255,7 @@ describe('unindexedFileIds', () => {
         : table([row('a', '@cf/baai/bge-large-en-v1.5'), row('b', 'voyage-4')])
     );
 
-    await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
+    await expect(unindexedIds('user-1', 'voyage-4')).resolves.toEqual(['a', 'c']);
   });
 
   /* One answer used to be taken as all there was, and PostgREST stops at a
@@ -253,7 +273,7 @@ describe('unindexedFileIds', () => {
         name === 'files' ? table(many(1500)) : table(indexedUpTo(1400))
       );
 
-      const missing = await aiService.unindexedFileIds('user-1', 'voyage-4');
+      const missing = await unindexedIds('user-1', 'voyage-4');
 
       expect(missing).toHaveLength(100);
       expect(missing[0]).toBe(id(1400));
@@ -266,7 +286,7 @@ describe('unindexedFileIds', () => {
           : table(indexedUpTo(1100), { maxRows: 500 })
       );
 
-      await expect(aiService.unindexedFileIds('user-1', 'voyage-4')).resolves.toHaveLength(100);
+      await expect(unindexedIds('user-1', 'voyage-4')).resolves.toHaveLength(100);
     });
 
     it('asks each table once for an account of a few files', async () => {
@@ -274,9 +294,99 @@ describe('unindexedFileIds', () => {
         name === 'files' ? table(many(30)) : table(indexedUpTo(10))
       );
 
-      await aiService.unindexedFileIds('user-1', 'voyage-4');
+      await unindexedIds('user-1', 'voyage-4');
 
       expect(from.mock.calls.map(([name]) => name).sort()).toEqual(['file_chunks', 'files']);
     });
+  });
+});
+
+/** A body that arrives in the chunks given, as a network delivers it. */
+const streamOf = (chunks: (string | Uint8Array)[]) =>
+  new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks)
+        controller.enqueue(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk);
+      controller.close();
+    },
+  });
+
+describe('indexModel', () => {
+  it('asks the route, with the session, which model the index is made with', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ model: 'bge' }) });
+
+    await expect(aiService.indexModel()).resolves.toBe('bge');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/api\/ai\/model$/);
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer jwt' });
+  });
+});
+
+describe('readLines', () => {
+  it('reads a line split across chunks, and a character split across them', async () => {
+    const line = new TextEncoder().encode('{"type":"text","text":"евро"}\n');
+    const cut = line.indexOf(0xd0, 25) + 1; // inside the two bytes of a Cyrillic letter
+    const events: AnswerEvent[] = [];
+
+    for await (const event of readLines(
+      streamOf([
+        '{"type":"so',
+        'urces","model":"m","sources":[]}\n',
+        line.slice(0, cut),
+        line.slice(cut),
+        '{"type":"done"}',
+      ])
+    ))
+      events.push(event);
+
+    expect(events).toEqual([
+      { type: 'sources', model: 'm', sources: [] },
+      { type: 'text', text: 'евро' },
+      { type: 'done' },
+    ]);
+  });
+});
+
+describe('ask', () => {
+  it('hands each line on as it comes', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: streamOf(['{"type":"text","text":"950 euros [1]."}\n{"type":"done"}\n']),
+    });
+    const events: AnswerEvent[] = [];
+
+    await aiService.ask('Rent?', (event) => events.push(event));
+
+    expect(events).toEqual([{ type: 'text', text: '950 euros [1].' }, { type: 'done' }]);
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body))).toEqual({
+      question: 'Rent?',
+    });
+  });
+
+  it('throws a refusal before the answer, with when to come back', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        message: 'You have asked as many questions today as a day allows.',
+        retryAt: new Date(Date.now() + 5 * 3600_000).toISOString(),
+      }),
+    });
+
+    const error = await aiService.ask('Rent?', () => {}).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(429);
+    expect((error as HttpError).message).toMatch(/You can try again (tomorrow )?after/);
+  });
+
+  it('passes the signal on, so that Stop ends the request', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, body: streamOf([]) });
+    const stop = new AbortController();
+
+    await aiService.ask('Rent?', () => {}, stop.signal);
+
+    expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].signal).toBe(stop.signal);
   });
 });

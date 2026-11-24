@@ -463,6 +463,18 @@ async function askQuestion(req: VercelRequest, res: VercelResponse, userId: stri
     return;
   }
 
+  /* The person closed the screen or pressed Stop: the connection closes
+     before the answer is written, and the model is told to stop rather than
+     finish a reply nobody reads, out of the same free allocation. Watched
+     from here, not from the first word: Stop pressed while the pieces are
+     still being found closes the connection before there is an answer, and
+     a listener added after that never hears it. On Vercel the function is
+     told at all only with `supportsCancellation` (vercel.json). */
+  const left = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) left.abort();
+  });
+
   const backend = activeBackend();
 
   /* One unit a question, its search included, claimed before the first call
@@ -471,6 +483,12 @@ async function askQuestion(req: VercelRequest, res: VercelResponse, userId: stri
 
   const vector = await backend.embed(text, 'query');
   const excerpts = await nearestPieces(req, vector, backend.embeddingModel);
+
+  // Gone while the pieces were found: no model is asked for an answer nobody waits for.
+  if (left.signal.aborted) {
+    res.end();
+    return;
+  }
 
   res.status(200);
   res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
@@ -498,18 +516,24 @@ async function askQuestion(req: VercelRequest, res: VercelResponse, userId: stri
   }
 
   try {
-    for await (const piece of backend.answer(excerpts, text)) send({ type: 'text', text: piece });
-    send({ type: 'done' });
+    for await (const piece of backend.answer(excerpts, text, left.signal)) {
+      if (left.signal.aborted) break;
+      send({ type: 'text', text: piece });
+    }
+    if (!left.signal.aborted) send({ type: 'done' });
   } catch (error) {
-    console.error('[ai]', error);
-    if (!(error instanceof AnswerRefused)) await report(error, { route: 'ai/ask', userId });
-    send({
-      type: 'error',
-      message:
-        error instanceof AnswerRefused
-          ? error.message
-          : 'The answer could not be finished. Try asking again.',
-    });
+    // Nobody is there to tell, and a stop asked for is not a failure.
+    if (!left.signal.aborted) {
+      console.error('[ai]', error);
+      if (!(error instanceof AnswerRefused)) await report(error, { route: 'ai/ask', userId });
+      send({
+        type: 'error',
+        message:
+          error instanceof AnswerRefused
+            ? error.message
+            : 'The answer could not be finished. Try asking again.',
+      });
+    }
   }
   res.end();
 }
@@ -567,7 +591,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   /* What a report says the failure was in: one of the two actions, or the
      function for a segment that is neither. */
   const route =
-    action === 'index' || action === 'embed' || action === 'ask' ? `ai/${action}` : 'ai';
+    action === 'index' || action === 'embed' || action === 'ask' || action === 'model'
+      ? `ai/${action}`
+      : 'ai';
 
   try {
     const user = await authenticate(req);
@@ -594,6 +620,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
       await indexFile(req, res, userId);
+      return;
+    }
+
+    /* Which model this deployment indexes with. The dashboard needs it to
+       tell which files are missing from the index (one indexed by another
+       model is), and until now learned it only from a search's answer, so
+       "Index them" appeared only after a search by meaning. Costs nothing:
+       no model is asked, nothing is claimed. */
+    if (action === 'model') {
+      res.status(200).json({ model: activeBackend().embeddingModel });
       return;
     }
 

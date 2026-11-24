@@ -159,6 +159,11 @@ render — and the banner says the deletion has not reached the server yet:
   run depends on which keys the deployment has, and a deployment with none —
   every fresh clone — does not show the mode at all
   ([ADR 0013](docs/decisions/0013-search-by-meaning-is-indexed-on-demand.md))
+- ✅ **Ask your files a question.** "When does my lease end?" is answered from
+  the pieces of your own files nearest to it, as it is written, with each
+  claim citing the piece it comes from, in the language you asked in. Free on
+  Workers AI for any account, the demo's included, within a daily limit
+  ([ADR 0019](docs/decisions/0019-questions-are-answered-from-pieces-of-the-files.md))
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
 - ✅ File renaming and deletion — removed from the provider, not just from the list
@@ -1051,7 +1056,7 @@ cloud-storage-app/
 │   └── main.tsx                   # Entry point
 ├── api/                           # Vercel Functions — anything holding a secret
 │   ├── account/[action].ts        # delete: erases the caller's account; reconcile: the nightly check of storage
-│   ├── ai/[action].ts             # Search by meaning: describe a file, embed a query
+│   ├── ai/[action].ts             # Search by meaning and questions: index a file, embed a query, answer
 │   ├── cloudinary/[action].ts     # sign (quota-checked) and delete (ownership-checked)
 │   ├── demo/session.ts            # Throwaway account for "Try the demo"
 │   ├── dropbox/                   # OAuth exchange, token refresh, disconnect

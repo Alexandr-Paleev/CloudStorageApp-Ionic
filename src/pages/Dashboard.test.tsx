@@ -33,9 +33,11 @@ const { getItems, deleteFile, createFolder, getUserStorageSize, profile, runOrQu
     ops: [] as unknown[],
   }));
 
-const { smartSearch, unindexedFileIds, deployment } = vi.hoisted(() => ({
+const { smartSearch, indexModel, unindexedFiles, indexMany, deployment } = vi.hoisted(() => ({
   smartSearch: vi.fn(),
-  unindexedFileIds: vi.fn(),
+  indexModel: vi.fn(),
+  unindexedFiles: vi.fn(),
+  indexMany: vi.fn(),
   deployment: { offersSmartSearch: false },
 }));
 
@@ -79,7 +81,7 @@ vi.mock('../services/mutation-queue', async () => {
 vi.mock('../hooks/useProfile', () => ({ useProfile: () => profile }));
 vi.mock('../services/auth.service', () => ({ authService: { logout: vi.fn() } }));
 vi.mock('../services/ai.service', () => ({
-  default: { smartSearch, unindexedFileIds, indexMany: vi.fn() },
+  default: { smartSearch, indexModel, unindexedFiles, indexMany },
 }));
 vi.mock('../utils/smart-search.utils', () => ({
   smartSearchIsOffered: () => deployment.offersSmartSearch,
@@ -115,6 +117,7 @@ function storageStats(): string {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   ops.length = 0;
   deployment.offersSmartSearch = false;
   profile.profile = { tier: 'free', storage_limit: 500 * MB, allowed_providers: ['r2'] };
@@ -308,23 +311,62 @@ describe('Dashboard', () => {
       expect(getItems.mock.calls[0]![1]).toMatchObject({ page: 0, pageSize: 15 });
     });
 
-    /* Indexed means indexed by the model the search on screen was made with,
-       and the page is what carries that name from the one to the other. A
-       count asked without it called the files another model had indexed done,
-       and never offered them again. */
-    it('counts what is not indexed by the model the search was made with', async () => {
+    /* "Index them" used to appear only once a search by meaning had run:
+       the search's answer was the one place the page learned the model. */
+    it('offers to index what is missing without a search first', async () => {
       deployment.offersSmartSearch = true;
-      smartSearch.mockResolvedValue({ files: [], model: 'voyage-4' });
-      unindexedFileIds.mockResolvedValue(['f1', 'f2']);
+      indexModel.mockResolvedValue('@cf/baai/bge-m3');
+      unindexedFiles.mockResolvedValue([
+        { id: 'f1', name: 'lease.pdf' },
+        { id: 'f2', name: 'bill.pdf' },
+      ]);
       show();
 
-      // The switch between the two searches appears once there is a term.
-      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'hotel receipt');
-      ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
-
       expect(await screen.findByText('2 files not indexed yet')).toBeInTheDocument();
-      expect(smartSearch).toHaveBeenCalledWith('hotel receipt');
-      expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
+      expect(unindexedFiles).toHaveBeenCalledWith('user-1', '@cf/baai/bge-m3');
+      expect(smartSearch).not.toHaveBeenCalled();
+    });
+
+    it('offers nothing where the deployment has no search by meaning', async () => {
+      show();
+
+      await waitFor(() => expect(getItems).toHaveBeenCalled());
+      expect(indexModel).not.toHaveBeenCalled();
+    });
+
+    /* A file the model cannot read used to stay in "N not indexed", offered
+       again on every visit; now it is listed once, with why, and the run
+       says so in grey rather than red. */
+    it('lists the files it cannot read with the reason, and says so without alarm', async () => {
+      deployment.offersSmartSearch = true;
+      indexModel.mockResolvedValue('@cf/baai/bge-m3');
+      unindexedFiles.mockResolvedValue([{ id: 'f2', name: 'backup.zip' }]);
+      indexMany.mockImplementation(async () => {
+        unindexedFiles.mockResolvedValue([{ id: 'f2', name: 'backup.zip' }]);
+        return {
+          indexed: 0,
+          skipped: 1,
+          failed: 0,
+          skips: [{ fileId: 'f2', reason: 'archives are not indexed' }],
+        };
+      });
+      show();
+
+      fireEvent.click(await screen.findByText('Index them'));
+
+      const list = await screen.findByTestId('unreadable-files');
+      expect(list).toHaveTextContent('1 file cannot be indexed');
+      expect(list).toHaveTextContent('backup.zip');
+      expect(list).toHaveTextContent('archives are not indexed');
+      expect(screen.queryByText(/not indexed yet/)).not.toBeInTheDocument();
+      const toast = await waitFor(() => {
+        const found = [...document.querySelectorAll('ion-toast')].find((t) =>
+          (t.getAttribute('message') ?? '').startsWith('Nothing could be indexed')
+        );
+        expect(found).toBeTruthy();
+        return found!;
+      });
+      expect(toast.getAttribute('color')).toBe('dark');
     });
 
     /* A new term is a new query with nothing to show until it answers, and
@@ -366,18 +408,14 @@ describe('Dashboard', () => {
         allowed_providers: ['supabase_storage'],
         email: 'demo-1763640000000-abc123@example.com',
       };
-      smartSearch.mockResolvedValue({ files: [], model: '@cf/baai/bge-m3' });
-      unindexedFileIds.mockResolvedValue(['f1']);
+      indexModel.mockResolvedValue('@cf/baai/bge-m3');
+      unindexedFiles.mockResolvedValue([{ id: 'f1', name: 'lease.pdf' }]);
       show();
 
-      ionEvent(screen.getByTestId('file-search'), 'ionInput', 'contrato de alquiler');
-      ionEvent(screen.getByTestId('search-mode'), 'ionChange', 'smart');
-
-      // The search has answered, so the model is known: the moment a count
-      // would be asked for. Then a moment more, for a query to start.
-      expect(await screen.findByText(/Nothing indexed matches/)).toBeInTheDocument();
+      await waitFor(() => expect(getItems).toHaveBeenCalled());
       await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(unindexedFileIds).not.toHaveBeenCalled();
+      expect(indexModel).not.toHaveBeenCalled();
+      expect(unindexedFiles).not.toHaveBeenCalled();
       expect(screen.queryByText(/not indexed yet/)).not.toBeInTheDocument();
     });
   });

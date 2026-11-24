@@ -178,20 +178,6 @@ describe('useFileListing', () => {
       await waitFor(() => expect(result.current.items.files).toEqual([file('s2')]));
     });
 
-    /* For the count of files not indexed yet, which has to ask about the
-       same model: a row another one made is a file this search cannot
-       return. */
-    it('says which model the matches were found with, and none for the list', async () => {
-      const { result, rerender } = show(undefined, BY_MEANING);
-      await waitFor(() => expect(result.current.smartModel).toBe('voyage-4'));
-
-      // The same words, asked of the names: the matches are still cached.
-      rerender({ filters: { ...BY_MEANING, mode: 'name' } });
-
-      await waitFor(() => expect(getItems).toHaveBeenCalledTimes(1));
-      expect(result.current.smartModel).toBeUndefined();
-    });
-
     it('reports the search’s failure and its loading, not the list’s', async () => {
       let fail!: (error: Error) => void;
       smartSearch.mockReturnValue(new Promise((_, reject) => (fail = reject)));

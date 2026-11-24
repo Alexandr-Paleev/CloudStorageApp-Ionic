@@ -6,7 +6,7 @@ import DashboardHeader from './DashboardHeader';
 import { renderWithProviders } from '../test/utils';
 
 const { envMock, isNativePlatform, logout } = vi.hoisted(() => ({
-  envMock: { VITE_BILLING_ENABLED: true },
+  envMock: { VITE_BILLING_ENABLED: true, VITE_SMART_SEARCH_ENABLED: false },
   isNativePlatform: vi.fn(() => false),
   logout: vi.fn(),
 }));
@@ -22,6 +22,7 @@ function show(props: Partial<React.ComponentProps<typeof DashboardHeader>> = {})
       <Route path="/" element={<DashboardHeader title="My Files" {...props} />} />
       <Route path="/pricing" element={<p>Plans page</p>} />
       <Route path="/account" element={<p>Account page</p>} />
+      <Route path="/ask" element={<p>Ask page</p>} />
       <Route path="/login" element={<p>Login page</p>} />
     </Routes>
   );
@@ -34,6 +35,7 @@ const iconOf = (button: HTMLElement) =>
 beforeEach(() => {
   vi.clearAllMocks();
   envMock.VITE_BILLING_ENABLED = true;
+  envMock.VITE_SMART_SEARCH_ENABLED = false;
   isNativePlatform.mockReturnValue(false);
   logout.mockResolvedValue(undefined);
 });
@@ -125,5 +127,22 @@ describe('DashboardHeader and what Hotjar may record', () => {
   it('leaves out the title, which names the open folder', () => {
     show({ title: 'Invoices' });
     expect(document.querySelector('ion-title')).toHaveAttribute('data-hj-suppress');
+  });
+});
+
+describe('the way to questions', () => {
+  it('opens the page of questions where search by meaning is offered', async () => {
+    envMock.VITE_SMART_SEARCH_ENABLED = true;
+    show();
+
+    fireEvent.click(screen.getByTestId('ask-link'));
+
+    expect(await screen.findByText('Ask page')).toBeInTheDocument();
+  });
+
+  it('is not there where search by meaning is not, since nothing would be indexed', () => {
+    show();
+
+    expect(screen.queryByTestId('ask-link')).not.toBeInTheDocument();
   });
 });

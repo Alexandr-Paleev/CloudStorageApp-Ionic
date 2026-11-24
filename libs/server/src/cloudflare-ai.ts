@@ -325,7 +325,11 @@ export async function* readEventStream(body: AsyncIterable<Uint8Array>): AsyncGe
 }
 
 /** An answer from the pieces, as it is written (ADR 0019). */
-export async function* answer(system: string, user: string): AsyncGenerator<string> {
+export async function* answer(
+  system: string,
+  user: string,
+  signal?: AbortSignal
+): AsyncGenerator<string> {
   const token = process.env.CLOUDFLARE_AI_TOKEN;
   const account = cloudflareAccountId();
   if (!token || !account) {
@@ -347,7 +351,11 @@ export async function* answer(system: string, user: string): AsyncGenerator<stri
         max_tokens: MAX_ANSWER_TOKENS,
         stream: true,
       }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      /* Closing the request is what stops Workers AI writing, and so what
+         stops the neurons being counted. */
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)])
+        : AbortSignal.timeout(TIMEOUT_MS),
     }
   );
 

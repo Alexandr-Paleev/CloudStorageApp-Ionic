@@ -94,8 +94,6 @@ export function useFileListing(folderId: string | undefined, filters: FileFilter
     items,
     searching,
     smartSearching,
-    /** The model the matches were found with: what "indexed" means for them. */
-    smartModel: smartSearching ? smart?.model : undefined,
     loading: smartSearching ? smartLoading : isLoading,
     error: smartSearching ? smartError : error,
     hasNextPage,

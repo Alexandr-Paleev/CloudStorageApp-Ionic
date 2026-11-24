@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   mockRequest,
   mockResponse,
@@ -234,6 +235,30 @@ describe('access', () => {
 
     expect(res.statusCode).toBe(401);
     expect(describeFile).not.toHaveBeenCalled();
+  });
+
+  it('names the model this deployment indexes with, asking no model and claiming nothing', async () => {
+    authenticate.mockResolvedValue({ id: 'user-1', email: 'alex@example.com' });
+    const res = mockResponse();
+
+    await handler(mockRequest({ query: { action: 'model' } }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ model: EMBEDDING_MODEL });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it('answers 501 for the model where no backend is configured', async () => {
+    authenticate.mockResolvedValue({ id: 'user-1', email: 'alex@example.com' });
+    activeBackend.mockImplementation(() => {
+      throw new ProviderNotConfigured('no keys');
+    });
+    const res = mockResponse();
+
+    await handler(mockRequest({ query: { action: 'model' } }), res);
+
+    expect(res.statusCode).toBe(501);
   });
 
   it('answers 404 for a segment that is neither action', async () => {
@@ -474,7 +499,12 @@ describe('index', () => {
       await handler(index('file-1'), res);
 
       expect(res.statusCode).toBe(429);
-      expect(res.body).toMatchObject({ message: expect.stringContaining('tomorrow') });
+      // What happened, not when: the moment is `retryAt`, said by the app in local time.
+      expect(res.body).toMatchObject({
+        message: expect.stringContaining('today'),
+        // Within seconds of midnight: Retry-After rounds up, and a loaded run is slow.
+        retryAt: expect.stringMatching(/T00:00:0\d/),
+      });
       const retryAfter = Number(
         vi.mocked(res.setHeader).mock.calls.find(([name]) => name === 'Retry-After')?.[1]
       );
@@ -999,9 +1029,70 @@ describe('ask (ADR 0019)', () => {
           content: 'Total: 86,40 euros.',
         },
       ],
-      'How much is the rent?'
+      'How much is the rent?',
+      expect.any(AbortSignal)
     );
     expect(res.end).toHaveBeenCalled();
+  });
+
+  it('stops the model when the person goes away, and reports nothing', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+    let signal: AbortSignal | undefined;
+    answer.mockImplementation(async function* (_e: unknown, _q: unknown, s: AbortSignal) {
+      signal = s;
+      yield 'The rent ';
+      res.disconnect();
+      yield 'is 950 euros.';
+    });
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(signal?.aborted).toBe(true);
+    expect(lines(res).map((line) => line.type)).toEqual(['sources', 'text']);
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  /* Stop pressed while the pieces were still being found: the connection is
+     gone before the first word, and the model would have written the whole
+     answer to nobody. */
+  it('asks no model when the person went away while the pieces were found', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+    embed.mockImplementation(async () => {
+      res.disconnect();
+      return VECTOR;
+    });
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(answer).not.toHaveBeenCalled();
+    expect(res.written).toEqual([]);
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  /* Without it, Vercel tells the function nothing when the browser goes:
+     "Cancellation is opt-in" (Functions API reference, "Cancel requests"). */
+  it('is told on Vercel that the person went away', () => {
+    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as {
+      functions?: Record<string, unknown>;
+    };
+    expect(vercel.functions).toHaveProperty(['api/ai/*.ts', 'supportsCancellation'], true);
+  });
+
+  it('leaves the model alone once the answer is written', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+    let signal: AbortSignal | undefined;
+    answer.mockImplementation(async function* (_e: unknown, _q: unknown, s: AbortSignal) {
+      signal = s;
+      yield 'Done.';
+    });
+
+    await handler(ask('How much is the rent?'), res);
+
+    // The connection closes after every answer; only a close before the end is a person leaving.
+    expect(signal?.aborted).toBe(false);
   });
 
   it('asks no model when nothing is indexed to read', async () => {
@@ -1077,12 +1168,13 @@ describe('ask (ADR 0019)', () => {
     expect(res.body).toMatchObject({ message: expect.stringContaining('questions') });
     // The moment the day's budget turns over, midnight UTC, for the screen to
     // show in the reader's own time. Retry-After is whole seconds, rounded up,
-    // so it lands within a second after midnight and never before.
+    // so it lands just after midnight and never before; a few seconds of slack
+    // for a run under load, between the two readings of the clock.
     const retryAt = new Date((res.body as { retryAt: string }).retryAt).getTime();
     const now = new Date();
     const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
     expect(retryAt).toBeGreaterThanOrEqual(midnight);
-    expect(retryAt).toBeLessThan(midnight + 1000);
+    expect(retryAt).toBeLessThan(midnight + 5000);
     expect(embed).not.toHaveBeenCalled();
     expect(res.written).toEqual([]);
   });

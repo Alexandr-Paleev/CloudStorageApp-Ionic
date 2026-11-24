@@ -44,6 +44,7 @@ setupIonicReact();
 const Dashboard = lazyPage(() => import('./pages/Dashboard'));
 const Upload = lazyPage(() => import('./pages/Upload'));
 const FileView = lazyPage(() => import('./pages/FileView'));
+const Ask = lazyPage(() => import('./pages/Ask'));
 const Pricing = lazyPage(() => import('./pages/Pricing'));
 const Account = lazyPage(() => import('./pages/Account'));
 const SubscriptionSuccess = lazyPage(() => import('./pages/SubscriptionSuccess'));
@@ -107,6 +108,14 @@ const App: React.FC = () => (
                   element={
                     <PrivateRoute>
                       <FileView />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/ask"
+                  element={
+                    <PrivateRoute>
+                      <Ask />
                     </PrivateRoute>
                   }
                 />

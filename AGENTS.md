@@ -54,8 +54,8 @@ src/
 ├── hooks/           # Custom hooks (useAnalytics for GA4, useProfile for billing)
 ├── native/          # Capacitor-only code (deep links for OAuth in the shell)
 ├── observability/   # Sentry bootstrap (loads when idle)
-├── pages/           # Route pages (Dashboard, Login, PasswordReset, Upload, FileView, Account,
-│                    # Pricing, SubscriptionSuccess, DropboxCallback, Legal, NotFound)
+├── pages/           # Route pages (Dashboard, Login, PasswordReset, Upload, FileView, Ask,
+│                    # Account, Pricing, SubscriptionSuccess, DropboxCallback, Legal, NotFound)
 ├── providers/       # Storage provider abstraction layer
 │   └── impl/        # CloudinaryProvider, R2Provider, GoogleDriveProvider, SupabaseStorageProvider, DropboxProvider
 ├── schemas/         # Zod schemas (file metadata)
@@ -79,7 +79,8 @@ libs/                # Shared code, unit-tested next to the source — see ADR 0
 
 api/                 # Vercel serverless functions
 ├── account/         # [action].ts — delete the caller's account; reconcile, the nightly check of storage
-├── ai/              # [action].ts — index a file and embed a search query, in one function
+├── ai/              # [action].ts — index a file, embed a search query, answer a question,
+│                    # name the index's model, in one function
 ├── cloudinary/      # [action].ts — sign and delete in one function
 ├── demo/            # session.ts — opens a demo account; sweeps expired ones on the way
 ├── dropbox/         # callback, token, disconnect (code is complete, no app configured)

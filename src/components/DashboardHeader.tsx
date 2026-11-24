@@ -1,8 +1,16 @@
 import { IonButton, IonButtons, IonHeader, IonIcon, IonTitle, IonToolbar } from '@ionic/react';
-import { arrowBack, logOutOutline, personCircleOutline, rocketOutline, star } from 'ionicons/icons';
+import {
+  arrowBack,
+  chatbubbleEllipsesOutline,
+  logOutOutline,
+  personCircleOutline,
+  rocketOutline,
+  star,
+} from 'ionicons/icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { billingIsOffered } from '../utils/billing.utils';
+import { smartSearchIsOffered } from '../utils/smart-search.utils';
 
 interface DashboardHeaderProps {
   /** What the bar says: the name of the folder that is open, or "My Files". */
@@ -15,7 +23,8 @@ interface DashboardHeaderProps {
 
 /**
  * The bar across the top of the dashboard: the way up, where you are, and the
- * three ways off the page — the plans, the account and signing out.
+ * ways off the page — questions to one's files, the plans, the account and
+ * signing out.
  */
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ title, onUp, tier }) => {
   const { logout } = useAuth();
@@ -42,6 +51,19 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ title, onUp, tier }) 
             and kept out of what Hotjar records. */}
         <IonTitle data-hj-suppress="">{title}</IonTitle>
         <IonButtons slot="end">
+          {/* Questions are answered from the index search by meaning builds,
+              so they are offered where it is, to every account alike. */}
+          {smartSearchIsOffered() && (
+            <IonButton
+              onClick={() => navigate('/ask')}
+              color="dark"
+              data-testid="ask-link"
+              title="Ask your files"
+              aria-label="Ask your files"
+            >
+              <IonIcon icon={chatbubbleEllipsesOutline} aria-hidden="true" />
+            </IonButton>
+          )}
           {/* The only permanent way into billing: UpgradeBanner appears at
               80% usage, so without this a user could not reach the plans at
               all, and a Pro user had no route to the customer portal.

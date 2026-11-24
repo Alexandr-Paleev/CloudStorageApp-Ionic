@@ -2,11 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useSearchIndex } from './useSearchIndex';
 import { withQueryClient } from '../test/utils';
+import { skipsKey } from '../utils/index-skips';
 
-type Outcome = { indexed: number; skipped: number; failed: number; stopped?: string };
+type Outcome = {
+  indexed: number;
+  skipped: number;
+  failed: number;
+  skips: { fileId: string; reason: string }[];
+  stopped?: string;
+};
 
-const { unindexedFileIds, indexMany } = vi.hoisted(() => ({
-  unindexedFileIds: vi.fn(),
+const { indexModel, unindexedFiles, indexMany } = vi.hoisted(() => ({
+  indexModel: vi.fn(),
+  unindexedFiles: vi.fn(),
   indexMany: vi.fn(),
 }));
 
@@ -14,24 +22,28 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
-vi.mock('../services/ai.service', () => ({ default: { unindexedFileIds, indexMany } }));
+vi.mock('../services/ai.service', () => ({
+  default: { indexModel, unindexedFiles, indexMany },
+}));
 
-type Shown = { enabled: boolean; model?: string };
+const F1 = { id: 'f1', name: 'lease.pdf' };
+const F2 = { id: 'f2', name: 'backup.zip' };
 
-function show(initialProps: Shown = { enabled: true, model: 'voyage-4' }) {
+function show(enabled = true) {
   const onProblem = vi.fn();
+  const onNotice = vi.fn();
   const { queryClient, wrapper } = withQueryClient();
   const view = renderHook(
-    ({ enabled, model }: Shown) => useSearchIndex({ enabled, model, onProblem }),
-    { wrapper, initialProps }
+    ({ enabled }: { enabled: boolean }) => useSearchIndex({ enabled, onProblem, onNotice }),
+    { wrapper, initialProps: { enabled } }
   );
-  return { ...view, onProblem, queryClient };
+  return { ...view, onProblem, onNotice, queryClient };
 }
 
 /** Shown, with the two missing files known, and ready to index them. */
 async function ready() {
   const shown = show();
-  await waitFor(() => expect(shown.result.current.unindexed).toEqual(['f1', 'f2']));
+  await waitFor(() => expect(shown.result.current.pending).toEqual([F1, F2]));
   return shown;
 }
 
@@ -42,55 +54,36 @@ async function runWith(outcome: Outcome) {
   return shown;
 }
 
+const NOTHING_SKIPPED = { skips: [] };
+
 beforeEach(() => {
   vi.clearAllMocks();
-  unindexedFileIds.mockResolvedValue(['f1', 'f2']);
-  indexMany.mockResolvedValue({ indexed: 2, skipped: 0, failed: 0 });
+  localStorage.clear();
+  indexModel.mockResolvedValue('@cf/baai/bge-m3');
+  unindexedFiles.mockResolvedValue([F1, F2]);
+  indexMany.mockResolvedValue({ indexed: 2, skipped: 0, failed: 0, ...NOTHING_SKIPPED });
 });
 
 describe('useSearchIndex', () => {
-  /* Two reads the dashboard need not make on every visit: the answer only
-     matters while a search by meaning is on screen. */
-  it('asks which files are missing only while a search by meaning is on screen', async () => {
-    const { result, rerender } = show({ enabled: false, model: 'voyage-4' });
-    await act(() => Promise.resolve());
-    expect(unindexedFileIds).not.toHaveBeenCalled();
+  /* "Index them" used to wait for a search by meaning, the only place the
+     browser learned the model; the server now says it, at no cost. */
+  it('asks the server for the model, then which files that model is missing', async () => {
+    const { result } = show();
 
-    rerender({ enabled: true, model: 'voyage-4' });
-
-    await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2']));
-    expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
+    await waitFor(() => expect(result.current.pending).toEqual([F1, F2]));
+    expect(unindexedFiles).toHaveBeenCalledWith('user-1', '@cf/baai/bge-m3');
   });
 
-  /* Indexed means indexed by the model the search was made with: match_files
-     compares no other rows, so until the search has answered there is no
-     question to ask. */
-  it('waits for the search to say which model it was made with', async () => {
-    const { result, rerender } = show({ enabled: true });
+  it('asks nothing where the account may not index', async () => {
+    show(false);
     await act(() => Promise.resolve());
-    expect(unindexedFileIds).not.toHaveBeenCalled();
 
-    rerender({ enabled: true, model: 'voyage-4' });
-
-    await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2']));
-    expect(unindexedFileIds).toHaveBeenCalledWith('user-1', 'voyage-4');
-  });
-
-  /* The server picks the models by which keys it has. After a change, the
-     rows the old one made are hidden from the search on purpose, and this
-     count is the only thing that offers those files again. */
-  it('asks again when the search comes back from another model', async () => {
-    const { result, rerender } = await ready();
-    unindexedFileIds.mockResolvedValue(['f1', 'f2', 'f3']);
-
-    rerender({ enabled: true, model: '@cf/baai/bge-large-en-v1.5' });
-
-    await waitFor(() => expect(result.current.unindexed).toEqual(['f1', 'f2', 'f3']));
-    expect(unindexedFileIds).toHaveBeenLastCalledWith('user-1', '@cf/baai/bge-large-en-v1.5');
+    expect(indexModel).not.toHaveBeenCalled();
+    expect(unindexedFiles).not.toHaveBeenCalled();
   });
 
   it('indexes the files that were missing, and no others', async () => {
-    await runWith({ indexed: 2, skipped: 0, failed: 0 });
+    await runWith({ indexed: 2, skipped: 0, failed: 0, ...NOTHING_SKIPPED });
 
     expect(indexMany).toHaveBeenCalledWith(['f1', 'f2'], expect.any(Function));
   });
@@ -115,7 +108,7 @@ describe('useSearchIndex', () => {
     expect(result.current.indexing).toEqual({ done: 1, total: 2 });
 
     await act(async () => {
-      finish({ indexed: 2, skipped: 0, failed: 0 });
+      finish({ indexed: 2, skipped: 0, failed: 0, ...NOTHING_SKIPPED });
       await run;
     });
     expect(result.current.indexing).toBeNull();
@@ -130,27 +123,123 @@ describe('useSearchIndex', () => {
     expect(result.current.indexing).toBeNull();
   });
 
+  /* A ZIP stays a ZIP: offered on every visit, it was the "1 not indexed"
+     that pressing "Index them" never made go away. */
+  describe('a file it cannot read', () => {
+    const SKIPPED: Outcome = {
+      indexed: 1,
+      skipped: 1,
+      failed: 0,
+      skips: [{ fileId: 'f2', reason: 'archives are not indexed' }],
+    };
+
+    /** A run that indexes f1 and skips f2, after which only f2 is missing. */
+    const runSkipping = async () => {
+      const shown = await ready();
+      indexMany.mockImplementation(async () => {
+        unindexedFiles.mockResolvedValue([F2]);
+        return SKIPPED;
+      });
+      await act(() => shown.result.current.indexMissing());
+      return shown;
+    };
+
+    it('moves to its own list, with the reason, and is not offered again', async () => {
+      const { result } = await runSkipping();
+
+      await waitFor(() => expect(result.current.pending).toEqual([]));
+      expect(result.current.unreadable).toEqual([{ ...F2, reason: 'archives are not indexed' }]);
+    });
+
+    it('is remembered in this browser, per account and model', async () => {
+      await runWith(SKIPPED);
+
+      expect(JSON.parse(localStorage.getItem(skipsKey('user-1', '@cf/baai/bge-m3'))!)).toEqual({
+        f2: 'archives are not indexed',
+      });
+    });
+
+    it('is read back on the next visit', async () => {
+      localStorage.setItem(
+        skipsKey('user-1', '@cf/baai/bge-m3'),
+        JSON.stringify({ f2: 'archives are not indexed' })
+      );
+      const { result } = show();
+
+      await waitFor(() => expect(result.current.pending).toEqual([F1]));
+      expect(result.current.unreadable).toEqual([{ ...F2, reason: 'archives are not indexed' }]);
+    });
+
+    it('belongs to the model: another model is offered it again', async () => {
+      localStorage.setItem(skipsKey('user-1', 'voyage-4'), JSON.stringify({ f2: 'too large' }));
+      const { result } = show();
+
+      await waitFor(() => expect(result.current.pending).toEqual([F1, F2]));
+      expect(result.current.unreadable).toEqual([]);
+    });
+
+    it('can be offered once more, since a reason can go away', async () => {
+      const { result } = await runSkipping();
+      await waitFor(() => expect(result.current.unreadable).toHaveLength(1));
+
+      act(() => result.current.retryUnreadable());
+
+      expect(result.current.pending).toEqual([F2]);
+      expect(localStorage.getItem(skipsKey('user-1', '@cf/baai/bge-m3'))).toBeNull();
+    });
+
+    it('works without storage, offering the file again rather than failing', async () => {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      const { result } = await runSkipping();
+
+      // Listed for this visit all the same; only the next one forgets it.
+      await waitFor(() => expect(result.current.unreadable).toHaveLength(1));
+      setItem.mockRestore();
+    });
+  });
+
   /* A run where every file failed, with no key on this deployment say, used
      to end exactly like a run where every file was indexed. */
   describe('what it says when a run is over', () => {
     it('how many failed, and that search will not find them yet', async () => {
-      const { onProblem } = await runWith({ indexed: 1, skipped: 0, failed: 1 });
+      const { onProblem } = await runWith({ indexed: 1, skipped: 0, failed: 1, skips: [] });
 
       expect(onProblem).toHaveBeenCalledWith(
         'Indexed 1 of 2. 1 failed — smart search will not find those yet.'
       );
     });
 
-    it('that there was nothing it could read', async () => {
-      const { onProblem } = await runWith({ indexed: 0, skipped: 2, failed: 0 });
+    /* Not red: nothing went wrong, and the list says which and why. */
+    it('that there was nothing it could read, as news rather than a fault', async () => {
+      const { onProblem, onNotice } = await runWith({
+        indexed: 0,
+        skipped: 2,
+        failed: 0,
+        skips: [
+          { fileId: 'f1', reason: 'no text' },
+          { fileId: 'f2', reason: 'archives are not indexed' },
+        ],
+      });
 
-      expect(onProblem).toHaveBeenCalledWith('Nothing to index: 2 files cannot be read.');
+      expect(onNotice).toHaveBeenCalledWith(
+        'Nothing could be indexed: 2 files cannot be read. The list says why.'
+      );
+      expect(onProblem).not.toHaveBeenCalled();
     });
 
     it('one file, not one files', async () => {
-      const { onProblem } = await runWith({ indexed: 0, skipped: 1, failed: 0 });
+      const { onNotice } = await runWith({
+        indexed: 1,
+        skipped: 1,
+        failed: 0,
+        skips: [{ fileId: 'f2', reason: 'archives are not indexed' }],
+      });
 
-      expect(onProblem).toHaveBeenCalledWith('Nothing to index: 1 file cannot be read.');
+      expect(onNotice).toHaveBeenCalledWith(
+        'Indexed 1 of 2. 1 file cannot be read. The list says why.'
+      );
     });
 
     it('what the route said when it stopped the run', async () => {
@@ -158,33 +247,38 @@ describe('useSearchIndex', () => {
         indexed: 1,
         skipped: 0,
         failed: 0,
-        stopped:
-          'This site has indexed as many files today as it allows in a day. Try again tomorrow.',
+        skips: [],
+        stopped: 'This site has indexed as many files today as it allows in a day.',
       });
 
       expect(onProblem).toHaveBeenCalledWith(
-        'Indexed 1 of 2. This site has indexed as many files today as it allows in a day. Try again tomorrow.'
+        'Indexed 1 of 2. This site has indexed as many files today as it allows in a day.'
       );
     });
 
-    it('nothing, when every file was indexed or could not be read', async () => {
-      const { onProblem } = await runWith({ indexed: 1, skipped: 1, failed: 0 });
+    it('nothing, when every file was indexed', async () => {
+      const { onProblem, onNotice } = await runWith({
+        indexed: 2,
+        skipped: 0,
+        failed: 0,
+        skips: [],
+      });
 
       expect(onProblem).not.toHaveBeenCalled();
+      expect(onNotice).not.toHaveBeenCalled();
     });
   });
 
   it('asks again afterwards, for what is missing and for what matches', async () => {
-    indexMany.mockResolvedValue({ indexed: 2, skipped: 0, failed: 0 });
     const { result, queryClient } = await ready();
     const earlierMatches = ['smart-search', 'user-1', 'hotel receipt'];
     queryClient.setQueryData(earlierMatches, []);
-    unindexedFileIds.mockResolvedValue([]);
+    unindexedFiles.mockResolvedValue([]);
 
     await act(() => result.current.indexMissing());
 
-    expect(unindexedFileIds).toHaveBeenCalledTimes(2);
+    expect(unindexedFiles).toHaveBeenCalledTimes(2);
     expect(queryClient.getQueryState(earlierMatches)?.isInvalidated).toBe(true);
-    await waitFor(() => expect(result.current.unindexed).toEqual([]));
+    await waitFor(() => expect(result.current.pending).toEqual([]));
   });
 });

@@ -5,7 +5,9 @@
 export class HttpError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    /** For a 429: the moment the limit turns over, when the route said it. */
+    readonly retryAt?: Date
   ) {
     super(message);
     this.name = 'HttpError';
@@ -42,8 +44,35 @@ export function isRetriableError(error: unknown): boolean {
   return true;
 }
 
-/** Builds an HttpError from a failed fetch Response, using its JSON message when present */
+/** A wait this short is the minute's limit, and its own message already says "in a minute". */
+const A_MINUTE_OR_SO_MS = 120_000;
+
+/**
+ * When a spent limit lets the person go on, in their own time.
+ *
+ * A day's budget turns over at midnight UTC, which is one in the morning in
+ * Valencia and seven in the evening, the day before, in New York; only the
+ * browser knows which, so the route sends the moment and this says it.
+ * Nothing for a wait of a minute or so: the route's message says that much.
+ */
+export function comeBackAt(retryAt: Date, now: Date = new Date()): string | null {
+  if (retryAt.getTime() - now.getTime() <= A_MINUTE_OR_SO_MS) return null;
+  const time = retryAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const sameDay = retryAt.toDateString() === now.toDateString();
+  return sameDay ? `You can try again after ${time}.` : `You can try again tomorrow after ${time}.`;
+}
+
+/**
+ * Builds an HttpError from a failed fetch Response, using its JSON message
+ * when present, and for a 429 the time the person can go on (`comeBackAt`).
+ */
 export async function httpErrorFrom(response: Response, fallbackMessage: string) {
   const body = await response.json().catch(() => null);
-  return new HttpError(body?.message || fallbackMessage, response.status);
+  const message: string = body?.message || fallbackMessage;
+  const retryAt =
+    response.status === 429 && typeof body?.retryAt === 'string' ? new Date(body.retryAt) : null;
+  if (!retryAt || Number.isNaN(retryAt.getTime())) return new HttpError(message, response.status);
+
+  const when = comeBackAt(retryAt);
+  return new HttpError(when ? `${message} ${when}` : message, response.status, retryAt);
 }

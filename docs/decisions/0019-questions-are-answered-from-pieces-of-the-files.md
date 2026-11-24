@@ -166,6 +166,24 @@ What follows, decided here and amended as each part ships:
   for all 75 of the eval's questions); and one citation of five pointed at
   the piece next to the one holding the fact, which the answers' eval will
   count.
+- **Step 4 (2026-11-23).** The screen: `/ask`, a page of its own, loaded when
+  first opened, behind a button in the dashboard's bar wherever search by
+  meaning is offered. The answer appears as it is written, as text and
+  never as markup; each [n] in it opens the file it cites, and the pieces
+  it cites are listed under it to be checked against. Stop, or leaving the
+  page, ends the request, and the route then stops the model rather than
+  finish an answer nobody reads out of the same free allocation. Vercel
+  tells a function that its caller left only when `vercel.json` says
+  `supportsCancellation` for it, so `api/ai/*.ts` does; the function is then
+  ended on a disconnect, and an index of one file in flight when the tab is
+  closed is lost with it, its unit spent, as it would be on a timeout. A spent
+  limit says when the person can go on in their own time ("after 01:00"),
+  from the moment every 429 now carries. The question, the answer and the
+  files' names are kept from Hotjar and Sentry. The dashboard learns the
+  index's model from the server (`/api/ai/model`, which asks no model), so
+  "Index them" no longer waits for a search by meaning, and a file the
+  route will not index is listed once with its reason instead of being
+  offered again on every visit.
 
 ## Alternatives
 

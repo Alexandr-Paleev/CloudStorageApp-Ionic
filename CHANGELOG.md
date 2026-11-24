@@ -54,12 +54,25 @@ reasoning behind the larger decisions lives in
   a demo's included; a question is one unit of a new daily budget (20 an
   account, 100 in all, `AI_ASK_DAILY_LIMIT`), which migration 023 lets the
   database count. A deployment with Anthropic's key answers with Claude Opus
-  5.5 at low effort. The screen to ask it from comes next. ADR 0019, step 3.
+  5.5 at low effort. ADR 0019, step 3.
+- **The screen to ask from.** A button in the dashboard's bar opens `/ask`:
+  the answer appears as it is written, each [n] opens the file it cites, and
+  the pieces it cites are listed under it. Stop ends the answer, and so does
+  leaving the page; either way the server stops the model too. ADR 0019,
+  step 4.
 - **A refusal for too many requests says when to come back.** Every 429 the
   functions send carries `retryAt` beside its message: the moment the limit
-  turns over, so that a screen can say "you can go on after 01:00" in the
-  reader's own time zone. A day's budget turns over at midnight UTC, a
-  different hour everywhere, and only the browser knows which.
+  turns over. The app adds it to the message in the reader's own time: "You
+  can try again after 01:00", or "tomorrow after 19:00". A day's budget
+  turns over at midnight UTC, a different hour everywhere, and only the
+  browser knows which, so the day's messages no longer say "tomorrow".
+- **"Index them" without a search first, and the files it cannot read said
+  once.** The button appeared only after a search by meaning, the one place
+  the dashboard learned the model; `/api/ai/model` now says it, at no cost.
+  A file the route will not index, a ZIP or a scan with no text, was offered
+  again on every visit as "N not indexed"; it is now listed once with the
+  reason, remembered in the browser, and can be tried again. A run that
+  found nothing to read says so in grey, not as an error.
 - **A demo account comes with its pieces.** A demo cannot index, so the seed
   carries them: `public/demo/search-index.json` now holds each file cut as
   `/api/ai/index` cuts it, with a vector per piece, and `/api/demo/session`
