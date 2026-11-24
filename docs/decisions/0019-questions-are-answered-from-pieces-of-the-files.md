@@ -172,7 +172,11 @@ What follows, decided here and amended as each part ships:
   never as markup; each [n] in it opens the file it cites, and the pieces
   it cites are listed under it to be checked against. Stop, or leaving the
   page, ends the request, and the route then stops the model rather than
-  finish an answer nobody reads out of the same free allocation. A spent
+  finish an answer nobody reads out of the same free allocation. Vercel
+  tells a function that its caller left only when `vercel.json` says
+  `supportsCancellation` for it, so `api/ai/*.ts` does; the function is then
+  ended on a disconnect, and an index of one file in flight when the tab is
+  closed is lost with it, its unit spent, as it would be on a timeout. A spent
   limit says when the person can go on in their own time ("after 01:00"),
   from the moment every 429 now carries. The question, the answer and the
   files' names are kept from Hotjar and Sentry. The dashboard learns the

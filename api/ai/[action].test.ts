@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   mockRequest,
   mockResponse,
@@ -1050,6 +1051,33 @@ describe('ask (ADR 0019)', () => {
     expect(signal?.aborted).toBe(true);
     expect(lines(res).map((line) => line.type)).toEqual(['sources', 'text']);
     expect(report).not.toHaveBeenCalled();
+  });
+
+  /* Stop pressed while the pieces were still being found: the connection is
+     gone before the first word, and the model would have written the whole
+     answer to nobody. */
+  it('asks no model when the person went away while the pieces were found', async () => {
+    callerRpc.mockResolvedValue({ data: PIECES, error: null });
+    const res = mockResponse();
+    embed.mockImplementation(async () => {
+      res.disconnect();
+      return VECTOR;
+    });
+
+    await handler(ask('How much is the rent?'), res);
+
+    expect(answer).not.toHaveBeenCalled();
+    expect(res.written).toEqual([]);
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  /* Without it, Vercel tells the function nothing when the browser goes:
+     "Cancellation is opt-in" (Functions API reference, "Cancel requests"). */
+  it('is told on Vercel that the person went away', () => {
+    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as {
+      functions?: Record<string, unknown>;
+    };
+    expect(vercel.functions).toHaveProperty(['api/ai/*.ts', 'supportsCancellation'], true);
   });
 
   it('leaves the model alone once the answer is written', async () => {

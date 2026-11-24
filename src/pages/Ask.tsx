@@ -274,8 +274,10 @@ const Ask: React.FC = () => {
           rows={1}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
-            // Enter asks; Shift+Enter is a new line.
-            if (event.key === 'Enter' && !event.shiftKey) {
+            /* Enter asks; Shift+Enter is a new line. An Enter that ends a
+               word being composed (Chinese, Japanese, a phone's suggestions)
+               belongs to the keyboard, not to the question. */
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
               void ask();
             }

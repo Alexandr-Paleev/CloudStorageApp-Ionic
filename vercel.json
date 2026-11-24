@@ -6,7 +6,8 @@
   "crons": [{ "path": "/api/account/reconcile", "schedule": "17 3 * * *" }],
   "functions": {
     "api/ai/*.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "supportsCancellation": true
     },
     "api/account/*.ts": {
       "maxDuration": 60

@@ -222,6 +222,18 @@ describe('Ask', () => {
     await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
   });
 
+  /* Typing Chinese or Japanese, Enter picks the word; the question goes on. */
+  it('leaves an Enter that ends a composed word to the keyboard', async () => {
+    show();
+    const box = screen.getByTestId('ask-question');
+    fireEvent.change(box, { target: { value: '租约什么时候' } });
+
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+
+    await act(() => Promise.resolve());
+    expect(ask).not.toHaveBeenCalled();
+  });
+
   it('asks nothing for an empty question', async () => {
     show();
     fireEvent.change(screen.getByTestId('ask-question'), { target: { value: '   ' } });
