@@ -6,7 +6,12 @@ import {
   mockSupabase,
   type TableAnswer,
 } from '../../libs/server/src/test-utils';
-import { AI_INDEX_LIMIT, resetRateLimits } from '../../libs/server/src/rate-limit';
+import {
+  AI_ASK_LIMIT,
+  AI_EMBED_LIMIT,
+  AI_INDEX_LIMIT,
+  resetRateLimits,
+} from '../../libs/server/src/rate-limit';
 import { AI_DAILY_LIMITS } from '../../libs/server/src/ai-budget';
 import {
   CHUNK_OVERLAP,
@@ -14,8 +19,11 @@ import {
   EMBEDDING_MODEL,
   MAX_PIECES_PER_FILE,
   ProviderNotConfigured,
+  SEARCH_RESULTS,
   TEXT_SAMPLE_BYTES,
+  searchFloor,
 } from '../../libs/core/src/ai';
+import { FILE_TEXT_IS_DATA } from '../../libs/server/src/mcp-tools';
 import { chunkText } from '../../libs/core/src/chunks';
 
 const {
@@ -72,8 +80,12 @@ vi.mock('../../libs/server/src/auth', () => ({
       from: () => ({ createSignedUrl: (...args: unknown[]) => createSignedUrl(...args) }),
     },
   },
-  // The database as the caller sees it, for match_chunks (migration 022).
-  supabaseAsCaller: () => ({ rpc: (...args: unknown[]) => callerRpc(...args) }),
+  // The database as the caller sees it, for match_chunks (migration 022) and
+  // for what /mcp reads: match_files, the folders, the files (ADR 0020).
+  supabaseAsCaller: () => ({
+    rpc: (...args: unknown[]) => callerRpc(...args),
+    from: (table: string) => db.client!.from(table),
+  }),
 }));
 
 // The backend is the seam between this route and whichever pair of models the
@@ -1235,5 +1247,265 @@ describe('ask (ADR 0019)', () => {
 
     expect(res.statusCode).toBe(500);
     expect(res.body).toMatchObject({ message: expect.stringContaining('migrations/022') });
+  });
+});
+
+describe('mcp (ADR 0020)', () => {
+  const ENVELOPE = {
+    'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+    'io.modelcontextprotocol/clientCapabilities': {},
+    'io.modelcontextprotocol/clientInfo': { name: 'test', version: '1' },
+  };
+
+  /** A tools/call of the 2026-07-28 revision, as vercel.json hands /mcp to this function. */
+  const toolCall = (name: string, args: Record<string, unknown>) =>
+    mockRequest({
+      query: { action: 'mcp' },
+      url: '/mcp',
+      headers: {
+        authorization: 'Bearer test-token',
+        host: 'app.example',
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-protocol-version': '2026-07-28',
+        'mcp-method': 'tools/call',
+        'mcp-name': name,
+      },
+      body: {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name, arguments: args, _meta: ENVELOPE },
+      },
+    });
+
+  interface ToolResult {
+    content: { text: string }[];
+    isError?: boolean;
+  }
+
+  async function call(name: string, args: Record<string, unknown> = {}): Promise<ToolResult> {
+    const res = mockResponse();
+    await handler(toolCall(name, args), res);
+    expect(res.statusCode).toBe(200);
+    return (JSON.parse(res.written.join('')) as { result: ToolResult }).result;
+  }
+
+  const json = (result: ToolResult) =>
+    JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+
+  const FOLDERS = [
+    { id: 'd-1', name: 'Home', parent_id: null },
+    { id: 'd-2', name: 'Lease', parent_id: 'd-1' },
+  ];
+  const ROW = {
+    id: 'f-1',
+    name: 'lease.pdf',
+    type: 'application/pdf',
+    size: 1200,
+    folder_id: 'd-2',
+    created_at: '2026-11-01T10:00:00Z',
+  };
+
+  function withRows(files: TableAnswer = { data: [ROW] }) {
+    const mock = mockSupabase({ folders: { data: FOLDERS }, files });
+    db.client = mock.client;
+    db.calls = mock.calls;
+  }
+
+  beforeEach(() => withRows());
+
+  it('refuses a demo account before any tool is reached', async () => {
+    authenticate.mockResolvedValue({ id: 'user-1', email: 'demo-1700000000-ab12@example.com' });
+    const res = mockResponse();
+    await handler(toolCall('list_files', {}), res);
+    expect(res.statusCode).toBe(403);
+    expect(db.calls).toEqual([]);
+  });
+
+  it('answers a request with no valid token 401, before the protocol', async () => {
+    authenticate.mockRejectedValue(new FakeAuthError('Missing authorization token'));
+    const res = mockResponse();
+    await handler(toolCall('list_files', {}), res);
+    expect(res.statusCode).toBe(401);
+    expect(res.written).toEqual([]);
+  });
+
+  describe('search_files', () => {
+    it('claims a search, embeds the query, and searches as the caller with the page’s floor', async () => {
+      callerRpc.mockResolvedValue({
+        data: [{ ...ROW, summary: 'A lease for a flat.', tags: [], similarity: 0.61 }],
+        error: null,
+      });
+
+      const result = json(await call('search_files', { query: 'the lease' }));
+
+      expect(rpc).toHaveBeenCalledWith(
+        'claim_ai_call',
+        expect.objectContaining({ p_action: 'embed' })
+      );
+      expect(embed).toHaveBeenCalledWith('the lease', 'query');
+      expect(callerRpc).toHaveBeenCalledWith('match_files', {
+        query_embedding: `[${VECTOR.join(',')}]`,
+        model_name: EMBEDDING_MODEL,
+        match_count: SEARCH_RESULTS,
+        min_similarity: searchFloor(EMBEDDING_MODEL),
+      });
+      expect(result).toEqual({
+        note: FILE_TEXT_IS_DATA,
+        files: [
+          {
+            id: 'f-1',
+            name: 'lease.pdf',
+            type: 'application/pdf',
+            size: 1200,
+            folder: 'Home/Lease',
+            addedAt: '2026-11-01T10:00:00Z',
+            description: 'A lease for a flat.',
+            similarity: 0.61,
+          },
+        ],
+      });
+    });
+
+    it('says the day’s searches are spent, and embeds nothing', async () => {
+      rpc.mockResolvedValue({ data: 'account', error: null });
+      const result = await call('search_files', { query: 'the lease' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toMatch(/searched by meaning as many times today/);
+      expect(result.content[0]!.text).toMatch(/midnight UTC/);
+      expect(embed).not.toHaveBeenCalled();
+    });
+
+    it('holds an assistant to the page’s searches a minute', async () => {
+      for (let i = 0; i < AI_EMBED_LIMIT; i++) await call('search_files', { query: 'lease' });
+      const result = await call('search_files', { query: 'lease' });
+      expect(result).toMatchObject({ isError: true });
+      expect(result.content[0]!.text).toMatch(/Too many searches/);
+      expect(embed).toHaveBeenCalledTimes(AI_EMBED_LIMIT);
+    });
+  });
+
+  describe('ask_files', () => {
+    const PIECES = [
+      { file_id: 'f-1', file_name: 'lease.pdf', chunk_index: 2, content: 'The rent is 950 euros.' },
+    ];
+
+    it('claims a question, reads the pieces as /ask does, and gives the answer whole', async () => {
+      callerRpc.mockResolvedValue({ data: PIECES, error: null });
+
+      const result = json(await call('ask_files', { question: 'How much is the rent?' }));
+
+      expect(rpc).toHaveBeenCalledWith(
+        'claim_ai_call',
+        expect.objectContaining({ p_action: 'ask' })
+      );
+      expect(callerRpc).toHaveBeenCalledWith(
+        'match_chunks',
+        expect.objectContaining({ match_count: 8 })
+      );
+      expect(answer).toHaveBeenCalledWith(
+        [
+          {
+            n: 1,
+            fileId: 'f-1',
+            fileName: 'lease.pdf',
+            chunkIndex: 2,
+            content: 'The rent is 950 euros.',
+          },
+        ],
+        'How much is the rent?',
+        expect.any(AbortSignal)
+      );
+      expect(result).toEqual({
+        note: FILE_TEXT_IS_DATA,
+        answer: 'The rent is 950 euros [1].',
+        model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+        sources: [
+          { n: 1, fileId: 'f-1', fileName: 'lease.pdf', piece: 2, text: 'The rent is 950 euros.' },
+        ],
+      });
+    });
+
+    it('asks no model when nothing is indexed', async () => {
+      const result = json(await call('ask_files', { question: 'Anything?' }));
+      expect(result.answer).toBeNull();
+      expect(answer).not.toHaveBeenCalled();
+    });
+
+    it('holds an assistant to the page’s questions a minute', async () => {
+      for (let i = 0; i < AI_ASK_LIMIT; i++) await call('ask_files', { question: 'Rent?' });
+      const result = await call('ask_files', { question: 'Rent?' });
+      expect(result.content[0]!.text).toMatch(/Too many questions/);
+      expect(rpc).toHaveBeenCalledTimes(AI_ASK_LIMIT);
+    });
+
+    it('reports a failure under its route and tool, and tells the model only that it failed', async () => {
+      callerRpc.mockResolvedValue({ data: PIECES, error: null });
+      answer.mockImplementation(async function* () {
+        yield 'The rent';
+        throw new Error('upstream 502');
+      });
+
+      const result = await call('ask_files', { question: 'Rent?' });
+
+      expect(result).toMatchObject({
+        isError: true,
+        content: [{ text: 'ask_files could not be finished. Try again.' }],
+      });
+      expect(report).toHaveBeenCalledWith(expect.any(Error), {
+        route: 'ai/mcp',
+        userId: 'user-1',
+        extra: { tool: 'ask_files' },
+      });
+    });
+  });
+
+  describe('list_files', () => {
+    it('lists the caller’s files with their folders’ paths, newest first, and claims nothing', async () => {
+      const result = json(await call('list_files'));
+
+      expect(result).toEqual({
+        note: FILE_TEXT_IS_DATA,
+        files: [
+          {
+            id: 'f-1',
+            name: 'lease.pdf',
+            type: 'application/pdf',
+            size: 1200,
+            folder: 'Home/Lease',
+            addedAt: '2026-11-01T10:00:00Z',
+          },
+        ],
+        folders: ['Home', 'Home/Lease'],
+        more: false,
+      });
+      expect(db.calls).toContainEqual({ table: 'files', op: 'order' });
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it('lists one folder by its path, however its slashes are written', async () => {
+      await call('list_files', { folder: '/Home/Lease/' });
+      expect(db.calls).toContainEqual({ table: 'files', op: 'in', args: ['folder_id', ['d-2']] });
+    });
+
+    it('lists the files at the top for "/"', async () => {
+      await call('list_files', { folder: '/' });
+      expect(db.calls).toContainEqual({ table: 'files', op: 'is', args: ['folder_id', null] });
+    });
+
+    it('says a folder that does not exist does not, and reads no files', async () => {
+      const result = await call('list_files', { folder: 'Taxes' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toMatch(/no folder "Taxes"/);
+      expect(db.calls.some((c) => c.table === 'files')).toBe(false);
+    });
+
+    it('says there is more when a row past the page came back', async () => {
+      withRows({ data: [ROW, { ...ROW, id: 'f-2' }] });
+      const result = json(await call('list_files', { limit: 1 }));
+      expect(result.files).toHaveLength(1);
+      expect(result.more).toBe(true);
+    });
   });
 });

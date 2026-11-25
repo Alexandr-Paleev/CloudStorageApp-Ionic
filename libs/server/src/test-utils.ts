@@ -149,10 +149,11 @@ export function mockSupabase(tables: Record<string, TableAnswer | TableAnswer[]>
         return chain;
       };
     }
-    // These two keep their arguments, unlike the rest: `.eq(column, value)`
-    // and `.is(column, null)` are what make a write conditional, and a test
-    // has to see on which column, and against what.
-    for (const method of ['eq', 'is']) {
+    // These keep their arguments, unlike the rest: `.eq(column, value)` and
+    // `.is(column, null)` are what make a write conditional, `.in(column,
+    // values)` what narrows a read, and a test has to see on which column, and
+    // against what.
+    for (const method of ['eq', 'is', 'in']) {
       chain[method] = (...args: unknown[]) => {
         calls.push({ table, op: method, args });
         return chain;

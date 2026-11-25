@@ -80,7 +80,7 @@ libs/                # Shared code, unit-tested next to the source — see ADR 0
 api/                 # Vercel serverless functions
 ├── account/         # [action].ts — delete the caller's account; reconcile, the nightly check of storage
 ├── ai/              # [action].ts — index a file, embed a search query, answer a question,
-│                    # name the index's model, in one function
+│                    # name the index's model, and /mcp's tools (ADR 0020), in one function
 ├── cloudinary/      # [action].ts — sign and delete in one function
 ├── demo/            # session.ts — opens a demo account; sweeps expired ones on the way
 ├── dropbox/         # callback, token, disconnect (code is complete, no app configured)

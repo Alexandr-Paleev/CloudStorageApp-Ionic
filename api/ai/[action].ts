@@ -10,9 +10,11 @@ import { isDemoEmail } from '../../libs/server/src/demo';
 import {
   MAX_DESCRIBE_BYTES,
   ProviderNotConfigured,
+  SEARCH_RESULTS,
   TEXT_SAMPLE_BYTES,
   embeddingInput,
   planFor,
+  searchFloor,
   toVectorLiteral,
   type IndexPlan,
   type IndexableFile,
@@ -44,6 +46,12 @@ import {
 } from '../../libs/server/src/rate-limit';
 import { applyCors } from '../../libs/server/src/cors';
 import { report } from '../../libs/server/src/report';
+import {
+  ToolRefusal,
+  folderPaths,
+  type FileTools,
+  type ListOptions,
+} from '../../libs/server/src/mcp-tools';
 
 /**
  * What search by meaning, and asking one's files, need a secret for:
@@ -51,18 +59,20 @@ import { report } from '../../libs/server/src/report';
  *   POST /api/ai/index   describe one file, cut its text into pieces, store the vectors
  *   POST /api/ai/embed   turn a search box into a vector
  *   POST /api/ai/ask     answer a question from the pieces nearest to it (ADR 0019)
+ *   POST /mcp            the same search and answer, and a listing, as tools an
+ *                        assistant calls (ADR 0020); vercel.json rewrites it here
  *
  * One file for both, because Vercel makes a function out of every file under
  * api/ and the Hobby plan allows twelve — this is the twelfth. See
  * docs/decisions/0008-two-actions-one-function.md.
  *
- * What is *not* here is the search itself. The vector comes back to the
- * browser and the browser asks the database, under its own session, through
- * `match_files` — the same way the dashboard already reads its rows. Routing
- * that read through this function would mean holding a second Supabase client
- * with the anon key here, and the RLS that makes the answer correct would then
- * depend on this file getting the token forwarding right instead of on the
- * database. See migrations/011_add_file_embeddings.sql.
+ * What is *not* here is the dashboard's search itself. The vector comes back
+ * to the browser and the browser asks the database, under its own session,
+ * through `match_files` — the same way the dashboard already reads its rows.
+ * An assistant has no database session of its own, so `/mcp` makes that read
+ * here, with the caller's token through `supabaseAsCaller`, as `/ask` reads
+ * the pieces: the database's policies still decide whose rows they are. See
+ * migrations/011_add_file_embeddings.sql.
  */
 
 /** A row pointing somewhere it should not. Answered with 403, not 500. */
@@ -597,6 +607,210 @@ async function embedQuery(req: VercelRequest, res: VercelResponse, userId: strin
   });
 }
 
+/** A per-account limit, said to the model in words: a tool's error, not a 429. */
+function allowOrRefuse(limiter: RateLimiter, userId: string, what: string): void {
+  if (limiter.allow(userId)) return;
+  throw new ToolRefusal(`${what} Try again in ${limiter.retryAfterSeconds(userId)} seconds.`);
+}
+
+/**
+ * What the pages are told with a status, a tool's caller is told in words: a
+ * spent budget, a deployment with no model, a model that declined. Anything
+ * else stays a failure.
+ */
+async function refusing<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof BudgetSpent) {
+      if (error.scope === 'deployment') {
+        console.warn('[ai]', error.message);
+        await report(error, { route: 'ai/mcp', level: 'warning' });
+      }
+      throw new ToolRefusal(`${error.message} The day's budget starts again at midnight UTC.`);
+    }
+    if (error instanceof ProviderNotConfigured || error instanceof AnswerRefused) {
+      throw new ToolRefusal(error.message);
+    }
+    throw error;
+  }
+}
+
+type CallerDb = ReturnType<typeof supabaseAsCaller>;
+
+/** Every folder of the caller's, by id, as a path: "Taxes/2026". */
+async function folderPathsOf(db: CallerDb): Promise<Map<string, string>> {
+  const { data, error } = await db.from('folders').select('id, name, parent_id');
+  if (error) throw new Error(`Could not read the folders: ${error.message}`);
+  return folderPaths((data ?? []) as { id: string; name: string; parent_id: string | null }[]);
+}
+
+/** A path as a person or a model may write it: "/Taxes/2026/" is "Taxes/2026". */
+function plainPath(path: string): string {
+  let start = 0;
+  let end = path.length;
+  while (start < end && path[start] === '/') start++;
+  while (end > start && path[end - 1] === '/') end--;
+  return path.slice(start, end);
+}
+
+interface ListedRow {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  folder_id: string | null;
+  created_at: string;
+}
+
+/**
+ * The tools of `/mcp` for one caller (ADR 0020), over what the pages use: the
+ * search `match_files` makes for the dashboard, the pieces and the answer of
+ * `/ask`, the rows the dashboard lists. Every read is the caller's own,
+ * through their token and the database's policies, as `/ask` reads the
+ * pieces; nothing here writes.
+ *
+ * The budgets are the pages' too: a search claims `embed`, a question `ask`,
+ * a listing nothing, since it asks no model.
+ */
+function fileToolsFor(req: VercelRequest, userId: string, signal: AbortSignal): FileTools {
+  return {
+    search: (query) =>
+      refusing(async () => {
+        allowOrRefuse(byEmbeddingUser, userId, 'Too many searches.');
+        const backend = activeBackend();
+        await claimAiCall(userId, 'embed');
+        const vector = await backend.embed(query, 'query');
+
+        const db = supabaseAsCaller(req);
+        const [{ data, error }, folders] = await Promise.all([
+          db.rpc('match_files', {
+            query_embedding: toVectorLiteral(vector),
+            model_name: backend.embeddingModel,
+            match_count: SEARCH_RESULTS,
+            min_similarity: searchFloor(backend.embeddingModel),
+          }),
+          folderPathsOf(db),
+        ]);
+        if (error) throw indexTableError('Could not search the files', error);
+
+        const rows = (data ?? []) as (ListedRow & { summary: string; similarity: number })[];
+        return rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          type: row.type,
+          size: row.size,
+          folder: row.folder_id ? (folders.get(row.folder_id) ?? null) : null,
+          addedAt: row.created_at,
+          description: row.summary,
+          similarity: row.similarity,
+        }));
+      }),
+
+    ask: (question) =>
+      refusing(async () => {
+        allowOrRefuse(byAskingUser, userId, 'Too many questions at once.');
+        const backend = activeBackend();
+        await claimAiCall(userId, 'ask');
+        const vector = await backend.embed(question, 'query');
+        const excerpts = await nearestPieces(req, vector, backend.embeddingModel);
+        const sources = excerpts.map(({ n, fileId, fileName, chunkIndex, content }) => ({
+          n,
+          fileId,
+          fileName,
+          piece: chunkIndex,
+          text: content,
+        }));
+
+        // As /ask: nothing indexed, and no model is asked to answer from nothing.
+        if (excerpts.length === 0) return { answer: null, model: backend.answerModel, sources };
+
+        /* Whole rather than streamed: a tool returns one result. `signal`
+           stops the model when the caller goes, as Stop does on the page. */
+        let answer = '';
+        for await (const piece of backend.answer(excerpts, question, signal)) answer += piece;
+        return { answer, model: backend.answerModel, sources };
+      }),
+
+    list: async ({ folder, limit, offset }: ListOptions) => {
+      const db = supabaseAsCaller(req);
+      const folders = await folderPathsOf(db);
+
+      /* Which folder, before anything is read: null for the top, the ids of
+         one path, or every file. Two folders of one name under one parent
+         have one path, and both are listed. */
+      let inFolders: string[] | null | undefined;
+      if (folder !== undefined) {
+        const wanted = plainPath(folder);
+        inFolders =
+          wanted === '' ? null : [...folders].filter(([, p]) => p === wanted).map(([id]) => id);
+        if (inFolders?.length === 0) {
+          throw new ToolRefusal(
+            `There is no folder "${folder}". list_files without a folder lists every folder.`
+          );
+        }
+      }
+
+      /* One row past the page, to say whether there is another: cheaper than
+         counting the whole table for a yes or no. */
+      let query = db
+        .from('files')
+        .select('id, name, type, size, folder_id, created_at')
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(offset, offset + limit);
+      if (inFolders === null) query = query.is('folder_id', null);
+      else if (inFolders) query = query.in('folder_id', inFolders);
+
+      const { data, error } = await query;
+      if (error) throw new Error(`Could not list the files: ${error.message}`);
+      const rows = (data ?? []) as ListedRow[];
+
+      return {
+        files: rows.slice(0, limit).map((row) => ({
+          id: row.id,
+          name: row.name,
+          type: row.type,
+          size: row.size,
+          folder: row.folder_id ? (folders.get(row.folder_id) ?? null) : null,
+          addedAt: row.created_at,
+        })),
+        folders: [...new Set(folders.values())].sort(),
+        more: rows.length > limit,
+      };
+    },
+  };
+}
+
+/** One request of an assistant's, answered by the tools above (ADR 0020). */
+async function answerMcp(req: VercelRequest, res: VercelResponse, userId: string): Promise<void> {
+  /* As /ask: the caller gone, the model is stopped rather than left to finish
+     out of the same free allocation (`supportsCancellation`, vercel.json). */
+  const left = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) left.abort();
+  });
+
+  /* Loaded here, not at the top: the SDK is some 940 kB of code, and every
+     other action of this function, the pages' search and questions among
+     them, would otherwise load it at each cold start. */
+  const { mcpServer, serveMcp } = await import('../../libs/server/src/mcp');
+
+  const tools = fileToolsFor(req, userId, left.signal);
+  await serveMcp(
+    req,
+    res,
+    () =>
+      mcpServer(tools, async (error, tool) => {
+        // A stop asked for is not a failure, and nobody is there to tell.
+        if (left.signal.aborted) return;
+        console.error('[ai]', error);
+        await report(error, { route: 'ai/mcp', userId, extra: { tool } });
+      }),
+    left.signal
+  );
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (applyCors(req, res)) return;
 
@@ -616,10 +830,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
-  /* What a report says the failure was in: one of the two actions, or the
-     function for a segment that is neither. */
+  /* What a report says the failure was in: one of the actions, or the
+     function for a segment that is none of them. */
   const route =
-    action === 'index' || action === 'embed' || action === 'ask' || action === 'model'
+    action === 'index' ||
+    action === 'embed' ||
+    action === 'ask' ||
+    action === 'model' ||
+    action === 'mcp'
       ? `ai/${action}`
       : 'ai';
 
@@ -658,6 +876,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
        no model is asked, nothing is claimed. */
     if (action === 'model') {
       res.status(200).json({ model: activeBackend().embeddingModel });
+      return;
+    }
+
+    /* An assistant's tools (ADR 0020). Until the OAuth server is on (M2) it
+       takes the token the app holds, for trying it with the MCP Inspector
+       and Claude Code. A demo account is refused: it is gone within a day,
+       and an assistant connected to it would outlive it. */
+    if (action === 'mcp') {
+      if (isDemoEmail(user.email)) {
+        res.status(403).json({
+          message:
+            'A demo account cannot connect an assistant: it is erased within a day. Sign up to connect one.',
+        });
+        return;
+      }
+      await answerMcp(req, res, userId);
       return;
     }
 
