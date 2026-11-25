@@ -158,6 +158,24 @@ export const AI_ASK_LIMIT = 10;
 export const AI_IP_LIMIT = 120;
 
 /**
+ * Requests to `/mcp` per account per minute (ADR 0020), after the token check.
+ *
+ * An assistant sends several for one tool call (the handshake, the list of
+ * tools, the call), so this is counted by account rather than by address: an
+ * assistant on the web reaches the server from its company's few addresses,
+ * shared by every person who connected it. The budgets and each tool's own
+ * limit still bound what the calls cost.
+ */
+export const MCP_LIMIT = 120;
+
+/**
+ * `/mcp` per address before the token check: only what keeps a stranger from
+ * making Supabase check tokens without end, ten times AI_IP_LIMIT, since many
+ * people's assistants can share one address.
+ */
+export const MCP_IP_LIMIT = 1200;
+
+/**
  * Every limiter built in this process.
  *
  * Only so that tests can put the module back to a known state: limiters are
