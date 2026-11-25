@@ -184,8 +184,12 @@ person's files and nothing more, wherever it is presented.**
   metadata, an action `resource` of the same function, names
   `/mcp` at the host asked and `<SUPABASE_URL>/auth/v1` as its
   authorization server, and any page may read it. `email` is the scope
-  asked for: `openid` would ask for an ID token, which Supabase signs only
-  with an asymmetric key. `/mcp` is limited per account, 120 a minute, and
+  asked for: no tool needs an ID token, which `openid` asks for and which
+  Supabase signs only with an asymmetric key (production signs with ES256,
+  so a fork on the shared secret is the one it would fail). Every other
+  `/.well-known/` path answers 404 rather than the app's page, so a client
+  looking for an authorization server here, as 2025-03-26 clients did, is
+  told there is none. `/mcp` is limited per account, 120 a minute, and
   per address only at ten times the pages' limit: an assistant on the web
   calls from a few addresses all its users share. From this deployment on,
   `/mcp` takes no token at all until the OAuth server issues one.

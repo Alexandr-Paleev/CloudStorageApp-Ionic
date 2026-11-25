@@ -15,9 +15,9 @@ export const RESOURCE_METADATA_PATH = '/.well-known/oauth-protected-resource/mcp
 /**
  * What an assistant is told to ask for. Supabase's scopes are OpenID's and
  * gate none of the data (ADR 0020); `email` is the one it grants when asked
- * for none. `openid` is left out: it asks for an ID token, which Supabase
- * signs only with an asymmetric key, and a project signing with its shared
- * secret would fail the sign-in.
+ * for none. `openid` is left out: no tool needs the ID token it asks for,
+ * which Supabase signs only with an asymmetric key, so a project still on its
+ * shared secret would fail the sign-in (production signs with ES256).
  */
 export const MCP_SCOPES = ['email'] as const;
 

@@ -88,7 +88,7 @@
     },
     { "source": "/.well-known/oauth-protected-resource", "destination": "/api/ai/resource" },
     {
-      "source": "/((?!api/|assets/|fonts/).*)",
+      "source": "/((?!api/|assets/|fonts/|\\.well-known/).*)",
       "destination": "/index.html"
     }
   ]

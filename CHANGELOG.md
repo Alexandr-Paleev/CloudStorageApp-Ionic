@@ -28,7 +28,8 @@ reasoning behind the larger decisions lives in
   objects and from reading the profile or the share links. `/mcp` answers a
   request without one 401 with `WWW-Authenticate`, naming its protected
   resource metadata at `/.well-known/oauth-protected-resource/mcp`, which
-  says to sign in through Supabase Auth. `/mcp` is limited per account, not
+  says to sign in through Supabase Auth; any other `/.well-known/` path is a
+  404, not the app's page. `/mcp` is limited per account, not
   per address, since the assistants on the web share a few.
 
 ## [4.17.1] — 2026-11-25
