@@ -808,8 +808,9 @@ A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.17.0, as CI measured them. Its first load is
-1.3 kB over 4.16.0's: 1.2 kB is Ionic 9.0.11, in the Ionic chunk, and 0.1 kB
+Those are the figures of 4.17.1 and of 4.17.0, as CI measured them: the fix
+between the two is on the server and moved none of them. 4.17.0's first load
+was 1.3 kB over 4.16.0's: 1.2 kB is Ionic 9.0.11, in the Ionic chunk, and 0.1 kB
 the route to the page that asks. All assets grew 6.0 kB: 2.8 kB is the page to
 ask from, loaded when first opened; 2.0 kB is `ai.service` and `http.utils`,
 now chunks of their own because two pages import them, with the reading of a

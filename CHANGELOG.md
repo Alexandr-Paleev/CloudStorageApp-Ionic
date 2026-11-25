@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.17.1] — 2026-11-25
+
 ### Fixed
 
 - **A photo larger than the free path's model takes is described from a
@@ -21,7 +25,9 @@ reasoning behind the larger decisions lives in
   touched. The 3.46 MB photo that was skipped comes to 180 kB. Supabase
   Storage makes such copies only on a paid plan, so a large picture there is
   still skipped with its reason. A file already listed as one that cannot be
-  indexed is offered again by "Try these again".
+  indexed is offered again by "Try these again", then indexed by "Index
+  them". Checked in production on 2026-11-25: the photo is indexed, described
+  as "a dramatic sky with sunlight breaking through clouds".
 
 ## [4.17.0] — 2026-11-24
 
@@ -3167,7 +3173,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.1...HEAD
+[4.17.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.0...v4.17.1
 [4.17.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.16.0...v4.17.0
 [4.16.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.15.0...v4.16.0
 [4.15.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.14.0...v4.15.0
