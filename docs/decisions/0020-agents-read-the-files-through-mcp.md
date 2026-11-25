@@ -144,3 +144,28 @@ person's files and nothing more, wherever it is presented.**
   and passes it the right arguments, recorded and graded by rules, as the
   answers are.
 - **M4.** How to connect, in the README, and the release.
+
+## Amendments
+
+- **M1 (2026-11-25).** `/mcp` answers, rewritten by `vercel.json` to the
+  `mcp` action of `api/ai/[action].ts`, with `@modelcontextprotocol/server`
+  2.4.0. The tools are in `libs/server/src/mcp.ts`, what they do in the
+  route, over what the pages use: `search_files` claims `embed` and reads
+  `match_files` as the caller with the dashboard's 15 results and floor;
+  `ask_files` claims `ask`, reads the pieces through the same
+  `nearestPieces` as `/ask`, and returns the answer whole with its sources;
+  `list_files` claims nothing, and gives each folder as a path,
+  "Taxes/2026". Each tool is marked read-only, not destructive and
+  closed-world. Each result is JSON with a note that the files' words in it
+  are data, the names a listing gives included, since a person writes those
+  too; a file cannot close the string that holds it. A spent budget, a
+  per-minute limit or an unknown folder is said to the model as the tool's
+  error, and any other failure is reported and said only as a failure. A
+  demo account is refused with 403 before any tool. The SDK
+  serves 2025 clients without a session, as this ADR asked of it: a test
+  sends `initialize`, then `tools/list` and `tools/call`, each on its own
+  and with no `Mcp-Session-Id`, and does the same for 2026-07-28. The SDK
+  loads 11 files, some 940 kB, in about 30 ms more than the Zod the function
+  already loads (55 ms and 26 ms, on a laptop); it is imported only for
+  `/mcp`, so the pages' requests to the function load none of it at a cold
+  start. The token is still the app's own, as the step says.

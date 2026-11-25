@@ -65,6 +65,7 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/status-bar": "^8.0.4",
     "@ionic/react": "^9.0.11",
+    "@modelcontextprotocol/server": "^2.4.0",
     "@sentry/react": "^10.78.0",
     "@supabase/supabase-js": "^2.119.0",
     "@tanstack/react-query": "^5.107.1",

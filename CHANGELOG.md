@@ -10,7 +10,19 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **An assistant can search, ask and list one's files over MCP** (ADR 0020,
+  step M1). `/mcp` speaks the Model Context Protocol with three tools that
+  only read: `search_files` finds files by meaning, as the dashboard's search
+  does; `ask_files` answers a question from the pieces of the files, as
+  `/ask` does, whole and with its sources; `list_files` lists the files and
+  their folders. They spend the same daily budgets as the pages, and a file's
+  text comes back marked as data, never instructions. Clients of the
+  2026-07-28 revision and of the 2025 ones are served alike, a request at a
+  time, with no session. A demo account is refused. Until sign-in through
+  OAuth (M2), `/mcp` takes the token the app already holds, for trying it with
+  the MCP Inspector or Claude Code; nothing points an assistant at it yet.
 
 ## [4.17.1] — 2026-11-25
 
