@@ -35,3 +35,4 @@ piece ships.
 | [0017](0017-the-server-weighs-an-upload.md)      | The server weighs an upload before it counts                     | v4.16.0  |
 | [0018](0018-a-nightly-reconciliation.md)         | A nightly reconciliation holds the providers to the rows         | v4.16.0  |
 | [0019](0019-questions-are-answered-from-pieces-of-the-files.md) | Questions are answered from pieces of the files, 400 characters each | v4.17.0  |
+| [0020](0020-agents-read-the-files-through-mcp.md) | Agents read the files through MCP, and an agent's token only reads | proposed |
