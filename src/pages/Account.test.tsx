@@ -135,11 +135,18 @@ beforeEach(() => {
   isNativePlatform.mockReturnValue(false);
   configured.current = ['cloudinary', 'supabase_storage', 'googledrive'];
   // Supabase's OAuth server off, as it is until ADR 0020's M2 turns it on.
-  grants.mockRejectedValue(new Error('OAuth server is disabled'));
+  grants.mockResolvedValue(null);
   revoke.mockResolvedValue(undefined);
 });
 
 describe('Account: assistants (ADR 0020)', () => {
+  it('says nothing of assistants when Supabase cannot list them either', async () => {
+    grants.mockRejectedValue(new Error('Network down'));
+    show();
+    await waitFor(() => expect(grants).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Assistants' })).toBeNull();
+  });
+
   it('says nothing of assistants while Supabase lists none to say', async () => {
     show();
     await waitFor(() => expect(grants).toHaveBeenCalled());

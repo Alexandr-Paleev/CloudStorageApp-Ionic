@@ -206,10 +206,15 @@ person's files and nothing more, wherever it is presented.**
   sent can ask for the files in their assistant's name, the consent
   phishing open registration allows. Signed out, the request waits in
   sessionStorage (`src/utils/pending-consent.ts`) and every way of signing
-  in leads back to it, Google's return address included. Its address
+  in leads back to it, Google's return address included; signed in, it
+  moves to the page's address and out of storage, so that a request walked
+  away from, or expired, does not lead every later sign-in of the tab back
+  here. Its address
   carries the id in its query, which keeps the collectors from starting and
   Sentry from keeping it ([0015](0015-collectors-are-told-paths.md)).
   A demo account sees why it cannot connect one and may only deny. The
   account page lists the grants (`listGrants`) and revokes one; it shows
-  the section only when Supabase answers, so nothing appears until the
-  OAuth server is on.
+  the section only when Supabase answers with a list, so nothing appears
+  until the OAuth server is on. Its endpoints answer 404 until then, read as
+  no list rather than as an error, which every query reports to Google
+  Analytics; M2c checks the 404 on a local Supabase with the server off.

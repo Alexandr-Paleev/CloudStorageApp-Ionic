@@ -15,6 +15,7 @@ import { isDemoEmail } from '@cloud-storage/core/demo-address';
 import { useAuth } from '../contexts/AuthContext';
 import assistantsService, { leaveFor, whereBack } from '../services/assistants.service';
 import {
+  CONSENT_PATH,
   clearPendingConsent,
   isAuthorizationId,
   leavePendingConsent,
@@ -54,6 +55,17 @@ const OAuthConsent: React.FC = () => {
     leavePendingConsent(id);
     navigate('/login', { replace: true });
   }, [loading, user, id, navigate]);
+
+  /* Signed in: the request moves to the address, where a reload finds it,
+     and out of sessionStorage, which leads every sign-in of this tab back
+     here. Left there, a request walked away from, or expired, would. */
+  useEffect(() => {
+    if (!user || !id) return;
+    clearPendingConsent();
+    if (fromAddress !== id) {
+      navigate(`${CONSENT_PATH}?authorization_id=${encodeURIComponent(id)}`, { replace: true });
+    }
+  }, [user, id, fromAddress, navigate]);
 
   const pending = useQuery({
     queryKey: ['oauth-request', id, user?.id],
@@ -116,6 +128,9 @@ const OAuthConsent: React.FC = () => {
               The request may have expired: start again from the assistant.
             </p>
           </IonText>
+          <IonButton expand="block" fill="outline" onClick={() => navigate('/dashboard')}>
+            Go to your files
+          </IonButton>
         </section>
       );
     }

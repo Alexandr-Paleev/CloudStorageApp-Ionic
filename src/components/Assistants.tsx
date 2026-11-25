@@ -9,8 +9,9 @@ import { formatDate } from '../utils/format.utils';
  * tokens at Supabase, and `/mcp` asks Supabase about every token, so its
  * next request is refused.
  *
- * Shown only when Supabase answers: until its OAuth server is turned on,
- * there is nothing to list, and a card saying an error would only say that.
+ * Shown only when Supabase answers with a list: until its OAuth server is
+ * turned on there is none (null), and a card saying an error would only say
+ * that.
  */
 const Assistants: React.FC = () => {
   const queryClient = useQueryClient();

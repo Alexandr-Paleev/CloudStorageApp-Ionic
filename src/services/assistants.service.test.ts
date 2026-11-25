@@ -112,6 +112,16 @@ describe('assistantsService (ADR 0020)', () => {
     expect(oauth.revokeGrant).toHaveBeenCalledWith({ clientId: 'c-1' });
   });
 
+  it('lists nothing, quietly, where Supabase has no OAuth server to ask', async () => {
+    // Its endpoints are not there until it is on; an error would reach GA4
+    // from every visit of the account page.
+    oauth.listGrants.mockResolvedValue({
+      data: null,
+      error: { message: 'Not Found', status: 404 },
+    });
+    await expect(assistantsService.grants()).resolves.toBeNull();
+  });
+
   it('throws when the grants cannot be listed, so the account page shows none', async () => {
     oauth.listGrants.mockResolvedValue({ data: null, error: { message: 'disabled' } });
     await expect(assistantsService.grants()).rejects.toThrow('disabled');

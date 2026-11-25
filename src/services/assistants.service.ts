@@ -108,8 +108,15 @@ const assistantsService = {
     return placeToGo(data.redirect_url);
   },
 
-  async grants(): Promise<Grant[]> {
+  /**
+   * The grants, or null where Supabase has no OAuth server to ask: its
+   * endpoints answer 404 until it is turned on. Null rather than an error,
+   * which every query reports to Google Analytics (query-client.ts), once
+   * for each visit of the account page.
+   */
+  async grants(): Promise<Grant[] | null> {
     const { data, error } = await supabase.auth.oauth.listGrants();
+    if ((error as { status?: number } | null)?.status === 404) return null;
     if (error || !data) throw failed(error, 'Could not list the assistants.');
     return data.map((grant) => ({
       clientId: grant.client.id,

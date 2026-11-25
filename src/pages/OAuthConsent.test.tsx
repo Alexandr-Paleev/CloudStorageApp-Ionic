@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import OAuthConsent from './OAuthConsent';
 import { renderWithProviders } from '../test/utils';
 import { leavePendingConsent, pendingConsent } from '../utils/pending-consent';
@@ -40,10 +40,24 @@ const REQUEST = {
   },
 };
 
+/** Where the page has put itself. */
+function Address() {
+  const { pathname, search } = useLocation();
+  return <output>{pathname + search}</output>;
+}
+
 function show(route = '/oauth/consent?authorization_id=auth-1') {
   return renderWithProviders(
     <Routes>
-      <Route path="/oauth/consent" element={<OAuthConsent />} />
+      <Route
+        path="/oauth/consent"
+        element={
+          <>
+            <OAuthConsent />
+            <Address />
+          </>
+        }
+      />
       <Route path="/login" element={<p>Sign in</p>} />
       <Route path="/dashboard" element={<p>Your files</p>} />
     </Routes>,
@@ -120,12 +134,15 @@ describe('OAuthConsent (ADR 0020)', () => {
     expect(pending).not.toHaveBeenCalled();
   });
 
-  it('picks the request up again after signing in, from where it was left', async () => {
+  it('picks the request up again after signing in, and moves it to the address', async () => {
     // Google comes back to /oauth/consent with no id in the address.
     leavePendingConsent('auth-1');
     show('/oauth/consent');
     expect(await screen.findByText('Claude')).toBeTruthy();
     expect(pending).toHaveBeenCalledWith('auth-1');
+    expect(await screen.findByText('/oauth/consent?authorization_id=auth-1')).toBeTruthy();
+    // Out of sessionStorage: walked away from, it must not lead the next sign-in here.
+    expect(pendingConsent()).toBeNull();
   });
 
   it('goes straight back when the request was answered before', async () => {
@@ -144,12 +161,16 @@ describe('OAuthConsent (ADR 0020)', () => {
     expect(pending).not.toHaveBeenCalled();
   });
 
-  it('says what went wrong when the request cannot be read', async () => {
+  it('says what went wrong when the request cannot be read, and offers a way on', async () => {
+    leavePendingConsent('auth-1');
     pending.mockRejectedValue(new Error('authorization request expired'));
     show();
     expect((await screen.findByRole('alert')).textContent).toContain(
       'authorization request expired'
     );
+    expect(pendingConsent()).toBeNull();
+    fireEvent.click(button('Go to your files'));
+    expect(await screen.findByText('Your files')).toBeTruthy();
   });
 
   it('signs out to answer as another account, and keeps the request', async () => {
