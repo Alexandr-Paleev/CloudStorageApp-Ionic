@@ -40,10 +40,13 @@ const BUDGETS = {
      app never renders, and 241.5 on Ionic 8 before that. */
   largestChunk: 185,
 
-  /* Everything under dist/assets, route chunks included: 461.1 kB today.
+  /* Everything under dist/assets, route chunks included: 483.1 kB today.
      Sentry (48.5) sits here rather than in the first load, and this is what
-     would catch it quietly moving back. */
-  total: 480,
+     would catch it quietly moving back. Raised from 480 on 2026-11-25, at
+     478.7, for the page that lets an assistant in and the assistants on the
+     account page (ADR 0020): 3.7 kB of route chunks, 0.2 kB of the first
+     load. */
+  total: 490,
 };
 
 function gzipped(file) {

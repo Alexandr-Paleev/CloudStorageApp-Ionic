@@ -19,6 +19,7 @@ import { allowCollectors, refuseCollectors } from '../analytics/collectors';
 import { collectorsConfigured, onConsentChange, readConsent } from '../analytics/consent';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
+import Assistants from '../components/Assistants';
 import accountService from '../services/account.service';
 import billingService from '../services/billing.service';
 import storageService from '../services/storage.service';
@@ -211,6 +212,8 @@ const Account: React.FC = () => {
               </IonText>
             )}
           </section>
+
+          <Assistants />
 
           {collectorsConfigured() && (
             <section className="account-card">

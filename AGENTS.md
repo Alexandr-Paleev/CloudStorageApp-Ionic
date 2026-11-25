@@ -55,7 +55,8 @@ src/
 ├── native/          # Capacitor-only code (deep links for OAuth in the shell)
 ├── observability/   # Sentry bootstrap (loads when idle)
 ├── pages/           # Route pages (Dashboard, Login, PasswordReset, Upload, FileView, Ask,
-│                    # Account, Pricing, SubscriptionSuccess, DropboxCallback, Legal, NotFound)
+│                    # Account, Pricing, SubscriptionSuccess, DropboxCallback, Legal, NotFound,
+│                    # OAuthConsent)
 ├── providers/       # Storage provider abstraction layer
 │   └── impl/        # CloudinaryProvider, R2Provider, GoogleDriveProvider, SupabaseStorageProvider, DropboxProvider
 ├── schemas/         # Zod schemas (file metadata)

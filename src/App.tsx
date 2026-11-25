@@ -11,6 +11,7 @@ import { ConsentBanner } from './components/ConsentBanner';
 import { PageViewTracker } from './components/PageViewTracker';
 import { useHotjarStateChange } from './analytics/hotjar';
 import { NEW_PASSWORD_PATH } from './utils/password-reset.utils';
+import { CONSENT_PATH } from './utils/pending-consent';
 import { lazyPage } from './utils/lazy-page';
 /* Not lazy, unlike every other page. It is the page a new visitor sees
    first, and a lazy page is fetched only once the app has started: one more
@@ -52,6 +53,7 @@ const DropboxCallback = lazyPage(() => import('./pages/DropboxCallback'));
 const NotFound = lazyPage(() => import('./pages/NotFound'));
 const Legal = lazyPage(() => import('./pages/Legal'));
 const PasswordReset = lazyPage(() => import('./pages/PasswordReset'));
+const OAuthConsent = lazyPage(() => import('./pages/OAuthConsent'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -84,6 +86,10 @@ const App: React.FC = () => (
                   are kept for whoever still has them, and lead there. */}
                 <Route path="/terms" element={<Legal document="terms" />} />
                 <Route path="/privacy" element={<Legal document="privacy" />} />
+                {/* Where Supabase Auth sends a person whose assistant is
+                  signing in (ADR 0020). Not a PrivateRoute: signed out, the
+                  page keeps the request and sends them to sign in first. */}
+                <Route path={CONSENT_PATH} element={<OAuthConsent />} />
                 {/* There is no route for a share link. Links are opened on
                   the site, and one that arrives here at `/s/` and a token is
                   sent on from `main.tsx`, before any of this is rendered. */}

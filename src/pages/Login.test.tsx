@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import Login from './Login';
+import { leavePendingConsent } from '../utils/pending-consent';
 import { renderWithProviders } from '../test/utils';
 import { whereHotjarWouldRead } from '../test/hotjar';
 import { SITE_ORIGIN } from '@cloud-storage/core/origins';
@@ -97,6 +98,7 @@ function ionButtonByText(text: string): HTMLElement {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   user.current = null;
   login.mockResolvedValue(undefined);
   // As this project answers a sign-up: the address is to be confirmed first.
@@ -105,6 +107,18 @@ beforeEach(() => {
 });
 
 describe('Login', () => {
+  it('goes back to an assistant’s waiting sign-in, and says why it is here (ADR 0020)', async () => {
+    leavePendingConsent('auth-1');
+    show();
+    expect(screen.getByText(/An assistant asks to read your files/)).toBeInTheDocument();
+
+    type('Email Address', 'someone@example.com');
+    type('Password', 'correct horse');
+    submit();
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/oauth/consent'));
+  });
+
   it('signs in with what was typed, and leaves for the dashboard', async () => {
     show();
     type('Email Address', 'someone@example.com');
