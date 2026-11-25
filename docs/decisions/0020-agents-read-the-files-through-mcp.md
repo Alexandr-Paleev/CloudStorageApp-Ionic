@@ -59,19 +59,26 @@ person's files and nothing more, wherever it is presented.**
   its protected resource metadata, which says where to sign in. The app hosts
   the consent page Supabase sends the person to (`/oauth/consent`): which
   assistant asks, and that it will read and search their files. A demo account
-  is refused there, since it is gone within a day and the connection would
-  outlive it.
+  is refused by `/mcp` (`isDemoEmail`, as indexing refuses one), since it is
+  gone within a day and the connection would outlive it; the consent page
+  says so before asking. The page alone cannot refuse it: approving is a call
+  the browser makes to Supabase with the person's session, and a demo can
+  make it without the page.
 - **An agent's token only reads.** Supabase issues an agent the same kind of
   JWT the browser holds, with one claim more, `client_id`. Without more, that
   token could do anything the person can: write and delete `files` and
   `folders` rows, upload and delete their objects in Storage, create a share
-  link, erase the account. So, before the OAuth server is turned on:
+  link, erase the account; and read, straight from the database, what the
+  person's own pages read besides the files: the profile with its Stripe
+  customer and subscription ids, and the share links. So, before the OAuth
+  server is turned on:
   - every route but `/mcp` refuses a token that carries `client_id`;
   - a migration adds a restrictive policy to `files`, `folders` and
     `storage.objects` that refuses a write by a token that carries one, as
     [migration 020](../../migrations/020_server_records_hosted_uploads.sql)
-    refuses a browser's insert of a hosted upload; the four policies that
-    let a person write today stay as they are;
+    refuses a browser's insert of a hosted upload, and one to `profiles` and
+    `shared_links` that refuses it any read, since no tool needs either; the
+    policies a person reads and writes by today stay as they are;
   - `/mcp` accepts only a token that does carry one, so a browser's session
     is not an agent's;
   - Supabase Auth's own endpoints take the token too, and nothing of ours
@@ -105,7 +112,10 @@ person's files and nothing more, wherever it is presented.**
   closes it.
 - **The person can take access back.** A grant lasts until revoked; the
   account page lists the assistants given access and revokes one
-  (`getUserGrants`, `revokeGrant`).
+  (`getUserGrants`, `revokeGrant`). An access token is a JWT that lasts its
+  hour; `/mcp` asks Supabase about each one (`getUser`) rather than check its
+  signature alone, and M2 checks that a revoked assistant's token is refused
+  at once, not when it expires.
 - **`api/ai` gets heavier.** The SDK joins the function every AI route loads,
   and its cold start is measured before and after.
 
