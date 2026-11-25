@@ -21,9 +21,10 @@ Three things shape how:
   used ([0008](0008-two-actions-one-function.md)).
 - **The free path stays free** for any account, on Workers AI, inside the same
   daily budgets ([migration 017](../../migrations/017_bound_ai_spend.sql)).
-- **A remote MCP server is an OAuth 2.1 resource server.** The protocol has
-  the client find the server's authorization server, register, and send the
-  person to sign in and consent.
+- **A remote MCP server that needs a sign-in is an OAuth 2.1 resource
+  server.** The protocol makes authorization optional, and where a server
+  asks for it, the client finds the server's authorization server, registers,
+  and sends the person to sign in and consent.
 
 ## Decision
 
@@ -66,10 +67,17 @@ person's files and nothing more, wherever it is presented.**
   `folders` rows, upload and delete their objects in Storage, create a share
   link, erase the account. So, before the OAuth server is turned on:
   - every route but `/mcp` refuses a token that carries `client_id`;
-  - a migration makes every policy that writes (`files`, `folders`,
-    `storage.objects` insert and delete) require that the token carry none;
+  - a migration adds a restrictive policy to `files`, `folders` and
+    `storage.objects` that refuses a write by a token that carries one, as
+    [migration 020](../../migrations/020_server_records_hosted_uploads.sql)
+    refuses a browser's insert of a hosted upload; the four policies that
+    let a person write today stay as they are;
   - `/mcp` accepts only a token that does carry one, so a browser's session
-    is not an agent's.
+    is not an agent's;
+  - Supabase Auth's own endpoints take the token too, and nothing of ours
+    stands in front of them: with a real agent's token, M2 checks that it
+    cannot change the account's email or password, or approve another
+    client's request. Until each is shown refused, the OAuth server stays off.
 - **A file's text is data.** The tools return it marked as the person's file
   content, never instructions, and each tool's description says so.
 
@@ -105,9 +113,9 @@ person's files and nothing more, wherever it is presented.**
 
 - **Personal access tokens,** made on the account page and pasted into an
   assistant's settings, stored hashed like share tokens
-  ([0003](0003-share-tokens-are-stored-hashed.md)). Simpler, but Claude's
-  connectors sign in only with OAuth, and a pasted token lives in a config
-  file.
+  ([0003](0003-share-tokens-are-stored-hashed.md)). Simpler, but an
+  assistant on the web is connected by signing in, not by pasting, and a
+  pasted token lives in a config file with no consent page in front of it.
 - **An authorization server of our own.** The SDK's is frozen in a legacy
   package, and issuing tokens is the part of this most costly to get wrong.
 - **A local server over stdio,** run on the person's machine. It needs their
