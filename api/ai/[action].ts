@@ -40,12 +40,15 @@ import {
   AI_EMBED_LIMIT,
   AI_INDEX_LIMIT,
   AI_IP_LIMIT,
+  MCP_IP_LIMIT,
+  MCP_LIMIT,
   RateLimiter,
   clientIp,
   tooManyRequests,
 } from '../../libs/server/src/rate-limit';
 import { applyCors } from '../../libs/server/src/cors';
 import { report } from '../../libs/server/src/report';
+import { mcpChallenge, protectedResourceMetadata } from '../../libs/server/src/mcp-resource';
 import {
   ToolRefusal,
   folderPaths,
@@ -61,6 +64,9 @@ import {
  *   POST /api/ai/ask     answer a question from the pieces nearest to it (ADR 0019)
  *   POST /mcp            the same search and answer, and a listing, as tools an
  *                        assistant calls (ADR 0020); vercel.json rewrites it here
+ *   GET  /.well-known/oauth-protected-resource/mcp
+ *                        where an assistant signs in for /mcp (RFC 9728), as
+ *                        action `resource`
  *
  * One file for both, because Vercel makes a function out of every file under
  * api/ and the Hobby plan allows twelve — this is the twelfth. See
@@ -82,6 +88,8 @@ const byAddress = new RateLimiter(AI_IP_LIMIT);
 const byIndexingUser = new RateLimiter(AI_INDEX_LIMIT);
 const byEmbeddingUser = new RateLimiter(AI_EMBED_LIMIT);
 const byAskingUser = new RateLimiter(AI_ASK_LIMIT);
+const byMcpAddress = new RateLimiter(MCP_IP_LIMIT);
+const byMcpUser = new RateLimiter(MCP_LIMIT);
 
 /** Long enough to fetch a file, short enough that nothing else can use it. */
 const READ_URL_TTL = 300;
@@ -811,25 +819,64 @@ async function answerMcp(req: VercelRequest, res: VercelResponse, userId: string
   );
 }
 
+/**
+ * Where an assistant signs in for `/mcp` (RFC 9728). Public, and read by any
+ * page: an assistant in a browser, the MCP Inspector, fetches it from its own
+ * origin before it has a token, so it is told it may, preflight included.
+ * Nothing here is a secret; the project's URL is in the app's bundle already.
+ */
+function answerResourceMetadata(req: VercelRequest, res: VercelResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    res.status(405).json({ message: 'Method not allowed' });
+    return;
+  }
+  const supabaseUrl = process.env.SUPABASE_URL;
+  if (!supabaseUrl) throw new Error('SUPABASE_URL is not configured');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.status(200).json(protectedResourceMetadata(req.headers.host ?? 'localhost', supabaseUrl));
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
+
+  // Before CORS: its allowlist is the app's shells, and this is for anyone.
+  if (action === 'resource') {
+    answerResourceMetadata(req, res);
+    return;
+  }
+
   if (applyCors(req, res)) return;
 
   if (req.method !== 'POST') {
+    // `/mcp` included: with no session, there is no stream to GET (the MCP
+    // transport's own answer, 405, with what is allowed).
+    res.setHeader('Allow', 'POST');
     res.status(405).json({ message: 'Method not allowed' });
     return;
   }
 
+  /* `/mcp` counts by account once the token is checked (MCP_LIMIT): many
+     people's assistants can come from one address. */
   const ip = clientIp(req.headers, req.socket?.remoteAddress);
-  if (!byAddress.allow(ip)) {
+  const addresses = action === 'mcp' ? byMcpAddress : byAddress;
+  if (!addresses.allow(ip)) {
     tooManyRequests(
       res,
-      byAddress.retryAfterSeconds(ip),
+      addresses.retryAfterSeconds(ip),
       'Too many requests. Try again in a minute.'
     );
     return;
   }
 
-  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
   /* What a report says the failure was in: one of the actions, or the
      function for a segment that is none of them. */
   const route =
@@ -842,7 +889,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       : 'ai';
 
   try {
-    const user = await authenticate(req);
+    // An assistant's token at /mcp only, a person's everywhere else (ADR 0020).
+    const user = await authenticate(req, action === 'mcp' ? 'agent' : 'person');
     const userId = user.id;
 
     if (action === 'index') {
@@ -879,11 +927,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    /* An assistant's tools (ADR 0020). Until the OAuth server is on (M2) it
-       takes the token the app holds, for trying it with the MCP Inspector
-       and Claude Code. A demo account is refused: it is gone within a day,
-       and an assistant connected to it would outlive it. */
+    /* An assistant's tools (ADR 0020), for a token Supabase's OAuth server
+       issued it. A demo account is refused: it is gone within a day, and an
+       assistant connected to it would outlive it. */
     if (action === 'mcp') {
+      if (!byMcpUser.allow(userId)) {
+        tooManyRequests(
+          res,
+          byMcpUser.retryAfterSeconds(userId),
+          'Too many requests. Try again in a minute.'
+        );
+        return;
+      }
       if (isDemoEmail(user.email)) {
         res.status(403).json({
           message:
@@ -963,6 +1018,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (!(error instanceof AuthError)) await report(error, { route });
+    /* Where to sign in, for an assistant that has no token /mcp takes yet:
+       this is what starts its OAuth flow (RFC 9728). */
+    if (error instanceof AuthError && action === 'mcp') {
+      res.setHeader(
+        'WWW-Authenticate',
+        mcpChallenge(req.headers.host ?? 'localhost', Boolean(req.headers.authorization))
+      );
+    }
     res.status(error instanceof AuthError ? 401 : 500).json({
       message: error instanceof Error ? error.message : 'Unknown server error',
     });

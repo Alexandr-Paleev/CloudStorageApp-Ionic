@@ -20,9 +20,17 @@ reasoning behind the larger decisions lives in
   their folders. They spend the same daily budgets as the pages, and a file's
   text comes back marked as data, never instructions. Clients of the
   2026-07-28 revision and of the 2025 ones are served alike, a request at a
-  time, with no session. A demo account is refused. Until sign-in through
-  OAuth (M2), `/mcp` takes the token the app already holds, for trying it with
-  the MCP Inspector or Claude Code; nothing points an assistant at it yet.
+  time, with no session. A demo account is refused.
+- **A token issued to an assistant only reads** (ADR 0020, step M2, before
+  the OAuth server is turned on). `/mcp` takes only a token Supabase's OAuth
+  server issued an assistant, and every other route refuses one. Migration
+  024 keeps such a token from writing `files`, `folders` or the bucket's
+  objects and from reading the profile or the share links. `/mcp` answers a
+  request without one 401 with `WWW-Authenticate`, naming its protected
+  resource metadata at `/.well-known/oauth-protected-resource/mcp`, which
+  says to sign in through Supabase Auth; any other `/.well-known/` path is a
+  404, not the app's page. `/mcp` is limited per account, not
+  per address, since the assistants on the web share a few.
 
 ## [4.17.1] — 2026-11-25
 

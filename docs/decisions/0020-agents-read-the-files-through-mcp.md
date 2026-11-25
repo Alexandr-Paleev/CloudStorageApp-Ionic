@@ -169,3 +169,27 @@ person's files and nothing more, wherever it is presented.**
   already loads (55 ms and 26 ms, on a laptop); it is imported only for
   `/mcp`, so the pages' requests to the function load none of it at a cold
   start. The token is still the app's own, as the step says.
+- **M2, the token rules (2026-11-25).** `authenticate` in
+  `libs/server/src/auth.ts`, through which every route checks a token,
+  takes a `caller`: `'person'` everywhere, which refuses a token with
+  `client_id`, and `'agent'` at `/mcp`, which takes only one; the claim is
+  read from the payload after `getUser` has accepted the token. Any value
+  of the claim but none is an assistant's, as the database reads it.
+  Migration 024 adds the restrictive policies: no insert, update or delete
+  on `files`, `folders` and `storage.objects`, nothing at all on `profiles`
+  and `shared_links`, for a token whose `client_id` is not null. It was
+  run, twice, against Postgres with the tables' permissive policies, and
+  probed as an assistant and as the person. `/mcp` answers 401 with
+  `WWW-Authenticate: Bearer resource_metadata=…, scope="email"`; the
+  metadata, an action `resource` of the same function, names
+  `/mcp` at the host asked and `<SUPABASE_URL>/auth/v1` as its
+  authorization server, and any page may read it. `email` is the scope
+  asked for: no tool needs an ID token, which `openid` asks for and which
+  Supabase signs only with an asymmetric key (production signs with ES256,
+  so a fork on the shared secret is the one it would fail). Every other
+  `/.well-known/` path answers 404 rather than the app's page, so a client
+  looking for an authorization server here, as 2025-03-26 clients did, is
+  told there is none. `/mcp` is limited per account, 120 a minute, and
+  per address only at ten times the pages' limit: an assistant on the web
+  calls from a few addresses all its users share. From this deployment on,
+  `/mcp` takes no token at all until the OAuth server issues one.

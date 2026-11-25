@@ -23,6 +23,38 @@ const supabase = createClient(requireEnv('SUPABASE_URL'), requireServiceRoleKey(
 export interface AuthenticatedUser {
   id: string;
   email?: string;
+  /** The assistant the token was issued to, for a token from Supabase's OAuth server. */
+  clientId?: string;
+}
+
+/**
+ * Who may present a token to a route (ADR 0020). A person's session, from the
+ * app's own sign-in, everywhere but `/mcp`; an assistant's, issued through
+ * Supabase's OAuth server and carrying `client_id`, at `/mcp` alone, where
+ * every tool only reads.
+ */
+export type Caller = 'person' | 'agent';
+
+/**
+ * The `client_id` claim of a token `getUser` has just accepted. Read from the
+ * payload without checking the signature again: Supabase did, and a payload
+ * altered after signing would not have been accepted.
+ *
+ * Any value but none is an assistant's, as migration 024 reads it
+ * (`auth.jwt() ->> 'client_id' IS NULL` is a person): one rule here and in
+ * the database, so no token is a person to one and an assistant to the other.
+ */
+function clientIdOf(token: string): string | undefined {
+  const payload = token.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const clientId = (claims as { client_id?: unknown } | null)?.client_id;
+    if (clientId === undefined || clientId === null) return undefined;
+    return typeof clientId === 'string' ? clientId : JSON.stringify(clientId);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -31,8 +63,18 @@ export interface AuthenticatedUser {
  * `getUser` returns the whole record, and most routes want only the id — but
  * the email is what tells a demo account from a real one, and asking for it
  * separately would be a second round trip for something already in hand.
+ * Asking Supabase rather than checking the signature alone is also what makes
+ * a revoked assistant's token stop working before its hour is up.
+ *
+ * An assistant's token is a JWT of the same kind as the person's, with one
+ * claim more; without this check it could do here whatever the person can,
+ * delete files and erase the account included. So every route refuses it,
+ * and `/mcp`, which asks for `'agent'`, refuses everything else.
  */
-export async function authenticate(req: VercelRequest): Promise<AuthenticatedUser> {
+export async function authenticate(
+  req: VercelRequest,
+  caller: Caller = 'person'
+): Promise<AuthenticatedUser> {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) throw new AuthError('Missing authorization token');
 
@@ -41,7 +83,15 @@ export async function authenticate(req: VercelRequest): Promise<AuthenticatedUse
     error,
   } = await supabase.auth.getUser(token);
   if (error || !user) throw new AuthError('Invalid or expired token');
-  return { id: user.id, email: user.email };
+
+  const clientId = clientIdOf(token);
+  if (caller === 'person' && clientId !== undefined) {
+    throw new AuthError('A token issued to an assistant only reads files, through /mcp');
+  }
+  if (caller === 'agent' && clientId === undefined) {
+    throw new AuthError('/mcp takes a token issued to an assistant: connect it to sign in');
+  }
+  return { id: user.id, email: user.email, ...(clientId !== undefined && { clientId }) };
 }
 
 export async function authenticateUser(req: VercelRequest): Promise<string> {

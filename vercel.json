@@ -83,7 +83,12 @@
   "rewrites": [
     { "source": "/mcp", "destination": "/api/ai/mcp" },
     {
-      "source": "/((?!api/|assets/|fonts/).*)",
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "/api/ai/resource"
+    },
+    { "source": "/.well-known/oauth-protected-resource", "destination": "/api/ai/resource" },
+    {
+      "source": "/((?!api/|assets/|fonts/|\\.well-known/).*)",
       "destination": "/index.html"
     }
   ]

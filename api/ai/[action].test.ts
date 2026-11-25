@@ -10,6 +10,8 @@ import {
   AI_ASK_LIMIT,
   AI_EMBED_LIMIT,
   AI_INDEX_LIMIT,
+  AI_IP_LIMIT,
+  MCP_LIMIT,
   resetRateLimits,
 } from '../../libs/server/src/rate-limit';
 import { AI_DAILY_LIMITS } from '../../libs/server/src/ai-budget';
@@ -1323,12 +1325,68 @@ describe('mcp (ADR 0020)', () => {
     expect(db.calls).toEqual([]);
   });
 
-  it('answers a request with no valid token 401, before the protocol', async () => {
-    authenticate.mockRejectedValue(new FakeAuthError('Missing authorization token'));
+  const header = (res: ReturnType<typeof mockResponse>, name: string) =>
+    vi.mocked(res.setHeader).mock.calls.find(([n]) => n === name)?.[1];
+
+  it('answers a request with no valid token 401, before the protocol, saying where to sign in', async () => {
+    authenticate.mockRejectedValue(new FakeAuthError('Invalid or expired token'));
     const res = mockResponse();
     await handler(toolCall('list_files', {}), res);
     expect(res.statusCode).toBe(401);
     expect(res.written).toEqual([]);
+    expect(header(res, 'WWW-Authenticate')).toBe(
+      'Bearer error="invalid_token", ' +
+        'resource_metadata="https://app.example/.well-known/oauth-protected-resource/mcp", ' +
+        'scope="email"'
+    );
+  });
+
+  it('tells a request that sent no token where to sign in, without calling it invalid', async () => {
+    authenticate.mockRejectedValue(new FakeAuthError('Missing authorization token'));
+    const req = toolCall('list_files', {});
+    delete req.headers.authorization;
+    const res = mockResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
+    expect(header(res, 'WWW-Authenticate')).toBe(
+      'Bearer resource_metadata="https://app.example/.well-known/oauth-protected-resource/mcp", ' +
+        'scope="email"'
+    );
+  });
+
+  it('asks for an assistant’s token, and every other action for a person’s', async () => {
+    await call('list_files');
+    expect(authenticate).toHaveBeenLastCalledWith(expect.anything(), 'agent');
+
+    await handler(mockRequest({ query: { action: 'model' } }), mockResponse());
+    expect(authenticate).toHaveBeenLastCalledWith(expect.anything(), 'person');
+  });
+
+  it('says nothing of signing in on a 401 from the pages’ actions', async () => {
+    authenticate.mockRejectedValue(new FakeAuthError('Invalid or expired token'));
+    const res = mockResponse();
+    await handler(mockRequest({ query: { action: 'embed' }, body: { text: 'x' } }), res);
+    expect(res.statusCode).toBe(401);
+    expect(header(res, 'WWW-Authenticate')).toBeUndefined();
+  });
+
+  it('counts by account, not by the address many assistants share', async () => {
+    // One address, many accounts: past the pages' limit for an address.
+    for (let i = 0; i < AI_IP_LIMIT + 5; i++) {
+      authenticate.mockResolvedValue({ id: `user-${i}`, email: 'alex@example.com', clientId: 'c' });
+      const res = mockResponse();
+      await handler(toolCall('list_files', {}), res);
+      expect(res.statusCode).toBe(200);
+    }
+
+    // One account: refused past its own.
+    authenticate.mockResolvedValue({ id: 'user-1', email: 'alex@example.com', clientId: 'c' });
+    for (let i = 0; i < MCP_LIMIT - 1; i++)
+      await handler(toolCall('list_files', {}), mockResponse());
+    const res = mockResponse();
+    await handler(toolCall('list_files', {}), res);
+    expect(res.statusCode).toBe(429);
+    expect(header(res, 'Retry-After')).toBeDefined();
   });
 
   describe('search_files', () => {
@@ -1507,5 +1565,49 @@ describe('mcp (ADR 0020)', () => {
       expect(result.files).toHaveLength(1);
       expect(result.more).toBe(true);
     });
+  });
+});
+
+describe('the protected resource metadata (ADR 0020)', () => {
+  beforeEach(() => vi.stubEnv('SUPABASE_URL', 'https://project.supabase.co/'));
+  afterEach(() => vi.unstubAllEnvs());
+
+  const metadata = (method = 'GET', headers: Record<string, string> = {}) =>
+    mockRequest({
+      method,
+      query: { action: 'resource' },
+      headers: { host: 'app.example', ...headers },
+    });
+
+  const header = (res: ReturnType<typeof mockResponse>, name: string) =>
+    vi.mocked(res.setHeader).mock.calls.find(([n]) => n === name)?.[1];
+
+  it('names /mcp at the host asked and Supabase Auth as where to sign in, with no token', async () => {
+    const res = mockResponse();
+    await handler(metadata('GET', { origin: 'https://inspector.example' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      resource: 'https://app.example/mcp',
+      authorization_servers: ['https://project.supabase.co/auth/v1'],
+      bearer_methods_supported: ['header'],
+      scopes_supported: ['email'],
+      resource_name: 'Cloud Storage',
+    });
+    expect(header(res, 'Access-Control-Allow-Origin')).toBe('*');
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it('answers any page’s preflight, and nothing but a read', async () => {
+    const preflight = mockResponse();
+    await handler(metadata('OPTIONS', { origin: 'https://inspector.example' }), preflight);
+    expect(preflight.statusCode).toBe(204);
+    expect(header(preflight, 'Access-Control-Allow-Origin')).toBe('*');
+    expect(header(preflight, 'Access-Control-Allow-Headers')).toBe('*');
+
+    const post = mockResponse();
+    await handler(metadata('POST'), post);
+    expect(post.statusCode).toBe(405);
+    expect(header(post, 'Allow')).toBe('GET');
   });
 });
