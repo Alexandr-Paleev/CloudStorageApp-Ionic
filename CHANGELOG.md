@@ -31,6 +31,14 @@ reasoning behind the larger decisions lives in
   says to sign in through Supabase Auth; any other `/.well-known/` path is a
   404, not the app's page. `/mcp` is limited per account, not
   per address, since the assistants on the web share a few.
+- **A page to let an assistant in, and a list to take it back** (ADR 0020,
+  step M2). `/oauth/consent` is where Supabase Auth sends a person whose
+  assistant is signing in: the assistant's name, the address the answer goes
+  back to, what it will and will not be able to do, and a warning that a
+  link someone sent can ask in their assistant's name. Signed out, the page
+  keeps the request, and signing in, by password or Google, comes back to
+  it. A demo account can only deny. The account page lists the assistants
+  let in, and revokes one; it shows nothing until the OAuth server is on.
 
 ## [4.17.1] — 2026-11-25
 

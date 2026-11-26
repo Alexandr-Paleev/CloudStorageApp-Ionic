@@ -159,6 +159,16 @@ describe('signing in with Google', () => {
     expect(browserOpen).not.toHaveBeenCalled();
   });
 
+  it('comes back to an assistant’s waiting sign-in, if one sent them to sign in (ADR 0020)', async () => {
+    sessionStorage.setItem('pending-consent', 'auth-1');
+    try {
+      await authService.signInWithGoogle();
+      expect(optionsUsed().redirectTo).toBe(window.location.origin + '/oauth/consent');
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
   it('comes back to the deep link in the shell, and opens the system browser', async () => {
     isNativePlatform.mockReturnValue(true);
 

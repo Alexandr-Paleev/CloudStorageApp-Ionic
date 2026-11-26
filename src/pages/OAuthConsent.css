@@ -1,0 +1,67 @@
+.consent-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+/* The assistant's name, as it registered itself: the thing the person is
+   asked about, so the largest thing on the card. */
+.consent-client {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+
+.consent-text {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.consent-warning {
+  font-weight: 600;
+}
+
+.consent-place {
+  word-break: break-all;
+}
+
+.consent-subheading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 4px;
+}
+
+.consent-list {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+
+.consent-who {
+  color: var(--ion-color-medium-shade);
+}
+
+.consent-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ion-color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.consent-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Deny alone, for a demo account: the whole width. */
+.consent-actions > :only-child {
+  grid-column: 1 / -1;
+}

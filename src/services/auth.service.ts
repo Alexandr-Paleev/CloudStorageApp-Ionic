@@ -3,6 +3,7 @@ import type { AuthChangeEvent, User } from '@supabase/supabase-js';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { NATIVE_AUTH_CALLBACK } from '../native/deep-links';
+import { afterSignIn } from '../utils/pending-consent';
 
 export type AuthUser = User | null;
 
@@ -92,7 +93,9 @@ export const authService = {
       provider: 'google',
       options: {
         scopes: 'openid email profile https://www.googleapis.com/auth/drive.file',
-        redirectTo: native ? NATIVE_AUTH_CALLBACK : window.location.origin + '/dashboard',
+        /* Back to an assistant's waiting sign-in, if one sent them to sign
+           in (utils/pending-consent.ts). */
+        redirectTo: native ? NATIVE_AUTH_CALLBACK : window.location.origin + afterSignIn(),
         skipBrowserRedirect: native,
       },
     });

@@ -112,7 +112,7 @@ person's files and nothing more, wherever it is presented.**
   closes it.
 - **The person can take access back.** A grant lasts until revoked; the
   account page lists the assistants given access and revokes one
-  (`getUserGrants`, `revokeGrant`). An access token is a JWT that lasts its
+  (`listGrants`, `revokeGrant`). An access token is a JWT that lasts its
   hour; `/mcp` asks Supabase about each one (`getUser`) rather than check its
   signature alone, and M2 checks that a revoked assistant's token is refused
   at once, not when it expires.
@@ -193,3 +193,28 @@ person's files and nothing more, wherever it is presented.**
   per address only at ten times the pages' limit: an assistant on the web
   calls from a few addresses all its users share. From this deployment on,
   `/mcp` takes no token at all until the OAuth server issues one.
+- **M2, the consent page and the assistants (2026-11-25).** `/oauth/consent`
+  (`src/pages/OAuthConsent.tsx`) reads the request with
+  `getAuthorizationDetails` and answers it with `approveAuthorization` or
+  `denyAuthorization`, keeping supabase-js from leaving the page so that the
+  address it goes to is checked first: any scheme an assistant may come
+  back to (`https:`, `http://localhost`, an app's own), none that runs in
+  the page (`javascript:`, `data:`). The id is checked for its shape before
+  any call, since supabase-js puts it into the request's path as it is. The
+  page names the assistant as it registered and, as what a registration
+  cannot dress up, the host it goes back to; it says that a link someone
+  sent can ask for the files in their assistant's name, the consent
+  phishing open registration allows. Signed out, the request waits in
+  sessionStorage (`src/utils/pending-consent.ts`) and every way of signing
+  in leads back to it, Google's return address included; signed in, it
+  moves to the page's address and out of storage, so that a request walked
+  away from, or expired, does not lead every later sign-in of the tab back
+  here. Its address
+  carries the id in its query, which keeps the collectors from starting and
+  Sentry from keeping it ([0015](0015-collectors-are-told-paths.md)).
+  A demo account sees why it cannot connect one and may only deny. The
+  account page lists the grants (`listGrants`) and revokes one; it shows
+  the section only when Supabase answers with a list, so nothing appears
+  until the OAuth server is on. Its endpoints answer 404 until then, read as
+  no list rather than as an error, which every query reports to Google
+  Analytics; M2c checks the 404 on a local Supabase with the server off.

@@ -25,6 +25,7 @@ import './Login.css';
 import { LEGAL_URL } from '../utils/legal.utils';
 import { askAgain, collectorsConfigured } from '../analytics/consent';
 import { takeDeletionNotice } from '../utils/deletion-notice';
+import { afterSignIn, pendingConsent } from '../utils/pending-consent';
 import './Legal.css';
 
 /* Supabase's words for a password sign-in before the address is confirmed
@@ -64,6 +65,8 @@ const Login: React.FC = () => {
   /* Taken once, when the page opens: utils/deletion-notice.ts says why it is
      not in the router's state. */
   const [deleted] = useState(takeDeletionNotice);
+  /* An assistant's sign-in sent them here (utils/pending-consent.ts). */
+  const [forAssistant] = useState(() => pendingConsent() !== null);
 
   // Redirect if already logged in. Declared rather than called: navigate() here
   // is a side effect during render, which React makes no promise about — under
@@ -71,7 +74,7 @@ const Login: React.FC = () => {
   // away would still have pushed onto the history stack. Pricing.tsx does the
   // same thing this way. `replace` keeps /login out of the back history.
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={afterSignIn()} replace />;
   }
 
   /* Either request in flight locks the whole card: two sessions being opened
@@ -113,7 +116,8 @@ const Login: React.FC = () => {
       } else {
         await login(email, password);
       }
-      navigate('/dashboard');
+      // Back to an assistant's waiting sign-in, if one sent them here.
+      navigate(afterSignIn());
     } catch (err) {
       setError(sayWhy(err));
     } finally {
@@ -150,6 +154,12 @@ const Login: React.FC = () => {
                   Your account has been deleted.
                   {deleted.failures.length > 0 &&
                     ' Some of its files could not be erased straight away. That has been reported, and they will be removed.'}
+                </p>
+              )}
+              {forAssistant && (
+                <p className="login-notice">
+                  An assistant asks to read your files. Sign in, and you are asked whether to let
+                  it.
                 </p>
               )}
               {confirming && (

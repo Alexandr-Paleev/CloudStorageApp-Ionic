@@ -50,6 +50,15 @@ vi.mock('../services/account.service', () => ({
   default: { deleteAccount: (...args: unknown[]) => deleteAccount(...args) },
 }));
 
+const { grants, revoke } = vi.hoisted(() => ({ grants: vi.fn(), revoke: vi.fn() }));
+
+vi.mock('../services/assistants.service', () => ({
+  default: {
+    grants: () => grants(),
+    revoke: (...args: unknown[]) => revoke(...args),
+  },
+}));
+
 vi.mock('../services/billing.service', () => ({
   default: { createPortalSession: () => createPortalSession() },
 }));
@@ -125,6 +134,55 @@ beforeEach(() => {
   envMock.VITE_BILLING_ENABLED = true;
   isNativePlatform.mockReturnValue(false);
   configured.current = ['cloudinary', 'supabase_storage', 'googledrive'];
+  // Supabase's OAuth server off, as it is until ADR 0020's M2 turns it on.
+  grants.mockResolvedValue(null);
+  revoke.mockResolvedValue(undefined);
+});
+
+describe('Account: assistants (ADR 0020)', () => {
+  it('says nothing of assistants when Supabase cannot list them either', async () => {
+    grants.mockRejectedValue(new Error('Network down'));
+    show();
+    await waitFor(() => expect(grants).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Assistants' })).toBeNull();
+  });
+
+  it('says nothing of assistants while Supabase lists none to say', async () => {
+    show();
+    await waitFor(() => expect(grants).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'Assistants' })).toBeNull();
+  });
+
+  it('says when no assistant can read the files', async () => {
+    grants.mockResolvedValue([]);
+    show();
+    expect(await screen.findByRole('heading', { name: 'Assistants' })).toBeTruthy();
+    expect(screen.getByText(/No assistant can read your files/)).toBeTruthy();
+  });
+
+  it('lists the assistants let in, and takes one’s access back', async () => {
+    grants.mockResolvedValue([
+      { clientId: 'c-1', name: 'Claude', uri: '', grantedAt: '2026-11-20T10:00:00Z' },
+    ]);
+    show();
+    expect(await screen.findByText('Claude')).toBeTruthy();
+
+    grants.mockResolvedValue([]);
+    fireEvent.click(screen.getByText('Revoke'));
+
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith('c-1'));
+    expect(await screen.findByText(/No assistant can read your files/)).toBeTruthy();
+  });
+
+  it('says why a revocation did not go through', async () => {
+    grants.mockResolvedValue([
+      { clientId: 'c-1', name: 'Claude', uri: '', grantedAt: '2026-11-20T10:00:00Z' },
+    ]);
+    revoke.mockRejectedValue(new Error('Network down'));
+    show();
+    fireEvent.click(await screen.findByText('Revoke'));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Network down');
+  });
 });
 
 describe('Account', () => {
