@@ -36,25 +36,76 @@ export interface AuthenticatedUser {
 export type Caller = 'person' | 'agent';
 
 /**
- * The `client_id` claim of a token `getUser` has just accepted. Read from the
- * payload without checking the signature again: Supabase did, and a payload
- * altered after signing would not have been accepted.
- *
- * Any value but none is an assistant's, as migration 024 reads it
- * (`auth.jwt() ->> 'client_id' IS NULL` is a person): one rule here and in
- * the database, so no token is a person to one and an assistant to the other.
+ * The claims of a token, read from its payload without checking the
+ * signature: each caller below has Supabase check it before trusting them
+ * (`getUser` for a person, PostgREST for an assistant), and a payload altered
+ * after signing is refused there.
  */
-function clientIdOf(token: string): string | undefined {
+function claimsOf(token: string): Record<string, unknown> {
   const payload = token.split('.')[1];
-  if (!payload) return undefined;
+  if (!payload) return {};
   try {
     const claims: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    const clientId = (claims as { client_id?: unknown } | null)?.client_id;
-    if (clientId === undefined || clientId === null) return undefined;
-    return typeof clientId === 'string' ? clientId : JSON.stringify(clientId);
+    return claims !== null && typeof claims === 'object' ? (claims as Record<string, unknown>) : {};
   } catch {
-    return undefined;
+    return {};
   }
+}
+
+/**
+ * The `client_id` claim: any value but none is an assistant's, as migrations
+ * 024 and 025 read it (`auth.jwt() ->> 'client_id' IS NULL` is a person): one
+ * rule here and in the database, so no token is a person to one and an
+ * assistant to the other.
+ */
+function clientIdOf(claims: Record<string, unknown>): string | undefined {
+  const clientId = claims.client_id;
+  if (clientId === undefined || clientId === null) return undefined;
+  return typeof clientId === 'string' ? clientId : JSON.stringify(clientId);
+}
+
+/**
+ * PostgREST's codes for a token it would not take: one it cannot verify
+ * (PGRST301), with no role it knows (PGRST302), or expired (PGRST303).
+ */
+const REFUSED_TOKEN = /^PGRST30\d$/;
+
+/**
+ * An assistant's token, at `/mcp` (ADR 0020, migration 025).
+ *
+ * Not through `getUser`: the hook of migration 025 gives an assistant's token
+ * a `session_id` Supabase Auth has no session for, so that it is no session
+ * at Auth's own endpoints (it could set the account's password there), and
+ * Auth refuses it here too. The database checks it instead:
+ * `assistant_session_alive`, called as the caller, has PostgREST verify the
+ * signature and the expiry, and itself finds the session the assistant was
+ * let in with. Revoking deletes that session, so a revoked token is refused
+ * at once. A token issued while the hook was off has no `mcp_session_id` and
+ * is refused as well.
+ */
+async function authenticateAssistant(
+  req: VercelRequest,
+  claims: Record<string, unknown>
+): Promise<AuthenticatedUser> {
+  const clientId = clientIdOf(claims);
+  if (clientId === undefined) {
+    throw new AuthError('/mcp takes a token issued to an assistant: connect it to sign in');
+  }
+  const { data, error } = await supabaseAsCaller(req).rpc('assistant_session_alive');
+  if (error) {
+    if (REFUSED_TOKEN.test(error.code ?? '')) throw new AuthError('Invalid or expired token');
+    throw new Error(`Could not check the assistant's session: ${error.message}`);
+  }
+  if (data !== true) {
+    throw new AuthError('This assistant was disconnected, or its sign-in ended: connect it again');
+  }
+  if (typeof claims.sub !== 'string' || !claims.sub)
+    throw new AuthError('Invalid or expired token');
+  return {
+    id: claims.sub,
+    email: typeof claims.email === 'string' ? claims.email : undefined,
+    clientId,
+  };
 }
 
 /**
@@ -63,13 +114,12 @@ function clientIdOf(token: string): string | undefined {
  * `getUser` returns the whole record, and most routes want only the id — but
  * the email is what tells a demo account from a real one, and asking for it
  * separately would be a second round trip for something already in hand.
- * Asking Supabase rather than checking the signature alone is also what makes
- * a revoked assistant's token stop working before its hour is up.
  *
  * An assistant's token is a JWT of the same kind as the person's, with one
  * claim more; without this check it could do here whatever the person can,
  * delete files and erase the account included. So every route refuses it,
- * and `/mcp`, which asks for `'agent'`, refuses everything else.
+ * and `/mcp`, which asks for `'agent'`, refuses everything else and checks
+ * an assistant's token its own way (`authenticateAssistant`).
  */
 export async function authenticate(
   req: VercelRequest,
@@ -78,20 +128,21 @@ export async function authenticate(
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) throw new AuthError('Missing authorization token');
 
+  const claims = claimsOf(token);
+  if (caller === 'agent') return authenticateAssistant(req, claims);
+
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser(token);
   if (error || !user) throw new AuthError('Invalid or expired token');
 
-  const clientId = clientIdOf(token);
-  if (caller === 'person' && clientId !== undefined) {
+  // Auth refuses an assistant's token by itself once migration 025's hook is
+  // on; this holds without the hook too.
+  if (clientIdOf(claims) !== undefined) {
     throw new AuthError('A token issued to an assistant only reads files, through /mcp');
   }
-  if (caller === 'agent' && clientId === undefined) {
-    throw new AuthError('/mcp takes a token issued to an assistant: connect it to sign in');
-  }
-  return { id: user.id, email: user.email, ...(clientId !== undefined && { clientId }) };
+  return { id: user.id, email: user.email };
 }
 
 export async function authenticateUser(req: VercelRequest): Promise<string> {

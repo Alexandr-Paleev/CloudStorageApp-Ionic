@@ -113,9 +113,10 @@ person's files and nothing more, wherever it is presented.**
 - **The person can take access back.** A grant lasts until revoked; the
   account page lists the assistants given access and revokes one
   (`listGrants`, `revokeGrant`). An access token is a JWT that lasts its
-  hour; `/mcp` asks Supabase about each one (`getUser`) rather than check its
-  signature alone, and M2 checks that a revoked assistant's token is refused
-  at once, not when it expires.
+  hour; `/mcp` asks the database whether the session behind each one still
+  exists rather than check its signature alone (see the amendment M2c and
+  M2d), so a revoked assistant's token is refused at once, not when it
+  expires.
 - **`api/ai` gets heavier.** The SDK joins the function every AI route loads,
   and its cold start is measured before and after.
 
@@ -218,3 +219,56 @@ person's files and nothing more, wherever it is presented.**
   until the OAuth server is on. Its endpoints answer 404 until then, read as
   no list rather than as an error, which every query reports to Google
   Analytics; M2c checks the 404 on a local Supabase with the server off.
+- **M2c and M2d, Supabase Auth's own endpoints (2026-11-26).** Checked on a
+  local Supabase (CLI 2.111.0, Auth v2.194.0) with the project's 25
+  migrations and a real assistant: registered, sent to `/authorize`, let in
+  through the same calls the consent page makes, its code exchanged. The
+  flow, the deny, the 404 with the server off (`feature_disabled`, which
+  supabase-js keeps as `status: 404`), migration 024 and the revoke all did
+  what the steps above say. Auth itself did not: the assistant's token was
+  the person's whole session there. With it, `PUT /user` set the account's
+  password (200; signing in with the new one worked, and the person's own
+  sessions ended), wrote `user_metadata`, and started an email change,
+  stopped only by the confirmation the old address must give; it read
+  another assistant's request, which binds it to the person, and approved
+  it; it could sign the person out everywhere. Supabase's documentation
+  says nothing of these endpoints; it offers RLS on `client_id` and the
+  Custom Access Token hook. A different `aud` from the hook changes nothing:
+  Auth, PostgREST and Storage take the token alike. What Auth does read is
+  `session_id`: it looks the session up for every endpoint that needs one
+  and refuses with `403 session_not_found` when there is none, unless the id
+  is empty or the nil uuid. PostgREST and Storage do not read it.
+  [Migration 025](../../migrations/025_assistant_tokens_do_not_reach_auth.sql)
+  therefore adds the hook `hide_assistant_session`, which moves an
+  assistant's `session_id` to `mcp_session_id` and puts a fresh random uuid
+  in its place; `assistant_session_alive()`, which finds that session for
+  the assistant and the account named in the token; and a restrictive
+  SELECT policy on `files`, `folders`, `file_chunks`, `file_embeddings` and
+  the bucket's objects that asks it of any token with `client_id`. With the
+  hook on, ten endpoints of Auth answered the assistant 403, the password,
+  the email, the metadata, MFA, `/logout`, the grants and the consent among
+  them; the database read for it as before, 024 still refused its writes; a
+  refresh kept the session hidden; the person's sign-in did not change.
+  `getUser` now refuses an assistant too, so `authenticate` checks one by
+  calling `assistant_session_alive` as the caller: PostgREST verifies the
+  signature and the expiry (a token it will not take, `PGRST30x`, is a 401;
+  any other failure is ours, a 500), the function finds the session, and the
+  id and the email are the token's own claims. Revoking deletes the
+  session, so `/mcp` refuses the token at once, and so do PostgREST and
+  Storage, which until now would have read for it to the end of its hour.
+  A token issued while the hook is off has no `mcp_session_id` and reads
+  nothing, so turning the hook off fails closed everywhere but at Auth.
+  The real `authenticate`, run against that Supabase, took the assistant,
+  refused it on a person's route, refused a person at `/mcp`, refused a
+  token with its subject altered, and refused the assistant the moment it
+  was revoked. Production was read before writing 025: `auth.sessions` has
+  `oauth_client_id`, and no hook was set up. The order there: 025, then the
+  hook (Authentication → Hooks → Custom Access Token,
+  `public.hide_assistant_session`), a sign-in of a person to see it changed
+  nothing, then the OAuth server with dynamic registration and
+  `/oauth/consent`. Two things to look at once it is on: the discovery
+  document at the address RFC 8414 builds for an issuer with a path,
+  `/.well-known/oauth-authorization-server/auth/v1`, answered 404 locally,
+  and clients reach it at `/auth/v1/.well-known/openid-configuration`
+  instead, as the MCP specification lets them; and whether MFA by TOTP is
+  enabled, which the hook covers too (`/factors` needs a session).

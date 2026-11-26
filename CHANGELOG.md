@@ -39,6 +39,17 @@ reasoning behind the larger decisions lives in
   keeps the request, and signing in, by password or Google, comes back to
   it. A demo account can only deny. The account page lists the assistants
   let in, and revokes one; it shows nothing until the OAuth server is on.
+- **An assistant's token is no session to Supabase Auth** (ADR 0020, step
+  M2, found before the OAuth server was turned on). Tried with a real
+  assistant on a local Supabase, the token Supabase issues one was the
+  person's whole session at Auth's own endpoints: it could set the account's
+  password and sign in with it, write the user's metadata, start an email
+  change, approve another assistant in the person's name. Migration 025 adds
+  a Custom Access Token hook that gives an assistant's token a session id
+  Auth has none for, so Auth refuses it everywhere, while the database reads
+  it as before. `/mcp` checks such a token with the database rather than
+  Auth, and revoking an assistant stops its reads at once, straight from the
+  database included, not when its token expires an hour later.
 
 ## [4.17.1] — 2026-11-25
 
