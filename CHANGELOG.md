@@ -49,7 +49,10 @@ reasoning behind the larger decisions lives in
   Auth has none for, so Auth refuses it everywhere, while the database reads
   it as before. `/mcp` checks such a token with the database rather than
   Auth, and revoking an assistant stops its reads at once, straight from the
-  database included, not when its token expires an hour later.
+  database included, not when its token expires an hour later. Signing out
+  of the app now signs out of that browser alone: Supabase's default signed
+  out every session of the account, and would have disconnected every
+  assistant each time. A new password still signs out everywhere.
 
 ## [4.17.1] — 2026-11-25
 

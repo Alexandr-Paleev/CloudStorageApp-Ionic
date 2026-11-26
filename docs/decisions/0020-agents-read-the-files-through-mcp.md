@@ -272,3 +272,14 @@ person's files and nothing more, wherever it is presented.**
   and clients reach it at `/auth/v1/.well-known/openid-configuration`
   instead, as the MCP specification lets them; and whether MFA by TOTP is
   enabled, which the hook covers too (`/factors` needs a session).
+  Found in review: a sign-out with supabase-js's default scope, `global`,
+  ends every session of the account, the assistants' with them (checked:
+  `assistant_session_alive` false, the refresh token refused; `others` the
+  same, `local` neither). The app's Log out and the consent page's "Use
+  another account" used that default, so every sign-out of the app would
+  have disconnected every assistant. `authService.logout` now signs out of
+  this browser alone. A new password still ends every session, the
+  assistants' included (checked), which is what a new password is for; the
+  account page's Revoke ends one assistant's. The assistant's refresh token
+  is refused at the person's `/token` endpoint, and at `/oauth/token` under
+  another client's id.

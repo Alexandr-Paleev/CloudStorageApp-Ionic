@@ -38,10 +38,14 @@ export const authService = {
   },
 
   /**
-   * Sign out current user
+   * Sign out of this browser, and only this one (ADR 0020). supabase-js signs
+   * out everywhere by default, and everywhere includes the sessions of the
+   * assistants the person let in: each would have to be connected again after
+   * every sign-out of the app. Taking an assistant's access back is the
+   * account page's Revoke; ending every session at once, a new password's.
    */
   async logout(): Promise<void> {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) throw error;
   },
 
