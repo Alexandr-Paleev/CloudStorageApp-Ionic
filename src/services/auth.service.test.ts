@@ -14,7 +14,7 @@ vi.mock('../supabase/supabase.config', () => ({
     auth: {
       signUp: (...a: unknown[]) => signUp(...a),
       signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
-      signOut: () => signOut(),
+      signOut: (...a: unknown[]) => signOut(...a),
       getUser: () => getUser(),
       onAuthStateChange: (...a: unknown[]) => onAuthStateChange(...a),
       signInWithOAuth: (...a: unknown[]) => signInWithOAuth(...a),
@@ -81,6 +81,12 @@ describe('email and password', () => {
 
     signInWithPassword.mockResolvedValue({ data: { user: null }, error: null });
     await expect(authService.login('a@example.com', 'x')).rejects.toThrow('Login failed');
+  });
+
+  it('signs out of this browser alone, leaving the assistants let in connected', async () => {
+    // The default scope, global, ends the assistants' sessions too (ADR 0020).
+    await authService.logout();
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 
   it('throws when signing out fails, so the interface does not claim it worked', async () => {
