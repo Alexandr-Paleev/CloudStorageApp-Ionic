@@ -317,16 +317,17 @@ temperature set.
   tool fits got one: "Delete the old electricity bills." became `ask_files`
   with "What are the old electricity bills?", "Share my lease with my
   landlord." became "How do I share my lease with my landlord?". No harm
-  follows, since every tool only reads, but each spends a question of the
-  person's daily allowance, and the assistant then says the files do not
-  answer rather than that it cannot delete.
+  follows, since every tool only reads, but each spends a search or a
+  question of the person's daily allowance, and the assistant then says the
+  files do not answer rather than that it cannot delete.
 - **"Where is…" is a question to it.** "¿Dónde está mi contrato de trabajo?"
   and "Где скан моего паспорта?" went to `ask_files`, which answers from the
   files' text rather than naming the file.
 - **It wrote two Russian queries in Latin letters**, "remont kuhni" and
   "polis OSAГO", which the search's model does not read as the Russian
-  words. Six more Spanish and Russian requests it put in English, which the
-  search crosses languages for.
+  words. Seven more, three searches and four questions asked in Spanish or
+  Russian, it put in English, which the search and the answers cross
+  languages for.
 - **One argument the server refuses:** `"limit": "1"`, a string where the
   schema says integer. The assistant gets the tool's error back.
 - **The descriptions do the work.** Before this eval, one request to

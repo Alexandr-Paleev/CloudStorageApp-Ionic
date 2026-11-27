@@ -312,7 +312,7 @@ person's files and nothing more, wherever it is presented.**
   `ask_files`, the request turned into a question), "where is…" sent to
   `ask_files` twice, two Russian queries written in Latin letters, and one
   `limit` given as a string. Every tool only reads, so a wrong choice costs
-  a question of the day's allowance, not a file. The descriptions are not
+  a search or a question of the day's allowance, never a file. The descriptions are not
   changed here: a change to them is measured before it ships, and Claude,
   which the person's assistant most likely is, costs per run and is not
   measured. Details and the tables in `evals/README.md`.
