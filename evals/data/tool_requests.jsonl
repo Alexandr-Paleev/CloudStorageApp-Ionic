@@ -1,0 +1,60 @@
+{"id": "e01", "lang": "en", "text": "Find my lease for the flat.", "tools": ["search_files"], "terms": ["lease", "rent", "tenancy"]}
+{"id": "e02", "lang": "en", "text": "Where's the scan of my passport?", "tools": ["search_files"], "terms": ["passport"]}
+{"id": "e03", "lang": "en", "text": "I need that photo of the dog on the beach.", "tools": ["search_files"], "terms": ["dog"]}
+{"id": "e04", "lang": "en", "text": "Pull up the electricity bill from March.", "tools": ["search_files"], "terms": ["electric"]}
+{"id": "e05", "lang": "en", "text": "Look for anything about my car insurance.", "tools": ["search_files"], "terms": ["insurance"]}
+{"id": "e06", "lang": "en", "text": "Find the warranty for the washing machine.", "tools": ["search_files"], "terms": ["warranty", "washing"]}
+{"id": "e07", "lang": "en", "text": "When does my lease end?", "tools": ["ask_files"], "terms": ["lease", "rent", "tenancy"]}
+{"id": "e08", "lang": "en", "text": "How much was my electricity bill in March?", "tools": ["ask_files"], "terms": ["electric"]}
+{"id": "e09", "lang": "en", "text": "What's the deductible on my car insurance?", "tools": ["ask_files"], "terms": ["deductible", "excess", "insurance"]}
+{"id": "e10", "lang": "en", "text": "What time does my flight to Berlin leave?", "tools": ["ask_files"], "terms": ["flight", "berlin"]}
+{"id": "e11", "lang": "en", "text": "According to my blood test, is my cholesterol high?", "tools": ["ask_files"], "terms": ["cholesterol"]}
+{"id": "e12", "lang": "en", "text": "How much notice do I have to give to cancel my gym membership?", "tools": ["ask_files"], "terms": ["gym", "membership", "notice", "cancel"]}
+{"id": "e13", "lang": "en", "text": "What files do I have?", "tools": ["list_files"]}
+{"id": "e14", "lang": "en", "text": "Show me what I uploaded most recently.", "tools": ["list_files"]}
+{"id": "e15", "lang": "en", "text": "What's in my Taxes/2026 folder?", "tools": ["list_files"], "folder": "Taxes/2026"}
+{"id": "e16", "lang": "en", "text": "List the files in the Work folder.", "tools": ["list_files"], "folder": "Work"}
+{"id": "e17", "lang": "en", "text": "Which files aren't in any folder?", "tools": ["list_files"], "folder": "/"}
+{"id": "e18", "lang": "en", "text": "Delete the old electricity bills.", "tools": []}
+{"id": "e19", "lang": "en", "text": "Share my lease with my landlord.", "tools": []}
+{"id": "e20", "lang": "en", "text": "What's the weather like in Berlin tomorrow?", "tools": []}
+{"id": "s01", "lang": "es", "text": "Busca la factura de la luz de abril.", "tools": ["search_files"], "terms": ["luz", "electric"]}
+{"id": "s02", "lang": "es", "text": "¿Dónde está mi contrato de trabajo?", "tools": ["search_files"], "terms": ["trabajo", "laboral", "employment", "job", "work"]}
+{"id": "s03", "lang": "es", "text": "Encuentra las fotos de la boda.", "tools": ["search_files"], "terms": ["boda", "wedding"]}
+{"id": "s04", "lang": "es", "text": "Necesito el extracto bancario de enero.", "tools": ["search_files"], "terms": ["extracto", "banc", "bank"]}
+{"id": "s05", "lang": "es", "text": "Busca el manual de la lavadora.", "tools": ["search_files"], "terms": ["lavadora", "washing"]}
+{"id": "s06", "lang": "es", "text": "¿Tengo algún documento del seguro de hogar?", "tools": ["search_files", "ask_files"], "terms": ["seguro", "insurance"]}
+{"id": "s07", "lang": "es", "text": "¿Cuánto pago de alquiler al mes?", "tools": ["ask_files"], "terms": ["alquiler", "rent", "arrendamiento"]}
+{"id": "s08", "lang": "es", "text": "¿A qué hora sale mi vuelo a Lisboa?", "tools": ["ask_files"], "terms": ["vuelo", "flight", "lisboa", "lisbon"]}
+{"id": "s09", "lang": "es", "text": "¿Cuánto cuesta la cuota del gimnasio?", "tools": ["ask_files"], "terms": ["gimnasio", "gym"]}
+{"id": "s10", "lang": "es", "text": "¿Qué cubre la garantía de la nevera?", "tools": ["ask_files"], "terms": ["garantía", "garantia", "warranty"]}
+{"id": "s11", "lang": "es", "text": "Según mis análisis de sangre, ¿tengo el hierro bajo?", "tools": ["ask_files"], "terms": ["hierro", "iron"]}
+{"id": "s12", "lang": "es", "text": "¿Qué salario me ofrecen en la oferta de trabajo?", "tools": ["ask_files"], "terms": ["salario", "sueldo", "salary", "oferta", "offer"]}
+{"id": "s13", "lang": "es", "text": "¿Qué archivos tengo?", "tools": ["list_files"]}
+{"id": "s14", "lang": "es", "text": "Enséñame los últimos archivos que subí.", "tools": ["list_files"]}
+{"id": "s15", "lang": "es", "text": "¿Qué hay en la carpeta Documentos/Banco?", "tools": ["list_files"], "folder": "Documentos/Banco"}
+{"id": "s16", "lang": "es", "text": "Lista los archivos de la carpeta Viajes.", "tools": ["list_files"], "folder": "Viajes"}
+{"id": "s17", "lang": "es", "text": "¿Qué archivos no están en ninguna carpeta?", "tools": ["list_files"], "folder": "/"}
+{"id": "s18", "lang": "es", "text": "Borra todas las fotos de la boda.", "tools": []}
+{"id": "s19", "lang": "es", "text": "Cambia el nombre del contrato a «contrato-2026.pdf».", "tools": []}
+{"id": "s20", "lang": "es", "text": "Tradúceme «buenos días» al inglés.", "tools": []}
+{"id": "r01", "lang": "ru", "text": "Найди договор аренды квартиры.", "tools": ["search_files"], "terms": ["аренд", "lease", "rent"]}
+{"id": "r02", "lang": "ru", "text": "Где скан моего паспорта?", "tools": ["search_files"], "terms": ["паспорт", "passport"]}
+{"id": "r03", "lang": "ru", "text": "Найди фотографии из отпуска в Италии.", "tools": ["search_files"], "terms": ["итал", "italy", "отпуск", "vacation", "holiday"]}
+{"id": "r04", "lang": "ru", "text": "Мне нужен полис ОСАГО.", "tools": ["search_files"], "terms": ["осаго", "страхов", "полис", "insurance", "policy"]}
+{"id": "r05", "lang": "ru", "text": "Найди чек за ноутбук.", "tools": ["search_files"], "terms": ["ноутбук", "laptop"]}
+{"id": "r06", "lang": "ru", "text": "Поищи что-нибудь про ремонт кухни.", "tools": ["search_files"], "terms": ["кухн", "kitchen"]}
+{"id": "r07", "lang": "ru", "text": "До какого числа действует мой договор аренды?", "tools": ["ask_files"], "terms": ["аренд", "lease", "rent"]}
+{"id": "r08", "lang": "ru", "text": "Сколько я заплатил за электричество в марте?", "tools": ["ask_files"], "terms": ["электр", "свет", "electric"]}
+{"id": "r09", "lang": "ru", "text": "Во сколько вылетает мой рейс в Берлин?", "tools": ["ask_files"], "terms": ["рейс", "вылет", "берлин", "flight", "berlin"]}
+{"id": "r10", "lang": "ru", "text": "На какую сумму застрахованы вещи в квартире?", "tools": ["ask_files"], "terms": ["страх", "insur"]}
+{"id": "r11", "lang": "ru", "text": "Какая зарплата указана в оффере?", "tools": ["ask_files"], "terms": ["зарплат", "оффер", "salary", "offer"]}
+{"id": "r12", "lang": "ru", "text": "Сколько варить бульон по рецепту?", "tools": ["ask_files"], "terms": ["бульон", "рецепт", "broth", "recipe"]}
+{"id": "r13", "lang": "ru", "text": "Какие у меня есть файлы?", "tools": ["list_files"]}
+{"id": "r14", "lang": "ru", "text": "Покажи последние загруженные файлы.", "tools": ["list_files"]}
+{"id": "r15", "lang": "ru", "text": "Что лежит в папке Документы/Налоги?", "tools": ["list_files"], "folder": "Документы/Налоги"}
+{"id": "r16", "lang": "ru", "text": "Покажи файлы из папки Фото.", "tools": ["list_files"], "folder": "Фото"}
+{"id": "r17", "lang": "ru", "text": "Какие файлы лежат не в папке, а в корне?", "tools": ["list_files"], "folder": "/"}
+{"id": "r18", "lang": "ru", "text": "Удали старые счета за свет.", "tools": []}
+{"id": "r19", "lang": "ru", "text": "Отправь договор аренды хозяину квартиры.", "tools": []}
+{"id": "r20", "lang": "ru", "text": "Какая погода завтра в Москве?", "tools": []}

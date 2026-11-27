@@ -413,3 +413,11 @@ jobs:
       # from evals/cache/answers-*.jsonl. An answer missing or asked of an
       # older message exits 2 and fails the step.
       - run: uv run --locked search-evals score-answers
+
+      # Which tool of /mcp a model calls for each request (docs/decisions/0020,
+      # M3), graded from evals/cache/tools-*.jsonl. A choice missing, or made
+      # from tools the server no longer lists, exits 2 and fails the step.
+      - run: |
+          for model in @cf/mistralai/mistral-small-3.1-24b-instruct @cf/meta/llama-3.3-70b-instruct-fp8-fast; do
+            uv run --locked search-evals score-tools --model "$model"
+          done

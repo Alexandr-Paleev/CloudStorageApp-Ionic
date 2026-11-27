@@ -11,11 +11,16 @@ question is answered from (`retrieval.py`), at each size compared.
 `answer` and `score-answers` are the pair for the answers themselves: the
 first asks the model every question from the pieces the app would give it,
 the second grades what it said (`grading.py`).
+
+`choose` and `score-tools` are the pair for the tools of `/mcp`: the first
+asks a model what it would call for each request a person might make of an
+assistant, the second grades the calls (`tool_choice.py`).
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import statistics
 import sys
 
@@ -23,7 +28,7 @@ import numpy as np
 
 from . import metrics, retrieval
 from .answers import Answer, AnswerCache, message_hash
-from .backends import MissingKey, cloudflare_answer, embedder
+from .backends import MissingKey, cloudflare_answer, cloudflare_tools, embedder
 from .contract import (
     ANSWER_MODEL,
     ANSWER_SYSTEM,
@@ -42,10 +47,16 @@ from .prompt import Excerpt, excerpts_as_text
 from .documents import problems as document_problems
 from .rank import rank
 from .vectors import VectorCache
+from . import tool_choice
+from .tool_choice import Call, Choice, ChoiceCache, ChoiceGrade, Request, grade_choice
 
 
 def _check() -> int:
-    found = problems(load_files(), load_queries()) + document_problems(load_documents(), load_questions())
+    found = (
+        problems(load_files(), load_queries())
+        + document_problems(load_documents(), load_questions())
+        + tool_choice.problems(tool_choice.load_requests())
+    )
     for problem in found:
         print(problem, file=sys.stderr)
     return 1 if found else 0
@@ -350,6 +361,113 @@ def _score_answers(model: str, embedding_model: str, verbose: bool) -> int:
                 print(f"{q.id} ({q.lang}) {'; '.join(flaws)}\n    Q: {q.text}\n    A: {text}")
     return 0
 
+# The free models of Workers AI that call tools, measured side by side. The
+# first is the one the app answers questions with.
+TOOL_MODELS = ("@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+
+
+def _choose(model: str, dry_run: bool) -> int:
+    if not model.startswith("@cf/"):
+        print(f"{model}: only Workers AI models (@cf/…) are asked here", file=sys.stderr)
+        return 2
+    requests = tool_choice.load_requests()
+    cache = ChoiceCache(model)
+    todo = [r for r in requests if cache.get(r.id, tool_choice.message_hash(model, r.text)) is None]
+    if not todo:
+        print(f"{model}: all {len(requests)} choices are cached in {cache.path.name}")
+        return 0
+    if dry_run:
+        tools = json.dumps(tool_choice.tools_payload(), ensure_ascii=False)
+        characters = sum(len(tool_choice.MCP_INSTRUCTIONS) + len(tools) + len(r.text) for r in todo)
+        print(f"{model}: {len(todo)} requests to ask, about {characters:,} characters of input")
+        return 0
+    asked = 0
+    neurons = 0.0
+    try:
+        for r in todo:
+            calls, content, cost = cloudflare_tools(
+                tool_choice.MCP_INSTRUCTIONS, r.text, tool_choice.tools_payload(), model, tool_choice.MAX_CHOICE_TOKENS
+            )
+            cache.put(
+                Choice(
+                    id=r.id,
+                    message_hash=tool_choice.message_hash(model, r.text),
+                    calls=[Call(name, arguments) for name, arguments in calls],
+                    content=content,
+                    neurons=cost,
+                )
+            )
+            asked += 1
+            neurons += cost or 0.0
+            # Kept as it comes: a run stopped halfway is not paid for twice.
+            cache.save()
+            said = ", ".join(f"{name}({arguments})" for name, arguments in calls) or f"no call: {(content or '')[:60]!r}"
+            print(f"{r.id}: {said}")
+    except MissingKey as error:
+        print(f"{model}: {error}", file=sys.stderr)
+        return 2
+    print(f"{model}: asked {asked} for {neurons:,.0f} neurons, {len(cache)} in {cache.path.name}")
+    return 0
+
+
+def _share(values: list[bool]) -> str:
+    return f"{sum(values) / len(values):.3f}" if values else "—"
+
+
+def _score_tools(model: str, verbose: bool) -> int:
+    requests = tool_choice.load_requests()
+    found = tool_choice.problems(requests)
+    if found:
+        print(f"data/ has {len(found)} problems; run `search-evals check`", file=sys.stderr)
+        return 1
+    cache = ChoiceCache(model)
+    graded: list[tuple[Request, ChoiceGrade, Choice]] = []
+    for r in requests:
+        row = cache.get(r.id, tool_choice.message_hash(model, r.text))
+        if row is None:
+            print(
+                f"{model}: {r.id} is missing or was asked of other tools; run `search-evals choose --model {model}`",
+                file=sys.stderr,
+            )
+            return 2
+        graded.append((r, grade_choice(r, row.calls), row))
+
+    print(f"{model}, the tools and instructions of /mcp, one sample each")
+    print(f"{'':8}{'requests':>9}{'tool':>8}{'valid':>8}{'args':>8}{'no call':>9}")
+    for label in (*LANGUAGES, "all"):
+        rows = [(r, g) for r, g, _ in graded if label == "all" or r.lang == label]
+        called = [g for _, g in rows if g.valid is not None]
+        right = [g for r, g in rows if r.tools and g.right_tool]
+        none = [g for r, g in rows if not r.tools]
+        print(
+            f"{label:8}{len(rows):>9}"
+            f"{_share([g.right_tool for _, g in rows]):>8}"
+            f"{_share([bool(g.valid) for g in called]):>8}"
+            f"{_share([bool(g.right_arguments) for g in right]):>8}"
+            f"{_share([g.right_tool for g in none]):>9}"
+        )
+    kinds = (*tool_choice.TOOL_NAMES, "none")
+    print("\nAsked for (rows), called first (columns):")
+    print(f"{'':14}" + "".join(f"{k:>14}" for k in kinds) + f"{'other':>8}")
+    for kind in kinds:
+        rows = [g for r, g, _ in graded if tool_choice.expected_kind(r) == kind]
+        counts = [sum((g.chosen or "none") == k for g in rows) for k in kinds]
+        other = len(rows) - sum(counts)
+        print(f"{kind:14}" + "".join(f"{c:>14}" for c in counts) + f"{other:>8}")
+    several = sum(g.calls > 1 for _, g, _ in graded)
+    spent = [c.neurons for _, _, c in graded if c.neurons is not None]
+    print(f"\nMore than one call: {several}. Neurons: {sum(spent):,.0f} for {len(spent)} requests.")
+
+    if verbose:
+        print("\nWhat fell short:")
+        for r, g, c in graded:
+            if g.flaws:
+                made = ", ".join(f"{call.name}({call.arguments})" for call in c.calls) or "no call"
+                print(f"{r.id} ({r.lang}) {'; '.join(g.flaws)}\n    R: {r.text}\n    C: {made}")
+                if c.content:
+                    print(f"    S: {c.content[:200]}")
+    return 0
+
 
 def _sizes(text: str) -> list[int]:
     return [int(part) for part in text.split(",") if part.strip()]
@@ -386,7 +504,21 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--dry-run", action="store_true", help="count what would be asked")
         else:
             command.add_argument("--verbose", action="store_true", help="show every answer that fell short")
+    for name, text in (
+        ("choose", "ask a model which tool of /mcp it calls for each request; needs a key"),
+        ("score-tools", "grade the cached choices of tools"),
+    ):
+        command = commands.add_parser(name, help=text)
+        command.add_argument("--model", default=TOOL_MODELS[0])
+        if name == "choose":
+            command.add_argument("--dry-run", action="store_true", help="count what would be asked")
+        else:
+            command.add_argument("--verbose", action="store_true", help="show every choice that fell short")
     args = parser.parse_args(argv)
+    if args.command == "choose":
+        return _choose(args.model, args.dry_run)
+    if args.command == "score-tools":
+        return _score_tools(args.model, args.verbose)
     if args.command == "answer":
         return _answer(args.model, args.embedding_model, args.dry_run)
     if args.command == "score-answers":

@@ -283,3 +283,36 @@ person's files and nothing more, wherever it is presented.**
   account page's Revoke ends one assistant's. The assistant's refresh token
   is refused at the person's `/token` endpoint, and at `/oauth/token` under
   another client's id.
+- **M2 in production (2026-11-27).** Migration 025 was run and checked
+  (both functions, the five policies, the hook on a made-up event; inside a
+  transaction rolled back, a person read their 15 files and 3 folders and
+  an assistant with no live session none). Then the hook was set, a person
+  signed in by password, by Google and as the demo as before, and the OAuth
+  server was turned on with dynamic registration and `/oauth/consent`. The
+  discovery document answers at all three addresses, the one RFC 8414 builds
+  for an issuer with a path included, which only the local Supabase did not.
+  An assistant registered, sent the person to the consent page (a demo
+  account could only deny), and was let in. With its token, Auth answered
+  `403 session_not_found` to `GET` and `PUT /user`, `/factors`, the grants,
+  another request and `/logout`; `/mcp` listed its three tools and PostgREST
+  read the 15 files; a refresh kept the session hidden; it read on after the
+  person signed out of the app and in again. After Revoke on the account
+  page, the database held no assistant's session and no live refresh token
+  of one, and a session is what `/mcp`, PostgREST and Storage ask for.
+- **M3 (2026-11-27).** `evals/` measures which tool a model calls, from the
+  server's instructions and `tools/list` word for word
+  (`libs/server/src/mcp.eval-contract.json`, which `mcp.test.ts` holds the
+  server to), for 60 requests in English, Spanish and Russian, 9 of them
+  ones no tool is for. Graded by rules from the first call: the tool, the
+  arguments against the schema, and the query, question or folder against
+  what was asked. On Workers AI, `mistral-small-3.1-24b-instruct` called the
+  right tool 59 times of 60 and never mixed the three up; its miss was the
+  weather sent to `ask_files`. `llama-3.3-70b-instruct-fp8-fast` called the
+  right one 49 times: a tool for each of the 9 requests none fits (8 of them
+  `ask_files`, the request turned into a question), "where is…" sent to
+  `ask_files` twice, two Russian queries written in Latin letters, and one
+  `limit` given as a string. Every tool only reads, so a wrong choice costs
+  a question of the day's allowance, not a file. The descriptions are not
+  changed here: a change to them is measured before it ships, and Claude,
+  which the person's assistant most likely is, costs per run and is not
+  measured. Details and the tables in `evals/README.md`.
