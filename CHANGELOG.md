@@ -10,7 +10,18 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **The answers' eval holds two versions of one CV.** Claude Code, asking
+  over MCP in production, mixed an old and a new CV into one answer and,
+  asked about work experience, read every section but the jobs. The eval's
+  documents were short, without sections, and none had two versions, so it
+  could not see either. Two made-up CVs of one person and nine questions now
+  show both: of the eight answerable, five are answered right; asked in
+  Russian, two figures for one question read to the model as no answer. The
+  same happened to one earlier question: with the dates of the CVs' jobs read
+  beside it, the offer letter's start date was answered as not in the files.
+  What fixes these is measured next, against the same questions.
 
 ## [4.18.0] — 2026-11-27
 

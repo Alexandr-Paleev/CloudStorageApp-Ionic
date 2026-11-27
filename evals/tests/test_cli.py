@@ -127,7 +127,7 @@ class TestAnswers:
         self, answers_in, capsys: pytest.CaptureFixture[str]
     ) -> None:
         assert main(["score-answers"]) == 2
-        assert "75 answers are missing or stale; run `search-evals answer" in capsys.readouterr().err
+        assert "84 answers are missing or stale; run `search-evals answer" in capsys.readouterr().err
 
     def test_asks_only_a_model_it_can_reach(self, answers_in, capsys: pytest.CaptureFixture[str]) -> None:
         assert main(["answer", "--model", "claude-opus-5-5"]) == 2
@@ -138,7 +138,7 @@ class TestAnswers:
 
         monkeypatch.setattr(cli, "cloudflare_answer", lambda *args: pytest.fail("asked the model"))
         assert main(["answer", "--dry-run"]) == 0
-        assert "75 questions to ask" in capsys.readouterr().out
+        assert "84 questions to ask" in capsys.readouterr().out
 
     def test_asks_each_question_once_then_grades_from_the_cache(
         self, answers_in, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -155,19 +155,19 @@ class TestAnswers:
 
         monkeypatch.setattr(cli, "cloudflare_answer", model)
         assert main(["answer"]) == 0
-        assert len(seen) == 75
+        assert len(seen) == 84
         # The message names the pieces it was given and the language to answer in.
         assert seen[0].startswith("<excerpts>\n[1] ") and seen[0].endswith("Answer in Russian.")
 
         assert main(["answer"]) == 0
-        assert len(seen) == 75  # nothing asked twice
+        assert len(seen) == 84  # nothing asked twice
 
         capsys.readouterr()
         assert main(["score-answers", "--verbose"]) == 0
         out = capsys.readouterr().out
-        # A model that refuses everything is right ten times and wrong sixty-five.
-        assert re.search(r"^all\s+65\s+0\.000\s+65\s", out, re.MULTILINE)
-        assert re.search(r"^all\s+10\s+10\s", out, re.MULTILINE)
+        # A model that refuses everything is right eleven times and wrong seventy-three.
+        assert re.search(r"^all\s+73\s+0\.000\s+73\s", out, re.MULTILINE)
+        assert re.search(r"^all\s+11\s+11\s", out, re.MULTILINE)
         assert "a01 (ru) refused" in out
 
 

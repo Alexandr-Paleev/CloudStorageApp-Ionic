@@ -125,15 +125,18 @@ piece is embedded with the file's name in front of it, and a model answers
 from the pieces nearest to the question. This measures the first half: whether
 those pieces hold the answer.
 
-**The data.** `data/documents/` holds fifteen made-up files, seven in English
+**The data.** `data/documents/` holds seventeen made-up files, nine in English
 and four each in Spanish and Russian: a lease, two electricity bills a month apart, a trip and a flight,
 two insurance policies, a blood test, an offer letter, two manuals, a recipe,
-meeting notes, a warranty and a gym's terms. The pairs are alike on purpose.
-`data/questions.jsonl` asks 75 questions of them. Each of 65 names where its
+meeting notes, a warranty, a gym's terms, and two versions of one CV (below).
+The pairs are alike on purpose.
+`data/questions.jsonl` asks 84 questions of them. Each of 73 names where its
 answer is written, as **evidence**: quotes copied exactly from a document. A
 piece answers when it holds a whole quote, so the same labels score every size
-of piece. 36 are asked in another language than their answer is written in.
-The other 10 have no answer in these files, for the eval of the answers.
+of piece. 41 are asked in another language than their answer is written in.
+The other 11 have no answer in these files, for the eval of the answers.
+The tables of this section and the next were measured on the first fifteen
+files and 75 questions; the CVs came later, with their own results.
 
 **What is reported**, for each size: **recall@k**, the share of a question's
 quotes that are whole in one of the first k pieces; **all@k**, the share of
@@ -255,6 +258,62 @@ reading the answers in the cache is still the check of last resort. A share near
 0.95 measured on 65 questions moves by about ±0.05 at 95%: enough to see a
 model fail a language or start making up amounts, not to rank two close
 models.
+
+## Two versions of one CV
+
+Claude Code, connected to production over MCP (ADR 0020), asked `ask_files`
+about a CV on 2026-11-27, and two things went wrong. It mixed two versions of
+the file into one answer, "4+ years" from the old CV and "7+ years" from the
+new, without saying they were two files. And asked about work experience, it
+read the summary, the skills and the languages, and none of the jobs. The
+documents above are about 2 kB each, none has sections, and no two are
+versions of one file, so this eval could not see either.
+
+Two made-up CVs of one person were added: a 2026 one of 4 kB with sections, 13
+pieces of 400 characters with the jobs in the middle, and a 2022 one that
+disagrees with it (5+ years where the newer says 9+). Eight questions ask
+about them, in all three languages, and one has no answer.
+
+**Results** (2026-11-27, the same model, instruction and pieces as above, all
+84 questions):
+
+| | questions | correct | refused | evidence | precision | numbers | language |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| en | 29 | 0.931 | 1 | 0.982 | 0.848 | 0 | 1.000 |
+| es | 18 | 0.944 | 0 | 0.931 | 0.917 | 0 | 1.000 |
+| ru | 26 | 0.846 | 3 | 1.000 | 0.913 | 0 | 1.000 |
+| same language | 32 | 0.969 | 0 | 0.984 | 0.867 | 0 | 1.000 |
+| across languages | 41 | 0.854 | 4 | 0.966 | 0.905 | 0 | 1.000 |
+| all | 73 | **0.904** | 4 | 0.975 | 0.888 | 0 | 1.000 |
+
+Of the 11 questions with no answer, 10 were refused, as before plus the new
+one.
+
+- **The two versions.** Asked in English how many years the CV gives, the old
+  CV's piece was not among the eight read, and the answer gave the newer
+  CV's 9+ years as the CV's: right about one file, silent about the other.
+  Asked in Russian, both pieces were read, and the model said the files do
+  not say: two figures for one question read to it as no answer. Nothing in
+  the instruction says that excerpts can come from two versions of a file.
+- **The jobs.** Asked in Russian, all four jobs were among the pieces and in
+  the answer. Asked in Spanish, the newest job's piece was not among the
+  eight, and the answer named the other three.
+- **Dates beside the right one.** The CVs changed the nearest pieces of 24
+  earlier questions, which were asked again. One answer turned wrong: "Когда я
+  начал работать в Brightfield?" still read all six pieces of the offer
+  letter, its start date among them, and in the last two places pieces of the
+  CVs with the dates of other jobs where a meeting and a policy had been. The
+  model said the files do not say. As with the years, other figures beside
+  the right one read to it as no answer. Of the first 65 questions the files
+  answer, 61 are right, against 62 before.
+- **One fact was loosened.** "Can I bring a friend to the gym?" was answered
+  "Full Access members may bring one guest per month free of charge.", which
+  is right, and the fact asked for "yes" or "can"; it takes "may" now.
+
+Five of the eight CV questions the files answer were answered right. What
+comes next is in that order: an instruction that keeps two files apart, then
+a search that reaches a section of a long file, each measured on all the
+questions before it ships.
 
 ## Choosing a tool
 

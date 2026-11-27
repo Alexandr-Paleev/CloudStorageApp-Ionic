@@ -1,0 +1,70 @@
+MARTA RUIZ
+Staff Backend Engineer
+Valencia, Spain · marta.ruiz@example.com · +34 600 000 000
+
+SUMMARY
+
+Backend engineer with 9+ years of commercial experience building services that move money and goods. I design APIs that other teams can rely on, keep data consistent across services, and make systems observable before they are busy. Comfortable owning a service from the first schema to the on-call rota. I mentor engineers and write the design documents that decisions are taken from.
+
+SKILLS
+
+Languages: Go, Python, TypeScript, SQL.
+Data: PostgreSQL, Redis, Kafka, ClickHouse.
+Infrastructure: AWS (ECS, Lambda, RDS, SQS), Terraform, Docker, Kubernetes.
+Practice: domain-driven design, event sourcing, contract testing, incident review, OpenTelemetry.
+
+EXPERIENCE
+
+Lumen Freight — Staff Backend Engineer
+Valencia, Spain · March 2023 – present
+- Own the pricing service that quotes every shipment, about 40,000 quotes an hour at peak.
+- Cut the p99 latency of a quote from 1.8 s to 240 ms by moving rate tables from PostgreSQL queries into a precomputed Redis index.
+- Introduced contract tests between the pricing, booking and invoicing services; releases that broke a consumer went from two a month to none in a year.
+- Lead a group of four backend engineers and run the weekly architecture review.
+- Designed the fuel surcharge model with the finance team, so that a change of diesel prices reaches every quote within an hour instead of at the end of the month.
+- Replaced a nightly reconciliation of carrier invoices with a stream that flags a mismatch the day it happens, which recovered about 120,000 euros of overbilling in its first year.
+- Wrote the service's runbooks and took part in the on-call rota, one week in five.
+
+Corvid Health — Senior Backend Engineer
+Remote, Netherlands · January 2020 – February 2023
+- Led the migration of the claims service from a monolith to event-driven services on Kafka, with no downtime for the 300 clinics using it.
+- Built the audit trail every claim change is written to, which passed two external compliance audits.
+- Wrote the on-call handbook and cut the time to resolve an incident from 3 hours to 50 minutes.
+- Moved the document store for scanned invoices from a single server to S3 with lifecycle rules, which halved its cost.
+- Interviewed about forty engineers and designed the take-home exercise the team still uses.
+
+Tidepool Games — Backend Developer
+Barcelona, Spain · June 2017 – December 2019
+- Built the matchmaking service in Go for a mobile game with 1.2 million monthly players.
+- Moved player analytics from nightly batch jobs to a ClickHouse pipeline with five-minute freshness.
+- Built the anti-cheat checks for in-game purchases with the security team.
+- Kept the leaderboards up through two launch weekends with ten times the usual traffic.
+
+Ardent Retail — Junior Developer
+Madrid, Spain · September 2016 – May 2017
+- Maintained the Python services behind the online shop's stock and returns.
+- Wrote the first automated test suite for the returns flow.
+
+EDUCATION
+
+BSc in Computer Engineering, Universitat Politècnica de València, 2012 – 2016.
+
+LANGUAGES
+
+Spanish (native), English (C1), German (B1).
+
+SELECTED PROJECTS
+
+Open-source contract testing kit (2022 – present). A small Go library that checks a service's events against the schemas its consumers publish. About 600 stars on GitHub, used by three companies I know of.
+
+Valencia Tech Mentoring (2021 – present). An evening programme that pairs people changing careers with working engineers. I mentor two people a year and organise the monthly meetups.
+
+TALKS AND WRITING
+
+"Quotes at the speed of a page load", a talk on precomputed pricing indexes, Commit Conf Madrid, 2024.
+"Moving claims without stopping them", a write-up of the Kafka migration, on the Corvid Health engineering blog, 2022.
+
+CERTIFICATES
+
+AWS Certified Solutions Architect – Professional, 2024.
+Certified Kubernetes Application Developer, 2021.

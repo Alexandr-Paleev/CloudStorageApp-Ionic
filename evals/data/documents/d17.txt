@@ -1,0 +1,26 @@
+MARTA RUIZ
+Senior Backend Engineer
+Valencia, Spain · marta.ruiz@example.com
+
+PROFILE
+
+Backend engineer with 5+ years of experience in Go and Python. I build reliable services for healthcare and games, and I like turning slow batch jobs into streams.
+
+EXPERIENCE
+
+Corvid Health — Senior Backend Engineer, January 2020 – present (remote).
+Building the event-driven claims platform and its audit trail.
+
+Tidepool Games — Backend Developer, June 2017 – December 2019 (Barcelona).
+Matchmaking service in Go; player analytics on ClickHouse.
+
+Ardent Retail — Junior Developer, September 2016 – May 2017 (Madrid).
+Python services for stock and returns.
+
+EDUCATION
+
+BSc in Computer Engineering, Universitat Politècnica de València, 2016.
+
+LANGUAGES
+
+Spanish (native), English (B2).
