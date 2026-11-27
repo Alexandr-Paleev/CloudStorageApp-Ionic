@@ -28,6 +28,37 @@ export interface Excerpt {
  *  three at 400 characters; eight is margin, about 3,200 characters. */
 export const EXCERPTS_PER_QUESTION = 8;
 
+/** How many of the nearest pieces are asked for before the repeats among them
+ *  are dropped. A file kept twice, a copy of a CV under another name, gives
+ *  the same pieces twice, and each copy took a place of the eight: measured
+ *  in evals/ with a copy of the CV, the questions about it whose every quote
+ *  was read went from 6 of 8 to 5. Twice the eight leaves room for a copy of
+ *  every one; `match_chunks` returns at most 20. */
+export const PIECES_SEARCHED = 16;
+
+/**
+ * The pieces in the order given, nearest first, with every text already kept
+ * dropped, the first `limit`. Two pieces are the same when their text is, white
+ * space at either end aside: the nearer one stays, whichever file it is from.
+ * The eval keeps the same rule (`distinct_pieces` in evals/), held to it by the
+ * cases in answer.eval-contract.json.
+ */
+export function distinctPieces<T extends { content: string }>(
+  pieces: readonly T[],
+  limit: number
+): T[] {
+  const seen = new Set<string>();
+  const kept: T[] = [];
+  for (const piece of pieces) {
+    if (kept.length >= limit) break;
+    const text = piece.content.trim();
+    if (seen.has(text)) continue;
+    seen.add(text);
+    kept.push(piece);
+  }
+  return kept;
+}
+
 /** The longest question taken, as the search box's own limit. */
 export const MAX_QUESTION_CHARS = 500;
 

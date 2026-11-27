@@ -10,6 +10,16 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+### Fixed
+
+- **A copy of a file no longer takes the places of other pieces.** A question
+  is answered from the eight pieces nearest to it, and a file kept twice gave
+  the same pieces twice. The answer now reads the first eight whose text it
+  has not read already, from the sixteen nearest. Measured on the eval's
+  vectors with a copy of a CV, the questions about it whose every quote was
+  read went from 6 of 8 down to 5 with the copy, and back to 6 with this. An
+  account in production keeps one picture three times; it is read once now.
+
 ### Added
 
 - **The answers' eval holds two versions of one CV.** Claude Code, asking

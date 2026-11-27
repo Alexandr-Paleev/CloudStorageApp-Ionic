@@ -198,6 +198,23 @@ What follows, decided here and amended as each part ships:
   every miss was the model's, and each of the three wrong answers was to a
   question asked in another language than its answer is written in. The fifteen files stay: the eval
   shows where the model fails, not where the search is too easy.
+- **A copy of a file is read once (2026-11-27).** A file kept twice, a copy
+  under another name, gives the same pieces as its original, and each would
+  take a place of the eight. Production has such copies: the account Claude
+  Code asked over MCP keeps one picture three times, and its one piece is
+  there three times, 31 distinct texts in 33 pieces. Its copies of a CV are
+  not indexed, so the wrong answer about the CV that started this was not
+  theirs. Measured in `evals/` on the cached vectors, with a copy of the 2026
+  CV added, the CV questions whose every quote was read went from 6 of 8 to
+  5. The route now asks `match_chunks` for 16 pieces and reads the first
+  eight whose text it has not read already (`distinctPieces` in
+  `libs/server/src/answer.ts`; the eval drops them the same way, held to it
+  by the cases in the contract). With the copy that is 6 of 8 again; with no
+  copy nothing changes, and the eval's answers were not asked again. Reading
+  12 pieces instead of 8 found every quote of every question, copy or not, at
+  half as much text again. It is not taken here: more pieces holding other
+  figures turned two answers into refusals (`evals/README.md`, "Two versions
+  of one CV"), so it is measured on the answers first.
 
 ## Alternatives
 
