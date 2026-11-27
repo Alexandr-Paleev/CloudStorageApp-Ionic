@@ -19,8 +19,9 @@ reasoning behind the larger decisions lives in
   could not see either. Two made-up CVs of one person and nine questions now
   show both: of the eight answerable, five are answered right; asked in
   Russian, two figures for one question read to the model as no answer. The
-  CVs also took the place of the offer letter's start date for one earlier
-  question. What fixes these is measured next, against the same questions.
+  same happened to one earlier question: with the dates of the CVs' jobs read
+  beside it, the offer letter's start date was answered as not in the files.
+  What fixes these is measured next, against the same questions.
 
 ## [4.18.0] — 2026-11-27
 

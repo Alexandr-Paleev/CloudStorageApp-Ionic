@@ -298,11 +298,14 @@ one.
 - **The jobs.** Asked in Russian, all four jobs were among the pieces and in
   the answer. Asked in Spanish, the newest job's piece was not among the
   eight, and the answer named the other three.
-- **More files, a harder search.** The CVs changed the nearest pieces of 24
+- **Dates beside the right one.** The CVs changed the nearest pieces of 24
   earlier questions, which were asked again. One answer turned wrong: "Когда я
-  начал работать в Brightfield?" lost the offer letter's start date to the
-  dates of the CVs. Of the first 65 questions the files answer, 61 are right,
-  against 62 before.
+  начал работать в Brightfield?" still read all six pieces of the offer
+  letter, its start date among them, and in the last two places pieces of the
+  CVs with the dates of other jobs where a meeting and a policy had been. The
+  model said the files do not say. As with the years, other figures beside
+  the right one read to it as no answer. Of the first 65 questions the files
+  answer, 61 are right, against 62 before.
 - **One fact was loosened.** "Can I bring a friend to the gym?" was answered
   "Full Access members may bring one guest per month free of charge.", which
   is right, and the fact asked for "yes" or "can"; it takes "may" now.
