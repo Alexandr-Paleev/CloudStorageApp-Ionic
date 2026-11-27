@@ -169,3 +169,22 @@ class TestAnswers:
         assert re.search(r"^all\s+65\s+0\.000\s+65\s", out, re.MULTILINE)
         assert re.search(r"^all\s+10\s+10\s", out, re.MULTILINE)
         assert "a01 (ru) refused" in out
+
+
+def test_score_tools_grades_the_committed_choices_of_both_models(capsys: pytest.CaptureFixture[str]) -> None:
+    # From cache/tools-*.jsonl, which CI grades too.
+    for model in ("@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"):
+        assert main(["score-tools", "--model", model]) == 0
+        out = capsys.readouterr().out
+        assert re.search(r"^all\s+60\s", out, re.MULTILINE)
+        assert "Asked for (rows), called first (columns):" in out
+
+
+def test_score_tools_says_which_command_asks_what_is_missing(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["score-tools", "--model", "@cf/none/model"]) == 2
+    assert "run `search-evals choose --model @cf/none/model`" in capsys.readouterr().err
+
+
+def test_choose_asks_workers_ai_alone(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["choose", "--model", "claude-none"]) == 2
+    assert "only Workers AI models" in capsys.readouterr().err

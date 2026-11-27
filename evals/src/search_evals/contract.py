@@ -70,3 +70,13 @@ ANSWER_SYSTEM = str(_answer_contract["system"])
 REFUSALS: list[str] = list(_answer_contract["refusals"])
 QUESTION_LANGUAGE_CASES: list[dict] = _answer_contract["questionLanguage"]
 EXCERPTS_AS_TEXT_CASES: list[dict] = _answer_contract["excerptsAsText"]
+
+
+# What the tool-choice eval agrees with the app on: what /mcp tells a model,
+# its instructions and its tools word for word (ADR 0020, M3), which
+# libs/server/src/mcp.test.ts holds the server to.
+MCP_CONTRACT_PATH = REPO / "libs" / "server" / "src" / "mcp.eval-contract.json"
+
+_mcp_contract = json.loads(MCP_CONTRACT_PATH.read_text(encoding="utf-8"))
+MCP_INSTRUCTIONS = str(_mcp_contract["instructions"])
+MCP_TOOLS: list[dict] = list(_mcp_contract["tools"])

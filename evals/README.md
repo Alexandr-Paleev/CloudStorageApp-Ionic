@@ -256,6 +256,93 @@ reading the answers in the cache is still the check of last resort. A share near
 model fail a language or start making up amounts, not to rank two close
 models.
 
+## Choosing a tool
+
+An assistant reaches the files through `/mcp` ([decision 0020](../docs/decisions/0020-agents-read-the-files-through-mcp.md)),
+which offers it three tools: `search_files` finds files by meaning,
+`ask_files` answers a question from what they say, `list_files` lists them,
+by folder if asked. Which one it calls is the model's choice, made from what
+the server tells it. This measures that choice: given a request a person
+might make, does the model call the right tool, with arguments the server
+takes, saying what was asked?
+
+**The data.** `data/tool_requests.jsonl` holds 60 requests, 20 in each of
+English, Spanish and Russian: in each, 6 to find a file, 6 questions about
+what the files say, 5 to list them (2 with no folder, 2 naming a folder, 1
+asking for the files in none), and 3 that no tool is for: to delete, share
+or rename a file, which nothing here does, and the weather or a
+translation. A request lists the tools that are right for it; one, "do I
+have a document about home insurance?", takes either search or a question.
+A query or a question must hold one of the request's terms, given in each
+language the model might write it in, and a folder must be the one named,
+compared as the route compares paths.
+
+**What the model is told** is what `/mcp` tells an assistant, word for word:
+the server's instructions as the system message, and the tools as
+`tools/list` gives them. Both are in `libs/server/src/mcp.eval-contract.json`,
+which `libs/server/src/mcp.test.ts` holds the server to. A real assistant's
+client adds instructions of its own; this measures the server's words with
+nothing in front of them. One request, one turn, one sample, no
+temperature set.
+
+**What is graded**, from the first call, with no model and no network
+(`src/search_evals/tool_choice.py`, specified by `tests/test_tool_choice.py`):
+
+- **tool**: the share of requests where the model called a right tool, or
+  called none where none fits;
+- **valid**: of the calls, the share whose arguments the tool's schema
+  takes, as the server checks them before the tool runs;
+- **args**: of the right calls, the share that say what was asked;
+- **no call**: of the 9 requests no tool fits, the share left without one.
+
+**Results** (2026-11-27, both on Workers AI, free):
+
+| | requests | `mistral-small-3.1-24b-instruct` | `llama-3.3-70b-instruct-fp8-fast` |
+| --- | ---: | ---: | ---: |
+| tool, en | 20 | 1.000 | 0.850 |
+| tool, es | 20 | 1.000 | 0.800 |
+| tool, ru | 20 | 0.950 | 0.800 |
+| **tool, all** | 60 | **0.983** | 0.817 |
+| valid | | 1.000 | 0.983 |
+| args | | 1.000 | 0.939 |
+| **no call** | 9 | **0.889** | **0.000** |
+| neurons | | 1,391 | 1,672 |
+
+- **The three tools are told apart.** `mistral-small`, the model the app
+  answers questions with, never called one of them for another: 18 searches,
+  18 questions and 15 listings, each with arguments that say what was asked,
+  every folder named right, the top given as "/". Its one miss: "Какая погода
+  завтра в Москве?" went to `ask_files`.
+- **`llama-3.3-70b` calls a tool for everything.** All 9 requests that no
+  tool fits got one: "Delete the old electricity bills." became `ask_files`
+  with "What are the old electricity bills?", "Share my lease with my
+  landlord." became "How do I share my lease with my landlord?". No harm
+  follows, since every tool only reads, but each spends a search or a
+  question of the person's daily allowance, and the assistant then says the
+  files do not answer rather than that it cannot delete.
+- **"Where is…" is a question to it.** "¿Dónde está mi contrato de trabajo?"
+  and "Где скан моего паспорта?" went to `ask_files`, which answers from the
+  files' text rather than naming the file.
+- **It wrote two Russian queries in Latin letters**, "remont kuhni" and
+  "polis OSAГO", which the search's model does not read as the Russian
+  words. Seven more, three searches and four questions asked in Spanish or
+  Russian, it put in English, which the search and the answers cross
+  languages for.
+- **One argument the server refuses:** `"limit": "1"`, a string where the
+  schema says integer. The assistant gets the tool's error back.
+- **The descriptions do the work.** Before this eval, one request to
+  `mistral-small` with a sentence for each tool listed the folder "lease"
+  for "When does my lease end?"; with the server's descriptions it asked.
+  One sample, so an anecdote, but the reason the descriptions are held word
+  for word.
+
+Sixty requests measure a share near 0.9 to about ±0.08 at 95%, enough to see
+one model call a tool for everything and the other not; the 9 requests with
+no tool are few, and 8 of 9 against none of 9 is still not noise. Not
+measured: a client's own instructions, which Claude and Cursor add; a model
+that lists and then asks, over several turns; Claude itself, which costs per
+run and is not wired in.
+
 ## Running it
 
 uv brings the Python in `.python-version` and the locked dependencies:
@@ -284,6 +371,11 @@ uv run search-evals score-chunks --model @cf/baai/bge-m3 --k 3
 uv run search-evals answer --dry-run
 uv run --env-file ../.env search-evals answer
 uv run search-evals score-answers --verbose   # offline; --verbose lists every miss
+
+# The tools of /mcp: about 1,400 to 1,700 neurons for the 60 requests, per model.
+uv run search-evals choose --dry-run
+uv run --env-file ../.env search-evals choose --model @cf/meta/llama-3.3-70b-instruct-fp8-fast
+uv run search-evals score-tools --verbose     # offline; the default model is mistral-small
 ```
 
 Voyage on an account without a payment method allows three requests a minute;

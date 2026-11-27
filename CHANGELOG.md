@@ -52,7 +52,20 @@ reasoning behind the larger decisions lives in
   database included, not when its token expires an hour later. Signing out
   of the app now signs out of that browser alone: Supabase's default signed
   out every session of the account, and would have disconnected every
-  assistant each time. A new password still signs out everywhere.
+  assistant each time. A new password still signs out everywhere. In
+  production since 2026-11-27: the hook and the OAuth server are on, and a
+  real assistant was let in, refused by Auth, read the files, and was
+  refused once revoked.
+- **The eval measures which tool an assistant calls** (ADR 0020, step M3).
+  `search-evals choose` offers a model the instructions and the tools of
+  `/mcp` word for word, held to the server by a test, for 60 requests in
+  English, Spanish and Russian; `score-tools` grades the first call by rules:
+  the tool, the arguments against its schema, and what they say. On Workers
+  AI, `mistral-small-3.1`, the model the app answers with, chose right 59
+  times of 60 and never mixed up the three tools. `llama-3.3-70b` chose
+  right 49 times: it called a tool for all 9 requests no tool is for, such
+  as deleting a file, and wrote two Russian queries in Latin letters. CI
+  grades both from the committed choices.
 
 ## [4.17.1] — 2026-11-25
 

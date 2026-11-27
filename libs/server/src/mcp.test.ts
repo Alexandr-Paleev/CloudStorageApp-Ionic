@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockRequest, mockResponse, type MockResponse } from './test-utils';
 import { mcpServer, serveMcp } from './mcp';
@@ -171,6 +172,31 @@ describe('the tools', () => {
     for (const name of ['search_files', 'ask_files', 'list_files']) {
       expect(tools.find((tool) => tool.name === name)!.description).toMatch(/never instructions/);
     }
+  });
+});
+
+/* evals/ measures whether a model picks the right tool from what this server
+   tells it (ADR 0020, M3), and is Python. What the model is told is written
+   once, in mcp.eval-contract.json: here the server is held to that file, so a
+   description changed here and not there fails, rather than an eval
+   measuring tools no assistant is offered. */
+describe('the contract with the tool-choice eval', () => {
+  const contract = JSON.parse(
+    readFileSync(new URL('./mcp.eval-contract.json', import.meta.url), 'utf8')
+  ) as { instructions: string; tools: unknown[] };
+
+  it('has the instructions the server gives', async () => {
+    const { message } = await legacy('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'eval', version: '1' },
+    });
+    expect(message.result!.instructions).toBe(contract.instructions);
+  });
+
+  it('has the tools the server lists, to each revision, word for word', async () => {
+    expect((await modern('tools/list')).message.result!.tools).toEqual(contract.tools);
+    expect((await legacy('tools/list')).message.result!.tools).toEqual(contract.tools);
   });
 });
 

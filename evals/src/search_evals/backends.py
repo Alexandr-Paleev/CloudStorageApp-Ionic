@@ -147,3 +147,53 @@ def cloudflare_answer(system: str, user: str, model: str, max_tokens: int) -> st
     if not payload.get("success", True):
         raise RuntimeError(f"Workers AI refused the question: {str(payload.get('errors'))[:200]}")
     return str(payload["result"]["response"]).strip()
+
+
+def cloudflare_tools(
+    system: str, user: str, tools: list[dict], model: str, max_tokens: int
+) -> tuple[list[tuple[str, str]], str | None, float | None]:
+    """The tools a Workers AI model calls for one request, and what it said.
+
+    Each call as (name, arguments as written); the text it wrote, if any; and
+    the neurons the request cost, which Workers AI reports. No temperature, as
+    for the answers: one sample, as a person would get it.
+    """
+    token = os.environ.get("CLOUDFLARE_AI_TOKEN")
+    account = _cloudflare_account()
+    if not token or not account:
+        raise MissingKey("CLOUDFLARE_AI_TOKEN and CLOUDFLARE_ACCOUNT_ID (or R2_ENDPOINT) are needed")
+    payload = _post(
+        f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}",
+        token,
+        {
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "tools": tools,
+            "max_tokens": max_tokens,
+        },
+    )
+    if not payload.get("success", True):
+        raise RuntimeError(f"Workers AI refused the request: {str(payload.get('errors'))[:200]}")
+    return chat_tool_calls(payload["result"])
+
+
+def chat_tool_calls(result: dict) -> tuple[list[tuple[str, str]], str | None, float | None]:
+    """The calls, the text and the neurons, from either shape Workers AI answers in.
+
+    Newer models answer as OpenAI's chat completions do (`choices`, with each
+    call's arguments a JSON string); older ones with `tool_calls` and
+    `response` at the top, the arguments an object.
+    """
+    if "choices" in result:
+        message = result["choices"][0]["message"]
+        raw_calls = [call["function"] for call in message.get("tool_calls") or []]
+        content = message.get("content")
+    else:
+        raw_calls = result.get("tool_calls") or []
+        content = result.get("response")
+    calls = [
+        (str(call["name"]), call["arguments"] if isinstance(call["arguments"], str) else json.dumps(call["arguments"], ensure_ascii=False))
+        for call in raw_calls
+    ]
+    neurons = (result.get("usage") or {}).get("neurons")
+    text = content.strip() if isinstance(content, str) and content.strip() else None
+    return calls, text, float(neurons) if neurons is not None else None
