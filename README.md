@@ -328,7 +328,7 @@ such clients; only Claude Code has been tried.
 
 - The account page lists the assistants you let in. **Revoke** stops one at
   once, its next request included. Signing out of the app leaves them
-  connected; a new password does not.
+  connected; a new password disconnects them all.
 - An assistant cannot upload, rename, move, delete or share a file, and does
   not see your plan, your billing or your share links. Its searches and
   questions spend the same daily allowance as the pages'.
