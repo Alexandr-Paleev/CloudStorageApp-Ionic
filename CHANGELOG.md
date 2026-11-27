@@ -10,6 +10,10 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [4.18.0] — 2026-11-27
+
 ### Added
 
 - **An assistant can search, ask and list one's files over MCP** (ADR 0020,
@@ -3228,7 +3232,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.1...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.18.0...HEAD
+[4.18.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.1...v4.18.0
 [4.17.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.0...v4.17.1
 [4.17.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.16.0...v4.17.0
 [4.16.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.15.0...v4.16.0

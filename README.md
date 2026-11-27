@@ -34,7 +34,7 @@ An **open-source** cloud storage product: an app for storing, viewing, sharing a
 
 ## 🔎 Engineering highlights
 
-Three things in this repository worth more than the feature list, each written
+Four things in this repository worth more than the feature list, each written
 up where it happened:
 
 - **[An `anon` key deployed under the name `SUPABASE_SERVICE_ROLE_KEY`](#-postmortem-the-anon-key-that-was-named-supabase_service_role_key)** —
@@ -55,6 +55,17 @@ up where it happened:
   the limit rested on a check in the client. Even the guarded path was
   check-then-act: two parallel uploads both passed. It is now a trigger on the
   row every upload must reach, holding a lock while it counts.
+- **[An assistant's token was the person's whole session at Supabase Auth](docs/decisions/0020-agents-read-the-files-through-mcp.md)** —
+  Supabase's OAuth server gives an assistant the same JWT the browser holds,
+  with one claim more. Row-level security kept it from writing the files, but
+  Auth's own endpoints took it as the person: tried on a local Supabase with a
+  real assistant, it set the account's password and signed in with it, and
+  approved another assistant in the person's name. Supabase's documentation
+  says nothing of it. A Custom Access Token hook now gives such a token a
+  session id Auth has no session for, so Auth refuses it everywhere while the
+  database still reads it, and `/mcp` checks the real session in the database
+  instead. It was found before the OAuth server was turned on, so production
+  never issued a token that could do it.
 
 Two more are not about a fault. They are about how something was built:
 
@@ -164,6 +175,10 @@ render — and the banner says the deletion has not reached the server yet:
   claim citing the piece it comes from, in the language you asked in. Free on
   Workers AI for any account, the demo's included, within a daily limit
   ([ADR 0019](docs/decisions/0019-questions-are-answered-from-pieces-of-the-files.md))
+- ✅ **Your assistant can read them too.** Claude and other assistants connect
+  over MCP after you let them in, on a page that says what they may do, and
+  they only read: search, ask, list. The account page takes one back
+  ([Connect an assistant](#-connect-an-assistant))
 - ✅ Nested folders with a breadcrumb path back to any level; folders can be renamed and deleted
 - ✅ PDF and image preview
 - ✅ File renaming and deletion — removed from the provider, not just from the list
@@ -280,6 +295,48 @@ render — and the banner says the deletion has not reached the server yet:
 > entry, not the text colour, so every `<IonText color="dark">` had gone
 > near-black on a near-black card. Three more contrast failures found by
 > measuring rather than looking are fixed alongside it.
+
+## 🤖 Connect an assistant
+
+An assistant such as Claude can read your files through the
+[Model Context Protocol](https://modelcontextprotocol.io), at
+`https://cloud-storage-app-ionic-v0.vercel.app/mcp`
+([ADR 0020](docs/decisions/0020-agents-read-the-files-through-mcp.md)). It
+gets three tools, and each of them only reads:
+
+| Tool | What it does |
+| --- | --- |
+| `search_files` | finds files by meaning, as the dashboard's search does |
+| `ask_files` | answers a question from what the files say, with the pieces it read as its sources |
+| `list_files` | lists the files, newest first, and only one folder's if asked |
+
+**Claude Code** (checked against production on 2026-11-27):
+
+```sh
+claude mcp add --transport http --scope user cloud-storage https://cloud-storage-app-ionic-v0.vercel.app/mcp
+```
+
+Then `/mcp` in Claude Code, `cloud-storage`, **Authenticate**. The browser
+opens the app's page "Connect an assistant", which names the assistant and
+says what it will and will not be able to do; **Allow** sends you back to
+Claude Code. Ask it what files you have.
+
+**Other clients.** A client that speaks MCP over HTTP and signs in with OAuth
+needs only that address: it finds Supabase Auth from it, registers itself,
+and sends you to the same page. claude.ai's custom connectors and Cursor are
+such clients; only Claude Code has been tried.
+
+- The account page lists the assistants you let in. **Revoke** stops one at
+  once, its next request included. Signing out of the app leaves them
+  connected; a new password disconnects them all.
+- An assistant cannot upload, rename, move, delete or share a file, and does
+  not see your plan, your billing or your share links. Its searches and
+  questions spend the same daily allowance as the pages'.
+- A demo account cannot connect one: it is erased within a day.
+- What a file says reaches the assistant marked as data to read, never as
+  instructions to follow.
+- Which tool a model picks from what the server tells it is measured in
+  [`evals/`](evals/README.md#choosing-a-tool).
 
 ## 🚀 Quick Start
 
@@ -398,14 +455,35 @@ DROPBOX_APP_KEY=your_dropbox_app_key
      takes a file into the owner's folder only, up to 50 MB
    - `019` — holds a demo account's storage to 10 MB, whatever writes its limit,
      and refuses a demo account while twenty exist
+   - `020` — the size of a file on Cloudinary or R2 is the provider's, written
+     by the server that asked it, not the browser's. Apply it once the
+     deployment that confirms those uploads is live
+   - `021` — the functions the nightly reconciliation of hosted storage uses
+   - `022` — `file_chunks`: the pieces of a file's text a question is answered
+     from, with their vectors, and the function that finds the nearest
+   - `023` — counts a question asked of one's files against the daily budget
+     of `017`. Apply it before the deployment that answers questions
+   - `024` — a token Supabase's OAuth server issues an assistant reads the
+     files and writes nothing
+   - `025` — such a token is no session to Supabase Auth, and stops reading
+     the moment the assistant is revoked. Its first function is a Custom
+     Access Token hook, set in step 5
 
-   All twenty are safe to re-run, so there is no need to track which ones have
-   already been applied.
+   All twenty-six are safe to re-run, so there is no need to track which ones
+   have already been applied.
 
 3. Enable **Google Auth** in Authentication -> Providers if needed.
 4. The `files` bucket and its policies come from migration `006` — nothing to click.
    Creating the bucket by hand in the dashboard is what left a fresh project with
    RLS on `storage.objects` and no policies, so every Supabase Storage upload failed.
+5. **Assistants over MCP** (optional), in this order: Authentication → Hooks →
+   Customize Access Token (JWT) Claims hook → Postgres, schema `public`,
+   function `hide_assistant_session`. Sign in once, to see that nothing
+   changed for a person. Then Authentication → OAuth Server: enable it, with
+   the authorization path `/oauth/consent` and dynamic OAuth apps allowed.
+   The hook first: without it, the token an assistant gets is the person's
+   whole session at Supabase Auth, password included
+   ([ADR 0020](docs/decisions/0020-agents-read-the-files-through-mcp.md)).
 
 #### Cloudinary
 
@@ -800,23 +878,27 @@ table onto the run page:
 
 | | Measured | Budget |
 | --- | ---: | ---: |
-| First load (JS + CSS) | 378.7 kB | 385 kB |
+| First load (JS + CSS) | 379.0 kB | 385 kB |
 | Largest chunk (Ionic) | 179.2 kB | 185 kB |
-| All assets, route chunks included | 478.9 kB | 480 kB |
+| All assets, route chunks included | 482.7 kB | 490 kB |
 
 A budget set to a round number nobody measured gets raised the first time it is
 hit. These are set a few percent above the build, so the pull request that adds
 a 40 KB dependency is the one that has to justify it.
 
-Those are the figures of 4.17.1 and of 4.17.0, as CI measured them: the fix
-between the two is on the server and moved none of them. 4.17.0's first load
+Those are the figures of 4.18.0, as CI measured them. Its first load is
+0.3 kB over 4.17.1's and all assets 3.8 kB more: the page that lets an
+assistant in and the assistants on the account page, loaded when first
+opened, for which the budget for all assets went from 480 to 490. 4.17.1's
+figures were 4.17.0's: the fix between the two is on the server and moved none
+of them. 4.17.0's first load
 was 1.3 kB over 4.16.0's: 1.2 kB is Ionic 9.0.11, in the Ionic chunk, and 0.1 kB
 the route to the page that asks. All assets grew 6.0 kB: 2.8 kB is the page to
 ask from, loaded when first opened; 2.0 kB is `ai.service` and `http.utils`,
 now chunks of their own because two pages import them, with the reading of a
 streamed answer and the time a spent limit ends; and 1.2 kB the Ionic update.
-That leaves 1.1 kB under the budget for all assets, so the next pull request
-that adds a page raises it and says why. 4.16.0's first load and its Ionic
+That left 1.1 kB under the budget for all assets, and the next pull request
+that added a page raised it and said why. 4.16.0's first load and its Ionic
 chunk were 4.15.0's to the tenth of a kilobyte, and its assets 0.3 kB more,
 one request after an upload to Cloudinary or R2. 4.15.0's first load was
 0.5 kB over 4.14.0's, and all of it is the updates of
