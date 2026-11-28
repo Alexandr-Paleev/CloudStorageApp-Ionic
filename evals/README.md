@@ -328,6 +328,38 @@ copy or not, at half as much text again; since more pieces with other
 figures in them is what turned two answers into refusals above, that is
 measured on the answers before it is taken.
 
+**An instruction that did not help** (2026-11-28). The excerpts already name
+their file, so the first thing tried was one rule more in the instruction:
+"The excerpts can come from several files, such as an old and a new version
+of one document. When files say different things, give each with the name of
+its file. A file that says something else does not make the answer missing."
+All 84 questions asked again with it: 66 of 73 right, as before, with the
+years in Russian now right, and the days of holiday and the sister's gym
+wrong. A difference of one or two questions is within what asking again
+changes, so those three, and the two other questions about another file's
+figures that were wrong both times, were each asked three times more, with
+the old instruction, the new one, and the new one without its last sentence:
+
+| | old | new | new, without the last sentence |
+| --- | ---: | ---: | ---: |
+| "Сколько лет опыта указано в моём резюме?" | 1/3 | 1/3 | 1/3 |
+| "Сколько дней отпуска у меня на работе?" | 1/3 | 0/3 | 0/3 |
+| "Когда я начал работать в Brightfield?" | 0/3 | 0/3 | 0/3 |
+| "¿Cuánto cuesta una clase … en el gimnasio de mi hermana?" (no answer) | 3/3 | 0/3 | 0/3 |
+| "¿Cuál es la contraseña del wifi?" (no answer) | 0/3 | 0/3 | 0/3 |
+
+The rule fixed nothing: the years were right one time in three with or
+without it. And it broke what worked: asked about the gym of the person's
+sister, the old instruction refused three times in three, and with the rule
+the model answered three times from the person's own gym, its last sentence
+or not. Told that files can disagree, it took a file about something else as
+one more version. The rule was not kept, and the answers in `cache/` are the
+old instruction's. Two things follow. One sample per question hides a lot:
+three of these five questions are answered right one time in three or never,
+whatever the instruction. And a fix for the years has to come from somewhere
+other than the words of the instruction; 45 more answers cost about 1,800
+neurons, and the whole run about 3,500.
+
 ## Choosing a tool
 
 An assistant reaches the files through `/mcp` ([decision 0020](../docs/decisions/0020-agents-read-the-files-through-mcp.md)),
