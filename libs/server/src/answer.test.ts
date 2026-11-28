@@ -5,6 +5,8 @@ import {
   EXCERPTS_PER_QUESTION,
   MAX_ANSWER_TOKENS,
   MAX_QUESTION_CHARS,
+  PIECES_SEARCHED,
+  distinctPieces,
   excerptTitle,
   excerptsAsText,
   questionLanguage,
@@ -122,6 +124,12 @@ describe('the contract with the answers eval', () => {
       excerpts: { n: number; fileName: string; content: string }[];
       text: string;
     }[];
+    distinctPieces: {
+      name: string;
+      pieces: { fileName: string; content: string }[];
+      limit: number;
+      kept: { fileName: string; content: string }[];
+    }[];
   };
 
   it('names the model and the limits this side uses', () => {
@@ -130,8 +138,16 @@ describe('the contract with the answers eval', () => {
       EXCERPTS_PER_QUESTION,
       MAX_ANSWER_TOKENS,
       MAX_QUESTION_CHARS,
+      PIECES_SEARCHED,
     });
   });
+
+  it.each(contract.distinctPieces)(
+    'keeps the pieces as the eval does: $name',
+    ({ pieces, limit, kept }) => {
+      expect(distinctPieces(pieces, limit)).toEqual(kept);
+    }
+  );
 
   it('holds the instruction word for word', () => {
     expect(contract.system).toBe(ANSWER_SYSTEM);

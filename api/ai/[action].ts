@@ -3,6 +3,8 @@ import { authenticate, AuthError, supabase, supabaseAsCaller } from '../../libs/
 import {
   EXCERPTS_PER_QUESTION,
   MAX_QUESTION_CHARS,
+  PIECES_SEARCHED,
+  distinctPieces,
   type Excerpt,
 } from '../../libs/server/src/answer';
 import { AnswerRefused } from '../../libs/server/src/claude-answer';
@@ -446,9 +448,9 @@ async function indexFile(req: VercelRequest, res: VercelResponse, userId: string
 }
 
 /**
- * The pieces nearest to a question, numbered as the answer cites them, found
- * by the caller's own search under the database's policies: `match_chunks` is
- * not the service role's to call (migration 022).
+ * The pieces nearest to a question, each text once, numbered as the answer
+ * cites them, found by the caller's own search under the database's policies:
+ * `match_chunks` is not the service role's to call (migration 022).
  */
 async function nearestPieces(
   req: VercelRequest,
@@ -458,7 +460,7 @@ async function nearestPieces(
   const { data, error } = await supabaseAsCaller(req).rpc('match_chunks', {
     query_embedding: toVectorLiteral(vector),
     model_name: model,
-    match_count: EXCERPTS_PER_QUESTION,
+    match_count: PIECES_SEARCHED,
     min_similarity: 0,
   });
   if (error) throw indexTableError('Could not search the pieces', error);
@@ -469,7 +471,8 @@ async function nearestPieces(
     chunk_index: number;
     content: string;
   }[];
-  return rows.map((row, i) => ({
+  // A copy of a file would otherwise take places of the eight with the same words.
+  return distinctPieces(rows, EXCERPTS_PER_QUESTION).map((row, i) => ({
     n: i + 1,
     fileId: row.file_id,
     fileName: row.file_name,

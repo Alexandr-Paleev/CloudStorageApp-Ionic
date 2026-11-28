@@ -36,6 +36,7 @@ from .contract import (
     EMBEDDING_MODEL,
     EXCERPTS_PER_QUESTION,
     MAX_ANSWER_TOKENS,
+    PIECES_SEARCHED,
     SEARCH_RESULTS,
     embedding_input,
     search_floor,
@@ -43,7 +44,7 @@ from .contract import (
 from .data import LANGUAGES, load_files, load_queries, only_across_languages, problems
 from .documents import Question, across_languages, load_documents, load_questions
 from .grading import Grade, grade
-from .prompt import Excerpt, excerpts_as_text
+from .prompt import Excerpt, distinct_pieces, excerpts_as_text
 from .documents import problems as document_problems
 from .rank import rank
 from .vectors import VectorCache
@@ -210,8 +211,9 @@ PIECES_MODEL = "@cf/baai/bge-m3"
 def _asked(embedding_model: str) -> list[tuple[Question, list[retrieval.Piece], str]] | None:
     """Every question with the pieces the app would give it and the message it would send.
 
-    The pieces are those `match_chunks` returns: the nearest of all the files'
-    pieces at the app's size, no floor, the first EXCERPTS_PER_QUESTION.
+    The pieces are those the app reads: the nearest PIECES_SEARCHED of all the
+    files' pieces at the app's size, no floor, as `match_chunks` returns them,
+    and of those the first EXCERPTS_PER_QUESTION once a repeated text is dropped.
     """
     documents, questions = load_documents(), load_questions()
     by_id = {d.id: d for d in documents}
@@ -226,8 +228,8 @@ def _asked(embedding_model: str) -> list[tuple[Question, list[retrieval.Piece], 
     piece_by_id = {p.id: p for p in all_pieces}
     out = []
     for q, vector in zip(questions, query_vectors, strict=True):
-        nearest = rank(vector, matrix, [p.id for p in all_pieces], limit=EXCERPTS_PER_QUESTION, min_similarity=0.0)
-        given = [piece_by_id[piece_id] for piece_id, _ in nearest]
+        nearest = rank(vector, matrix, [p.id for p in all_pieces], limit=PIECES_SEARCHED, min_similarity=0.0)
+        given = distinct_pieces([piece_by_id[piece_id] for piece_id, _ in nearest], EXCERPTS_PER_QUESTION, lambda p: p.text)
         excerpts = [Excerpt(n=i, file_name=by_id[p.doc].name, content=p.text) for i, p in enumerate(given, start=1)]
         out.append((q, given, excerpts_as_text(excerpts, q.text)))
     return out

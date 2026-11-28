@@ -1,5 +1,5 @@
-"""The message a model is asked to answer from: `excerptsAsText` and
-`questionLanguage` in libs/server/src/answer.ts, in Python.
+"""The message a model is asked to answer from: `excerptsAsText`,
+`questionLanguage` and `distinctPieces` in libs/server/src/answer.ts, in Python.
 
 The instruction itself is not copied: it is read from the contract
 (`contract.ANSWER_SYSTEM`), which the app's test holds word for word. These two
@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import TypeVar
 
 OPEN = "<excerpts>"
 CLOSE = "</excerpts>"
@@ -28,6 +30,26 @@ class Excerpt:
     n: int
     file_name: str
     content: str
+
+
+T = TypeVar("T")
+
+
+def distinct_pieces(pieces: Sequence[T], limit: int, text: Callable[[T], str]) -> list[T]:
+    """The pieces in the order given, nearest first, with every text already kept
+    dropped, the first `limit`: `distinctPieces` in answer.ts. A copy of a file
+    gives the same pieces twice; the nearer one stays."""
+    seen: set[str] = set()
+    kept: list[T] = []
+    for piece in pieces:
+        if len(kept) >= limit:
+            break
+        key = text(piece).strip()
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(piece)
+    return kept
 
 
 def _fenced(text: str) -> str:

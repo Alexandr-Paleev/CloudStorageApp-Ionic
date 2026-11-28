@@ -1019,11 +1019,35 @@ describe('ask (ADR 0019)', () => {
     expect(callerRpc).toHaveBeenCalledWith('match_chunks', {
       query_embedding: `[${VECTOR.join(',')}]`,
       model_name: EMBEDDING_MODEL,
-      match_count: 8,
+      match_count: 16,
       min_similarity: 0,
     });
     // The pieces are never read with the service role, which bypasses RLS.
     expect(db.calls.some((c) => c.table === 'file_chunks')).toBe(false);
+  });
+
+  it('reads a copy of a file once, and eight pieces at most, numbered in order', async () => {
+    // The lease kept twice, under two names: its pieces come back twice, nearest first.
+    const copied = [
+      PIECES[0]!,
+      { ...PIECES[0]!, file_id: 'f-9', file_name: 'lease (1).pdf' },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        file_id: `f-${i + 10}`,
+        file_name: `note-${i}.txt`,
+        chunk_index: 0,
+        content: `Note ${i}.`,
+        similarity: 0.3,
+      })),
+    ];
+    callerRpc.mockResolvedValue({ data: copied, error: null });
+
+    await handler(ask('How much is the rent?'), mockResponse());
+
+    const given = answer.mock.calls[0]![0] as { n: number; fileName: string }[];
+    expect(given.map((e) => [e.n, e.fileName])).toEqual([
+      [1, 'lease.pdf'],
+      ...Array.from({ length: 7 }, (_, i) => [i + 2, `note-${i}.txt`]),
+    ]);
   });
 
   it('streams the numbered sources first, then the answer, then done', async () => {
@@ -1460,7 +1484,7 @@ describe('mcp (ADR 0020)', () => {
       );
       expect(callerRpc).toHaveBeenCalledWith(
         'match_chunks',
-        expect.objectContaining({ match_count: 8 })
+        expect.objectContaining({ match_count: 16 })
       );
       expect(answer).toHaveBeenCalledWith(
         [

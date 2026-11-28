@@ -315,6 +315,19 @@ comes next is in that order: an instruction that keeps two files apart, then
 a search that reaches a section of a long file, each measured on all the
 questions before it ships.
 
+**A copy of a file is read once** (2026-11-27). A file kept twice gives the
+same pieces twice, and each copy took a place of the eight. Production has
+copies: one picture three times in the account Claude Code asked. On the
+cached vectors, with a copy of the 2026 CV added, the CV questions whose every
+quote was among the pieces read went from 6 of 8 to 5. The app and `answer`
+now take the 16 nearest pieces and read the first eight whose text was not
+read already, and with the copy that is 6 of 8 again
+(`tests/test_distinct.py`). These files have no copy, so no answer was asked
+again. Twelve pieces instead of eight read every quote of every question,
+copy or not, at half as much text again; since more pieces with other
+figures in them is what turned two answers into refusals above, that is
+measured on the answers before it is taken.
+
 ## Choosing a tool
 
 An assistant reaches the files through `/mcp` ([decision 0020](../docs/decisions/0020-agents-read-the-files-through-mcp.md)),

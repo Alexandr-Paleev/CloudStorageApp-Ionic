@@ -63,6 +63,8 @@ _answer_contract = json.loads(ANSWER_CONTRACT_PATH.read_text(encoding="utf-8"))
 ANSWER_CONSTANTS: dict[str, str | int] = _answer_contract["constants"]
 ANSWER_MODEL = str(ANSWER_CONSTANTS["ANSWER_MODEL"])
 EXCERPTS_PER_QUESTION = int(ANSWER_CONSTANTS["EXCERPTS_PER_QUESTION"])
+# How many nearest pieces are read before the repeats among them are dropped.
+PIECES_SEARCHED = int(ANSWER_CONSTANTS["PIECES_SEARCHED"])
 MAX_ANSWER_TOKENS = int(ANSWER_CONSTANTS["MAX_ANSWER_TOKENS"])
 ANSWER_SYSTEM = str(_answer_contract["system"])
 # The sentence the instruction asks for when the excerpts do not hold the answer,
@@ -70,6 +72,7 @@ ANSWER_SYSTEM = str(_answer_contract["system"])
 REFUSALS: list[str] = list(_answer_contract["refusals"])
 QUESTION_LANGUAGE_CASES: list[dict] = _answer_contract["questionLanguage"]
 EXCERPTS_AS_TEXT_CASES: list[dict] = _answer_contract["excerptsAsText"]
+DISTINCT_PIECES_CASES: list[dict] = _answer_contract["distinctPieces"]
 
 
 # What the tool-choice eval agrees with the app on: what /mcp tells a model,

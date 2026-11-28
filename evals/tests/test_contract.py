@@ -9,6 +9,7 @@ from search_evals.contract import (
     CHUNK_CASES,
     CHUNK_OVERLAP,
     CHUNK_SIZE,
+    DISTINCT_PIECES_CASES,
     PIECE_INPUT_CASES,
     EMBEDDING_DIMENSIONS,
     EMBEDDING_INPUT_CASES,
@@ -16,6 +17,7 @@ from search_evals.contract import (
     EXCERPTS_AS_TEXT_CASES,
     EXCERPTS_PER_QUESTION,
     MAX_ANSWER_TOKENS,
+    PIECES_SEARCHED,
     QUESTION_LANGUAGE_CASES,
     REFUSALS,
     SEARCH_FLOORS,
@@ -24,7 +26,7 @@ from search_evals.contract import (
     embedding_input,
     search_floor,
 )
-from search_evals.prompt import Excerpt, excerpts_as_text, question_language
+from search_evals.prompt import Excerpt, distinct_pieces, excerpts_as_text, question_language
 from search_evals.retrieval import SIZES, overlap_for, piece_input
 
 
@@ -83,3 +85,13 @@ def test_a_question_is_read_as_the_app_reads_it(case: dict) -> None:
 def test_the_message_is_the_one_the_app_sends(case: dict) -> None:
     excerpts = [Excerpt(n=e["n"], file_name=e["fileName"], content=e["content"]) for e in case["excerpts"]]
     assert excerpts_as_text(excerpts, case["question"]) == case["text"]
+
+
+@pytest.mark.parametrize("case", DISTINCT_PIECES_CASES, ids=lambda case: case["name"])
+def test_repeated_pieces_are_dropped_as_the_app_drops_them(case: dict) -> None:
+    # The same cases libs/server/src/answer.test.ts runs against distinctPieces.
+    assert distinct_pieces(case["pieces"], case["limit"], lambda p: p["content"]) == case["kept"]
+
+
+def test_twice_the_pieces_read_are_searched_for_the_repeats() -> None:
+    assert (PIECES_SEARCHED, EXCERPTS_PER_QUESTION) == (16, 8)
