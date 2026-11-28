@@ -334,10 +334,11 @@ their file, so the first thing tried was one rule more in the instruction:
 of one document. When files say different things, give each with the name of
 its file. A file that says something else does not make the answer missing."
 All 84 questions asked again with it: 66 of 73 right, as before, with the
-years in Russian now right and the days of holiday wrong. A difference of one
-or two questions is within what asking again changes, so the five questions
-whose answer moved were each asked three times more, with the old
-instruction, the new one, and the new one without its last sentence:
+years in Russian now right, and the days of holiday and the sister's gym
+wrong. A difference of one or two questions is within what asking again
+changes, so those three, and the two other questions about another file's
+figures that were wrong both times, were each asked three times more, with
+the old instruction, the new one, and the new one without its last sentence:
 
 | | old | new | new, without the last sentence |
 | --- | ---: | ---: | ---: |
