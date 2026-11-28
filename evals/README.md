@@ -360,6 +360,19 @@ whatever the instruction. And a fix for the years has to come from somewhere
 other than the words of the instruction; 45 more answers cost about 1,800
 neurons, and the whole run about 3,500.
 
+**Twelve pieces, not asked for** (2026-11-28). Reading 12 pieces instead of 8
+read every quote of every question, so it was next. Before paying for the
+answers, what the four extra pieces would hold was counted on the cached
+vectors, at no cost. They complete two questions of 84: the old CV's years,
+and the newest job. For 77 of the 84 questions, three or four of them hold
+figures from files the question is not about, which is what turned the
+Brightfield answer into a refusal; every question would read half as much
+text again, in production too. Taking the extra pieces only from files
+already among the first eight completes one question, costs 40% more text,
+and still gives 49 questions three such pieces. A gain of one or two
+questions is less than asking again changes, so the answers were not asked:
+the eight stay.
+
 ## Choosing a tool
 
 An assistant reaches the files through `/mcp` ([decision 0020](../docs/decisions/0020-agents-read-the-files-through-mcp.md)),
