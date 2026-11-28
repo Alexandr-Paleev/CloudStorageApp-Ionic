@@ -191,6 +191,45 @@ describe('pdfText', () => {
     expect(second).toBe(first);
   });
 
+  /* On main the first empty answer was a skip with its reason; a second try
+     that fails must not turn it into a failed file. */
+  it.each([
+    ['fails on the copy', { ok: true, json: async () => ({ success: false, errors: [] }) }],
+    ['answers 500', { ok: false, status: 500, text: async () => 'oops' }],
+  ])('keeps the first empty answer when the second try %s', async (_, second) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, result: [{ format: 'markdown', data: EMPTY }] }),
+      })
+      .mockResolvedValueOnce(second);
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await pdfText(TAGGED, 'cv.pdf')).toBe('');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the first empty answer when the timeout runs out on the second try', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, result: [{ format: 'markdown', data: EMPTY }] }),
+      })
+      .mockRejectedValueOnce(new DOMException('The operation timed out.', 'TimeoutError'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await pdfText(TAGGED, 'cv.pdf')).toBe('');
+  });
+
+  it('still fails when the first try fails, and asks nothing more', async () => {
+    const fetchMock = answers({ errors: [{ message: 'Authentication error' }] }, false);
+
+    await expect(pdfText(TAGGED, 'cv.pdf')).rejects.toThrow(/answered 403/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('asks once when the PDF has no structure tree, and gives nothing', async () => {
     const fetchMock = answers({ success: true, result: [{ format: 'markdown', data: EMPTY }] });
 

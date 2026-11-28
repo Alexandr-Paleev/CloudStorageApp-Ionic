@@ -95,7 +95,11 @@ export async function pdfText(bytes: Buffer, name: string): Promise<string> {
   const text = await convert(bytes, name, token, account, signal);
   if (text) return text;
   const untagged = withoutTags(bytes);
-  return untagged ? convert(untagged, name, token, account, signal) : text;
+  if (!untagged) return text;
+  /* The second try can only add. The first was answered, and a copy the
+     converter fails on, or a timeout the first try used up, leaves the file
+     with the answer it had: no text, a skip with its reason, not a failure. */
+  return convert(untagged, name, token, account, signal).catch(() => text);
 }
 
 async function convert(
