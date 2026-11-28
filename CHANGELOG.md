@@ -19,6 +19,12 @@ reasoning behind the larger decisions lives in
   vectors with a copy of a CV, the questions about it whose every quote was
   read went from 6 of 8 down to 5 with the copy, and back to 6 with this. An
   account in production keeps one picture three times; it is read once now.
+- **A CV exported from Canva can be indexed.** Four PDFs in production were
+  refused as scans with no text, and each has a text layer: the converter
+  that reads a PDF's text for the free path gave nothing back for a tagged
+  PDF whose structure tree does not lead to the text. Such a PDF is now read
+  a second time with its tree hidden, in the copy sent to be read, and all
+  four came back with their text. The stored file is not changed.
 
 ### Added
 
