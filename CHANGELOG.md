@@ -10,6 +10,8 @@ reasoning behind the larger decisions lives in
 
 ## [Unreleased]
 
+## [4.18.1] — 2026-11-28
+
 ### Fixed
 
 - **A copy of a file no longer takes the places of other pieces.** A question
@@ -24,7 +26,8 @@ reasoning behind the larger decisions lives in
   that reads a PDF's text for the free path gave nothing back for a tagged
   PDF whose structure tree does not lead to the text. Such a PDF is now read
   a second time with its tree hidden, in the copy sent to be read, and all
-  four came back with their text. The stored file is not changed.
+  four came back with their text. The stored file is not changed. In
+  production, "Try these again" indexed the four, with 9 or 10 pieces each.
 
 ### Added
 
@@ -37,7 +40,13 @@ reasoning behind the larger decisions lives in
   Russian, two figures for one question read to the model as no answer. The
   same happened to one earlier question: with the dates of the CVs' jobs read
   beside it, the offer letter's start date was answered as not in the files.
-  What fixes these is measured next, against the same questions.
+  Two fixes were measured against these questions and not kept
+  (`evals/README.md`). A rule in the answer's instruction to say which file
+  says what fixed nothing, and turned a right refusal wrong. Twelve pieces
+  instead of eight were counted on the cached vectors first: they would
+  complete one or two questions of 84, which is less than asking again
+  changes, at half as much text again. So the two versions of a CV are still
+  mixed.
 
 ## [4.18.0] — 2026-11-27
 
@@ -3259,7 +3268,8 @@ First stable release: email and Google sign-in, file upload with preview,
 folders, rename and delete, four storage providers with automatic routing, a
 500 MB free tier, and an installable PWA with offline support.
 
-[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.18.0...HEAD
+[unreleased]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.18.1...HEAD
+[4.18.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.18.0...v4.18.1
 [4.18.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.1...v4.18.0
 [4.17.1]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.17.0...v4.17.1
 [4.17.0]: https://github.com/Alexandr-Paleev/CloudStorageApp-Ionic/compare/v4.16.0...v4.17.0
