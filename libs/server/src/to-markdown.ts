@@ -14,6 +14,14 @@ import { cloudflareAccountId } from './cloudflare-ai';
  * A scan, a PDF that is a picture of a page, has no text layer, and it is not
  * documented to read one: its text comes back empty.
  *
+ * So does a tagged PDF whose structure tree does not lead to its text, though
+ * the text is there: four CVs on production, three of them exported from
+ * Canva (2026-11-28). The same bytes with the tree's name changed came
+ * back whole, 3,262 to 3,663 characters each, and with nothing changed came
+ * back empty. Such a PDF is asked once more without its tree (`withoutTags`).
+ * Only on an empty answer: a tree that works shapes the text better, one
+ * Canva CV read 2,544 characters with its tree and 2,321 without.
+ *
  * What comes back is Markdown about the file as well as the file: a heading
  * with its name, a section of metadata unless asked not to send it, and a
  * heading for every page. `readableText` keeps the pages and turns each page
@@ -43,12 +51,36 @@ export function readableText(markdown: string): string {
   return text.replace(PAGE_HEADING, '\n').trim();
 }
 
+const TREE = Buffer.from('/StructTreeRoot', 'latin1');
+/** As long as the name it replaces, so no offset in the file moves. */
+const NO_TREE = Buffer.from('/StructTreeNone', 'latin1');
+
+/**
+ * A copy of a PDF with no structure tree a reader can find, or null when the
+ * bytes name none.
+ *
+ * Every `/StructTreeRoot` is renamed, the catalog's key and the tree's type
+ * alike; a name of the same length keeps the cross-reference table true. A
+ * catalog inside a compressed object stream is not seen, and gets no second
+ * try. Only the copy sent to be read changes; the stored file does not.
+ */
+export function withoutTags(bytes: Buffer): Buffer | null {
+  let at = bytes.indexOf(TREE);
+  if (at < 0) return null;
+  const copy = Buffer.from(bytes);
+  while (at >= 0) {
+    NO_TREE.copy(copy, at);
+    at = copy.indexOf(TREE, at + TREE.length);
+  }
+  return copy;
+}
+
 /**
  * The text of a PDF's pages, or an empty string when it has none to give.
  *
  * Throws when the deployment has no Cloudflare account to ask
- * (`ProviderNotConfigured`), and when the request fails, with the start of
- * what Cloudflare said.
+ * (`ProviderNotConfigured`), and when a request fails, with the start of
+ * what Cloudflare said. Both tries share one timeout.
  */
 export async function pdfText(bytes: Buffer, name: string): Promise<string> {
   const token = process.env.CLOUDFLARE_AI_TOKEN;
@@ -59,6 +91,20 @@ export async function pdfText(bytes: Buffer, name: string): Promise<string> {
     );
   }
 
+  const signal = AbortSignal.timeout(TIMEOUT_MS);
+  const text = await convert(bytes, name, token, account, signal);
+  if (text) return text;
+  const untagged = withoutTags(bytes);
+  return untagged ? convert(untagged, name, token, account, signal) : text;
+}
+
+async function convert(
+  bytes: Buffer,
+  name: string,
+  token: string,
+  account: string,
+  signal: AbortSignal
+): Promise<string> {
   const form = new FormData();
   /* The name is only a label in the answer; ".pdf" is what tells the
      converter what it was given, whatever the file was called. */
@@ -75,7 +121,7 @@ export async function pdfText(bytes: Buffer, name: string): Promise<string> {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal,
     }
   );
 

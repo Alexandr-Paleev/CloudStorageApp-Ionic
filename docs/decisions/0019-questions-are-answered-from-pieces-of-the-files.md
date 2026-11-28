@@ -215,6 +215,23 @@ What follows, decided here and amended as each part ships:
   half as much text again. It is not taken here: more pieces holding other
   figures turned two answers into refusals (`evals/README.md`, "Two versions
   of one CV"), so it is measured on the answers first.
+- **A tagged PDF is read without its tags when they hide its text
+  (2026-11-28).** The four CVs that account could not index were refused as
+  having no text, "a scanned page is a picture of text", and none of them is
+  a scan: pypdf reads 3,332 to 3,723 characters from each. Three are exports
+  from Canva, all four are tagged PDFs, and `toMarkdown` gave each a title
+  and no page. Two that are indexed, one of them from Canva and tagged too,
+  came back whole. Taken apart one change at a time, the structure tree is
+  what does it: the same bytes with only `/StructTreeRoot` renamed came back
+  with 3,262 to 3,663 characters, and written again with nothing changed
+  came back empty. The other suspects did not hold: text put in a form
+  XObject, a nested one or one with a transparency group was read in a test
+  file, and the CVs saved or drawn again by macOS stayed empty. So `pdfText` asks once more, when the text is empty
+  and the bytes name a tree, with the name changed in a copy, at the same
+  length, so no offset moves; both tries share the 30 seconds. A tree that
+  works is kept: a tagged Canva CV that reads gave 2,544 characters with it
+  and 2,321 without. A catalog inside a compressed object stream is not seen
+  by the rename, and such a file still gets the scan's reason.
 
 ## Alternatives
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderNotConfigured } from '../../core/src/ai';
-import { pdfText, readableText } from './to-markdown';
+import { pdfText, readableText, withoutTags } from './to-markdown';
 
 /* What toMarkdown answered for a PDF printed from a Russian lease, cut short:
    the probe of 2026-11-21 (ADR 0019), with the metadata section it sends
@@ -21,6 +21,37 @@ const WITH_METADATA = [
   '### Page 2',
   'Залог: 1900 евро.',
 ].join('\n');
+
+/* What toMarkdown answered for each of the four CVs: a title and no page. */
+const EMPTY = '# cv.pdf\n## Contents\n';
+
+/* The shape of a Canva export's catalog and tree, cut to what matters. */
+const TAGGED = Buffer.from(
+  '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> ' +
+    '/StructTreeRoot 9 0 R >>\nendobj\n9 0 obj\n<< /Type /StructTreeRoot /K [] >>\nendobj\n',
+  'latin1'
+);
+
+describe('withoutTags', () => {
+  it('renames every structure tree, and nothing moves', () => {
+    const copy = withoutTags(TAGGED)!;
+    expect(copy.length).toBe(TAGGED.length);
+    expect(copy.includes('/StructTreeRoot')).toBe(false);
+    expect(copy.toString('latin1')).toBe(
+      TAGGED.toString('latin1').split('/StructTreeRoot').join('/StructTreeNone')
+    );
+  });
+
+  it('leaves the bytes it was given alone', () => {
+    const before = Buffer.from(TAGGED);
+    withoutTags(TAGGED);
+    expect(TAGGED).toEqual(before);
+  });
+
+  it('has nothing to give for a PDF with no tree', () => {
+    expect(withoutTags(Buffer.from('%PDF-1.4\n<< /Type /Catalog >>'))).toBeNull();
+  });
+});
 
 function answers(body: unknown, ok = true) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -122,6 +153,66 @@ describe('pdfText', () => {
   it('fails on a file it could not read', async () => {
     answers({ success: true, result: [{ format: 'error', error: 'corrupt file' }] });
     await expect(pdfText(Buffer.from('%PDF'), 'a.pdf')).rejects.toThrow(/corrupt file/);
+  });
+
+  /* Four CVs on production came back empty with their structure tree and
+     whole without it (2026-11-28, ADR 0019). */
+  it('asks once more without the structure tree when a tagged PDF gives no text', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, result: [{ format: 'markdown', data: EMPTY }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          result: [{ format: 'markdown', data: WITH_METADATA }],
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const text = await pdfText(TAGGED, 'cv.pdf');
+
+    expect(text.startsWith('ДОГОВОР АРЕНДЫ')).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const sent = await Promise.all(
+      fetchMock.mock.calls.map(async ([, init]) =>
+        Buffer.from(
+          await (((init as RequestInit).body as FormData).get('files') as File).arrayBuffer()
+        )
+      )
+    );
+    expect(sent[0]).toEqual(TAGGED);
+    expect(sent[1]).toEqual(withoutTags(TAGGED));
+    // One timeout for both tries, so two of them cannot outlast the function.
+    const [first, second] = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).signal);
+    expect(second).toBe(first);
+  });
+
+  it('asks once when the PDF has no structure tree, and gives nothing', async () => {
+    const fetchMock = answers({ success: true, result: [{ format: 'markdown', data: EMPTY }] });
+
+    expect(await pdfText(Buffer.from('%PDF-1.4 a scan'), 'scan.pdf')).toBe('');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks once when the tagged PDF gives its text', async () => {
+    const fetchMock = answers({
+      success: true,
+      result: [{ format: 'markdown', data: WITH_METADATA }],
+    });
+
+    await pdfText(TAGGED, 'cv.pdf');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives nothing when neither try finds text', async () => {
+    const fetchMock = answers({ success: true, result: [{ format: 'markdown', data: EMPTY }] });
+
+    expect(await pdfText(TAGGED, 'scan.pdf')).toBe('');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('says it is not configured, and asks nobody, without an account', async () => {
